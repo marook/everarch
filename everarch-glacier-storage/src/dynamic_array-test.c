@@ -16,23 +16,37 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <picoquic.h>
-#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
 
-#include "configuration.h"
+#include "assert.h"
+#include "dynamic_array.h"
+#include "test.h"
+
+int is_ignored(int c);
+
+void test_rtrim_empty_array(){
+    dynamic_array *a = alloc_dynamic_array(1);
+    rtrim_dynamic_array(a, is_ignored);
+    assert_size_eq(a->size_used, 0);
+    free(a);
+}
+
+void test_rtrim_end_of_array(){
+    dynamic_array *a = alloc_dynamic_array(1024);
+    strcpy((char*)a->data, "test   ");
+    a->size_used = strlen((char*)a->data) + 1;
+    rtrim_dynamic_array(a, is_ignored);
+    assert_size_eq(a->size_used, strlen("test"));
+    free(a);
+}
+
+int is_ignored(int c){
+    return c == 0 || isspace(c);
+}
 
 int main(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
-    if(!config){
-        return 1;
-    }
-    const char *config_paths[] = {
-        "~/.config/everarch/glacier-storage.json",
-        "glacier-storage.json",
-    };
-    if(load_evr_glacier_storage_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*))){
-        return 1;
-    }
-    // TODO start server
+    run_test(test_rtrim_empty_array);
+    run_test(test_rtrim_end_of_array);
     return 0;
 }

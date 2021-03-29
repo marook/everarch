@@ -16,23 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <picoquic.h>
+#ifndef __test_h__
+#define __test_h__
+
 #include <stdio.h>
 
-#include "configuration.h"
+#define run_test(test) {printf("Running %s…\n", #test); test();}
 
-int main(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
-    if(!config){
-        return 1;
-    }
-    const char *config_paths[] = {
-        "~/.config/everarch/glacier-storage.json",
-        "glacier-storage.json",
-    };
-    if(load_evr_glacier_storage_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*))){
-        return 1;
-    }
-    // TODO start server
-    return 0;
-}
+#endif

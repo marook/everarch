@@ -1,0 +1,5 @@
+{
+    "cert_path": "path/to/my/cert",
+    "key_path": "path/to/my/key",
+    "cert_root_path": "path/to/my/root/cert"
+}

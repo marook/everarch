@@ -16,23 +16,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <picoquic.h>
-#include <stdio.h>
+#ifndef __files_h__
+#define __files_h__
 
-#include "configuration.h"
+#include "dynamic_array.h"
 
-int main(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
-    if(!config){
-        return 1;
-    }
-    const char *config_paths[] = {
-        "~/.config/everarch/glacier-storage.json",
-        "glacier-storage.json",
-    };
-    if(load_evr_glacier_storage_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*))){
-        return 1;
-    }
-    // TODO start server
-    return 0;
-}
+/**
+ * read_file reads the file content at a given path.
+ *
+ * *buffer must point to an existing buffer. *buffer may be null if
+ * read_file returns with != 0.
+ */
+int read_file(dynamic_array **buffer, const char *path, size_t max_size);
+
+/**
+ * read_file_str reads a file just like read_file and \0 terminates
+ * the string.
+ */
+int read_file_str(dynamic_array **buffer, const char *path, size_t max_size);
+
+#endif

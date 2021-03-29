@@ -1,0 +1,46 @@
+/*
+ * everarch - the hopefully ever lasting archive
+ * Copyright (C) 2021  Markus Peröbner
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include "assert.h"
+#include "dynamic_array.h"
+#include "files.h"
+#include "test.h"
+
+void test_read_empty_json_with_big_buffer(){
+    dynamic_array *buffer = alloc_dynamic_array(1024);
+    assert_not_null(buffer);
+    assert_zero(read_file_str(&buffer, "etc/configuration/empty.json", 1024));
+    assert_str_eq((char*)buffer->data, "{}\n");
+    assert_size_eq(buffer->size_used, 4);
+    free(buffer);
+}
+
+void test_read_empty_json_with_small_buffer(){
+    dynamic_array *buffer = alloc_dynamic_array(1);
+    assert_not_null(buffer);
+    assert_zero(read_file_str(&buffer, "etc/configuration/empty.json", 1024));
+    assert_str_eq((char*)buffer->data, "{}\n");
+    assert_size_eq(buffer->size_used, 4);
+    free(buffer);
+}
+
+int main(){
+    run_test(test_read_empty_json_with_big_buffer);
+    run_test(test_read_empty_json_with_small_buffer);
+    return 0;
+}

@@ -1,6 +1,27 @@
 everarch - the hopefully ever lasting archive
 
-1) License
+1) Build
+2) Tests
+3) License
+
+
+------------------------------------------------------------------------
+Build
+
+On linux you can execute the following within the everarch directory
+to build the application.
+
+$ cmake .
+$ make
+
+
+------------------------------------------------------------------------
+Tests
+
+Build the application and then exectute the following to run the whole
+test suite:
+
+$ ctest
 
 
 ------------------------------------------------------------------------

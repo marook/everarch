@@ -16,23 +16,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <picoquic.h>
-#include <stdio.h>
+#ifndef __assert_h__
+#define __assert_h__
 
-#include "configuration.h"
+#include <stdlib.h>
 
-int main(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
-    if(!config){
-        return 1;
-    }
-    const char *config_paths[] = {
-        "~/.config/everarch/glacier-storage.json",
-        "glacier-storage.json",
-    };
-    if(load_evr_glacier_storage_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*))){
-        return 1;
-    }
-    // TODO start server
-    return 0;
-}
+void fail(const char *format, ...);
+
+void assert_zero(int i);
+void assert_truthy(int i);
+void assert_null(const void *p);
+void assert_not_null(const void *p);
+void assert_not_null_msg(const void *p, const char *format, ...);
+void assert_str_eq(const char *actual, const char *expected);
+void assert_int_eq(int actual, int expected);
+void assert_size_eq(size_t actual, size_t expected);
+
+#endif
