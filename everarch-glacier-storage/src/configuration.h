@@ -30,6 +30,19 @@ typedef struct {
     char *cert_path;
     char *key_path;
     char *cert_root_path;
+
+    /**
+     * max_bucket_size is the maximum size of one bucket in bytes.
+     */
+    size_t max_bucket_size;
+
+    /**
+     * bucket_dir_path is a template string which produces the
+     * path for a bucket with a given index.
+     *
+     * %d is used to place the bucket index within the template.
+     */
+    char *bucket_dir_path;
 } evr_glacier_storage_configuration;
 
 evr_glacier_storage_configuration *create_evr_glacier_storage_configuration();

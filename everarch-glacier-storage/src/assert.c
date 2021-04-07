@@ -48,6 +48,18 @@ void assert_zero(int i){
     }
 }
 
+void assert_equal(int actual, int expected){
+    if(actual != expected){
+        fail("Expected %d to be %d", actual, expected);
+    }
+}
+
+void assert_greater_equal(int actual, int min){
+    if(actual < min){
+        fail("Expected %d to be >= %d\n", actual, min);
+    }
+}
+
 void assert_truthy(int i){
     if(!i){
         fail("Expected %d to be truthy\n", i);

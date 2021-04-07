@@ -57,3 +57,16 @@ target_link_libraries(configuration-test
   ${CJSON_LIBRARIES}
   )
 add_test(configuration-test ./configuration-test)
+
+add_executable(glacier-test
+  src/assert.c
+  src/configuration.c
+  src/glacier.c
+  src/glacier-test.c
+  src/dynamic_array.c
+  src/files.c
+  )
+target_link_libraries(glacier-test
+  ${CJSON_LIBRARIES}
+  )
+add_test(glacier-test ./glacier-test)

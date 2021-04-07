@@ -21,7 +21,9 @@ Tests
 Build the application and then exectute the following to run the whole
 test suite:
 
-$ ctest
+$ ./test.sh
+
+Test execution relies on valgrind ( https://www.valgrind.org ).
 
 
 ------------------------------------------------------------------------

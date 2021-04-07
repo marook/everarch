@@ -21,6 +21,26 @@
 
 #include "configuration.h"
 
+/*
+picoquic_quic_t *evr_bind_quic_server(const evr_glacier_storage_configuration *config){
+    picoquic_quic_config_t config;
+    picoquic_config_init(&config);
+
+    
+    picoquic_quic_t *ctx =
+        picoquic_create(32, config->cert_path, config->key_path, NULL, PICOQUIC_SAMPLE_ALPN, sample_server_callback, &default_context, NULL, NULL, NULL, current_time, NULL, NULL, NULL, 0);
+    if(!ctx){
+        fprintf(stderr, "Could not bind quic server.\n");
+        return NULL;
+    }
+    picoquic_set_cookie_mode(quic, 2);
+    picoquic_set_default_congestion_algorithm(quic, picoquic_bbr_algorithm);
+    picoquic_set_qlog(quic, qlog_dir);
+    picoquic_set_log_level(quic, 1);
+    picoquic_set_key_log_file_from_env(quic);
+}
+*/
+
 int main(){
     evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
     if(!config){

@@ -41,8 +41,11 @@ evr_glacier_storage_configuration *create_evr_glacier_storage_configuration(){
     config->cert_path = NULL;
     config->key_path = NULL;
     config->cert_root_path = NULL;
+    config->max_bucket_size = 1024*1024*1024;
+    config->bucket_dir_path = NULL;
     replace_string(config->cert_path, "~/.config/everarch/cert.pem", fail);
     replace_string(config->key_path, "~/.config/everarch/key.pem", fail);
+    replace_string(config->bucket_dir_path, "~/var/everarch/glacier", fail);
     return config;
  fail:
     free_evr_glacier_storage_configuration(config);
@@ -53,6 +56,7 @@ void free_evr_glacier_storage_configuration(evr_glacier_storage_configuration *c
     free_pointer(config->cert_path);
     free_pointer(config->key_path);
     free_pointer(config->cert_root_path);
+    free_pointer(config->bucket_dir_path);
     free(config);
 }
 
@@ -94,6 +98,8 @@ int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configurati
     replace_string(config->cert_path, get_object_string_property(json, "cert_path"), end_json);
     replace_string(config->key_path, get_object_string_property(json, "key_path"), end_json);
     replace_string(config->cert_root_path, get_object_string_property(json, "cert_root_path"), end_json);
+    // TODO replace max_bucket_size
+    replace_string(config->bucket_dir_path, get_object_string_property(json, "bucket_dir_path"), end_json);
     ret = 0;
  end_json:
     cJSON_Delete(json);

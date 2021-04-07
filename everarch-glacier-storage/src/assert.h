@@ -24,6 +24,8 @@
 void fail(const char *format, ...);
 
 void assert_zero(int i);
+void assert_equal(int actual, int expected);
+void assert_greater_equal(int actual, int min);
 void assert_truthy(int i);
 void assert_null(const void *p);
 void assert_not_null(const void *p);

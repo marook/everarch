@@ -1,0 +1,18 @@
+* add formatter and parser for human readable keys                    :hrkey:
+keys should have a human readable form like sha224-deadbeef. there
+should be a to-string formatter and a from-string parser.
+
+the formatter and parser should be in a keys.h file which can easily
+be moved into a central place if multiple modules will need it.
+* align chunk size with RLIMIT_FSIZE
+see [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
+regarding to it. also the chunk size should not grow over 1MB.
+* create bucket directory if not existing :bdircre:
+* repair out of sync bucket end pointer and file end offset :beprep:
+the whole bucket should be scanned with validation of each key and
+blob. if the file probably ends with one corrupt blob it should be
+discarded.
+
+it's important to be sensible about the discarded data at the end of
+the file. maybe there should be an 'autorepair' flag in the
+configuration.
