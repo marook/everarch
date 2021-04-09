@@ -37,22 +37,22 @@ const char *glacier_dir_index_db_path = "/index.db";
 
 void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_size, const char *bucket_dir_path, const char* path_suffix);
 
-int unlink_lock_file(evr_glacier_ctx *ctx);
+int unlink_lock_file(evr_glacier_write_ctx *ctx);
 
-int evr_create_index_db(evr_glacier_ctx *ctx);
+int evr_create_index_db(evr_glacier_write_ctx *ctx);
 
-int evr_prepare_stmt(evr_glacier_ctx *ctx, const char *sql, sqlite3_stmt **stmt);
+int evr_prepare_stmt(evr_glacier_write_ctx *ctx, const char *sql, sqlite3_stmt **stmt);
 
-int move_to_last_bucket(evr_glacier_ctx *ctx);
+int move_to_last_bucket(evr_glacier_write_ctx *ctx);
 
-int open_current_bucket(evr_glacier_ctx *ctx);
+int open_current_bucket(evr_glacier_write_ctx *ctx);
 
-int create_next_bucket(evr_glacier_ctx *ctx);
+int create_next_bucket(evr_glacier_write_ctx *ctx);
 
-int close_current_bucket(evr_glacier_ctx *ctx);
+int close_current_bucket(evr_glacier_write_ctx *ctx);
 
-evr_glacier_ctx *evr_create_glacier_ctx(evr_glacier_storage_configuration *config){
-    evr_glacier_ctx *ctx = (evr_glacier_ctx*)malloc(sizeof(evr_glacier_ctx));
+evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configuration *config){
+    evr_glacier_write_ctx *ctx = (evr_glacier_write_ctx*)malloc(sizeof(evr_glacier_write_ctx));
     if(!ctx){
         goto fail;
     }
@@ -157,7 +157,7 @@ evr_glacier_ctx *evr_create_glacier_ctx(evr_glacier_storage_configuration *confi
     return NULL;
 }
 
-int evr_create_index_db(evr_glacier_ctx *ctx){
+int evr_create_index_db(evr_glacier_write_ctx *ctx){
     // the following structure_sql creates the structure of the sqlite
     // index db used to quickly lookup blob positions. the db
     // containst the following tables and columns:
@@ -180,7 +180,7 @@ int evr_create_index_db(evr_glacier_ctx *ctx){
     return 0;
 }
 
-int evr_prepare_stmt(evr_glacier_ctx *ctx, const char *sql, sqlite3_stmt **stmt){
+int evr_prepare_stmt(evr_glacier_write_ctx *ctx, const char *sql, sqlite3_stmt **stmt){
     if(sqlite3_prepare_v2(ctx->db, sql, -1, stmt, NULL) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
         fprintf(stderr, "Failed to prepare statement \"%s\": %s\n", sql, sqlite_error_msg);
@@ -189,7 +189,7 @@ int evr_prepare_stmt(evr_glacier_ctx *ctx, const char *sql, sqlite3_stmt **stmt)
     return 0;
 }
 
-int move_to_last_bucket(evr_glacier_ctx *ctx){
+int move_to_last_bucket(evr_glacier_write_ctx *ctx){
     int ret = 1;
     evr_bucket_index_t max_bucket_index = 0;
     DIR *dir = opendir(ctx->config->bucket_dir_path);
@@ -227,7 +227,7 @@ int move_to_last_bucket(evr_glacier_ctx *ctx){
     return ret;
 }
 
-int open_current_bucket(evr_glacier_ctx *ctx) {
+int open_current_bucket(evr_glacier_write_ctx *ctx) {
     char *bucket_path;
     {
         // this block builds bucket_path
@@ -250,7 +250,7 @@ int open_current_bucket(evr_glacier_ctx *ctx) {
     return 0;
 }
 
-int evr_free_glacier_ctx(evr_glacier_ctx *ctx){
+int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx){
     int ret = 1;
     if(close_current_bucket(ctx)){
         goto end;
@@ -276,7 +276,7 @@ int evr_free_glacier_ctx(evr_glacier_ctx *ctx){
     return ret;
 }
 
-int unlink_lock_file(evr_glacier_ctx *ctx){
+int unlink_lock_file(evr_glacier_write_ctx *ctx){
     size_t bucket_dir_path_size = strlen(ctx->config->bucket_dir_path) + 10;
     char *lock_file_path = alloca(bucket_dir_path_size);
     build_glacier_file_path(lock_file_path, bucket_dir_path_size, ctx->config->bucket_dir_path, glacier_dir_lock_file_path);
@@ -303,7 +303,7 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
     memcpy(p, path_suffix, path_suffix_len+1);
 }
 
-int evr_glacier_bucket_append(evr_glacier_ctx *ctx, const evr_writing_blob_t *blob) {
+int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob) {
     int ret = 1;
     size_t key_disk_size = sizeof(evr_hash_algorithm_t) + sizeof(evr_key_len_t) + blob->key.key_len;
     size_t blob_disk_size = sizeof(evr_blob_size_t) + blob->size;
@@ -402,7 +402,7 @@ int evr_glacier_bucket_append(evr_glacier_ctx *ctx, const evr_writing_blob_t *bl
     return ret;
 }
 
-int create_next_bucket(evr_glacier_ctx *ctx){
+int create_next_bucket(evr_glacier_write_ctx *ctx){
     if(close_current_bucket(ctx)){
         return 1;
     }
@@ -419,7 +419,7 @@ int create_next_bucket(evr_glacier_ctx *ctx){
     return 0;
 }
 
-int close_current_bucket(evr_glacier_ctx *ctx){
+int close_current_bucket(evr_glacier_write_ctx *ctx){
     if(ctx->current_bucket_f != -1){
         if(close(ctx->current_bucket_f) == -1){
             return 1;

@@ -26,7 +26,7 @@ const char *bucket_dir_template = "/tmp/evr-glacier-test-XXXXXX";
 
 evr_glacier_storage_configuration* clone_config(evr_glacier_storage_configuration *config);
 char* clone_string(const char* s);
-void free_glacier_ctx(evr_glacier_ctx *ctx);
+void free_glacier_ctx(evr_glacier_write_ctx *ctx);
 
 char *new_bucket_dir_path(){
     size_t dir_len = strlen(bucket_dir_template);
@@ -53,7 +53,7 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
     for(int i = 0; i < 2; i++){
         printf("Round %d…\n", i);
         evr_glacier_storage_configuration *round_config = clone_config(config);
-        evr_glacier_ctx *ctx = evr_create_glacier_ctx(round_config);
+        evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
         assert_not_null(ctx);
         assert_equal(ctx->current_bucket_index, 1);
         assert_greater_equal(ctx->current_bucket_f, 0);
@@ -65,16 +65,16 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
 
 void test_evr_glacier_create_context_twice_fails(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
-    evr_glacier_ctx *ctx1 = evr_create_glacier_ctx(config);
+    evr_glacier_write_ctx *ctx1 = evr_create_glacier_write_ctx(config);
     assert_not_null(ctx1);
-    evr_glacier_ctx *ctx2 = evr_create_glacier_ctx(config);
+    evr_glacier_write_ctx *ctx2 = evr_create_glacier_write_ctx(config);
     assert_null(ctx2);
     free_glacier_ctx(ctx1);
 }
 
 void test_evr_glacier_write_blob(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
-    evr_glacier_ctx *ctx = evr_create_glacier_ctx(config);
+    evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
     assert_not_null(ctx);
     {
         // write a blob
@@ -97,7 +97,7 @@ void test_evr_glacier_write_blob(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
-        assert_zero(evr_glacier_bucket_append(ctx, wb));
+        assert_zero(evr_glacier_append_blob(ctx, wb));
         free(buffer);
         // TODO assert bucket position in index
         // assert_equal(bucket_pos.index, 1);
@@ -130,9 +130,9 @@ char* clone_string(const char* s){
     return c;
 }
 
-void free_glacier_ctx(evr_glacier_ctx *ctx){
+void free_glacier_ctx(evr_glacier_write_ctx *ctx){
     // TODO delete buckets dir
-    assert_zero(evr_free_glacier_ctx(ctx));
+    assert_zero(evr_free_glacier_write_ctx(ctx));
 }
 
 int main(){

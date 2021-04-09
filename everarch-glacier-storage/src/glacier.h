@@ -73,22 +73,22 @@ typedef struct {
     evr_bucket_pos_t current_bucket_pos;
     sqlite3 *db;
     sqlite3_stmt *insert_blob_stmt;
-} evr_glacier_ctx;
+} evr_glacier_write_ctx;
 
 /**
- * evr_create_glacier_ctx creates a evr_glacier_ctx.
+ * evr_create_glacier_write_ctx creates a evr_glacier_write_ctx.
  *
- * config's ownership is given to the returned evr_glacier_ctx on
+ * config's ownership is given to the returned evr_glacier_write_ctx on
  * successful execution.
  *
- * The returned context must be freed using evr_free_glacier_ctx.
+ * The returned context must be freed using evr_free_glacier_write_ctx.
  */
-evr_glacier_ctx *evr_create_glacier_ctx(evr_glacier_storage_configuration *config);
+evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configuration *config);
 
-int evr_free_glacier_ctx(evr_glacier_ctx *ctx);
+int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx);
 
 /**
- * evr_glacier_bucket_append appends the given blob at the current
+ * evr_glacier_append_blob appends the given blob at the current
  * bucket.
  *
  * A new current bucket is created if the blob does not fit into the
@@ -97,6 +97,6 @@ int evr_free_glacier_ctx(evr_glacier_ctx *ctx);
  * The blob's position in the appended bucket is written into the
  * index db.
  */
-int evr_glacier_bucket_append(evr_glacier_ctx *ctx, const evr_writing_blob_t *blob);
+int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob);
 
 #endif
