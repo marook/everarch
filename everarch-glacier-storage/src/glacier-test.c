@@ -72,7 +72,7 @@ void test_evr_glacier_create_context_twice_fails(){
     free_glacier_ctx(ctx1);
 }
 
-void test_evr_glacier_write_blob(){
+void test_evr_glacier_write_smal_blob(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
     assert_not_null(ctx);
@@ -108,6 +108,43 @@ void test_evr_glacier_write_blob(){
     free_glacier_ctx(ctx);
 }
 
+void test_evr_glacier_write_big_blob(){
+    evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
+    evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
+    assert_not_null(ctx);
+    {
+        // write a blob
+        void *buffer = malloc(256);
+        assert_not_null(buffer);
+        void *p = buffer;
+        evr_writing_blob_t *wb = (evr_writing_blob_t*)p;
+        wb->key.type = 0x22;
+        const char key[] = {0x11};
+        size_t key_len = sizeof(key);
+        wb->key.key_len = key_len;
+        p = (void*)(wb + 1);
+        wb->key.key = (uint8_t*)p;
+        memcpy(wb->key.key, key, key_len);
+        p = (void*)&(wb->key.key[key_len]);
+        wb->chunks = (uint8_t**)p;
+        p = (void*)(wb->chunks + 2);
+        wb->chunks[0] = malloc(evr_chunk_size);
+        assert_not_null(wb->chunks[0]);
+        memset(wb->chunks[0], 0x33, evr_chunk_size);
+        size_t chunk_1_len = evr_chunk_size / 2;
+        wb->chunks[1] = malloc(chunk_1_len);
+        assert_not_null(wb->chunks[1]);
+        memset(wb->chunks[1], 0x44, chunk_1_len);
+        wb->size = evr_chunk_size + chunk_1_len;
+        assert_zero(evr_glacier_append_blob(ctx, wb));
+        free(wb->chunks[0]);
+        free(wb->chunks[1]);
+        free(buffer);
+    }
+    assert_equal(ctx->current_bucket_index, 1);
+    free_glacier_ctx(ctx);
+}
+
 evr_glacier_storage_configuration* clone_config(evr_glacier_storage_configuration *config){
     evr_glacier_storage_configuration *clone = (evr_glacier_storage_configuration*)malloc(sizeof(evr_glacier_storage_configuration));
     assert_not_null(clone);
@@ -138,5 +175,6 @@ void free_glacier_ctx(evr_glacier_write_ctx *ctx){
 int main(){
     run_test(test_evr_glacier_open_same_empty_glacier_twice);
     run_test(test_evr_glacier_create_context_twice_fails);
-    run_test(test_evr_glacier_write_blob);
+    run_test(test_evr_glacier_write_smal_blob);
+    run_test(test_evr_glacier_write_big_blob);
 }

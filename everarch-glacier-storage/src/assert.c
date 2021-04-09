@@ -50,7 +50,7 @@ void assert_zero(int i){
 
 void assert_equal(int actual, int expected){
     if(actual != expected){
-        fail("Expected %d to be %d", actual, expected);
+        fail("Expected %d to be %d\n", actual, expected);
     }
 }
 
