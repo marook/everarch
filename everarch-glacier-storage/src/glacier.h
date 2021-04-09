@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __glacier_h__
-#define __glacier_h__
+#ifndef __evr_glacier_h__
+#define __evr_glacier_h__
 
 #include <endian.h>
 #include <stdint.h>
@@ -27,65 +27,65 @@
 
 #include "configuration.h"
 
-typedef uint8_t hash_algorithm_t;
+typedef uint8_t evr_hash_algorithm_t;
 
-extern const hash_algorithm_t evr_hash_algorithm_sha224;
+extern const evr_hash_algorithm_t evr_hash_algorithm_sha224;
 
-typedef uint8_t key_len_t;
+typedef uint8_t evr_key_len_t;
 
 typedef struct {
     /**
      * type indicates the kind of hashing algorithm used to produce key.
      */
-    hash_algorithm_t type;
+    evr_hash_algorithm_t type;
     
-    key_len_t key_len;
+    evr_key_len_t key_len;
     uint8_t *key;
-} blob_key_t;
+} evr_blob_key_t;
 
 /**
- * chunk_size is the size of one chunk within the written_blob struct
- * in bytes.
+ * evr_chunk_size is the size of one chunk within the
+ * evr_writing_blob_t struct in bytes.
  */
-extern const size_t chunk_size;
-extern const size_t max_blob_data_size;
-extern const size_t max_chunks_per_blob;
+extern const size_t evr_chunk_size;
+extern const size_t evr_max_blob_data_size;
+extern const size_t evr_max_chunks_per_blob;
 
-typedef uint32_t blob_size_t;
-#define blob_size_to_be htobe32
+typedef uint32_t evr_blob_size_t;
+#define evr_blob_size_to_be htobe32
 
 typedef struct {
-    blob_key_t key;
-    blob_size_t size;
+    evr_blob_key_t key;
+    evr_blob_size_t size;
     uint8_t **chunks;
-} written_blob;
+} evr_writing_blob_t;
 
-typedef uint32_t bucket_pos_t;
-#define bucket_pos_to_be htobe32
-#define be_to_bucket_pos be32toh
+typedef uint32_t evr_bucket_pos_t;
+#define evr_bucket_pos_to_be htobe32
+#define evr_be_to_bucket_pos be32toh
 
-typedef unsigned long bucket_index_t;
+typedef unsigned long evr_bucket_index_t;
 
 typedef struct {
     evr_glacier_storage_configuration *config;
-    bucket_index_t current_bucket_index;
+    evr_bucket_index_t current_bucket_index;
     int current_bucket_f;
-    bucket_pos_t current_bucket_pos;
+    evr_bucket_pos_t current_bucket_pos;
     sqlite3 *db;
     sqlite3_stmt *insert_blob_stmt;
 } evr_glacier_ctx;
 
 /**
- * create_evr_glacier_ctx creates a evr_glacier_ctx.
+ * evr_create_glacier_ctx creates a evr_glacier_ctx.
  *
  * config's ownership is given to the returned evr_glacier_ctx on
  * successful execution.
  *
- * The returned context must be freed using free_evr_glacier_ctx.
+ * The returned context must be freed using evr_free_glacier_ctx.
  */
-evr_glacier_ctx *create_evr_glacier_ctx(evr_glacier_storage_configuration *config);
+evr_glacier_ctx *evr_create_glacier_ctx(evr_glacier_storage_configuration *config);
 
-int free_evr_glacier_ctx(evr_glacier_ctx *ctx);
+int evr_free_glacier_ctx(evr_glacier_ctx *ctx);
 
 /**
  * evr_glacier_bucket_append appends the given blob at the current
@@ -97,6 +97,6 @@ int free_evr_glacier_ctx(evr_glacier_ctx *ctx);
  * The blob's position in the appended bucket is written into the
  * index db.
  */
-int evr_glacier_bucket_append(evr_glacier_ctx *ctx, const written_blob *blob);
+int evr_glacier_bucket_append(evr_glacier_ctx *ctx, const evr_writing_blob_t *blob);
 
 #endif
