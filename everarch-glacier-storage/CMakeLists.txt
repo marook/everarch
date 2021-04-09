@@ -15,7 +15,13 @@ find_package(PICOQUIC REQUIRED)
 # https://github.com/DaveGamble/cJSON
 find_package(cJSON REQUIRED)
 
-include_directories(${PICOQUIC_INCLUDE_DIRS} ${cJSON_INCLUDE_DIRS})
+find_package(SQLite3 REQUIRED)
+
+include_directories(
+  ${PICOQUIC_INCLUDE_DIRS}
+  ${cJSON_INCLUDE_DIRS}
+  ${SQLite3_INCLUDE_DIRS}
+  )
 
 add_executable(evr-glacier-storage
   src/configuration.c
@@ -68,5 +74,6 @@ add_executable(glacier-test
   )
 target_link_libraries(glacier-test
   ${CJSON_LIBRARIES}
+  ${SQLite3_LIBRARIES}
   )
 add_test(glacier-test ./glacier-test)

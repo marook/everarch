@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sqlite3.h>
 
 #include "configuration.h"
 
@@ -70,6 +71,8 @@ typedef struct {
     bucket_index_t current_bucket_index;
     int current_bucket_f;
     bucket_pos_t current_bucket_pos;
+    sqlite3 *db;
+    sqlite3_stmt *insert_blob_stmt;
 } evr_glacier_ctx;
 
 /**
@@ -77,25 +80,12 @@ typedef struct {
  *
  * config's ownership is given to the returned evr_glacier_ctx on
  * successful execution.
+ *
+ * The returned context must be freed using free_evr_glacier_ctx.
  */
 evr_glacier_ctx *create_evr_glacier_ctx(evr_glacier_storage_configuration *config);
 
 int free_evr_glacier_ctx(evr_glacier_ctx *ctx);
-
-/**
- * evr_bucket_pos references a position within a specific bucket.
- */
-typedef struct {
-    /**
-     * index is the bucket's index.
-     */
-    bucket_index_t index;
-
-    /**
-     * offset is the position within the bucket.
-     */
-    bucket_pos_t offset;
-} evr_bucket_pos;
 
 /**
  * evr_glacier_bucket_append appends the given blob at the current
@@ -104,10 +94,9 @@ typedef struct {
  * A new current bucket is created if the blob does not fit into the
  * current bucket anymore.
  *
- * The position in the appended bucket is written into bucket_pos on
- * successful execution. On unsuccessful execution the values written
- * to bucket_pos are undefined.
+ * The blob's position in the appended bucket is written into the
+ * index db.
  */
-int evr_glacier_bucket_append(evr_glacier_ctx *ctx, evr_bucket_pos *bucket_pos, const written_blob *blob);
+int evr_glacier_bucket_append(evr_glacier_ctx *ctx, const written_blob *blob);
 
 #endif

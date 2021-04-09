@@ -97,11 +97,11 @@ void test_evr_glacier_write_blob(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
-        evr_bucket_pos bucket_pos;
-        assert_zero(evr_glacier_bucket_append(ctx, &bucket_pos, wb));
+        assert_zero(evr_glacier_bucket_append(ctx, wb));
         free(buffer);
-        assert_equal(bucket_pos.index, 1);
-        assert_equal(bucket_pos.offset, 4);
+        // TODO assert bucket position in index
+        // assert_equal(bucket_pos.index, 1);
+        // assert_equal(bucket_pos.offset, 4);
     }
     assert_equal(ctx->current_bucket_index, 1);
     assert_equal(ctx->current_bucket_pos, 20);
