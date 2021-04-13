@@ -53,6 +53,9 @@ evr_glacier_storage_configuration *create_evr_glacier_storage_configuration(){
 }
 
 void free_evr_glacier_storage_configuration(evr_glacier_storage_configuration *config){
+    if(!config){
+        return;
+    }
     free_pointer(config->cert_path);
     free_pointer(config->key_path);
     free_pointer(config->cert_root_path);

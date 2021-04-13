@@ -19,11 +19,14 @@
 #include <string.h>
 
 #include "assert.h"
+#include "dynamic_array.h"
 #include "glacier.h"
 #include "test.h"
 
 const char *bucket_dir_template = "/tmp/evr-glacier-test-XXXXXX";
 
+int store_into_dynamic_array(void *arg, const uint8_t *data, size_t data_len);
+int store_into_void(void *arg, const uint8_t *data, size_t data_len);
 evr_glacier_storage_configuration* clone_config(evr_glacier_storage_configuration *config);
 char* clone_string(const char* s);
 void free_glacier_ctx(evr_glacier_write_ctx *ctx);
@@ -74,8 +77,8 @@ void test_evr_glacier_create_context_twice_fails(){
 
 void test_evr_glacier_write_smal_blob(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
-    evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
-    assert_not_null(ctx);
+    evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(config);
+    assert_not_null(write_ctx);
     {
         // write a blob
         void *buffer = malloc(256);
@@ -97,15 +100,64 @@ void test_evr_glacier_write_smal_blob(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
-        assert_zero(evr_glacier_append_blob(ctx, wb));
+        assert_zero(evr_glacier_append_blob(write_ctx, wb));
+        assert_equal(write_ctx->current_bucket_index, 1);
+        assert_equal(write_ctx->current_bucket_pos, 20);
         free(buffer);
-        // TODO assert bucket position in index
-        // assert_equal(bucket_pos.index, 1);
-        // assert_equal(bucket_pos.offset, 4);
     }
-    assert_equal(ctx->current_bucket_index, 1);
-    assert_equal(ctx->current_bucket_pos, 20);
-    free_glacier_ctx(ctx);
+    evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert_not_null(read_ctx);
+    {
+        // read the written blob
+        const char *key = "hello";
+        size_t key_len = strlen(key);
+        evr_blob_key_t *evr_key = malloc(sizeof(evr_blob_key_t) + key_len);
+        assert_not_null(evr_key);
+        evr_key->type = 0x22;
+        evr_key->key_len = key_len;
+        evr_key->key = (uint8_t*)(evr_key + 1);
+        memcpy(evr_key->key, key, key_len);
+        dynamic_array *data_buffer = alloc_dynamic_array(128);
+        assert_not_null(data_buffer);
+        assert_zero(evr_glacier_read_blob(read_ctx, evr_key, store_into_dynamic_array, &data_buffer));
+        free(evr_key);
+        assert_equal(data_buffer->size_used, 5);
+        assert_zero(memcmp("world", data_buffer->data, 5));
+        free(data_buffer);
+    }
+    {
+        // read not existing key
+        const char *key = "peng";
+        size_t key_len = strlen(key);
+        evr_blob_key_t *evr_key = malloc(sizeof(evr_blob_key_t) + key_len);
+        assert_not_null(evr_key);
+        evr_key->type = 0x22;
+        evr_key->key_len = key_len;
+        evr_key->key = (uint8_t*)(evr_key + 1);
+        memcpy(evr_key->key, key, key_len);
+        assert_equal(evr_glacier_read_blob(read_ctx, evr_key, store_into_void, NULL), evr_not_found);
+        free(evr_key);
+    }
+    assert_zero(evr_free_glacier_read_ctx(read_ctx));
+    free_glacier_ctx(write_ctx);
+}
+
+int store_into_dynamic_array(void *arg, const uint8_t *data, size_t data_len){
+    dynamic_array **buffer = (dynamic_array**)arg;
+    size_t new_size_used = (*buffer)->size_used + data_len;
+    if(new_size_used > (*buffer)->size_allocated){
+        *buffer = grow_dynamic_array_at_least(*buffer, new_size_used);
+        if(!*buffer){
+            return 1;
+        }
+    }
+    memcpy(&(((uint8_t*)(*buffer)->data)[(*buffer)->size_used]), data, data_len);
+    (*buffer)->size_used = new_size_used;
+    return 0;
+}
+
+int store_into_void(void *arg, const uint8_t *data, size_t data_len){
+    return 0;
 }
 
 void test_evr_glacier_write_big_blob(){
@@ -169,7 +221,17 @@ char* clone_string(const char* s){
 
 void free_glacier_ctx(evr_glacier_write_ctx *ctx){
     // TODO delete buckets dir
+    evr_glacier_storage_configuration *config = ctx->config;
     assert_zero(evr_free_glacier_write_ctx(ctx));
+    free_evr_glacier_storage_configuration(config);
+}
+
+void test_evr_free_glacier_read_ctx_with_null_ctx(){
+    evr_free_glacier_read_ctx(NULL);
+}
+
+void test_evr_free_glacier_write_ctx_with_null_ctx(){
+    evr_free_glacier_write_ctx(NULL);
 }
 
 int main(){
@@ -177,4 +239,6 @@ int main(){
     run_test(test_evr_glacier_create_context_twice_fails);
     run_test(test_evr_glacier_write_smal_blob);
     run_test(test_evr_glacier_write_big_blob);
+    run_test(test_evr_free_glacier_read_ctx_with_null_ctx);
+    run_test(test_evr_free_glacier_write_ctx_with_null_ctx);
 }

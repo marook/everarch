@@ -32,9 +32,12 @@ dynamic_array *alloc_dynamic_array(size_t initial_size){
     return da;
 }
 
-dynamic_array *grow_dynamic_array(dynamic_array *da){
+dynamic_array *grow_dynamic_array_at_least(dynamic_array *da, size_t min_size){
     // + 1 because we want to avoid size not growing when small
     size_t new_size = (size_t)(da->size_allocated * 1.5) + 1;
+    if(new_size < min_size){
+        new_size = min_size;
+    }
     size_t new_da_size = get_dynamic_array_size(new_size);
     dynamic_array *new_da = (dynamic_array*)realloc(da, new_da_size);
     if(!new_da){

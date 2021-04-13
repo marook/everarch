@@ -52,8 +52,13 @@ void test_load_evr_glacier_storage_configurations(){
     free_evr_glacier_storage_configuration(config);
 }
 
+void test_free_null_configuration(){
+    free_evr_glacier_storage_configuration(NULL);
+}
+
 int main(){
     run_test(test_merge_evr_glacier_storage_configuration_file);
     run_test(test_load_evr_glacier_storage_configurations);
+    run_test(test_free_null_configuration);
     return 0;
 }

@@ -47,13 +47,17 @@ typedef struct {
  */
 dynamic_array *alloc_dynamic_array(size_t initial_size);
 
+#define grow_dynamic_array(da) grow_dynamic_array_at_least(da, 0)
+
 /**
  * grow_dynamic_array grows the dynamic array using realloc.
+ *
+ * min_size is the minimum size_allocated after the grow.
  *
  * Returns NULL if the memory could not be allocated. The former memory
  * is freed in that case.
  */
-dynamic_array *grow_dynamic_array(dynamic_array *da);
+dynamic_array *grow_dynamic_array_at_least(dynamic_array *da, size_t min_size);
 
 void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c));
 

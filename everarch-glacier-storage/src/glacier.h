@@ -27,6 +27,10 @@
 
 #include "configuration.h"
 
+#define evr_ok 0
+#define evr_error 1
+#define evr_not_found 2
+
 typedef uint8_t evr_hash_algorithm_t;
 
 extern const evr_hash_algorithm_t evr_hash_algorithm_sha224;
@@ -68,6 +72,41 @@ typedef unsigned long evr_bucket_index_t;
 
 typedef struct {
     evr_glacier_storage_configuration *config;
+    sqlite3 *db;
+    sqlite3_stmt *find_blob_stmt;
+    uint8_t *read_buffer;
+} evr_glacier_read_ctx;
+
+/**
+ * evr_create_glacier_read_ctx creates a new evr_glacier_read_ctx.
+ *
+ * config must not be modified or freed until
+ * evr_free_glacier_read_ctx is called with the returned context.
+ *
+ * A read context can only be created after a
+ * evr_create_glacier_write_ctx initalized the glacier on disk. This
+ * initialization could also have happend in a past process.
+ *
+ * The returned context must be freed using evr_free_glacier_read_ctx.
+ */
+evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config);
+
+int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx);
+
+/**
+ * evr_glacier_read_blob reads a blob with the given key.
+ *
+ * The function returns evr_not_found if the key is not part of the
+ * glacier.
+ *
+ * onData callback may be invoked multiple times. onData must return 0
+ * on successful processing. onData's data argument is only allocated
+ * while onData is executed.
+ */
+int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t *key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg);
+
+typedef struct {
+    evr_glacier_storage_configuration *config;
     evr_bucket_index_t current_bucket_index;
     int current_bucket_f;
     evr_bucket_pos_t current_bucket_pos;
@@ -78,8 +117,8 @@ typedef struct {
 /**
  * evr_create_glacier_write_ctx creates a evr_glacier_write_ctx.
  *
- * config's ownership is given to the returned evr_glacier_write_ctx on
- * successful execution.
+ * config must not be modifier or freed until
+ * evr_free_glacier_write_ctx is called with the returned context.
  *
  * The returned context must be freed using evr_free_glacier_write_ctx.
  */

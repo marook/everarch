@@ -34,22 +34,123 @@ const size_t evr_max_blob_data_size = 16*1024*1024;
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
 const char *glacier_dir_lock_file_path = "/lock";
 const char *glacier_dir_index_db_path = "/index.db";
+const size_t evr_read_buffer_size = 1*1024*1024;
 
 void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_size, const char *bucket_dir_path, const char* path_suffix);
+
+int evr_open_index_db(evr_glacier_storage_configuration *config, int sqliteFlags, sqlite3 **db);
+
+int evr_close_index_db(evr_glacier_storage_configuration *config, sqlite3 *db);
 
 int unlink_lock_file(evr_glacier_write_ctx *ctx);
 
 int evr_create_index_db(evr_glacier_write_ctx *ctx);
 
-int evr_prepare_stmt(evr_glacier_write_ctx *ctx, const char *sql, sqlite3_stmt **stmt);
+int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt);
 
 int move_to_last_bucket(evr_glacier_write_ctx *ctx);
 
 int open_current_bucket(evr_glacier_write_ctx *ctx);
 
+int evr_open_bucket(const evr_glacier_storage_configuration *config, evr_bucket_index_t bucket_index, int open_flags);
+
 int create_next_bucket(evr_glacier_write_ctx *ctx);
 
 int close_current_bucket(evr_glacier_write_ctx *ctx);
+
+evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config){
+    evr_glacier_read_ctx *ctx = (evr_glacier_read_ctx*)malloc(sizeof(evr_glacier_read_ctx) + evr_read_buffer_size);
+    if(!ctx){
+        goto fail;
+    }
+    ctx->config = config;
+    ctx->read_buffer = (uint8_t*)(ctx + 1);
+    ctx->db = NULL;
+    ctx->find_blob_stmt = NULL;
+    if(evr_open_index_db(config, SQLITE_OPEN_READONLY, &(ctx->db))){
+        goto fail_with_db;
+    }
+    if(evr_prepare_stmt(ctx->db, "select bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?", &(ctx->find_blob_stmt))){
+        goto fail_with_db;
+    }
+    return ctx;
+ fail_with_db:
+    sqlite3_finalize(ctx->find_blob_stmt);
+    sqlite3_close(ctx->db);
+    free(ctx);
+ fail:
+    return NULL;
+}
+
+int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx){
+    if(!ctx){
+        return 0;
+    }
+    int ret = 1;
+    if(sqlite3_finalize(ctx->find_blob_stmt) != SQLITE_OK){
+        goto end;
+    }
+    if(evr_close_index_db(ctx->config, ctx->db)){
+        goto end;
+    }
+    ret = 0;
+ end:
+    free(ctx);
+    return ret;
+}
+
+int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t *key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg){
+    int ret = evr_error;
+    {
+        size_t key_buffer_len = sizeof(evr_hash_algorithm_t) + key->key_len;
+        void *key_buffer = alloca(key_buffer_len);
+        void *p = key_buffer;
+        *((evr_hash_algorithm_t*)p) = key->type;
+        p = (evr_hash_algorithm_t*)p + 1;
+        memcpy(p, key->key, key->key_len);
+        if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key_buffer, key_buffer_len, SQLITE_TRANSIENT) != SQLITE_OK){
+            goto end_with_find_reset;
+        }
+    }
+    int step_result = sqlite3_step(ctx->find_blob_stmt);
+    if(step_result == SQLITE_DONE){
+        ret = evr_not_found;
+        goto end_with_find_reset;
+    }
+    if(step_result != SQLITE_ROW){
+        goto end_with_find_reset;
+    }
+    evr_bucket_index_t bucket_index = sqlite3_column_int64(ctx->find_blob_stmt, 0);
+    evr_bucket_pos_t bucket_blob_offset = sqlite3_column_int(ctx->find_blob_stmt, 1);
+    evr_blob_size_t blob_size = sqlite3_column_int(ctx->find_blob_stmt, 2);
+    int bucket_f = evr_open_bucket(ctx->config, bucket_index, O_RDONLY);
+    if(bucket_f == -1){
+        goto end_with_find_reset;
+    }
+    if(lseek(bucket_f, bucket_blob_offset, SEEK_SET) == -1){
+        goto end_with_open_bucket;
+    }
+    for(ssize_t bytes_read = 0; bytes_read < blob_size;){
+        ssize_t buffer_bytes_read = read(bucket_f, ctx->read_buffer, evr_read_buffer_size);
+        if(buffer_bytes_read == -1){
+            goto end_with_open_bucket;
+        }
+        if(on_data(on_data_arg, ctx->read_buffer, buffer_bytes_read)){
+            goto end_with_open_bucket;
+        }
+        bytes_read += buffer_bytes_read;
+    }
+    ret = evr_ok;
+ end_with_open_bucket:
+    if(close(bucket_f)){
+        ret = evr_error;
+    }
+ end_with_find_reset:
+    if(sqlite3_reset(ctx->find_blob_stmt) != SQLITE_OK){
+        ret = evr_error;
+    }
+    return ret;
+}
 
 evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configuration *config){
     evr_glacier_write_ctx *ctx = (evr_glacier_write_ctx*)malloc(sizeof(evr_glacier_write_ctx));
@@ -96,20 +197,13 @@ evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configur
         }
         close(lock_f);
     }
-    {
-        // open index.db
-        build_glacier_file_path(glacier_file_path, glacier_file_path_max_size, config->bucket_dir_path, glacier_dir_index_db_path);
-        int result = sqlite3_open_v2(glacier_file_path, &(ctx->db), SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, NULL);
-        if(result != SQLITE_OK){
-            const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
-            fprintf(stderr, "glacier storage could not open %s sqlite database: %s\n", glacier_file_path, sqlite_error_msg);
-            goto fail_with_db;
-        }
+    if(evr_open_index_db(config, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, &(ctx->db))){
+        goto fail_with_db;
     }
     if(evr_create_index_db(ctx)){
         goto fail_with_db;
     }
-    if(evr_prepare_stmt(ctx, "insert into blob_position (key, bucket_index, bucket_blob_offset, blob_size) values (?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
+    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, bucket_index, bucket_blob_offset, blob_size) values (?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
         goto fail_with_db;
     }
     if(move_to_last_bucket(ctx)){
@@ -180,9 +274,9 @@ int evr_create_index_db(evr_glacier_write_ctx *ctx){
     return 0;
 }
 
-int evr_prepare_stmt(evr_glacier_write_ctx *ctx, const char *sql, sqlite3_stmt **stmt){
-    if(sqlite3_prepare_v2(ctx->db, sql, -1, stmt, NULL) != SQLITE_OK){
-        const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
+int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
+    if(sqlite3_prepare_v2(db, sql, -1, stmt, NULL) != SQLITE_OK){
+        const char *sqlite_error_msg = sqlite3_errmsg(db);
         fprintf(stderr, "Failed to prepare statement \"%s\": %s\n", sql, sqlite_error_msg);
         return 1;
     }
@@ -228,29 +322,40 @@ int move_to_last_bucket(evr_glacier_write_ctx *ctx){
 }
 
 int open_current_bucket(evr_glacier_write_ctx *ctx) {
-    char *bucket_path;
-    {
-        // this block builds bucket_path
-        size_t bucket_dir_path_len = strlen(ctx->config->bucket_dir_path);
-        size_t bucket_path_max_len = bucket_dir_path_len + 30;
-        bucket_path = alloca(bucket_path_max_len);
-        char *end = bucket_path + bucket_path_max_len - 1;
-        memcpy(bucket_path, ctx->config->bucket_dir_path, bucket_dir_path_len);
-        char *s = bucket_path + bucket_dir_path_len;
-        *s++ = '/';
-        if(snprintf(s, end - bucket_path, "%05lx.blob", ctx->current_bucket_index) < 0){
-            return 1;
-        }
-        *end = '\0';
-    }
-    ctx->current_bucket_f = open(bucket_path, O_RDWR | O_CREAT, 0644);
+    ctx->current_bucket_f = evr_open_bucket(ctx->config, ctx->current_bucket_index, O_RDWR | O_CREAT);
     if(ctx->current_bucket_f == -1){
         return 1;
     }
     return 0;
 }
 
+int evr_open_bucket(const evr_glacier_storage_configuration *config, evr_bucket_index_t bucket_index, int open_flags){
+    char *bucket_path;
+    {
+        // this block builds bucket_path
+        size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
+        size_t bucket_path_max_len = bucket_dir_path_len + 30;
+        bucket_path = alloca(bucket_path_max_len);
+        char *end = bucket_path + bucket_path_max_len - 1;
+        memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
+        char *s = bucket_path + bucket_dir_path_len;
+        *s++ = '/';
+        if(snprintf(s, end - bucket_path, "%05lx.blob", bucket_index) < 0){
+            return 1;
+        }
+        *end = '\0';
+    }
+    int f = open(bucket_path, open_flags, 0644);
+    if(f == -1){
+        return 1;
+    }
+    return f;
+}
+
 int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx){
+    if(!ctx){
+        return 0;
+    }
     int ret = 1;
     if(close_current_bucket(ctx)){
         goto end;
@@ -258,10 +363,7 @@ int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx){
     if(sqlite3_finalize(ctx->insert_blob_stmt) != SQLITE_OK){
         goto end;
     }
-    int db_result = sqlite3_close(ctx->db);
-    if(db_result != SQLITE_OK){
-        const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
-        fprintf(stderr, "glacier storage %s could not close sqlite index database: %s\n", ctx->config->bucket_dir_path, sqlite_error_msg);
+    if(evr_close_index_db(ctx->config, ctx->db)){
         goto end;
     }
     if(unlink_lock_file(ctx)){
@@ -269,11 +371,31 @@ int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx){
     }
     ret = 0;
  end:
-    if(ctx->config){
-        free_evr_glacier_storage_configuration(ctx->config);
-    }
     free(ctx);
     return ret;
+}
+
+int evr_open_index_db(evr_glacier_storage_configuration *config, int sqliteFlags, sqlite3 **db){
+    size_t glacier_file_path_max_size = strlen(config->bucket_dir_path) + 10;
+    char *glacier_file_path = alloca(glacier_file_path_max_size);
+    build_glacier_file_path(glacier_file_path, glacier_file_path_max_size, config->bucket_dir_path, glacier_dir_index_db_path);
+    int result = sqlite3_open_v2(glacier_file_path, db, sqliteFlags | SQLITE_OPEN_NOMUTEX, NULL);
+    if(result != SQLITE_OK){
+        const char *sqlite_error_msg = sqlite3_errmsg(*db);
+        fprintf(stderr, "glacier storage could not open %s sqlite database: %s\n", glacier_file_path, sqlite_error_msg);
+        return 1;
+    }
+    return 0;
+}
+
+int evr_close_index_db(evr_glacier_storage_configuration *config, sqlite3 *db){
+    int db_result = sqlite3_close(db);
+    if(db_result != SQLITE_OK){
+        const char *sqlite_error_msg = sqlite3_errmsg(db);
+        fprintf(stderr, "glacier storage %s could not close sqlite index database: %s\n", config->bucket_dir_path, sqlite_error_msg);
+        return 1;
+    }
+    return 0;
 }
 
 int unlink_lock_file(evr_glacier_write_ctx *ctx){
