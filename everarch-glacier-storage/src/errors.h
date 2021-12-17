@@ -16,25 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __assert_h__
-#define __assert_h__
+#ifndef __errors_h__
+#define __errors_h__
 
-#include <stdarg.h>
-#include <stdlib.h>
-
-void fail(const char *format, ...);
-void vfail(const char* format, va_list args);
-
-void assert_zero(int i);
-void assert_equal(int actual, int expected);
-void assert_equal_msg(int actual, int expected, const char *format, ...);
-void assert_greater_equal(int actual, int min);
-void assert_truthy(int i);
-void assert_null(const void *p);
-void assert_not_null(const void *p);
-void assert_not_null_msg(const void *p, const char *format, ...);
-void assert_str_eq(const char *actual, const char *expected);
-void assert_int_eq(int actual, int expected);
-void assert_size_eq(size_t actual, size_t expected);
+#define evr_ok 0
+#define evr_error 1
+#define evr_not_found 2
 
 #endif

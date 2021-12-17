@@ -14,27 +14,30 @@
  *
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ * The names L1_CACHE_BYTES, SMP_CACHE_BYTES and ____cacheline_aligned
+ * are taken from various cache.h files from the linux kernel source.
  */
 
-#ifndef __assert_h__
-#define __assert_h__
+#ifndef __memory_h__
+#define __memory_h__
 
-#include <stdarg.h>
-#include <stdlib.h>
+/**
+ * L1_CACHE_BYTES is the size of the CPU's cache line in bytes.
+ *
+ * Can be determined using:
+ * 
+ * $ grep cache_alignment /proc/cpuinfo
+ */
+#define L1_CACHE_BYTES	64
 
-void fail(const char *format, ...);
-void vfail(const char* format, va_list args);
+#ifndef SMP_CACHE_BYTES
+#define SMP_CACHE_BYTES L1_CACHE_BYTES
+#endif
 
-void assert_zero(int i);
-void assert_equal(int actual, int expected);
-void assert_equal_msg(int actual, int expected, const char *format, ...);
-void assert_greater_equal(int actual, int min);
-void assert_truthy(int i);
-void assert_null(const void *p);
-void assert_not_null(const void *p);
-void assert_not_null_msg(const void *p, const char *format, ...);
-void assert_str_eq(const char *actual, const char *expected);
-void assert_int_eq(int actual, int expected);
-void assert_size_eq(size_t actual, size_t expected);
+#ifndef ____cacheline_aligned
+#define ____cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
+#endif
 
 #endif

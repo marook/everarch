@@ -17,7 +17,6 @@
  */
 
 #include <execinfo.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,8 +28,12 @@ void print_backtrace();
 void fail(const char *format, ...){
     va_list args;
     va_start(args, format);
-    vfprintf(stderr, format, args);
+    vfail(format, args);
     va_end(args);
+}
+
+void vfail(const char* format, va_list args){
+    vfprintf(stderr, format, args);
     print_backtrace();
     exit(1);
 }
@@ -49,8 +52,15 @@ void assert_zero(int i){
 }
 
 void assert_equal(int actual, int expected){
+    assert_equal_msg(actual, expected, "Expected %d to be %d\n", actual, expected);
+}
+
+void assert_equal_msg(int actual, int expected, const char *format, ...){
     if(actual != expected){
-        fail("Expected %d to be %d\n", actual, expected);
+        va_list args;
+        va_start(args, format);
+        vfail(format, args);
+        va_end(args);
     }
 }
 
@@ -80,7 +90,7 @@ void assert_not_null_msg(const void *p, const char *format, ...){
     if(!p){
         va_list args;
         va_start(args, format);
-        fail(format, args);
+        vfail(format, args);
         va_end(args);
     }
 }

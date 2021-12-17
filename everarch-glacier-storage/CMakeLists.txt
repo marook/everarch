@@ -17,10 +17,13 @@ find_package(cJSON REQUIRED)
 
 find_package(SQLite3 REQUIRED)
 
+find_package(Threads REQUIRED)
+
 include_directories(
   ${PICOQUIC_INCLUDE_DIRS}
   ${cJSON_INCLUDE_DIRS}
   ${SQLite3_INCLUDE_DIRS}
+  ${Threads_INCLUDE_DIRS}
   )
 
 add_executable(evr-glacier-storage
@@ -40,6 +43,16 @@ add_executable(dynamic_array-test
   )
 target_link_libraries(dynamic_array-test)
 add_test(dynamic_array-test ./dynamic_array-test)
+
+add_executable(queue-test
+  src/assert.c
+  src/queue.c
+  src/queue-test.c
+  )
+target_link_libraries(queue-test
+  Threads::Threads
+  )
+add_test(queue-test ./queue-test)
 
 add_executable(files-test
   src/assert.c

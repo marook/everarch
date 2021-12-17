@@ -26,10 +26,7 @@
 #include <sqlite3.h>
 
 #include "configuration.h"
-
-#define evr_ok 0
-#define evr_error 1
-#define evr_not_found 2
+#include "errors.h"
 
 typedef uint8_t evr_hash_algorithm_t;
 
