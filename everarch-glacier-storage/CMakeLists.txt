@@ -70,6 +70,7 @@ add_test(configuration-test ./configuration-test)
 add_executable(glacier-test
   src/assert.c
   src/configuration.c
+  src/configuration-testutil.c
   src/glacier.c
   src/glacier-test.c
   src/dynamic_array.c
