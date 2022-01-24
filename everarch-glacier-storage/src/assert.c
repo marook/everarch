@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "assert.h"
+#include "errors.h"
 
 void print_backtrace();
 
@@ -49,6 +50,10 @@ void assert_zero(int i){
     if(i){
         fail("Expected %d to be 0\n", i);
     }
+}
+
+void assert_ok(int result){
+    assert_equal(result, evr_ok);
 }
 
 void assert_equal(int actual, int expected){

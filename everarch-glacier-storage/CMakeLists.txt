@@ -81,3 +81,18 @@ target_link_libraries(glacier-test
   ${SQLite3_LIBRARIES}
   )
 add_test(glacier-test ./glacier-test)
+
+add_executable(concurrent-glacier-test
+  src/assert.c
+  src/configuration.c
+  src/configuration-testutil.c
+  src/concurrent-glacier.c
+  src/concurrent-glacier-test.c
+  src/dynamic_array.c
+  src/files.c
+  )
+target_link_libraries(concurrent-glacier-test
+  ${CJSON_LIBRARIES}
+  Threads::Threads
+  )
+add_test(concurrent-glacier-test ./concurrent-glacier-test)

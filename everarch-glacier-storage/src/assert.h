@@ -26,6 +26,7 @@ void fail(const char *format, ...);
 void vfail(const char* format, va_list args);
 
 void assert_zero(int i);
+void assert_ok(int result);
 void assert_equal(int actual, int expected);
 void assert_equal_msg(int actual, int expected, const char *format, ...);
 void assert_greater_equal(int actual, int min);

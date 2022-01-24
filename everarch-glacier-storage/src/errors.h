@@ -22,5 +22,6 @@
 #define evr_ok 0
 #define evr_error 1
 #define evr_not_found 2
+#define evr_temporary_occupied 3
 
 #endif
