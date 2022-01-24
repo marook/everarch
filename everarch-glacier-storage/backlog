@@ -1,3 +1,4 @@
+* copyright 2021 -> 2021-2022
 * create ring buffer which is consumed by one glacier writer thread
 the writer thread could use pthread_key_create to store the
 evr_glacier_write_ctx and make sure it's destructed if the thread
