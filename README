@@ -25,6 +25,28 @@ $ ./test.sh
 
 Test execution relies on valgrind ( https://www.valgrind.org ).
 
+The following steps should be performed when adding new tests. We
+assume a test for x.h/x.c should be added.
+
+Create a file which should contain the tests beside x.c with the name
+x-test.c. Add a main function which tests x.h and x.c.
+
+Open CMakeLists.txt and add a section like this one:
+
+add_executable(x-test
+  src/assert.c
+  src/x.c
+  src/x-test.c
+  )
+target_link_libraries(x-test
+  ${CJSON_LIBRARIES}
+  ${SQLite3_LIBRARIES}
+  )
+add_test(x-test ./x-test)
+
+Execute `cmake .` in the root project so ctest will recognize the new
+test.
+
 
 ------------------------------------------------------------------------
 License
