@@ -241,4 +241,5 @@ int main(){
     run_test(test_evr_glacier_write_big_blob);
     run_test(test_evr_free_glacier_read_ctx_with_null_ctx);
     run_test(test_evr_free_glacier_write_ctx_with_null_ctx);
+    return 0;
 }
