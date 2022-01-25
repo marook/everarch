@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include "glacier.h"
+#include "logger.h"
 
 const evr_hash_algorithm_t evr_hash_algorithm_sha224 = 1;
 
@@ -189,10 +190,10 @@ evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configur
         int lock_f = open(glacier_file_path, O_CREAT | O_EXCL, 0600);
         if(lock_f == -1){
             if(EEXIST == errno){
-                fprintf(stderr, "glacier storage lock file %s already exists\n", glacier_file_path);
+                log_error("glacier storage lock file %s already exists\n", glacier_file_path);
                 goto fail_free;
             }
-            fprintf(stderr, "glacier storage could not create lock file %s\n", glacier_file_path);
+            log_error("glacier storage could not create lock file %s\n", glacier_file_path);
             goto fail_free;
         }
         close(lock_f);
@@ -224,7 +225,7 @@ evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configur
         int read_errno = errno;
         if(bytes_read != sizeof(evr_bucket_pos_t)){
             const char *error = bytes_read == -1 ? strerror(read_errno) : "Short read";
-            fprintf(stderr, "Failed to read bucket end pointer within glacier directory %s: %s\n", ctx->config->bucket_dir_path, error);
+            log_error("Failed to read bucket end pointer within glacier directory %s: %s\n", ctx->config->bucket_dir_path, error);
             goto fail_with_open_bucket;
         }
         ctx->current_bucket_pos = evr_be_to_bucket_pos(ctx->current_bucket_pos);
@@ -234,7 +235,7 @@ evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configur
         }
         if(ctx->current_bucket_pos != end_offset){
             // TODO :beprep: repair file
-            fprintf(stderr, "Bucket end pointer (%d) and file end offset (%ld) don't match in glacier directory %s.", ctx->current_bucket_pos, end_offset, ctx->config->bucket_dir_path);
+            log_error("Bucket end pointer (%d) and file end offset (%ld) don't match in glacier directory %s.", ctx->current_bucket_pos, end_offset, ctx->config->bucket_dir_path);
             goto fail_with_open_bucket;
         }
     }
@@ -267,7 +268,7 @@ int evr_create_index_db(evr_glacier_write_ctx *ctx){
         "create table if not exists blob_position (key blob primary key not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null)";
     char *error;
     if(sqlite3_exec(ctx->db, structure_sql, NULL, NULL, &error) != SQLITE_OK){
-        fprintf(stderr, "Failed to create index db structure for glacier %s: %s\n", ctx->config->bucket_dir_path, error);
+        log_error("Failed to create index db structure for glacier %s: %s\n", ctx->config->bucket_dir_path, error);
         sqlite3_free(error);
         return 1;
     }
@@ -277,7 +278,7 @@ int evr_create_index_db(evr_glacier_write_ctx *ctx){
 int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
     if(sqlite3_prepare_v2(db, sql, -1, stmt, NULL) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db);
-        fprintf(stderr, "Failed to prepare statement \"%s\": %s\n", sql, sqlite_error_msg);
+        log_error("Failed to prepare statement \"%s\": %s\n", sql, sqlite_error_msg);
         return 1;
     }
     return 0;
@@ -382,7 +383,7 @@ int evr_open_index_db(evr_glacier_storage_configuration *config, int sqliteFlags
     int result = sqlite3_open_v2(glacier_file_path, db, sqliteFlags | SQLITE_OPEN_NOMUTEX, NULL);
     if(result != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(*db);
-        fprintf(stderr, "glacier storage could not open %s sqlite database: %s\n", glacier_file_path, sqlite_error_msg);
+        log_error("glacier storage could not open %s sqlite database: %s\n", glacier_file_path, sqlite_error_msg);
         return 1;
     }
     return 0;
@@ -392,7 +393,7 @@ int evr_close_index_db(evr_glacier_storage_configuration *config, sqlite3 *db){
     int db_result = sqlite3_close(db);
     if(db_result != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db);
-        fprintf(stderr, "glacier storage %s could not close sqlite index database: %s\n", config->bucket_dir_path, sqlite_error_msg);
+        log_error("glacier storage %s could not close sqlite index database: %s\n", config->bucket_dir_path, sqlite_error_msg);
         return 1;
     }
     return 0;
@@ -404,7 +405,7 @@ int unlink_lock_file(evr_glacier_write_ctx *ctx){
     build_glacier_file_path(lock_file_path, bucket_dir_path_size, ctx->config->bucket_dir_path, glacier_dir_lock_file_path);
     if(lock_file_path[0] != '\0'){
         if(unlink(lock_file_path)){
-            fprintf(stderr, "Can not unlink lock file %s\n", lock_file_path);
+            log_error("Can not unlink lock file %s\n", lock_file_path);
             return 1;
         }
     }
@@ -432,7 +433,7 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
     size_t disk_size = key_disk_size + blob_disk_size;
     if(disk_size > ctx->config->max_bucket_size){
         // TODO :hrkey: format key in human readable way
-        fprintf(stderr, "Can't persist blob for key TODO in glacier directory %s with %ld bytes which is bigger than max bucket size %ld\n", ctx->config->bucket_dir_path, disk_size, ctx->config->max_bucket_size);
+        log_error("Can't persist blob for key TODO in glacier directory %s with %ld bytes which is bigger than max bucket size %ld\n", ctx->config->bucket_dir_path, disk_size, ctx->config->max_bucket_size);
         goto fail;
     }
     if(ctx->current_bucket_pos + disk_size > ctx->config->max_bucket_size){
@@ -464,7 +465,7 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
     }
     if(write(ctx->current_bucket_f, header_buffer, header_buffer_len) != header_buffer_len){
         // TODO :hrkey: format key in human readable way
-        fprintf(stderr, "Can't completely write blob header for key TODO in glacier directory %s.\n", ctx->config->bucket_dir_path);
+        log_error("Can't completely write blob header for key TODO in glacier directory %s.\n", ctx->config->bucket_dir_path);
         goto fail;
     }
     uint8_t **c = blob->chunks;
@@ -477,7 +478,7 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         ssize_t chunk_bytes_written = write(ctx->current_bucket_f, *c, chunk_bytes_len);
         if(chunk_bytes_written != chunk_bytes_len){
             // TODO :hrkey: format key in human readable way
-            fprintf(stderr, "Can't completely write blob data for key TODO in glacier directory %s after %d bytes written.\n", ctx->config->bucket_dir_path, bytes_written);
+            log_error("Can't completely write blob data for key TODO in glacier directory %s after %d bytes written.\n", ctx->config->bucket_dir_path, bytes_written);
             goto fail;
         }
         bytes_written += chunk_bytes_written;
@@ -490,7 +491,7 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
     }
     evr_bucket_pos_t last_bucket_pos = evr_bucket_pos_to_be(ctx->current_bucket_pos);
     if(write(ctx->current_bucket_f, &last_bucket_pos, sizeof(evr_bucket_pos_t)) != sizeof(evr_bucket_pos_t)){
-        fprintf(stderr, "Can't completely write bucket end pointer in glacier directory %s\n", ctx->config->bucket_dir_path);
+        log_error("Can't completely write bucket end pointer in glacier directory %s\n", ctx->config->bucket_dir_path);
         goto fail;
     }
     {
@@ -512,7 +513,7 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
     }
     if(sqlite3_step(ctx->insert_blob_stmt) != SQLITE_DONE){
         const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
-        fprintf(stderr, "glacier storage %s failed to store blob index: %s\n", ctx->config->bucket_dir_path, sqlite_error_msg);
+        log_error("glacier storage %s failed to store blob index: %s\n", ctx->config->bucket_dir_path, sqlite_error_msg);
         goto fail_with_insert_reset;
     }
     ret = 0;
@@ -535,7 +536,7 @@ int create_next_bucket(evr_glacier_write_ctx *ctx){
     ctx->current_bucket_pos = sizeof(evr_bucket_pos_t);
     evr_bucket_pos_t pos = evr_bucket_pos_to_be(ctx->current_bucket_pos);
     if(write(ctx->current_bucket_f, &pos, sizeof(evr_bucket_pos_t)) != sizeof(evr_bucket_pos_t)){
-        fprintf(stderr, "Empty bucket file %05lx could not be created in glacier directory %s\n", ctx->current_bucket_index, ctx->config->bucket_dir_path);
+        log_error("Empty bucket file %05lx could not be created in glacier directory %s\n", ctx->current_bucket_index, ctx->config->bucket_dir_path);
         return 1;
     }
     return 0;

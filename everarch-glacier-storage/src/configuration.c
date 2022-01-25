@@ -25,6 +25,7 @@
 #include "configuration.h"
 #include "dynamic_array.h"
 #include "files.h"
+#include "logger.h"
 
 #define replace_string(dest, src, error_target) {char *src_var = src; if(src_var){if(dest){free(dest);} size_t src_len = strlen(src_var); dest = malloc(src_len+1); if(!dest){goto error_target;} memcpy(dest, src_var, src_len+1);}}
 
@@ -84,7 +85,7 @@ int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configurati
     }
     int ret = 1;
     if(read_file_str(&buffer, config_path, 1*1024*1024)){
-        fprintf(stderr, "Failed to read evr-glacier-storage configuration file content at %s\n", config_path);
+        log_error("Failed to read evr-glacier-storage configuration file content at %s\n", config_path);
         goto end_buffer;
     }
     rtrim_dynamic_array(buffer, is_json_ignored);
@@ -92,7 +93,7 @@ int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configurati
     
     cJSON *json = cJSON_Parse((char*)buffer->data);
     if(!json){
-        fprintf(stderr, "Failed to parse JSON from %s at '%s'\n", config_path, cJSON_GetErrorPtr());
+        log_error("Failed to parse JSON from %s at '%s'\n", config_path, cJSON_GetErrorPtr());
         goto end_buffer;
     }
     if(!cJSON_IsObject(json)){

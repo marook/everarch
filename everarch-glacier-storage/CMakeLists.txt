@@ -30,7 +30,9 @@ add_executable(evr-glacier-storage
   src/configuration.c
   src/dynamic_array.c
   src/evr-glacier-storage.c
-  src/files.c)
+  src/files.c
+  src/logger.c
+  )
 target_link_libraries(evr-glacier-storage
   ${PICOQUIC_LIBRARIES}
   ${CJSON_LIBRARIES}
@@ -61,6 +63,7 @@ add_executable(configuration-test
   src/configuration-test.c
   src/dynamic_array.c
   src/files.c
+  src/logger.c
   )
 target_link_libraries(configuration-test
   ${CJSON_LIBRARIES}
@@ -75,6 +78,7 @@ add_executable(glacier-test
   src/glacier-test.c
   src/dynamic_array.c
   src/files.c
+  src/logger.c
   )
 target_link_libraries(glacier-test
   ${CJSON_LIBRARIES}

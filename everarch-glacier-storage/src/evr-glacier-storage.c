@@ -30,7 +30,7 @@ picoquic_quic_t *evr_bind_quic_server(const evr_glacier_storage_configuration *c
     picoquic_quic_t *ctx =
         picoquic_create(32, config->cert_path, config->key_path, NULL, PICOQUIC_SAMPLE_ALPN, sample_server_callback, &default_context, NULL, NULL, NULL, current_time, NULL, NULL, NULL, 0);
     if(!ctx){
-        fprintf(stderr, "Could not bind quic server.\n");
+        log_error("Could not bind quic server.\n");
         return NULL;
     }
     picoquic_set_cookie_mode(quic, 2);

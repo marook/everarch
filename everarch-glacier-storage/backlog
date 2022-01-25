@@ -1,4 +1,3 @@
-* migrate fprintf(stderr, …) to log_error(…)
 * concurrent-glacier test which queues lots of tasks
 one thread queues lots of tasks. blob should contain index of written
 current blob. mock evr_glacier_append_blob tests if the index read
