@@ -3,7 +3,7 @@ project(everarch-glacier-storage C)
 
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "-std=c11 -Wall -Werror -O2 -g ${CC_WARNING_FLAGS} ${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS "-std=c11 -Wall -Werror -O2 -g ${CC_WARNING_FLAGS} ${CMAKE_C_FLAGS} -DEVR_LOG_DEBUG")
 
 include(CheckCCompilerFlag)
 
@@ -90,6 +90,7 @@ add_executable(concurrent-glacier-test
   src/concurrent-glacier-test.c
   src/dynamic_array.c
   src/files.c
+  src/logger.c
   )
 target_link_libraries(concurrent-glacier-test
   ${CJSON_LIBRARIES}

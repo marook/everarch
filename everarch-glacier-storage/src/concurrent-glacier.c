@@ -19,6 +19,7 @@
 #include <stdatomic.h>
 
 #include "errors.h"
+#include "logger.h"
 
 #include "concurrent-glacier.h"
 
@@ -59,6 +60,7 @@ int evr_persister_start(evr_glacier_storage_configuration *config){
     if(thrd_create(&evr_persister_thread, evr_persister_worker, NULL) != thrd_success){
         goto thread_create_fail;
     }
+    log_debug("evr persister started with glacier %s", config->bucket_dir_path);
     return evr_ok;
  thread_create_fail:
     evr_free_glacier_write_ctx(evr_persister.write_ctx);
@@ -87,6 +89,7 @@ int evr_persister_stop(){
     }
     mtx_destroy(&evr_persister.worker_lock);
     mtx_destroy(&evr_persister.tasks_lock);
+    log_debug("evr persister stopped");
     return evr_ok;
  fail:
     return evr_error;
