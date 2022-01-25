@@ -1,29 +1,27 @@
 * copyright 2021 -> 2021-2022
-* create ring buffer which is consumed by one glacier writer thread
-the writer thread could use pthread_key_create to store the
-evr_glacier_write_ctx and make sure it's destructed if the thread
-crashes.
-** ring buffer implementations
-*** ringbuf MPSC
-a possible ring buffer implementation is
-https://github.com/rmind/ringbuf
-*** ringbuffer SPMC
-https://github.com/JohannesLorenz/ringbuffer
-*** publib-dev
-https://packages.debian.org/bullseye/publib-dev
-sucht einen maintainer
-*** libevent
-https://libevent.org/
-handles reading from file descriptors
-*** ccl
-https://github.com/jacob-navia/ccl
-it seems like multi threaded writing must be forced by oneself
+* migrate fprintf(stderr, …) to log_error(…)
+* concurrent-glacier test which queues lots of tasks
+one thread queues lots of tasks. blob should contain index of written
+current blob. mock evr_glacier_append_blob tests if the index read
+from the blob is incremented with each processed entry.
 * add formatter and parser for human readable keys                    :hrkey:
 keys should have a human readable form like sha224-deadbeef. there
 should be a to-string formatter and a from-string parser.
 
 the formatter and parser should be in a keys.h file which can easily
 be moved into a central place if multiple modules will need it.
+* command parser
+network clients should be able to request and send blobs via commands.
+
+functions for parsing commands from buffers and formatting commands
+into buffers is necessary.
+
+should be an extractable piece of code so we can reuse it in a future
+client.
+* open network socket, spawn threads, process commands
+* implement an integration test / benchmark
+should connect via network socket. send lots of blobs. request lots of
+blobs. count blobs per second. maybe different blob sizes etc.
 * align chunk size with RLIMIT_FSIZE
 see [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
 regarding to it. also the chunk size should not grow over 1MB.
@@ -36,26 +34,3 @@ discarded.
 it's important to be sensible about the discarded data at the end of
 the file. maybe there should be an 'autorepair' flag in the
 configuration.
-* TODO align queue memory to become lock free                          :qlck:
-** alignment im kernel
-wird über z.b. ____cacheline_aligned gesteuert. definiert in
-include/linux/cache.h. verwendet ein gcc __attribute__. diese
-attribute sind in der gcc info page im kapitel "6.33 Declaring
-Attributes of Functions" erklärt.
-** pitrp hints
-pitrp gave me some hints on how to achieve this goal. i'm assuming the
-solution must only work on linux with gcc.
-
--Wif-not-aligned  -- can help with debugging
--Wpacked-not-aligned  -- wenn du strukturen (denke mit #pragma pack) ausrichten willst
-
-gcc dokumentation nachlesen was malloc() tut.  soweit ich weiss geben
-sie dir immer machine architecture aligned memory -- ist aber nicht
-ISO C spezifiziert
-
-gcc hat alignment(), wenn ich mich nicht irre.
-
-mmap ALIGN ... posix sysconf(_SC_PAGE_SIZE) => zwangsweise aligned,
-weil pages immer aligned sind
-
-pa_offset = offset & ~(sysconf(_SC_PAGE_SIZE) - 1);
