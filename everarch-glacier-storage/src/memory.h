@@ -1,6 +1,6 @@
 /*
  * everarch - the hopefully ever lasting archive
- * Copyright (C) 2021  Markus Peröbner
+ * Copyright (C) 2021-2022  Markus Peröbner
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
