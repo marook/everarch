@@ -26,7 +26,6 @@
 #define evr_persister_task_queue_length 32
 
 typedef struct {
-    mtx_t tasks_lock;
     evr_persister_task *tasks[evr_persister_task_queue_length + 1];
     evr_persister_task **writing;
     evr_persister_task **reading;
@@ -43,9 +42,6 @@ thrd_t evr_persister_thread;
 int evr_persister_worker(void *context);
 
 int evr_persister_start(evr_glacier_storage_configuration *config){
-    if(mtx_init(&evr_persister.tasks_lock, mtx_plain) != thrd_success){
-        goto lock_init_fail;
-    }
     if(mtx_init(&evr_persister.worker_lock, mtx_plain) != thrd_success){
         goto worker_lock_init_fail;
     }
@@ -67,14 +63,20 @@ int evr_persister_start(evr_glacier_storage_configuration *config){
  create_write_ctx_fail:
     mtx_destroy(&evr_persister.worker_lock);
  worker_lock_init_fail:
-    mtx_destroy(&evr_persister.tasks_lock);
- lock_init_fail:
     return evr_error;
 }
 
 int evr_persister_stop(){
     evr_persister.working = 0;
+    if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
+        goto fail;
+    }
+    atomic_thread_fence(memory_order_seq_cst);
     if(cnd_signal(&evr_persister.has_tasks) != thrd_success){
+        goto fail;
+    }
+    atomic_thread_fence(memory_order_seq_cst);
+    if(mtx_unlock(&evr_persister.worker_lock) != thrd_success){
         goto fail;
     }
     int worker_result;
@@ -88,7 +90,6 @@ int evr_persister_stop(){
         goto fail;
     }
     mtx_destroy(&evr_persister.worker_lock);
-    mtx_destroy(&evr_persister.tasks_lock);
     log_debug("evr persister stopped");
     return evr_ok;
  fail:
@@ -113,90 +114,88 @@ inline evr_persister_task** evr_persister_ctx_step(evr_persister_task **p);
 int evr_persister_queue_task(evr_persister_task *task){
     int result = evr_ok;
     // task->done is locked before locking
-    // evr_persister.tasks_lock. the goal is to outsource workload
-    // from the part where evr_persister.tasks_lock is
+    // evr_persister.worker_lock. the goal is to outsource workload
+    // from the part where evr_persister.worker_lock is
     // locked. (not sure if this argumentation is really valid because
     // of the CPU's allowance to change execution order).
     if(mtx_lock(&task->done) != thrd_success){
-        goto done_lock_fail;
+        goto fail;
     }
-    if(mtx_lock(&evr_persister.tasks_lock) != thrd_success){
-        goto lock_tasks_lock_fail;
+    if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
+        goto fail;
     }
-    atomic_thread_fence(memory_order_acquire);
+    atomic_thread_fence(memory_order_seq_cst);
     evr_persister_task **allocated_task = evr_persister.writing;
     evr_persister_task **next_writing = evr_persister_ctx_step(allocated_task);
     if(next_writing == evr_persister.reading){
         result = evr_temporary_occupied;
+        if(mtx_unlock(&task->done) != thrd_success){
+            goto fail;
+        }
         goto defined_cleanup;
     }
     *allocated_task = task;
     evr_persister.writing = next_writing;
-    atomic_thread_fence(memory_order_release);
  defined_cleanup:
-    if(mtx_unlock(&evr_persister.tasks_lock) != thrd_success){
-        result = evr_error;
-        goto unlock_task_lock_fail;
-    }
+    atomic_thread_fence(memory_order_seq_cst);
     if(cnd_signal(&evr_persister.has_tasks) != thrd_success){
-        goto signal_has_tasks_fail;
+        goto fail;
+    }
+    atomic_thread_fence(memory_order_seq_cst);
+    if(mtx_unlock(&evr_persister.worker_lock) != thrd_success){
+        goto fail;
     }
     return result;
- signal_has_tasks_fail:
- unlock_task_lock_fail:
- lock_tasks_lock_fail:
-    // mtx_unlock(task->done) not necessary because task may be broken
-    // after this function returns evr_error.
- done_lock_fail:
-    return result;
+ fail:
+    return evr_error;
 }
 
 int evr_persister_process_task(evr_persister_task *task);
 
 int evr_persister_worker(void *context){
+    log_debug("evr_persister_worker starting");
     int result = evr_ok;
     if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
         result = evr_error;
-        goto end;
+        goto end_with_unlock;
     }
+    atomic_thread_fence(memory_order_seq_cst);
     while(evr_persister.working){
         while(evr_persister.working) {
-            // TODO mtx_lock(tasks_lock) followed by mfence also appears in evr_persister_queue_task. can we and do we want to centralize it?
-            if(mtx_lock(&evr_persister.tasks_lock) != thrd_success){
-                result = evr_error;
-                goto end;
-            }
-            atomic_thread_fence(memory_order_acquire);
             evr_persister_task *task;
             if(evr_persister.writing == evr_persister.reading){
-                task = NULL;
+                break;
             } else {
                 task = *evr_persister.reading;
                 evr_persister.reading = evr_persister_ctx_step(evr_persister.reading);
-                atomic_thread_fence(memory_order_release);
             }
-            // TODO mtx_unlock(tasks_lock) followed by mfence also appears in evr_persister_queue_task. can we and do we want to centralize it?
-            if(mtx_unlock(&evr_persister.tasks_lock) != thrd_success){
+            atomic_thread_fence(memory_order_seq_cst);
+            if(mtx_unlock(&evr_persister.worker_lock) != thrd_success){
                 result = evr_error;
-                goto end;
-            }
-            if(!task){
-                break;
+                goto end_with_unlock;
             }
             if(evr_persister_process_task(task) != evr_ok){
                 result = evr_error;
-                goto end;
+                goto end_without_unlock;
             }
+            if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
+                result = evr_error;
+                goto end_without_unlock;
+            }
+            atomic_thread_fence(memory_order_seq_cst);
         }
         if(cnd_wait(&evr_persister.has_tasks, &evr_persister.worker_lock) != thrd_success){
             result = evr_error;
-            goto end;
+            goto end_with_unlock;
         }
     }
- end:
+ end_with_unlock:
+    atomic_thread_fence(memory_order_seq_cst);
     if(mtx_unlock(&evr_persister.worker_lock) != thrd_success){
         result = evr_error;
     }
+ end_without_unlock:
+    log_debug("evr_persister_worker ending with result %d", result);
     return result;
 }
 
