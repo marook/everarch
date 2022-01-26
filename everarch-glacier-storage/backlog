@@ -1,7 +1,3 @@
-* concurrent-glacier test which queues lots of tasks
-one thread queues lots of tasks. blob should contain index of written
-current blob. mock evr_glacier_append_blob tests if the index read
-from the blob is incremented with each processed entry.
 * add formatter and parser for human readable keys                    :hrkey:
 keys should have a human readable form like sha224-deadbeef. there
 should be a to-string formatter and a from-string parser.
