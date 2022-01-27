@@ -28,8 +28,6 @@
 #include "glacier.h"
 #include "logger.h"
 
-const evr_hash_algorithm_t evr_hash_algorithm_sha224 = 1;
-
 const size_t evr_chunk_size = 1*1024*1024;
 const size_t evr_max_blob_data_size = 16*1024*1024;
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
@@ -427,13 +425,13 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
 }
 
 int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob) {
-    int ret = 1;
+    int ret = evr_error;
     size_t key_disk_size = sizeof(evr_hash_algorithm_t) + sizeof(evr_key_len_t) + blob->key.key_len;
     size_t blob_disk_size = sizeof(evr_blob_size_t) + blob->size;
     size_t disk_size = key_disk_size + blob_disk_size;
     if(disk_size > ctx->config->max_bucket_size){
-        // TODO :hrkey: format key in human readable way
-        log_error("Can't persist blob for key TODO in glacier directory %s with %ld bytes which is bigger than max bucket size %ld\n", ctx->config->bucket_dir_path, disk_size, ctx->config->max_bucket_size);
+        evr_fmt_key_into(fmt_key, &blob->key, fail);
+        log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld\n", fmt_key, ctx->config->bucket_dir_path, disk_size, ctx->config->max_bucket_size);
         goto fail;
     }
     if(ctx->current_bucket_pos + disk_size > ctx->config->max_bucket_size){
@@ -464,8 +462,8 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         *((evr_blob_size_t*)p) = evr_blob_size_to_be(blob->size);
     }
     if(write(ctx->current_bucket_f, header_buffer, header_buffer_len) != header_buffer_len){
-        // TODO :hrkey: format key in human readable way
-        log_error("Can't completely write blob header for key TODO in glacier directory %s.\n", ctx->config->bucket_dir_path);
+        evr_fmt_key_into(fmt_key, &blob->key, fail);
+        log_error("Can't completely write blob header for key %s in glacier directory %s.\n", fmt_key, ctx->config->bucket_dir_path);
         goto fail;
     }
     uint8_t **c = blob->chunks;
@@ -477,8 +475,8 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         }
         ssize_t chunk_bytes_written = write(ctx->current_bucket_f, *c, chunk_bytes_len);
         if(chunk_bytes_written != chunk_bytes_len){
-            // TODO :hrkey: format key in human readable way
-            log_error("Can't completely write blob data for key TODO in glacier directory %s after %d bytes written.\n", ctx->config->bucket_dir_path, bytes_written);
+            evr_fmt_key_into(fmt_key, &blob->key, fail);
+            log_error("Can't completely write blob data for key %s in glacier directory %s after %d bytes written.\n", fmt_key, ctx->config->bucket_dir_path, bytes_written);
             goto fail;
         }
         bytes_written += chunk_bytes_written;
@@ -516,10 +514,10 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         log_error("glacier storage %s failed to store blob index: %s\n", ctx->config->bucket_dir_path, sqlite_error_msg);
         goto fail_with_insert_reset;
     }
-    ret = 0;
+    ret = evr_ok;
  fail_with_insert_reset:
     if(sqlite3_reset(ctx->insert_blob_stmt) != SQLITE_OK){
-        return 1;
+        return evr_error;
     }
  fail:
     return ret;

@@ -79,6 +79,7 @@ add_executable(glacier-test
   src/dynamic_array.c
   src/files.c
   src/logger.c
+  src/keys.c
   )
 target_link_libraries(glacier-test
   ${CJSON_LIBRARIES}
@@ -95,6 +96,7 @@ add_executable(concurrent-glacier-test
   src/dynamic_array.c
   src/files.c
   src/logger.c
+  src/keys.c
   )
 target_link_libraries(concurrent-glacier-test
   ${CJSON_LIBRARIES}

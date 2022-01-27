@@ -27,22 +27,7 @@
 
 #include "configuration.h"
 #include "errors.h"
-
-typedef uint8_t evr_hash_algorithm_t;
-
-extern const evr_hash_algorithm_t evr_hash_algorithm_sha224;
-
-typedef uint8_t evr_key_len_t;
-
-typedef struct {
-    /**
-     * type indicates the kind of hashing algorithm used to produce key.
-     */
-    evr_hash_algorithm_t type;
-    
-    evr_key_len_t key_len;
-    uint8_t *key;
-} evr_blob_key_t;
+#include "keys.h"
 
 /**
  * evr_chunk_size is the size of one chunk within the
