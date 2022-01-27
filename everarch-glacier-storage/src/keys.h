@@ -21,58 +21,30 @@
 
 #include <stdint.h>
 
-typedef uint8_t evr_hash_algorithm_t;
+#define evr_blob_key_bits 224
+#define evr_blob_key_size (evr_blob_key_bits / 8)
 
-extern const evr_hash_algorithm_t evr_hash_algorithm_sha224;
+typedef uint8_t evr_blob_key_t[evr_blob_key_size];
 
-typedef uint8_t evr_key_len_t;
-
-typedef struct {
-    /**
-     * type indicates the kind of hashing algorithm used to produce key.
-     */
-    evr_hash_algorithm_t type;
-    
-    evr_key_len_t key_len;
-    uint8_t *key;
-} evr_blob_key_t;
+#define evr_fmt_blob_key_prefix_len 7
 
 /**
- * evr_formatted_key_size returns the number of bytes which would be
- * required to store a string formatted version of key.
+ * evr_fmt_blob_key_size is the size required to store a human
+ * readable formatted blob key in a string.
  *
- * Returns 0 if an invalid key is supplied.
+ * The formular consists of: <prefix> <hex key> \0
  */
-size_t evr_fmt_key_size(const evr_blob_key_t *key);
+#define evr_fmt_blob_key_size (evr_fmt_blob_key_prefix_len + 2 * evr_blob_key_size + 1)
+
+typedef char evr_fmt_blob_key_t[evr_fmt_blob_key_size];
 
 /**
- * evr_format_key formats key in a human readable way into dest.
+ * evr_format_blob_key formats key in a human readable way into dest.
  *
  * Formatted keys may look like "sha224-deadbeef".
  *
- * max_size limits the bytes written.
- *
- * Return evr_ok on success. Otherwise evr_error may be returned if
- * space in dest is not enough.
+ * Make sure you have at least evr_fmt_blob_key_size bytes available.
  */
-int evr_fmt_key(char *dest, size_t max_size, const evr_blob_key_t *key);
-
-/**
- * evr_fmt_key_into is a shorthand for formatting a key into a string
- * on the stack.
- */
-#define evr_fmt_key_into(var, key, fail) \
-    size_t var ## _size = evr_fmt_key_size(key); \
-    if(var ## _size == 0){ \
-        goto fail; \
-    } \
-    char *var = alloca(var ## _size); \
-    evr_fmt_key(var, var ## _size, key)
-
-/**
- * evr_blob_key_sha224_size is the size required to fit in a
- * evr_blob_key_t which holds a key of type sha224.
- */
-#define evr_blob_key_sha224_size (sizeof(evr_blob_key_t) + 224 / 8)
+void evr_fmt_blob_key(char *dest, const evr_blob_key_t key);
 
 #endif

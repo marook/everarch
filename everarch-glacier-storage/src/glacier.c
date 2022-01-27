@@ -98,18 +98,10 @@ int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx){
     return ret;
 }
 
-int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t *key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg){
+int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg){
     int ret = evr_error;
-    {
-        size_t key_buffer_len = sizeof(evr_hash_algorithm_t) + key->key_len;
-        void *key_buffer = alloca(key_buffer_len);
-        void *p = key_buffer;
-        *((evr_hash_algorithm_t*)p) = key->type;
-        p = (evr_hash_algorithm_t*)p + 1;
-        memcpy(p, key->key, key->key_len);
-        if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key_buffer, key_buffer_len, SQLITE_TRANSIENT) != SQLITE_OK){
-            goto end_with_find_reset;
-        }
+    if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto end_with_find_reset;
     }
     int step_result = sqlite3_step(ctx->find_blob_stmt);
     if(step_result == SQLITE_DONE){
@@ -426,11 +418,12 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
 
 int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob) {
     int ret = evr_error;
-    size_t key_disk_size = sizeof(evr_hash_algorithm_t) + sizeof(evr_key_len_t) + blob->key.key_len;
+    size_t key_disk_size = evr_blob_key_size;
     size_t blob_disk_size = sizeof(evr_blob_size_t) + blob->size;
     size_t disk_size = key_disk_size + blob_disk_size;
     if(disk_size > ctx->config->max_bucket_size){
-        evr_fmt_key_into(fmt_key, &blob->key, fail);
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, blob->key);
         log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld", fmt_key, ctx->config->bucket_dir_path, disk_size, ctx->config->max_bucket_size);
         goto fail;
     }
@@ -442,27 +435,18 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
     if(lseek(ctx->current_bucket_f, ctx->current_bucket_pos, SEEK_SET) == -1){
         goto fail;
     }
-    size_t header_buffer_len = sizeof(evr_hash_algorithm_t) + sizeof(evr_key_len_t) + blob->key.key_len + sizeof(evr_blob_size_t);
+    size_t header_buffer_len = key_disk_size + sizeof(evr_blob_size_t);
     void *header_buffer = alloca(header_buffer_len);
-    void *header_buffer_key_p;
     {
         // fill header_buffer
         void *p = header_buffer;
-        *((evr_hash_algorithm_t*)p) = blob->key.type;
-        p = (evr_hash_algorithm_t*)p + 1;
-        *((evr_key_len_t*)p) = blob->key.key_len;
-        p = (evr_key_len_t*)p + 1;
-        memcpy(p, blob->key.key, blob->key.key_len);
-        // store header buffer key position for later insert into
-        // index db. make sure that there is always enough space for
-        // evr_hash_algorithm_t BEFORE header_buffer_key_p. don't judge
-        // me.
-        header_buffer_key_p = p;
-        p = (uint8_t*)p + blob->key.key_len;
+        memcpy(p, blob->key, sizeof(blob->key));
+        p = (uint8_t*)p + sizeof(blob->key);
         *((evr_blob_size_t*)p) = evr_blob_size_to_be(blob->size);
     }
     if(write(ctx->current_bucket_f, header_buffer, header_buffer_len) != header_buffer_len){
-        evr_fmt_key_into(fmt_key, &blob->key, fail);
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, blob->key);
         log_error("Can't completely write blob header for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
         goto fail;
     }
@@ -475,7 +459,8 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         }
         ssize_t chunk_bytes_written = write(ctx->current_bucket_f, *c, chunk_bytes_len);
         if(chunk_bytes_written != chunk_bytes_len){
-            evr_fmt_key_into(fmt_key, &blob->key, fail);
+            evr_fmt_blob_key_t fmt_key;
+            evr_fmt_blob_key(fmt_key, blob->key);
             log_error("Can't completely write blob data for key %s in glacier directory %s after %d bytes written.", fmt_key, ctx->config->bucket_dir_path, bytes_written);
             goto fail;
         }
@@ -492,13 +477,8 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         log_error("Can't completely write bucket end pointer in glacier directory %s", ctx->config->bucket_dir_path);
         goto fail;
     }
-    {
-        // bind key into prepared insert_blob_stmt
-        evr_hash_algorithm_t *key_type_p = ((evr_hash_algorithm_t*)header_buffer_key_p) - 1;
-        *key_type_p = blob->key.type;
-        if(sqlite3_bind_blob(ctx->insert_blob_stmt, 1, key_type_p, sizeof(evr_hash_algorithm_t) + blob->key.key_len, SQLITE_TRANSIENT) != SQLITE_OK){
-            goto fail_with_insert_reset;
-        }
+    if(sqlite3_bind_blob(ctx->insert_blob_stmt, 1, blob->key, sizeof(blob->key), SQLITE_TRANSIENT) != SQLITE_OK){
+        goto fail_with_insert_reset;
     }
     if(sqlite3_bind_int64(ctx->insert_blob_stmt, 2, ctx->current_bucket_index) != SQLITE_OK){
         goto fail_with_insert_reset;
@@ -514,6 +494,13 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         log_error("glacier storage %s failed to store blob index: %s", ctx->config->bucket_dir_path, sqlite_error_msg);
         goto fail_with_insert_reset;
     }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, blob->key);
+        log_debug("Wrote blob with key %s to glacier", fmt_key);
+    }
+#endif
     ret = evr_ok;
  fail_with_insert_reset:
     if(sqlite3_reset(ctx->insert_blob_stmt) != SQLITE_OK){

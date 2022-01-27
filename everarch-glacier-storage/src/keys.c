@@ -19,39 +19,18 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "errors.h"
 #include "keys.h"
 
-const evr_hash_algorithm_t evr_hash_algorithm_sha224 = 1;
+const char *evr_fmt_blob_key_prefix = "sha224-";
 
-const char *evr_hash_algorithm_sha224_prefix = "sha224-";
-#define evr_hash_algorithm_sha224_prefix_len strlen(evr_hash_algorithm_sha224_prefix)
-#define evr_hash_algorithm_sha224_fmt_len evr_hash_algorithm_sha224_prefix_len + 2 * 224 / 8 + 1
-
-size_t evr_fmt_key_size(const evr_blob_key_t *key){
-    if(key->type == evr_hash_algorithm_sha224){
-        return evr_hash_algorithm_sha224_fmt_len;
-    } else {
-        return 0;
+void evr_fmt_blob_key(char *dest, const evr_blob_key_t key) {
+    char *p = dest;
+    memcpy(p, evr_fmt_blob_key_prefix, evr_fmt_blob_key_prefix_len);
+    p += evr_fmt_blob_key_prefix_len;
+    const uint8_t *end = &key[evr_blob_key_size];
+    for(const uint8_t *k = key; k != end; k++){
+        sprintf(p, "%02x", *k);
+        p += 2;
     }
-}
-
-int evr_fmt_key(char *dest, size_t max_size, const evr_blob_key_t *key) {
-    if(key->type == evr_hash_algorithm_sha224){
-        if(max_size < evr_hash_algorithm_sha224_fmt_len || key->key_len != 224 / 8){
-            return evr_error;
-        }
-        char *p = dest;
-        memcpy(p, evr_hash_algorithm_sha224_prefix, evr_hash_algorithm_sha224_prefix_len);
-        p += evr_hash_algorithm_sha224_prefix_len;
-        uint8_t *end = &(key->key[28]);
-        for(uint8_t *k = key->key; k != end; k++){
-            sprintf(p, "%02x", *k);
-            p += 2;
-        }
-        *p++ = '\0';
-        return evr_ok;
-    } else {
-        return evr_error;
-    }
+    *p++ = '\0';
 }

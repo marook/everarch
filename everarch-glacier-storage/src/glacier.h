@@ -85,7 +85,7 @@ int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx);
  * on successful processing. onData's data argument is only allocated
  * while onData is executed.
  */
-int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t *key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg);
+int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg);
 
 typedef struct {
     evr_glacier_storage_configuration *config;
