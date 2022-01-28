@@ -16,12 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "concurrent-glacier.h"
+
 #include <stdatomic.h>
 
 #include "errors.h"
 #include "logger.h"
-
-#include "concurrent-glacier.h"
 
 #define evr_persister_task_queue_length 32
 

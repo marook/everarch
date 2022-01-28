@@ -16,13 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "logger.h"
+
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-#include "logger.h"
 
 const char *log_date_format = "%Y-%m-%dT%H:%M:%S";
 

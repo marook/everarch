@@ -16,9 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-
 #include "files.h"
+
+#include <stdio.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 

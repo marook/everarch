@@ -19,6 +19,8 @@
 #ifndef __configuration_h__
 #define __configuration_h__
 
+#include <stddef.h>
+
 /**
  * evr_glacier_storage_configuration aggregates configuration options
  * for the evr-glacier-storage application.

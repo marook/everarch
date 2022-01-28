@@ -16,13 +16,14 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "configuration.h"
+
 #include <cjson/cJSON.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "configuration.h"
 #include "dynamic_array.h"
 #include "files.h"
 #include "logger.h"

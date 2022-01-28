@@ -16,10 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "keys.h"
+
 #include <stdio.h>
 #include <string.h>
-
-#include "keys.h"
 
 const char *evr_fmt_blob_key_prefix = "sha224-";
 

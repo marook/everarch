@@ -19,6 +19,8 @@
 #ifndef __evr_glacier_h__
 #define __evr_glacier_h__
 
+#include "config.h"
+
 #include <endian.h>
 #include <stdint.h>
 #include <stdio.h>

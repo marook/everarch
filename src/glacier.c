@@ -16,6 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "glacier.h"
+
+#include <alloca.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -25,7 +28,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "glacier.h"
 #include "logger.h"
 
 const size_t evr_chunk_size = 1*1024*1024;

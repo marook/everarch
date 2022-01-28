@@ -16,32 +16,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * logger.h defines a log interface with log levels and output to
- * stdout.
- *
- * log levels may only be enabled/disabled during compile time using
- * the defines EVR_LOG_DEBUG or EVR_LOG_INFO.
- */
+#include "glacier-cmd.h"
 
-#ifndef __logger_h__
-#define __logger_h__
+#include "errors.h"
 
-#ifdef EVR_LOG_DEBUG
-#  define EVR_LOG_INFO
-#  define log_debug(args...) evr_log("D", args)
-#else
-#  define log_debug(args...)
-#endif
+int evr_parse_cmd_header(evr_cmd_header_t *header, const uint8_t *buffer){
+    const uint8_t *p = buffer;
+    header->type = *(evr_cmd_type_t*)p;
+    p = &((evr_cmd_type_t*)p)[1];
+    header->body_size = evr_cmd_size_to_h(*(evr_cmd_size_t*)p);
+    return evr_ok;
+}
 
-#ifdef EVR_LOG_INFO
-#  define log_info(args...) evr_log("I", args)
-#else
-#  define log_info(args...)
-#endif
-
-#define log_error(args...) evr_log("E", args)
-
-void evr_log(const char *level, const char *fmt, ...);
-
-#endif
+int evr_format_cmd_header(uint8_t *buffer, const evr_cmd_header_t *header){
+    uint8_t *p = buffer;
+    *(evr_cmd_type_t*)p = header->type;
+    p = &((evr_cmd_type_t*)p)[1];
+    *(evr_cmd_size_t*)p = evr_cmd_size_to_n(header->body_size);
+    return evr_ok;
+}

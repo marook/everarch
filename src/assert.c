@@ -16,12 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "assert.h"
+
 #include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "assert.h"
 #include "errors.h"
 
 void print_backtrace();

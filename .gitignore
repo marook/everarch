@@ -1,7 +1,24 @@
-# cmake generated files
-CMakeCache.txt
-CMakeFiles
-cmake_install.cmake
+# generally ignored artifacts
+*.log
+
+# build system artifacts
 Makefile
-Testing
-CTestTestfile.cmake
+Makefile.in
+.deps
+/aclocal.m4
+/autom4te.cache
+/compile
+/config.guess
+/config.h
+/config.h.in
+/config.status
+/config.sub
+/configure
+/depcomp
+/install-sh
+/missing
+/stamp-h1
+
+# compilation artifacts
+*.o
+/src/*-test

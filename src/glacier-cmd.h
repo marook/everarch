@@ -31,6 +31,8 @@
 #ifndef __evr_glacier_cmd_h__
 #define __evr_glacier_cmd_h__
 
+#include "config.h"
+
 #include <stdint.h>
 #include <endian.h>
 
