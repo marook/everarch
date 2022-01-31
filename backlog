@@ -2,7 +2,7 @@
 network clients should be able to request and send blobs via commands.
 
 functions for parsing commands from buffers and formatting commands
-into buffers is necessary.
+into buffers are necessary.
 
 should be an extractable piece of code so we can reuse it in a future
 client.
