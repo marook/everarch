@@ -1,11 +1,9 @@
-* command parser
-network clients should be able to request and send blobs via commands.
+* allocator and free for chunks
+allocation and free function for chunks of certain size.
 
-functions for parsing commands from buffers and formatting commands
-into buffers are necessary.
-
-should be an extractable piece of code so we can reuse it in a future
-client.
+the implementaion may allocate chunks for now in now big
+block. maintaining a pool of chuns in a reusable pool is a task for
+the future.
 * open network socket, spawn threads, process commands
 * implement an integration test / benchmark
 should connect via network socket. send lots of blobs. request lots of
