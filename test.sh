@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+cd "${script_dir}"
+
 echo "Start testing…"
 for test_bin in src/*-test
 do
