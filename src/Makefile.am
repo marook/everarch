@@ -6,7 +6,8 @@ bin_PROGRAMS = \
 	dynamic-array-test \
 	files-test \
 	glacier-cmd-test \
-	glacier-test
+	glacier-test \
+	keys-test
 
 concurrent_glacier_test_SOURCES = \
 	assert.c \
@@ -37,6 +38,7 @@ glacier_cmd_test_SOURCES = \
 	glacier-cmd.c \
 	glacier-cmd-test.c \
 	keys.c
+glacier_cmd_test_LDADD = $(EVERARCH_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
@@ -49,3 +51,10 @@ glacier_test_SOURCES = \
 	keys.c \
 	logger.c
 glacier_test_LDADD = $(EVERARCH_LIBS)
+
+keys_test_SOURCES = \
+	assert.c \
+	keys.c \
+	keys-test.c \
+	logger.c
+keys_test_LDADD = $(EVERARCH_LIBS)

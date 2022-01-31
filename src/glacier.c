@@ -30,7 +30,7 @@
 
 #include "logger.h"
 
-const size_t evr_chunk_size = 1*1024*1024;
+// TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_blob_data_size = 16*1024*1024;
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
 const char *glacier_dir_lock_file_path = "/lock";

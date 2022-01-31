@@ -19,14 +19,23 @@
 #ifndef __evr_keys_h__
 #define __evr_keys_h__
 
+#include <stddef.h>
 #include <stdint.h>
+#include <string.h>
+
+/**
+ * evr_chunk_size is the size of one chunk within the
+ * evr_writing_blob_t struct in bytes.
+ */
+#define evr_chunk_size (1*1024*1024)
 
 #define evr_blob_key_bits 224
 #define evr_blob_key_size (evr_blob_key_bits / 8)
 
 typedef uint8_t evr_blob_key_t[evr_blob_key_size];
 
-#define evr_fmt_blob_key_prefix_len 7
+#define evr_fmt_blob_key_prefix "sha3-224-"
+#define evr_fmt_blob_key_prefix_strlen 9
 
 /**
  * evr_fmt_blob_key_size is the size required to store a human
@@ -34,7 +43,7 @@ typedef uint8_t evr_blob_key_t[evr_blob_key_size];
  *
  * The formular consists of: <prefix> <hex key> \0
  */
-#define evr_fmt_blob_key_size (evr_fmt_blob_key_prefix_len + 2 * evr_blob_key_size + 1)
+#define evr_fmt_blob_key_size (evr_fmt_blob_key_prefix_strlen + 2 * evr_blob_key_size + 1)
 
 typedef char evr_fmt_blob_key_t[evr_fmt_blob_key_size];
 
@@ -46,5 +55,7 @@ typedef char evr_fmt_blob_key_t[evr_fmt_blob_key_size];
  * Make sure you have at least evr_fmt_blob_key_size bytes available.
  */
 void evr_fmt_blob_key(char *dest, const evr_blob_key_t key);
+
+int evr_calc_blob_key(evr_blob_key_t key, size_t size, const uint8_t **chunks);
 
 #endif

@@ -31,17 +31,6 @@ evr_glacier_storage_configuration* clone_config(evr_glacier_storage_configuratio
 char* clone_string(const char* s);
 void free_glacier_ctx(evr_glacier_write_ctx *ctx);
 
-void test_evr_fmt_key_into(){
-    evr_fmt_blob_key_t fmt_key;
-    evr_blob_key_t key;
-    memset(key, 0, evr_blob_key_size);
-    evr_fmt_blob_key(fmt_key, key);
-    assert_str_eq(fmt_key, "sha224-00000000000000000000000000000000000000000000000000000000");
-    memset(key, 255, evr_blob_key_size);
-    evr_fmt_blob_key(fmt_key, key);
-    assert_str_eq(fmt_key, "sha224-ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-}
-
 void test_evr_glacier_open_same_empty_glacier_twice(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     for(int i = 0; i < 2; i++){
@@ -200,7 +189,6 @@ void test_evr_free_glacier_write_ctx_with_null_ctx(){
 }
 
 int main(){
-    run_test(test_evr_fmt_key_into);
     run_test(test_evr_glacier_open_same_empty_glacier_twice);
     run_test(test_evr_glacier_create_context_twice_fails);
     run_test(test_evr_glacier_write_smal_blob);

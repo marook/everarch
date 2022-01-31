@@ -31,11 +31,6 @@
 #include "errors.h"
 #include "keys.h"
 
-/**
- * evr_chunk_size is the size of one chunk within the
- * evr_writing_blob_t struct in bytes.
- */
-extern const size_t evr_chunk_size;
 extern const size_t evr_max_blob_data_size;
 extern const size_t evr_max_chunks_per_blob;
 
