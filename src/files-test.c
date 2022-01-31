@@ -17,7 +17,6 @@
  */
 
 #include "assert.h"
-#include "dynamic_array.h"
 #include "files.h"
 #include "test.h"
 

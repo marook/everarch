@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "dynamic_array.h"
+#include "memory.h"
 
 inline size_t get_dynamic_array_size(size_t data_size);
 

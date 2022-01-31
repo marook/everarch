@@ -20,7 +20,7 @@
 #include <string.h>
 
 #include "assert.h"
-#include "dynamic_array.h"
+#include "memory.h"
 #include "test.h"
 
 int is_ignored(int c);

@@ -24,7 +24,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "dynamic_array.h"
+#include "memory.h"
 #include "files.h"
 #include "logger.h"
 

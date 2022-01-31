@@ -19,7 +19,7 @@
 #ifndef __files_h__
 #define __files_h__
 
-#include "dynamic_array.h"
+#include "memory.h"
 
 /**
  * read_file reads the file content at a given path.
