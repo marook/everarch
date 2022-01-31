@@ -20,7 +20,7 @@
 
 #include "assert.h"
 #include "configuration-testutil.h"
-#include "memory.h"
+#include "dyn-mem.h"
 #include "glacier.h"
 #include "test.h"
 #include "logger.h"

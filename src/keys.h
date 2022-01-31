@@ -23,12 +23,6 @@
 #include <stdint.h>
 #include <string.h>
 
-/**
- * evr_chunk_size is the size of one chunk within the
- * evr_writing_blob_t struct in bytes.
- */
-#define evr_chunk_size (1*1024*1024)
-
 #define evr_blob_key_bits 224
 #define evr_blob_key_size (evr_blob_key_bits / 8)
 

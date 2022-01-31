@@ -24,7 +24,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "memory.h"
 #include "files.h"
 #include "logger.h"
 

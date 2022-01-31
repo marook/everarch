@@ -3,7 +3,7 @@ AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(PTHREAD_CFLAGS)
 
 bin_PROGRAMS = \
 	concurrent-glacier-test \
-	memory-test \
+	dyn-mem-test \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
@@ -15,20 +15,20 @@ concurrent_glacier_test_SOURCES = \
 	concurrent-glacier.c \
 	configuration.c \
 	configuration-testutil.c \
-	memory.c \
+	dyn-mem.c \
 	files.c \
 	logger.c
 concurrent_glacier_test_LDADD = $(EVERARCH_LIBS)
 
-memory_test_SOURCES = \
+dyn_mem_test_SOURCES = \
 	assert.c \
-	memory.c \
-	memory-test.c
-memory_test_LDADD = $(EVERARCH_LIBS)
+	dyn-mem.c \
+	dyn-mem-test.c
+dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
 files_test_SOURCES = \
 	assert.c \
-	memory.c \
+	dyn-mem.c \
 	files.c \
 	files-test.c
 files_test_LDADD = $(EVERARCH_LIBS)
@@ -43,7 +43,7 @@ glacier_cmd_test_LDADD = $(EVERARCH_LIBS)
 glacier_test_SOURCES = \
 	assert.c \
 	configuration.c \
-	memory.c \
+	dyn-mem.c \
 	files.c \
 	glacier.c \
 	glacier-test.c \

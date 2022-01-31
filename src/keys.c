@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "errors.h"
+#include "dyn-mem.h"
 
 void evr_fmt_blob_key(char *dest, const evr_blob_key_t key) {
     char *p = dest;

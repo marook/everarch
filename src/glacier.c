@@ -29,6 +29,7 @@
 #include <unistd.h>
 
 #include "logger.h"
+#include "dyn-mem.h"
 
 // TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_blob_data_size = 16*1024*1024;

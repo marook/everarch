@@ -20,7 +20,7 @@
 #include <string.h>
 
 #include "assert.h"
-#include "memory.h"
+#include "dyn-mem.h"
 #include "test.h"
 
 int is_ignored(int c);
@@ -45,8 +45,22 @@ int is_ignored(int c){
     return c == 0 || isspace(c);
 }
 
+void test_allocate_chunk_set(){
+    chunk_set_t *cs = evr_allocate_chunk_set(3);
+    assert_not_null(cs);
+    assert_equal(cs->chunks_len, 3);
+    // write into every byte of the chunk set to force an error in
+    // valgrind if too less memory was allocated.
+    for(int i = 0; i < cs->chunks_len; i++){
+        uint8_t *c = cs->chunks[i];
+        memset(c, 42, evr_chunk_size);
+    }
+    evr_free_chunk_set(cs);
+}
+
 int main(){
     run_test(test_rtrim_empty_array);
     run_test(test_rtrim_end_of_array);
+    run_test(test_allocate_chunk_set);
     return 0;
 }

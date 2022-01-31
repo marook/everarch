@@ -16,9 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __dynamic_array_h__
-#define __dynamic_array_h__
+#ifndef __dyn_mem_h__
+#define __dyn_mem_h__
 
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef struct {
@@ -60,5 +61,25 @@ dynamic_array *alloc_dynamic_array(size_t initial_size);
 dynamic_array *grow_dynamic_array_at_least(dynamic_array *da, size_t min_size);
 
 void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c));
+
+/**
+ * evr_chunk_size is the size of one chunk within the
+ * evr_writing_blob_t struct in bytes.
+ */
+#define evr_chunk_size (1*1024*1024)
+
+typedef struct {
+    size_t chunks_len;
+    uint8_t **chunks;
+} chunk_set_t;
+
+/**
+ * evr_allocate_chunks allocates n chunks.
+ *
+ * Returns NULL if the chunk set could not be allocated.
+ */
+chunk_set_t* evr_allocate_chunk_set(size_t chunks_len);
+
+void evr_free_chunk_set(chunk_set_t *cs);
 
 #endif
