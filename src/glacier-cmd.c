@@ -35,3 +35,19 @@ int evr_format_cmd_header(uint8_t *buffer, const evr_cmd_header_t *header){
     *(evr_cmd_size_t*)p = evr_cmd_size_to_n(header->body_size);
     return evr_ok;
 }
+
+int evr_parse_resp_header(evr_resp_header_t *header, const uint8_t *buffer){
+    const uint8_t *p = buffer;
+    header->status_code = *(evr_status_code_t*)p;
+    p = &((evr_status_code_t*)p)[1];
+    header->body_size = evr_cmd_size_to_h(*(evr_cmd_size_t*)p);
+    return evr_ok;
+}
+
+int evr_format_resp_header(uint8_t *buffer, const evr_resp_header_t *header){
+    uint8_t *p = buffer;
+    *(evr_status_code_t*)p = header->status_code;
+    p = &((evr_status_code_t*)p)[1];
+    *(evr_cmd_size_t*)p = evr_cmd_size_to_n(header->body_size);
+    return evr_ok;
+}
