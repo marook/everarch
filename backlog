@@ -1,4 +1,7 @@
-* open network socket, spawn threads, process commands
+* open network socket, spawn threads, print commands
+* evr-glacier-cli application with put blob feature
+* add get blob feature to evr-glacier-cli
+* actually process commands using glacier
 * implement an integration test / benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
