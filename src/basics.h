@@ -16,13 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __errors_h__
-#define __errors_h__
+#ifndef __basics_h__
+#define __basics_h__
 
-#define evr_ok 0
-#define evr_error 1
-#define evr_not_found 2
-#define evr_temporary_occupied 3
-#define evr_end 4
+#define max(a, b) ((a < b) ? b : a)
 
 #endif

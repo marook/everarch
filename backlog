@@ -1,4 +1,3 @@
-* open network socket, spawn threads, print commands
 * evr-glacier-cli application with put blob feature
 * add get blob feature to evr-glacier-cli
 * actually process commands using glacier

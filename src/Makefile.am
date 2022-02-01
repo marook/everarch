@@ -4,6 +4,7 @@ AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(PTHREAD_CFLAGS)
 bin_PROGRAMS = \
 	concurrent-glacier-test \
 	dyn-mem-test \
+	evr-glacier-storage \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
@@ -25,6 +26,16 @@ dyn_mem_test_SOURCES = \
 	dyn-mem.c \
 	dyn-mem-test.c
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
+
+evr_glacier_storage_SOURCES = \
+	configuration.c \
+	dyn-mem.c \
+	evr-glacier-storage.c \
+	files.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c
+evr_glacier_storage_LDADD = $(EVERARCH_LIBS)
 
 files_test_SOURCES = \
 	assert.c \

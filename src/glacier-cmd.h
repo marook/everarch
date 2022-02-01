@@ -57,12 +57,8 @@ typedef struct {
  */
 #define evr_cmd_header_t_n_size (sizeof(evr_cmd_type_t) + sizeof(evr_cmd_size_t))
 
-int evr_parse_cmd_header(evr_cmd_header_t *header, const uint8_t *buffer);
-int evr_format_cmd_header(uint8_t *buffer, const evr_cmd_header_t *header);
-
-typedef struct {
-    evr_blob_key_t key;
-} evr_cmd_get_blob_body_t;
+int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer);
+int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header);
 
 typedef uint8_t evr_status_code_t;
 
@@ -82,11 +78,7 @@ typedef struct {
  */
 #define evr_resp_header_t_n_size (sizeof(evr_status_code_t) + sizeof(evr_cmd_size_t))
 
-int evr_parse_resp_header(evr_resp_header_t *header, const uint8_t *buffer);
-int evr_format_resp_header(uint8_t *buffer, const evr_resp_header_t *header);
-
-typedef struct {
-    evr_blob_key_t key;
-} evr_resp_put_body_body_t;
+int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer);
+int evr_format_resp_header(char *buffer, const evr_resp_header_t *header);
 
 #endif

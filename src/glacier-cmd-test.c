@@ -24,7 +24,7 @@ void test_format_parse_cmd_header(){
     evr_cmd_header_t in;
     in.type = evr_cmd_type_get_blob;
     in.body_size = 42;
-    uint8_t buffer[evr_cmd_header_t_n_size];
+    char buffer[evr_cmd_header_t_n_size];
     assert_ok(evr_format_cmd_header(buffer, &in));
     evr_cmd_header_t out;
     assert_ok(evr_parse_cmd_header(&out, buffer));
@@ -36,7 +36,7 @@ void test_format_parse_resp_header(){
     evr_resp_header_t in;
     in.status_code = evr_status_code_unknown_cmd;
     in.body_size = 666;
-    uint8_t buffer[evr_resp_header_t_n_size];
+    char buffer[evr_resp_header_t_n_size];
     assert_ok(evr_format_resp_header(buffer, &in));
     evr_resp_header_t out;
     assert_ok(evr_parse_resp_header(&out, buffer));
