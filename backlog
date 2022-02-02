@@ -1,3 +1,8 @@
+* remove typedefs for atomic types
+see [[https://www.kernel.org/doc/html/v4.10/process/coding-style.html][kernel coding style]] section 5b
+* rename structs from X_t to X
+pitrp said only the committe uses _t suffix.
+* function body opening braces in new lines
 * evr-glacier-cli application with put blob feature
 * add get blob feature to evr-glacier-cli
 * actually process commands using glacier
