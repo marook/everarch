@@ -1,0 +1,13 @@
+* Everarch Coding Style
+The prophet gave us the [[https://www.kernel.org/doc/html/v4.10/process/coding-style.html][Kernel Coding Style]] to which you should stick.
+
+But of course just like in nature new religions evolve in the human
+species and so do coding styles. So we get rid of the inconsistencies.
+
+** put the opening { in functions in the same line
+Here is a good example:
+#+BEGIN_SRC c
+function int foo() {
+  return 42;
+}
+#+END_SRC
