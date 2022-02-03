@@ -25,8 +25,13 @@
 #include "test.h"
 #include "logger.h"
 
-int store_into_dynamic_array(void *arg, const uint8_t *data, size_t data_len);
-int store_into_void(void *arg, const uint8_t *data, size_t data_len);
+int status_mock_ret;
+int status_mock_expected_exists;
+int status_mock_expected_blob_size;
+
+int status_mock(void *arg, int exists, size_t blob_size);
+int store_into_dynamic_array(void *arg, const char *data, size_t data_len);
+int store_into_void(void *arg, const char *data, size_t data_len);
 evr_glacier_storage_configuration* clone_config(evr_glacier_storage_configuration *config);
 char* clone_string(const char* s);
 void free_glacier_ctx(evr_glacier_write_ctx *ctx);
@@ -87,7 +92,10 @@ void test_evr_glacier_write_smal_blob(){
         memset(key, 1, evr_blob_key_size);
         dynamic_array *data_buffer = alloc_dynamic_array(128);
         assert_not_null(data_buffer);
-        assert_zero(evr_glacier_read_blob(read_ctx, key, store_into_dynamic_array, &data_buffer));
+        status_mock_ret = evr_ok;
+        status_mock_expected_exists = 1;
+        status_mock_expected_blob_size = 11;
+        assert_zero(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_dynamic_array, &data_buffer));
         assert_equal(data_buffer->size_used, 11);
         assert_zero(memcmp("hello world", data_buffer->data, data_buffer->size_used));
         free(data_buffer);
@@ -96,13 +104,22 @@ void test_evr_glacier_write_smal_blob(){
         log_info("Read not existing key");
         evr_blob_key_t key;
         memset(key, 2, evr_blob_key_size);
-        assert_equal(evr_glacier_read_blob(read_ctx, key, store_into_void, NULL), evr_not_found);
+        status_mock_ret = evr_ok;
+        status_mock_expected_exists = 0;
+        status_mock_expected_blob_size = 0;
+        assert_equal(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_void, NULL), evr_not_found);
     }
     assert_zero(evr_free_glacier_read_ctx(read_ctx));
     free_glacier_ctx(write_ctx);
 }
 
-int store_into_dynamic_array(void *arg, const uint8_t *data, size_t data_len){
+int status_mock(void *arg, int exists, size_t blob_size){
+    assert_equal(exists, status_mock_expected_exists);
+    assert_equal(blob_size, status_mock_expected_blob_size);
+    return status_mock_ret;
+}
+
+int store_into_dynamic_array(void *arg, const char *data, size_t data_len){
     dynamic_array **buffer = (dynamic_array**)arg;
     size_t new_size_used = (*buffer)->size_used + data_len;
     if(new_size_used > (*buffer)->size_allocated){
@@ -116,7 +133,7 @@ int store_into_dynamic_array(void *arg, const uint8_t *data, size_t data_len){
     return 0;
 }
 
-int store_into_void(void *arg, const uint8_t *data, size_t data_len){
+int store_into_void(void *arg, const char *data, size_t data_len){
     return 0;
 }
 

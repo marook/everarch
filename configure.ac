@@ -26,9 +26,12 @@ AC_CHECK_FUNCS_ONCE([mkdtemp])
 
 AX_PTHREAD
 
+PKG_CHECK_MODULES([GCRYPT], [
+    libgcrypt
+])
+
 PKG_CHECK_MODULES([EVERARCH], [
     libcjson
-    libgcrypt
     sqlite3
 ])
 

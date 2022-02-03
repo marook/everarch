@@ -52,7 +52,7 @@ void test_allocate_chunk_set(){
     // write into every byte of the chunk set to force an error in
     // valgrind if too less memory was allocated.
     for(int i = 0; i < cs->chunks_len; i++){
-        uint8_t *c = cs->chunks[i];
+        char *c = cs->chunks[i];
         memset(c, 42, evr_chunk_size);
     }
     evr_free_chunk_set(cs);

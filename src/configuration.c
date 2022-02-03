@@ -23,16 +23,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <wordexp.h>
 
 #include "files.h"
 #include "logger.h"
+#include "errors.h"
 
-#define replace_string(dest, src, error_target) {char *src_var = src; if(src_var){if(dest){free(dest);} size_t src_len = strlen(src_var); dest = malloc(src_len+1); if(!dest){goto error_target;} memcpy(dest, src_var, src_len+1);}}
+#define replace_string(dest, src, error_target) {       \
+        char *src_var = src;                            \
+        if(src_var){                                    \
+            if(dest){free(dest);}                       \
+            size_t src_len = strlen(src_var);           \
+            dest = malloc(src_len+1);                   \
+            if(!dest){goto error_target;}               \
+            memcpy(dest, src_var, src_len+1);           \
+        }                                               \
+    }
 
 #define free_pointer(p) if(p){free(p);}
 
 char *get_object_string_property(const cJSON *obj, const char* key);
 int is_json_ignored(int c);
+int evr_single_wordexp(char **pathname);
 
 evr_glacier_storage_configuration *create_evr_glacier_storage_configuration(){
     evr_glacier_storage_configuration *config = (evr_glacier_storage_configuration*)malloc(sizeof(evr_glacier_storage_configuration));
@@ -65,17 +77,31 @@ void free_evr_glacier_storage_configuration(evr_glacier_storage_configuration *c
 }
 
 int load_evr_glacier_storage_configurations(evr_glacier_storage_configuration *config, const char **paths, size_t paths_len){
+    int ret = evr_error;
     const char **paths_end = &(paths[paths_len]);
+    wordexp_t we;
     for(const char **p = paths; p != paths_end; p++){
-        if(access(*p, F_OK)){
-            // path *p does not exist
-            continue;
+        wordexp(*p, &we, 0);
+        for(int i = 0; i < we.we_wordc; ++i){
+            char *pe = we.we_wordv[i];
+            if(access(pe, F_OK)){
+                // path *p does not exist
+                continue;
+            }
+            log_debug("Load configuration from %s", pe);
+            if(merge_evr_glacier_storage_configuration_file(config, pe)){
+                wordfree(&we);
+                goto out;
+            }
         }
-        if(merge_evr_glacier_storage_configuration_file(config, *p)){
-            return 1;
-        }
+        wordfree(&we);
     }
-    return 0;
+    if(expand_evr_glacier_storage_configuration(config) != evr_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
 }
 
 int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configuration *config, const char *config_path){
@@ -122,4 +148,39 @@ char *get_object_string_property(const cJSON *obj, const char* key){
         return NULL;
     }
     return cJSON_GetStringValue(str);
+}
+
+#define evr_single_expand_property(p, fail)     \
+    if(evr_single_wordexp(&p) != evr_ok) {      \
+        goto fail;                              \
+    }
+
+int expand_evr_glacier_storage_configuration(evr_glacier_storage_configuration *config){
+    int ret = evr_error;
+    evr_single_expand_property(config->cert_path, out);
+    evr_single_expand_property(config->key_path, out);
+    evr_single_expand_property(config->cert_root_path, out);
+    evr_single_expand_property(config->bucket_dir_path, out);
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+int evr_single_wordexp(char **pathname){
+    int ret = evr_error;
+    if(*pathname){
+        wordexp_t p;
+        wordexp(*pathname, &p, 0);
+        if(p.we_wordc != 1){
+            log_error("Pathname %s must only expand to one file", *pathname);
+            goto out_with_free_p;
+        }
+        replace_string(*pathname, p.we_wordv[0], out_with_free_p);
+        ret = evr_ok;
+    out_with_free_p:
+        wordfree(&p);
+    } else {
+        ret = evr_ok;
+    }
+    return ret;
 }

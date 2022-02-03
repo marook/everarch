@@ -29,10 +29,20 @@
  */
 int read_file(dynamic_array **buffer, const char *path, size_t max_size);
 
+int read_fd(dynamic_array **buffer, int fd, size_t max_size);
+
 /**
  * read_file_str reads a file just like read_file and \0 terminates
  * the string.
  */
 int read_file_str(dynamic_array **buffer, const char *path, size_t max_size);
+
+int read_n(int f, char *buffer, size_t bytes);
+
+int write_n(int fd, const void *buffer, size_t size);
+
+int pipe_n(int dest, int src, size_t size);
+
+chunk_set_t *read_into_chunks(int fd, size_t size);
 
 #endif

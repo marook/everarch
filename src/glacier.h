@@ -54,7 +54,7 @@ typedef struct {
     evr_glacier_storage_configuration *config;
     sqlite3 *db;
     sqlite3_stmt *find_blob_stmt;
-    uint8_t *read_buffer;
+    char *read_buffer;
 } evr_glacier_read_ctx;
 
 /**
@@ -79,11 +79,14 @@ int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx);
  * The function returns evr_not_found if the key is not part of the
  * glacier.
  *
- * onData callback may be invoked multiple times. onData must return 0
- * on successful processing. onData's data argument is only allocated
- * while onData is executed.
+ * status is invoked before the first on_data call. exists 0 indicates
+ * that the blob does not exist.
+ *
+ * on_data callback may be invoked multiple times. on_data must return
+ * evr_ok on successful processing. on_data's data argument is only
+ * allocated while on_data is executed.
  */
-int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg);
+int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
 typedef struct {
     evr_glacier_storage_configuration *config;
@@ -117,5 +120,11 @@ int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx);
  * index db.
  */
 int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob);
+
+/**
+ * evr_quick_check_glacier performs a quick sanity check of the
+ * persisted glacier and creates it if not existing.
+ */
+int evr_quick_check_glacier(evr_glacier_storage_configuration *config);
 
 #endif

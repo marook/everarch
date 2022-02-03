@@ -65,6 +65,7 @@ typedef uint8_t evr_status_code_t;
 #define evr_status_code_ok 0x20
 #define evr_status_code_client_error 0x40
 #define evr_status_code_unknown_cmd 0x44
+#define evr_status_code_blob_not_found 0x45
 #define evr_status_code_server_error 0x50
 
 typedef struct {

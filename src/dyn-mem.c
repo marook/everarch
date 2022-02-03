@@ -65,15 +65,15 @@ void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c)){
 
 chunk_set_t* evr_allocate_chunk_set(size_t chunks_len){
     size_t header_size = sizeof(chunk_set_t) + sizeof(uint8_t**) * chunks_len;
-    uint8_t *p = malloc(header_size + chunks_len * evr_chunk_size);
+    char *p = malloc(header_size + chunks_len * evr_chunk_size);
     if(!p){
         return NULL;
     }
     chunk_set_t *cs = (chunk_set_t*)p;
-    p = (uint8_t*)&cs[1];
+    p = (char*)&cs[1];
     cs->chunks_len = chunks_len;
-    cs->chunks = (uint8_t**)p;
-    p = (uint8_t*)&cs->chunks[chunks_len];
+    cs->chunks = (char**)p;
+    p = (char*)&cs->chunks[chunks_len];
     for(int i = 0; i < chunks_len; i++){
         cs->chunks[i] = p;
         p += evr_chunk_size;

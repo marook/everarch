@@ -19,36 +19,52 @@
 #include "files.h"
 
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-#define min(a, b) ((a) < (b) ? (a) : (b))
+#include "basics.h"
+#include "errors.h"
 
 int read_file(dynamic_array **buffer, const char *path, size_t max_size){
-    FILE *f = fopen(path, "r");
+    int result = evr_error;
+    int f = open(path, O_RDONLY);
     if(!f){
-        return 1;
+        goto open_fail;
     }
+    if(read_fd(buffer, f, max_size) != evr_ok){
+        goto read_fail;
+    }
+    result = evr_ok;
+ read_fail:
+    close(f);
+ open_fail:
+    return result;
+}
+
+int read_fd(dynamic_array **buffer, int fd, size_t max_size) {
     while(1){
         if((*buffer)->size_allocated == (*buffer)->size_used){
             *buffer = grow_dynamic_array(*buffer);
             if(!*buffer){
-                return 1;
+                return evr_error;
             }
         }
         size_t max_read = min((*buffer)->size_allocated, max_size) - (*buffer)->size_used;
         void *out = &(((char*)(*buffer)->data)[(*buffer)->size_used]);
-        (*buffer)->size_used += fread(out, 1, max_read, f);
-        if(ferror(f)){
-            return 1;
-        }
-        if(feof(f)){
+        ssize_t bytes_read = read(fd, out, max_read);
+        if(bytes_read == 0){
             break;
+        } else if(bytes_read < 0){
+            return evr_error;
         }
+        (*buffer)->size_used += bytes_read;
         if((*buffer)->size_used == max_size){
-            return 1;
+            return evr_error;
         }
     }
-    fclose(f);
-    return 0;
+    return evr_ok;
 }
 
 int read_file_str(dynamic_array **buffer, const char *path, size_t max_size){
@@ -67,4 +83,72 @@ int read_file_str(dynamic_array **buffer, const char *path, size_t max_size){
     ((char*)(*buffer)->data)[(*buffer)->size_used] = '\0';
     (*buffer)->size_used++;
     return 0;
+}
+
+int read_n(int f, char *buffer, size_t bytes){
+    size_t remaining = bytes;
+    while(remaining > 0){
+        size_t nbytes = read(f, buffer, remaining);
+        if(nbytes < 0){
+            return evr_error;
+        }
+        if(nbytes == 0){
+            return evr_end;
+        }
+        buffer += nbytes;
+        remaining -= nbytes;
+    }
+    return evr_ok;
+}
+
+int write_n(int fd, const void *buffer, size_t size){
+    size_t remaining = size;
+    while(remaining > 0){
+        ssize_t written = write(fd, buffer, remaining);
+        if(written == 0){
+            return evr_end;
+        } else if(written == -1){
+            return evr_error;
+        }
+        buffer += written;
+        remaining -= written;
+    }
+    return evr_ok;
+}
+
+int pipe_n(int dest, int src, size_t size){
+    char buffer[2048];
+    size_t remaining = size;
+    while(remaining > 0){
+        ssize_t bytes_read = read(src, buffer, min(remaining, sizeof(buffer)));
+        if(bytes_read <= 0){
+            return evr_error;
+        }
+        remaining -= bytes_read;
+        if(write_n(dest, buffer, bytes_read) != evr_ok){
+            return evr_error;
+        }
+    }
+    return evr_ok;
+}
+
+chunk_set_t *read_into_chunks(int fd, size_t size){
+    size_t chunks_len = ceil_div(size, evr_chunk_size);
+    chunk_set_t *cs = evr_allocate_chunk_set(chunks_len);
+    if(!cs){
+        goto out;
+    }
+    size_t remaining = size;
+    for(int i = 0; i < chunks_len; ++i){
+        size_t chunk_read_size = min(remaining, evr_chunk_size);
+        if(read_n(fd, cs->chunks[i], chunk_read_size) != evr_ok){
+            goto out_free_cs;
+        }
+        remaining -= chunk_read_size;
+    }
+    return cs;
+ out_free_cs:
+    evr_free_chunk_set(cs);
+ out:
+    return NULL;
 }

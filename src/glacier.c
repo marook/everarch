@@ -65,7 +65,7 @@ evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configurat
         goto fail;
     }
     ctx->config = config;
-    ctx->read_buffer = (uint8_t*)(ctx + 1);
+    ctx->read_buffer = (char*)(ctx + 1);
     ctx->db = NULL;
     ctx->find_blob_stmt = NULL;
     if(evr_open_index_db(config, SQLITE_OPEN_READONLY, &(ctx->db))){
@@ -100,7 +100,7 @@ int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx){
     return ret;
 }
 
-int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*on_data)(void *on_data_arg, const uint8_t *data, size_t data_len), void *on_data_arg){
+int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
     int ret = evr_error;
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto end_with_find_reset;
@@ -108,6 +108,9 @@ int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, i
     int step_result = sqlite3_step(ctx->find_blob_stmt);
     if(step_result == SQLITE_DONE){
         ret = evr_not_found;
+        if(status(arg, 0, 0) != evr_ok){
+            ret = evr_error;
+        }
         goto end_with_find_reset;
     }
     if(step_result != SQLITE_ROW){
@@ -123,12 +126,16 @@ int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, i
     if(lseek(bucket_f, bucket_blob_offset, SEEK_SET) == -1){
         goto end_with_open_bucket;
     }
+    if(status(arg, 1, blob_size) != evr_ok){
+        ret = evr_error;
+        goto end_with_open_bucket;
+    }
     for(ssize_t bytes_read = 0; bytes_read < blob_size;){
         ssize_t buffer_bytes_read = read(bucket_f, ctx->read_buffer, evr_read_buffer_size);
         if(buffer_bytes_read == -1){
             goto end_with_open_bucket;
         }
-        if(on_data(on_data_arg, ctx->read_buffer, buffer_bytes_read)){
+        if(on_data(arg, ctx->read_buffer, buffer_bytes_read)){
             goto end_with_open_bucket;
         }
         bytes_read += buffer_bytes_read;
@@ -537,4 +544,18 @@ int close_current_bucket(evr_glacier_write_ctx *ctx){
         ctx->current_bucket_f = -1;
     }
     return 0;
+}
+
+int evr_quick_check_glacier(evr_glacier_storage_configuration *config){
+    int ret = evr_error;
+    evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
+    if(!ctx){
+        goto out;
+    }
+    ret = evr_ok;
+    if(evr_free_glacier_write_ctx(ctx) != evr_ok){
+        ret = evr_error;
+    }
+ out:
+    return ret;
 }

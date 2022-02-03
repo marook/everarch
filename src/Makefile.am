@@ -1,9 +1,9 @@
-AM_LIBS = $(EVERARCH_LIBS) $(PTHREAD_LIBS)
-AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(PTHREAD_CFLAGS)
+AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS)
 
 bin_PROGRAMS = \
 	concurrent-glacier-test \
 	dyn-mem-test \
+	evr-glacier-cli \
 	evr-glacier-storage \
 	files-test \
 	glacier-cmd-test \
@@ -27,15 +27,25 @@ dyn_mem_test_SOURCES = \
 	dyn-mem-test.c
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
+evr_glacier_cli_SOURCES = \
+	dyn-mem.c \
+	evr-glacier-cli.c \
+	files.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c
+evr_glacier_cli_LDADD = $(GCRYPT_LIBS)
+
 evr_glacier_storage_SOURCES = \
 	configuration.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \
 	files.c \
+	glacier.c \
 	glacier-cmd.c \
 	keys.c \
 	logger.c
-evr_glacier_storage_LDADD = $(EVERARCH_LIBS)
+evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 files_test_SOURCES = \
 	assert.c \
@@ -49,7 +59,7 @@ glacier_cmd_test_SOURCES = \
 	glacier-cmd.c \
 	glacier-cmd-test.c \
 	keys.c
-glacier_cmd_test_LDADD = $(EVERARCH_LIBS)
+glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
@@ -61,11 +71,11 @@ glacier_test_SOURCES = \
 	configuration-testutil.c \
 	keys.c \
 	logger.c
-glacier_test_LDADD = $(EVERARCH_LIBS)
+glacier_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 keys_test_SOURCES = \
 	assert.c \
 	keys.c \
 	keys-test.c \
 	logger.c
-keys_test_LDADD = $(EVERARCH_LIBS)
+keys_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)

@@ -29,6 +29,15 @@
 
 #include "config.h"
 
+/**
+ * evr_log_fd is the file descriptor to which all log statements are
+ * written.
+ *
+ * By default all logs are written to stdout. May be changed in order
+ * to write to stderr.
+ */
+extern int evr_log_fd;
+
 #ifdef EVR_LOG_DEBUG
 #  define EVR_LOG_INFO
 #  define log_debug(args...) evr_log("D", args)

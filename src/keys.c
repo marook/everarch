@@ -38,16 +38,44 @@ void evr_fmt_blob_key(char *dest, const evr_blob_key_t key) {
     *p++ = '\0';
 }
 
-int evr_calc_blob_key(evr_blob_key_t key, size_t size, const uint8_t **chunks){
+int evr_parse_blob_key(evr_blob_key_t key, const char *fmt_key){
+    const char *p = fmt_key;
+    if(strncmp(evr_fmt_blob_key_prefix, fmt_key, strlen(evr_fmt_blob_key_prefix)) != 0){
+        return evr_error;
+    }
+    p += strlen(evr_fmt_blob_key_prefix);
+    size_t hash_len = strlen(p);
+    if(hash_len != 2 * evr_blob_key_size){
+        return evr_error;
+    }
+    char buffer[3];
+    buffer[2] = '\0';
+    int v;
+    for(int i = 0; i < evr_blob_key_size; ++i){
+        buffer[0] = p[0];
+        buffer[1] = p[1];
+        if(sscanf(buffer, "%02x", &v) != 1){
+            return evr_error;
+        }
+        if(v < 0 || v > 255){
+            return evr_error;
+        }
+        key[i] = v;
+        p += 2;
+    }
+    return evr_ok;
+}
+
+int evr_calc_blob_key(evr_blob_key_t key, size_t size, char **chunks){
     int result = evr_error;
     gcry_md_hd_t hash_ctx;
     if(gcry_md_open(&hash_ctx, GCRY_MD_SHA3_224, 0) != GPG_ERR_NO_ERROR){
         goto md_open_fail;
     }
     size_t bytes_remaining = size;
-    const uint8_t **chunks_end = chunks + size / evr_chunk_size + 1;
-    for(const uint8_t **c = chunks; c != chunks_end; c++){
-        const uint8_t *current_chunk = *c;
+    char **chunks_end = chunks + size / evr_chunk_size + 1;
+    for(char **c = chunks; c != chunks_end; c++){
+        char *current_chunk = *c;
         size_t current_chunk_size = bytes_remaining < evr_chunk_size ? bytes_remaining : evr_chunk_size;
         gcry_md_write(hash_ctx, current_chunk, current_chunk_size);
         bytes_remaining -= current_chunk_size;

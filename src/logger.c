@@ -23,6 +23,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+
+int evr_log_fd = STDOUT_FILENO;
 
 const char *log_date_format = "%Y-%m-%dT%H:%M:%S";
 
@@ -48,6 +51,6 @@ void evr_log(const char *level, const char *fmt, ...){
     *p++ = '\0';
     va_list args;
     va_start(args, fmt);
-    vprintf(log_fmt, args);
+    vdprintf(evr_log_fd, log_fmt, args);
     va_end(args);
 }

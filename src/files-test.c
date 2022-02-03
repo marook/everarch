@@ -16,6 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "assert.h"
 #include "files.h"
 #include "test.h"
@@ -38,8 +41,21 @@ void test_read_empty_json_with_small_buffer(){
     free(buffer);
 }
 
+void test_read_into_chunks_with_small_file(){
+    int f = open("etc/configuration/empty.json", O_RDONLY);
+    assert_truthy(f);
+    chunk_set_t *cs = read_into_chunks(f, 2);
+    close(f);
+    assert_not_null(cs);
+    assert_equal(cs->chunks_len, 1);
+    assert_equal(cs->chunks[0][0], '{');
+    assert_equal(cs->chunks[0][1], '}');
+    evr_free_chunk_set(cs);
+}
+
 int main(){
     run_test(test_read_empty_json_with_big_buffer);
     run_test(test_read_empty_json_with_small_buffer);
+    run_test(test_read_into_chunks_with_small_file);
     return 0;
 }

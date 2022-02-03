@@ -34,8 +34,7 @@
 #include "logger.h"
 #include "glacier-cmd.h"
 #include "glacier.h"
-
-#define port 2361
+#include "files.h"
 
 typedef struct {
     int socket;
@@ -44,10 +43,16 @@ typedef struct {
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config);
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
-int read_n(int f, char *buffer, size_t bytes);
+int send_get_response(void *arg, int exists, size_t blob_size);
+int pipe_data(void *arg, const char *data, size_t data_size);
+
+/**
+ * config exists until the program is terminated.
+ */
+evr_glacier_storage_configuration *config;
 
 int main(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
+    config = create_evr_glacier_storage_configuration();
     if(!config){
         return 1;
     }
@@ -59,6 +64,10 @@ int main(){
         log_error("Failed to load configuration");
         return 1;
     }
+    if(evr_quick_check_glacier(config) != evr_ok){
+        log_error("Glacier quick check failed");
+        return 1;
+    }
     if(evr_glacier_tcp_server(config) != evr_ok){
         log_error("TCP server failed");
         return 1;
@@ -67,16 +76,16 @@ int main(){
 }
 
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config){
-    int s = evr_glacier_make_tcp_socket(port);
+    int s = evr_glacier_make_tcp_socket(evr_glacier_storage_port);
     if(s < 0){
         log_error("Failed to create socket");
         return evr_error;
     }
     if(listen(s, 7) < 0){
-        log_error("Failed to listen on localhost:%d", port);
+        log_error("Failed to listen on localhost:%d", evr_glacier_storage_port);
         return evr_error;
     }
-    log_info("Listening on localhost:%d", port);
+    log_info("Listening on localhost:%d", evr_glacier_storage_port);
     fd_set active_fd_set;
     FD_ZERO(&active_fd_set);
     FD_SET(s, &active_fd_set);
@@ -126,10 +135,10 @@ int evr_glacier_make_tcp_socket(){
     }
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    addr.sin_port = htons(evr_glacier_storage_port);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if(bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0){
-        log_error("Failed to bind to localhost:%d", port);
+        log_error("Failed to bind to localhost:%d", evr_glacier_storage_port);
         return -1;
     }
     return s;
@@ -140,6 +149,7 @@ int evr_connection_worker(void *context){
     evr_connection_t ctx = *(evr_connection_t*)context;
     free(context);
     log_debug("Started worker %d", ctx.socket);
+    evr_glacier_read_ctx *rctx = NULL;
     const size_t buffer_size = max(evr_cmd_header_t_n_size, evr_resp_header_t_n_size);
     char buffer[buffer_size];
     evr_cmd_header_t cmd;
@@ -156,7 +166,7 @@ int evr_connection_worker(void *context){
             result = evr_error;
             goto end;
         }
-        log_debug("Worker %d retrieved cmd 0x%x", ctx.socket, cmd.type);
+        log_debug("Worker %d retrieved cmd 0x%x with body size %d", ctx.socket, cmd.type, cmd.body_size);
         switch(cmd.type){
         default:
             // unknown command
@@ -182,7 +192,26 @@ int evr_connection_worker(void *context){
                 log_debug("Worker %d retrieved cmd get %s", ctx.socket, fmt_key);
             }
 #endif
-            // TODO get blob
+            if(!rctx){
+                log_debug("Worker %d creates a glacier read ctx", ctx.socket);
+                rctx = evr_create_glacier_read_ctx(config);
+                if(!rctx){
+                    result = evr_error;
+                    goto end;
+                }
+            }
+            int read_res = evr_glacier_read_blob(rctx, key, send_get_response, pipe_data, &ctx.socket);
+#ifdef EVR_LOG_DEBUG
+            if(read_res == evr_not_found) {
+                evr_fmt_blob_key_t fmt_key;
+                evr_fmt_blob_key(fmt_key, key);
+                log_debug("Worker %d did not find key %s", ctx.socket, fmt_key);
+            }
+#endif
+            if(read_res != evr_ok && read_res != evr_not_found){
+                // TODO should we send a server error here?
+                goto end;
+            }
             break;
         }
         case evr_cmd_type_put_blob: {
@@ -209,31 +238,64 @@ int evr_connection_worker(void *context){
                 log_debug("Worker %d retrieved cmd put %s with %d bytes blob", ctx.socket, fmt_key, blob_size);
             }
 #endif
-            // TODO validate key
+            chunk_set_t *blob = read_into_chunks(ctx.socket, blob_size);
+            if(!blob){
+                result = evr_error;
+                goto end;
+            }
+            evr_blob_key_t calced_key;
+            if(evr_calc_blob_key(calced_key, blob_size, blob->chunks) != evr_ok){
+                goto out_free_blob;
+            }
+            if(memcmp(key, calced_key, 0)){
+                // TODO indicate to the client that the key does not
+                // match the blob's hash
+                goto out_free_blob;
+            }
             // TODO put blob
             // TODO respond ok
             break;
+            out_free_blob:
+            evr_free_chunk_set(blob);
+            goto end;
         }
         }
     }
  end:
     close(ctx.socket);
+    if(rctx){
+        if(evr_free_glacier_read_ctx(rctx) != evr_ok){
+            result = evr_error;
+        }
+    }
     log_debug("Ended worker %d with result %d", ctx.socket, result);
     return result;
 }
 
-int read_n(int f, char *buffer, size_t bytes){
-    size_t remaining = bytes;
-    while(remaining > 0){
-        size_t nbytes = read(f, buffer, remaining);
-        if(nbytes < 0){
-            return evr_error;
-        }
-        if(nbytes == 0){
-            return evr_end;
-        }
-        buffer += nbytes;
-        remaining -= nbytes;
+int send_get_response(void *arg, int exists, size_t blob_size){
+    int ret = evr_error;
+    int *f = (int*)arg;
+    evr_resp_header_t resp;
+    if(exists){
+        resp.status_code = evr_status_code_ok;
+        resp.body_size = blob_size;
+    } else {
+        resp.status_code = evr_status_code_blob_not_found;
+        resp.body_size = 0;
     }
-    return evr_ok;
+    char buffer[evr_resp_header_t_n_size];
+    if(evr_format_resp_header(buffer, &resp) != evr_ok){
+        goto end;
+    }
+    if(write_n(*f, buffer, evr_resp_header_t_n_size) != evr_ok){
+        goto end;
+    }
+    ret = evr_ok;
+ end:
+    return ret;
+}
+
+int pipe_data(void *arg, const char *data, size_t data_size){
+    int *f = (int*)arg;
+    return write_n(*f, data, data_size);
 }

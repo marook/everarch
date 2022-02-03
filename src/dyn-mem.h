@@ -42,7 +42,7 @@ typedef struct {
 /**
  * alloc_dynamic_array allocates a dynamic_array using malloc.
  *
- * Returns NULL if the memory couly not be allocated.
+ * Returns NULL if the memory could not be allocated.
  *
  * The returned dynamic_array can be freed using free(…).
  */
@@ -70,7 +70,7 @@ void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c));
 
 typedef struct {
     size_t chunks_len;
-    uint8_t **chunks;
+    char **chunks;
 } chunk_set_t;
 
 /**
@@ -78,7 +78,7 @@ typedef struct {
  *
  * Returns NULL if the chunk set could not be allocated.
  */
-chunk_set_t* evr_allocate_chunk_set(size_t chunks_len);
+chunk_set_t *evr_allocate_chunk_set(size_t chunks_len);
 
 void evr_free_chunk_set(chunk_set_t *cs);
 

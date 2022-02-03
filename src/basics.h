@@ -19,6 +19,11 @@
 #ifndef __basics_h__
 #define __basics_h__
 
-#define max(a, b) ((a < b) ? b : a)
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#define max(a, b) ((a) < (b) ? (b) : (a))
+
+#define ceil_div(dividend, divisor) ((dividend + (divisor - 1)) / divisor)
+
+#define evr_glacier_storage_port 2361
 
 #endif

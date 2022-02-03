@@ -50,6 +50,12 @@ typedef char evr_fmt_blob_key_t[evr_fmt_blob_key_size];
  */
 void evr_fmt_blob_key(char *dest, const evr_blob_key_t key);
 
-int evr_calc_blob_key(evr_blob_key_t key, size_t size, const uint8_t **chunks);
+/**
+ * evr_parse_blob_key parses a key in a human readable way from
+ * fmt_key.
+ */
+int evr_parse_blob_key(evr_blob_key_t key, const char *fmt_key);
+
+int evr_calc_blob_key(evr_blob_key_t key, size_t size, char **chunks);
 
 #endif
