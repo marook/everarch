@@ -37,6 +37,7 @@ evr_glacier_cli_SOURCES = \
 evr_glacier_cli_LDADD = $(GCRYPT_LIBS)
 
 evr_glacier_storage_SOURCES = \
+	concurrent-glacier.c \
 	configuration.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \

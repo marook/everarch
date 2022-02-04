@@ -459,7 +459,7 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         log_error("Can't completely write blob header for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
         goto fail;
     }
-    uint8_t **c = blob->chunks;
+    char **c = blob->chunks;
     for(evr_blob_size_t bytes_written = 0; bytes_written < blob->size;){
         evr_blob_size_t chunk_bytes_len = evr_chunk_size;
         evr_blob_size_t remaining_blob_bytes = blob->size - bytes_written;

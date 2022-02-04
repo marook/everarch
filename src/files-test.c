@@ -48,14 +48,33 @@ void test_read_into_chunks_with_small_file(){
     close(f);
     assert_not_null(cs);
     assert_equal(cs->chunks_len, 1);
+    assert_equal(cs->size_used, 2);
     assert_equal(cs->chunks[0][0], '{');
     assert_equal(cs->chunks[0][1], '}');
     evr_free_chunk_set(cs);
+}
+
+void test_append_into_chunk_set_with_small_file(){
+    int f = open("etc/configuration/empty.json", O_RDONLY);
+    assert_truthy(f);
+    chunk_set_t *cs = evr_allocate_chunk_set(0);
+    assert_not_null(cs);
+    assert_ok(append_into_chunk_set(cs, f));
+    close(f);
+    assert_not_null(cs);
+    assert_equal(cs->chunks_len, 1);
+    assert_equal(cs->size_used, 3);
+    assert_equal(cs->chunks[0][0], '{');
+    assert_equal(cs->chunks[0][1], '}');
+    assert_equal(cs->chunks[0][2], '\n');
+    evr_free_chunk_set(cs);
+    
 }
 
 int main(){
     run_test(test_read_empty_json_with_big_buffer);
     run_test(test_read_empty_json_with_small_buffer);
     run_test(test_read_into_chunks_with_small_file);
+    run_test(test_append_into_chunk_set_with_small_file);
     return 0;
 }

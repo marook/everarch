@@ -72,9 +72,9 @@ void test_evr_glacier_write_smal_blob(){
         evr_writing_blob_t *wb = (evr_writing_blob_t*)p;
         memset(wb->key, 1, evr_blob_key_size);
         p = &wb[1];
-        wb->chunks = (uint8_t**)p;
+        wb->chunks = (char**)p;
         p = (void*)(wb->chunks + 1);
-        wb->chunks[0] = (uint8_t*)p;
+        wb->chunks[0] = (char*)p;
         const char *data = "hello world";
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
@@ -149,7 +149,7 @@ void test_evr_glacier_write_big_blob(){
         evr_writing_blob_t *wb = (evr_writing_blob_t*)p;
         memset(wb->key, 1, evr_blob_key_size);
         p = &wb[1];
-        wb->chunks = (uint8_t**)p;
+        wb->chunks = (char**)p;
         p = (void*)(wb->chunks + 2);
         wb->chunks[0] = malloc(evr_chunk_size);
         assert_not_null(wb->chunks[0]);

@@ -18,7 +18,11 @@
 
 #include "dyn-mem.h"
 
+#include "errors.h"
+
 inline size_t get_dynamic_array_size(size_t data_size);
+char *evr_alloc_chunk();
+void evr_free_chunk(char *chunk);
 
 dynamic_array *alloc_dynamic_array(size_t initial_size){
     size_t da_size = get_dynamic_array_size(initial_size);
@@ -64,23 +68,60 @@ void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c)){
 }
 
 chunk_set_t* evr_allocate_chunk_set(size_t chunks_len){
-    size_t header_size = sizeof(chunk_set_t) + sizeof(uint8_t**) * chunks_len;
-    char *p = malloc(header_size + chunks_len * evr_chunk_size);
-    if(!p){
+    if(chunks_len > evr_chunk_set_max_chunks){
         return NULL;
     }
-    chunk_set_t *cs = (chunk_set_t*)p;
-    p = (char*)&cs[1];
+    chunk_set_t *cs = malloc(sizeof(chunk_set_t));
+    if(!cs){
+        return NULL;
+    }
     cs->chunks_len = chunks_len;
-    cs->chunks = (char**)p;
-    p = (char*)&cs->chunks[chunks_len];
-    for(int i = 0; i < chunks_len; i++){
-        cs->chunks[i] = p;
-        p += evr_chunk_size;
+    cs->size_used = 0;
+    for(size_t i = 0; i < chunks_len; i++){
+        cs->chunks[i] = evr_alloc_chunk();
+        if(!cs->chunks[i]){
+            for(size_t j = 0; j < i; ++j){
+                evr_free_chunk(cs->chunks[j]);
+            }
+            free(cs);
+            return NULL;
+        }
     }
     return cs;
 }
 
+int evr_grow_chunk_set(chunk_set_t *cs, size_t new_chunks_len){
+    int ret = evr_error;
+    if(new_chunks_len > evr_chunk_set_max_chunks){
+        goto out;
+    }
+    for(size_t i = cs->chunks_len; i < new_chunks_len; ++i){
+        cs->chunks[i] = evr_alloc_chunk();
+        if(!cs->chunks[i]){
+            for(size_t j = cs->chunks_len; j < i; ++j){
+                evr_free_chunk(cs->chunks[j]);
+            }
+            goto out;
+        }
+    }
+    cs->chunks_len = new_chunks_len;
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
 void evr_free_chunk_set(chunk_set_t *cs){
+    for(int i = cs->chunks_len - 1; i >= 0; --i){
+        evr_free_chunk(cs->chunks[i]);
+    }
     free(cs);
+}
+
+char *evr_alloc_chunk(){
+    // TODO chunks should be organized in a pool in the future.
+    return malloc(evr_chunk_size);
+}
+
+void evr_free_chunk(char *chunk){
+    free(chunk);
 }

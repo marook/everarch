@@ -35,6 +35,7 @@
 #include "glacier-cmd.h"
 #include "glacier.h"
 #include "files.h"
+#include "concurrent-glacier.h"
 
 typedef struct {
     int socket;
@@ -43,6 +44,7 @@ typedef struct {
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config);
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
+int evr_work_put_blob(evr_connection_t *ctx, evr_cmd_header_t *cmd);
 int send_get_response(void *arg, int exists, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
@@ -68,8 +70,16 @@ int main(){
         log_error("Glacier quick check failed");
         return 1;
     }
+    if(evr_persister_start(config) != evr_ok){
+        log_error("Failed to start glacier persister thread");
+        return 1;
+    }
     if(evr_glacier_tcp_server(config) != evr_ok){
         log_error("TCP server failed");
+        return 1;
+    }
+    if(evr_persister_stop() != evr_ok){
+        log_error("Failed to stop glacier persister thread");
         return 1;
     }
     return 0;
@@ -145,11 +155,13 @@ int evr_glacier_make_tcp_socket(){
 }
 
 int evr_connection_worker(void *context){
-    int result = evr_ok;
+    int result = evr_error;
     evr_connection_t ctx = *(evr_connection_t*)context;
     free(context);
     log_debug("Started worker %d", ctx.socket);
     evr_glacier_read_ctx *rctx = NULL;
+    // TODO i guess buffer is never used for storing responses. why do
+    // we make sure it fits evr_resp_header_t_n_size
     const size_t buffer_size = max(evr_cmd_header_t_n_size, evr_resp_header_t_n_size);
     char buffer[buffer_size];
     evr_cmd_header_t cmd;
@@ -157,32 +169,30 @@ int evr_connection_worker(void *context){
         const int header_result = read_n(ctx.socket, buffer, evr_cmd_header_t_n_size);
         if(header_result == evr_end){
             log_debug("Worker %d ends because of remote termination", ctx.socket);
+            result = evr_ok;
             goto end;
         } else if (header_result != evr_ok){
-            result = evr_error;
             goto end;
         }
         if(evr_parse_cmd_header(&cmd, buffer) != evr_ok){
-            result = evr_error;
             goto end;
         }
-        log_debug("Worker %d retrieved cmd 0x%x with body size %d", ctx.socket, cmd.type, cmd.body_size);
+        log_debug("Worker %d retrieved cmd 0x%02x with body size %d", ctx.socket, cmd.type, cmd.body_size);
         switch(cmd.type){
         default:
             // unknown command
             log_error("Worker %d retieved unknown cmd 0x%x", ctx.socket, cmd.type);
             // TODO respond evr_status_code_unknown_cmd
+            result = evr_ok;
             goto end;
         case evr_cmd_type_get_blob: {
             size_t body_size = evr_blob_key_size;
             if(cmd.body_size != body_size){
-                result = evr_error;
                 goto end;
             }
             evr_blob_key_t key;
             const int body_result = read_n(ctx.socket, (char*)&key, body_size);
             if(body_result != evr_ok){
-                result = evr_error;
                 goto end;
             }
 #ifdef EVR_LOG_DEBUG
@@ -196,7 +206,6 @@ int evr_connection_worker(void *context){
                 log_debug("Worker %d creates a glacier read ctx", ctx.socket);
                 rctx = evr_create_glacier_read_ctx(config);
                 if(!rctx){
-                    result = evr_error;
                     goto end;
                 }
             }
@@ -214,53 +223,13 @@ int evr_connection_worker(void *context){
             }
             break;
         }
-        case evr_cmd_type_put_blob: {
-            if(cmd.body_size < evr_blob_key_size){
-                result = evr_error;
+        case evr_cmd_type_put_blob:
+            if(evr_work_put_blob(&ctx, &cmd) != evr_ok){
                 goto end;
             }
-            size_t blob_size = cmd.body_size - evr_blob_key_size;
-            if(blob_size > evr_max_blob_data_size){
-                // TODO should we send a client error here?
-                result = evr_error;
-                goto end;
-            }
-            evr_blob_key_t key;
-            const int key_result = read_n(ctx.socket, (char*)&key, evr_blob_key_size);
-            if(key_result != evr_ok){
-                result = evr_error;
-                goto end;
-            }
-#ifdef EVR_LOG_DEBUG
-            {
-                evr_fmt_blob_key_t fmt_key;
-                evr_fmt_blob_key(fmt_key, key);
-                log_debug("Worker %d retrieved cmd put %s with %d bytes blob", ctx.socket, fmt_key, blob_size);
-            }
-#endif
-            chunk_set_t *blob = read_into_chunks(ctx.socket, blob_size);
-            if(!blob){
-                result = evr_error;
-                goto end;
-            }
-            evr_blob_key_t calced_key;
-            if(evr_calc_blob_key(calced_key, blob_size, blob->chunks) != evr_ok){
-                goto out_free_blob;
-            }
-            if(memcmp(key, calced_key, 0)){
-                // TODO indicate to the client that the key does not
-                // match the blob's hash
-                goto out_free_blob;
-            }
-            // TODO put blob
-            // TODO respond ok
-            break;
-            out_free_blob:
-            evr_free_chunk_set(blob);
-            goto end;
-        }
         }
     }
+    result = evr_ok;
  end:
     close(ctx.socket);
     if(rctx){
@@ -270,6 +239,77 @@ int evr_connection_worker(void *context){
     }
     log_debug("Ended worker %d with result %d", ctx.socket, result);
     return result;
+}
+
+int evr_work_put_blob(evr_connection_t *ctx, evr_cmd_header_t *cmd){
+    int ret = evr_error;
+    if(cmd->body_size < evr_blob_key_size){
+        goto out;
+    }
+    size_t blob_size = cmd->body_size - evr_blob_key_size;
+    if(blob_size > evr_max_blob_data_size){
+        // TODO should we send a client error here?
+        goto out;
+    }
+    evr_writing_blob_t wblob;
+    const int key_result = read_n(ctx->socket, (char*)&wblob.key, evr_blob_key_size);
+    if(key_result != evr_ok){
+        goto out;
+    }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, wblob.key);
+        log_debug("Worker %d retrieved cmd put %s with %d bytes blob", ctx->socket, fmt_key, blob_size);
+    }
+#endif
+    chunk_set_t *blob = read_into_chunks(ctx->socket, blob_size);
+    if(!blob){
+        goto out;
+    }
+    evr_blob_key_t calced_key;
+    if(evr_calc_blob_key(calced_key, blob_size, blob->chunks) != evr_ok){
+        goto out_free_blob;
+    }
+    if(memcmp(wblob.key, calced_key, 0)){
+        // TODO indicate to the client that the key does not
+        // match the blob's hash
+        goto out_free_blob;
+    }
+    evr_persister_task task;
+    wblob.size = blob_size;
+    wblob.chunks = blob->chunks;
+    if(evr_persister_init_task(&task, &wblob) != evr_ok){
+        goto out_free_blob;
+    }
+    if(evr_persister_queue_task(&task) != evr_ok){
+        goto out_destroy_task;
+    }
+    if(evr_persister_wait_for_task(&task) != evr_ok){
+        goto out_destroy_task;
+    }
+    if(task.result != evr_ok){
+        goto out_destroy_task;
+    }
+    evr_resp_header_t resp;
+    resp.status_code = evr_status_code_ok;
+    resp.body_size = 0;
+    char buffer[evr_resp_header_t_n_size];
+    if(evr_format_resp_header(buffer, &resp) != evr_ok){
+        goto out_destroy_task;
+    }
+    if(write_n(ctx->socket, buffer, evr_resp_header_t_n_size) != evr_ok){
+        goto out_destroy_task;
+    }
+    ret = evr_ok;
+ out_destroy_task:
+    if(evr_persister_destroy_task(&task) != evr_ok){
+        ret = evr_error;
+    }
+ out_free_blob:
+    evr_free_chunk_set(blob);
+ out:
+    return ret;
 }
 
 int send_get_response(void *arg, int exists, size_t blob_size){

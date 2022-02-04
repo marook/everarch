@@ -31,8 +31,6 @@
 #include "errors.h"
 #include "keys.h"
 
-#define evr_max_blob_data_size (16*1024*1024)
-
 extern const size_t evr_max_chunks_per_blob;
 
 typedef uint32_t evr_blob_size_t;
@@ -41,7 +39,7 @@ typedef uint32_t evr_blob_size_t;
 typedef struct {
     evr_blob_key_t key;
     evr_blob_size_t size;
-    uint8_t **chunks;
+    char **chunks;
 } evr_writing_blob_t;
 
 typedef uint32_t evr_bucket_pos_t;

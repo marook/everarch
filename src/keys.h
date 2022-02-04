@@ -56,6 +56,7 @@ void evr_fmt_blob_key(char *dest, const evr_blob_key_t key);
  */
 int evr_parse_blob_key(evr_blob_key_t key, const char *fmt_key);
 
+// TODO change API from size+chunks to evr_chunk_set which now contains size_used
 int evr_calc_blob_key(evr_blob_key_t key, size_t size, char **chunks);
 
 #endif

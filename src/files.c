@@ -116,6 +116,20 @@ int write_n(int fd, const void *buffer, size_t size){
     return evr_ok;
 }
 
+int write_chunk_set(int f, const chunk_set_t *cs){
+    size_t remaining = cs->size_used;
+    char * const *c = cs->chunks;
+    while(remaining > 0){
+        size_t written_bytes = min(evr_chunk_size, remaining);
+        if(write_n(f, *c, written_bytes) != evr_ok){
+            return evr_error;
+        }
+        ++c;
+        remaining -= written_bytes;
+    }
+    return evr_ok;
+}
+
 int pipe_n(int dest, int src, size_t size){
     char buffer[2048];
     size_t remaining = size;
@@ -146,9 +160,31 @@ chunk_set_t *read_into_chunks(int fd, size_t size){
         }
         remaining -= chunk_read_size;
     }
+    cs->size_used = size;
     return cs;
  out_free_cs:
     evr_free_chunk_set(cs);
  out:
     return NULL;
+}
+
+int append_into_chunk_set(chunk_set_t *cs, int f){
+    while(1){
+        int ci = cs->size_used / evr_chunk_size;
+        size_t cip = cs->size_used % evr_chunk_size;
+        for(int i = cs->chunks_len; i <= ci; ++i){
+            if(evr_grow_chunk_set(cs, ci + 1) != evr_ok){
+                return evr_error;
+            }
+        }
+        size_t cir = evr_chunk_size - cip;
+        ssize_t bytes_read = read(f, &cs->chunks[ci][cip], cir);
+        if(bytes_read == 0){
+            break;
+        } else if(bytes_read < 0){
+            return evr_error;
+        }
+        cs->size_used += bytes_read;
+    }
+    return evr_ok;
 }

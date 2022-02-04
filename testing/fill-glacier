@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# fill-glacier simply generates random blobs and puts them into the
+# evr-glacier-storage server.
+set -e
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PATH="${script_dir}/../src:${PATH}"
+while true
+do
+    dd if=/dev/random bs=1024 count=4 2>/dev/null | evr-glacier-cli put 2> /dev/null
+done

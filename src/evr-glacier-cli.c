@@ -149,15 +149,15 @@ int evr_cli_get(char *fmt_key){
         goto cmd_format_fail;
     }
     log_debug("Sending get %s command to server", fmt_key);
-    // TODO combine the following two write_n calls into one os we
-    // only create one ip data packet and not two
+    // TODO combine the following two write_n calls into one as we
+    // want to only create one ip data packet and not two
     if(write_n(c, buffer, evr_cmd_header_t_n_size) != evr_ok){
         goto cmd_format_fail;
     }
     if(write_n(c, key, evr_blob_key_size) != evr_ok){
         goto cmd_format_fail;
     }
-    log_debug("Waiting for storage response");
+    log_debug("Reading storage response");
     if(read_n(c, buffer, evr_resp_header_t_n_size) != evr_ok){
         goto cmd_format_fail;
     }
@@ -177,14 +177,78 @@ int evr_cli_get(char *fmt_key){
     }
     result = evr_ok;
  cmd_format_fail:
-    close(c);
+    if(close(c)){
+        result = evr_error;
+    }
  fail:
     return result;
 }
 
 int evr_cli_put(){
-    // TODO
-    return evr_error;
+    int ret = evr_error;
+    chunk_set_t *blob = evr_allocate_chunk_set(0);
+    if(!blob){
+        goto out;
+    }
+    if(append_into_chunk_set(blob, STDIN_FILENO) != evr_ok){
+        goto out_with_free_blob;
+    }
+    log_debug("Read blob with %d bytes from stdin", blob->size_used);
+    if(blob->size_used > evr_max_blob_data_size){
+        log_error("Input exceeds maximum blob size of %d bytes", evr_max_blob_data_size);
+        goto out_with_free_blob;
+    }
+    evr_blob_key_t key;
+    if(evr_calc_blob_key(key, blob->size_used, blob->chunks) != evr_ok){
+        goto out_with_free_blob;
+    }
+    int c = evr_connect_to_storage();
+    if(c < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out_with_free_blob;
+    }
+    char buffer[max(evr_cmd_header_t_n_size + evr_blob_key_size, evr_resp_header_t_n_size)];
+    evr_cmd_header_t cmd;
+    cmd.type = evr_cmd_type_put_blob;
+    cmd.body_size = evr_blob_key_size + blob->size_used;
+    if(evr_format_cmd_header(buffer, &cmd) != evr_ok){
+        goto out_with_close_c;
+    }
+    memcpy(&buffer[evr_cmd_header_t_n_size], key, evr_blob_key_size);
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, key);
+        log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
+    }
+#endif
+    if(write_n(c, buffer, evr_cmd_header_t_n_size + evr_blob_key_size) != evr_ok){
+        goto out_with_close_c;
+    }
+    if(write_chunk_set(c, blob) != evr_ok){
+        goto out_with_close_c;
+    }
+    log_debug("Reading storage response");
+    if(read_n(c, buffer, evr_resp_header_t_n_size) != evr_ok){
+        goto out_with_close_c;
+    }
+    evr_resp_header_t resp;
+    if(evr_parse_resp_header(&resp, buffer) != evr_ok){
+        goto out_with_close_c;
+    }
+    log_debug("Storage responded with status code 0x%x", resp.status_code);
+    if(resp.status_code != evr_status_code_ok){
+        goto out_with_close_c;
+    }
+    ret = evr_ok;
+ out_with_close_c:
+    if(close(c)){
+        ret = evr_error;
+    }
+ out_with_free_blob:
+    evr_free_chunk_set(blob);
+ out:
+    return ret;
 }
 
 int evr_connect_to_storage(){

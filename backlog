@@ -3,9 +3,6 @@ see [[https://www.kernel.org/doc/html/v4.10/process/coding-style.html][kernel co
 * rename structs from X_t to X
 pitrp said only the committe uses _t suffix.
 * function body opening braces in new lines
-* evr-glacier-cli application with put blob feature
-* add get blob feature to evr-glacier-cli
-* actually process commands using glacier
 * implement an integration test / benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.

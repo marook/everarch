@@ -26,4 +26,6 @@
 
 #define evr_glacier_storage_port 2361
 
+#define evr_max_blob_data_size (16*1024*1024)
+
 #endif

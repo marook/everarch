@@ -22,6 +22,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "basics.h"
+
 typedef struct {
     /**
      * size_allocated is the maximal number of bytes which are
@@ -67,10 +69,12 @@ void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c));
  * evr_writing_blob_t struct in bytes.
  */
 #define evr_chunk_size (1*1024*1024)
+#define evr_chunk_set_max_chunks (evr_max_blob_data_size / evr_chunk_size + 1)
 
 typedef struct {
     size_t chunks_len;
-    char **chunks;
+    size_t size_used;
+    char *chunks[evr_chunk_set_max_chunks];
 } chunk_set_t;
 
 /**
@@ -79,6 +83,8 @@ typedef struct {
  * Returns NULL if the chunk set could not be allocated.
  */
 chunk_set_t *evr_allocate_chunk_set(size_t chunks_len);
+
+int evr_grow_chunk_set(chunk_set_t *cs, size_t new_chunks_len);
 
 void evr_free_chunk_set(chunk_set_t *cs);
 
