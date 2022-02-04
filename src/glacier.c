@@ -53,7 +53,7 @@ int move_to_last_bucket(evr_glacier_write_ctx *ctx);
 
 int open_current_bucket(evr_glacier_write_ctx *ctx);
 
-int evr_open_bucket(const evr_glacier_storage_configuration *config, evr_bucket_index_t bucket_index, int open_flags);
+int evr_open_bucket(const evr_glacier_storage_configuration *config, unsigned long bucket_index, int open_flags);
 
 int create_next_bucket(evr_glacier_write_ctx *ctx);
 
@@ -116,7 +116,7 @@ int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, i
     if(step_result != SQLITE_ROW){
         goto end_with_find_reset;
     }
-    evr_bucket_index_t bucket_index = sqlite3_column_int64(ctx->find_blob_stmt, 0);
+    unsigned long bucket_index = sqlite3_column_int64(ctx->find_blob_stmt, 0);
     size_t bucket_blob_offset = sqlite3_column_int(ctx->find_blob_stmt, 1);
     size_t blob_size = sqlite3_column_int(ctx->find_blob_stmt, 2);
     int bucket_f = evr_open_bucket(ctx->config, bucket_index, O_RDONLY);
@@ -287,7 +287,7 @@ int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
 
 int move_to_last_bucket(evr_glacier_write_ctx *ctx){
     int ret = 1;
-    evr_bucket_index_t max_bucket_index = 0;
+    unsigned long max_bucket_index = 0;
     DIR *dir = opendir(ctx->config->bucket_dir_path);
     if(!dir){
         goto end;
@@ -307,7 +307,7 @@ int move_to_last_bucket(evr_glacier_write_ctx *ctx){
             continue;
         }
         *end = '\0';
-        evr_bucket_index_t index = 0;
+        unsigned long index = 0;
         if(!sscanf(d->d_name, "%lx", &index)){
             continue;
         }
@@ -331,7 +331,7 @@ int open_current_bucket(evr_glacier_write_ctx *ctx) {
     return 0;
 }
 
-int evr_open_bucket(const evr_glacier_storage_configuration *config, evr_bucket_index_t bucket_index, int open_flags){
+int evr_open_bucket(const evr_glacier_storage_configuration *config, unsigned long bucket_index, int open_flags){
     char *bucket_path;
     {
         // this block builds bucket_path
