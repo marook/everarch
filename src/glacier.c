@@ -117,7 +117,7 @@ int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, i
         goto end_with_find_reset;
     }
     evr_bucket_index_t bucket_index = sqlite3_column_int64(ctx->find_blob_stmt, 0);
-    evr_bucket_pos_t bucket_blob_offset = sqlite3_column_int(ctx->find_blob_stmt, 1);
+    size_t bucket_blob_offset = sqlite3_column_int(ctx->find_blob_stmt, 1);
     size_t blob_size = sqlite3_column_int(ctx->find_blob_stmt, 2);
     int bucket_f = evr_open_bucket(ctx->config, bucket_index, O_RDONLY);
     if(bucket_f == -1){
@@ -220,14 +220,16 @@ evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configur
         if(lseek(ctx->current_bucket_f, 0, SEEK_SET) != 0){
             goto fail_with_open_bucket;
         }
-        ssize_t bytes_read = read(ctx->current_bucket_f, &(ctx->current_bucket_pos), sizeof(evr_bucket_pos_t));
+        uint32_t current_bucket_pos;
+        // TODO switch to read_n
+        ssize_t bytes_read = read(ctx->current_bucket_f, &current_bucket_pos, sizeof(current_bucket_pos));
         int read_errno = errno;
-        if(bytes_read != sizeof(evr_bucket_pos_t)){
+        if(bytes_read != sizeof(current_bucket_pos)){
             const char *error = bytes_read == -1 ? strerror(read_errno) : "Short read";
             log_error("Failed to read bucket end pointer within glacier directory %s: %s", ctx->config->bucket_dir_path, error);
             goto fail_with_open_bucket;
         }
-        ctx->current_bucket_pos = evr_be_to_bucket_pos(ctx->current_bucket_pos);
+        ctx->current_bucket_pos = be32toh(current_bucket_pos);
         off_t end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
         if(end_offset == -1){
             goto fail_with_open_bucket;
@@ -476,13 +478,14 @@ int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t
         bytes_written += chunk_bytes_written;
         c++;
     }
-    evr_bucket_pos_t blob_offset = ctx->current_bucket_pos + header_disk_size;
+    size_t blob_offset = ctx->current_bucket_pos + header_disk_size;
     ctx->current_bucket_pos += header_disk_size + blob->size;
     if(lseek(ctx->current_bucket_f, 0, SEEK_SET) == -1){
         goto fail;
     }
-    evr_bucket_pos_t last_bucket_pos = evr_bucket_pos_to_be(ctx->current_bucket_pos);
-    if(write(ctx->current_bucket_f, &last_bucket_pos, sizeof(evr_bucket_pos_t)) != sizeof(evr_bucket_pos_t)){
+    uint32_t last_bucket_pos = htobe32(ctx->current_bucket_pos);
+    // TODO switch to write_n
+    if(write(ctx->current_bucket_f, &last_bucket_pos, sizeof(last_bucket_pos)) != sizeof(last_bucket_pos)){
         log_error("Can't completely write bucket end pointer in glacier directory %s", ctx->config->bucket_dir_path);
         goto fail;
     }
@@ -527,9 +530,10 @@ int create_next_bucket(evr_glacier_write_ctx *ctx){
     if(open_current_bucket(ctx)){
         return 1;
     }
-    ctx->current_bucket_pos = sizeof(evr_bucket_pos_t);
-    evr_bucket_pos_t pos = evr_bucket_pos_to_be(ctx->current_bucket_pos);
-    if(write(ctx->current_bucket_f, &pos, sizeof(evr_bucket_pos_t)) != sizeof(evr_bucket_pos_t)){
+    ctx->current_bucket_pos = sizeof(uint32_t);
+    uint32_t pos = htobe32(ctx->current_bucket_pos);
+    // TODO switch to write_n
+    if(write(ctx->current_bucket_f, &pos, sizeof(pos)) != sizeof(pos)){
         log_error("Empty bucket file %05lx could not be created in glacier directory %s", ctx->current_bucket_index, ctx->config->bucket_dir_path);
         return 1;
     }

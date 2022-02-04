@@ -39,10 +39,6 @@ typedef struct {
     char **chunks;
 } evr_writing_blob_t;
 
-typedef uint32_t evr_bucket_pos_t;
-#define evr_bucket_pos_to_be htobe32
-#define evr_be_to_bucket_pos be32toh
-
 typedef unsigned long evr_bucket_index_t;
 
 typedef struct {
@@ -87,7 +83,7 @@ typedef struct {
     evr_glacier_storage_configuration *config;
     evr_bucket_index_t current_bucket_index;
     int current_bucket_f;
-    evr_bucket_pos_t current_bucket_pos;
+    size_t current_bucket_pos;
     sqlite3 *db;
     sqlite3_stmt *insert_blob_stmt;
 } evr_glacier_write_ctx;
