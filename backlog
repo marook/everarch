@@ -3,9 +3,52 @@ see [[https://www.kernel.org/doc/html/v4.10/process/coding-style.html][kernel co
 * rename structs from X_t to X
 pitrp said only the committe uses _t suffix.
 * function body opening braces in new lines
+* add blob predicate
+predicate is a one byte flag set. should contain one bit which
+indicates if the blob is only data or a claim (any maybe also data).
 * implement an integration test / benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
+* move glacier storage client functions into glacier-client.[hc]
+right now the evr-glacier-cli.c contains functions for handling blob
+put and blob get commands. code should be centralized in
+glacier-client.[ch] in order to be reused in other future clients like
+the file upload service.
+* implement blob signing
+struct chunk_set data should be signable using a pgp key.
+* implement claim parse and format functions
+claims should be encoded in XML. this provides the benefit that xml
+namespaces for claim types can be used. also xml is a format here to
+stay forever. so blobs containing xml should easily be parseable also
+in the future.
+
+a file claim might look like the following when pretty printed
+
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<file-claim
+  xmlns="https://ma300k.de/everarch/claims/"
+  file-name="some-file.txt"
+  created="Fri, 04 Feb 2022 18:26:13 +0000">
+    <content>
+        <segment ref="sha3-224-…"/>
+        <segment ref="sha3-224-…"/>
+        …
+    </content>
+</file-claim>
+#+END_SRC
+
+which date format should be used for the created timestamp? xml schema
+defines a [[http://www.datypic.com/sc/xsd/t-xsd_dateTime.html][dateTime]] datatype which supports dates like
+"2004-04-12T13:20:00Z".
+
+on the other hard we could use use email's date format RFC 5322 like
+"Fri, 04 Feb 2022 18:26:13 +0000".
+
+also possible would be ISO 8601 format with seconds precision like
+"2022-02-04T19:45:13+00:00".
+* implement a evr-file-storage service
+should provide put and get endpoints for files.
 * align chunk size with RLIMIT_FSIZE
 see [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
 regarding to it. also the chunk size should not grow over 1MB.
