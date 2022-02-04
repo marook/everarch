@@ -27,6 +27,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <threads.h>
+#include <signal.h>
 
 #include "basics.h"
 #include "configuration.h"
@@ -37,10 +38,13 @@
 #include "files.h"
 #include "concurrent-glacier.h"
 
+int running = 1;
+
 typedef struct {
     int socket;
 } evr_connection_t;
 
+void handle_sigterm(int signum);
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config);
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
@@ -54,9 +58,16 @@ int pipe_data(void *arg, const char *data, size_t data_size);
 evr_glacier_storage_configuration *config;
 
 int main(){
+    int ret = evr_error;
     config = create_evr_glacier_storage_configuration();
     if(!config){
-        return 1;
+        goto out;
+    }
+    {
+        struct sigaction action;
+        memset(&action, 0, sizeof(action));
+        action.sa_handler = handle_sigterm;
+        sigaction(SIGINT, &action, NULL);
     }
     const char *config_paths[] = {
         "~/.config/everarch/glacier-storage.json",
@@ -64,25 +75,39 @@ int main(){
     };
     if(load_evr_glacier_storage_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*)) != evr_ok){
         log_error("Failed to load configuration");
-        return 1;
+        goto out;
     }
     if(evr_quick_check_glacier(config) != evr_ok){
         log_error("Glacier quick check failed");
-        return 1;
+        goto out_with_free_configuration;
     }
     if(evr_persister_start(config) != evr_ok){
         log_error("Failed to start glacier persister thread");
-        return 1;
+        goto out_with_free_configuration;
     }
-    if(evr_glacier_tcp_server(config) != evr_ok){
+    int tcpret = evr_glacier_tcp_server(config);
+    if(tcpret != evr_ok && tcpret != evr_end){
         log_error("TCP server failed");
-        return 1;
+        goto out_with_stop_persister;
     }
+    ret = evr_ok;
+ out_with_stop_persister:
     if(evr_persister_stop() != evr_ok){
         log_error("Failed to stop glacier persister thread");
-        return 1;
+        ret = evr_error;
     }
-    return 0;
+ out_with_free_configuration:
+    // TODO we should wait for the worker threads to be finished before freeing config or maybe free config by OS when program ends?
+    free_evr_glacier_storage_configuration(config);
+ out:
+    return ret;
+}
+
+void handle_sigterm(int signum){
+    if(running){
+        log_info("Shutting down");
+        running = 0;
+    }
 }
 
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config){
@@ -100,8 +125,12 @@ int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config){
     FD_ZERO(&active_fd_set);
     FD_SET(s, &active_fd_set);
     struct sockaddr_in client_addr;
-    while(1){
-        if(select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL) < 0){
+    while(running){
+        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL);
+        if(sret == -1){
+            // select returns -1 on sigint.
+            return evr_end;
+        } else if(sret < 0){
             return evr_error;
         }
         for(int i = 0; i < FD_SETSIZE; ++i){
@@ -121,6 +150,9 @@ int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config){
                     context->socket = c;
                     thrd_t t;
                     if(thrd_create(&t, evr_connection_worker, context) != thrd_success){
+                        goto thread_create_fail;
+                    }
+                    if(thrd_detach(t) != thrd_success){
                         goto thread_create_fail;
                     }
                     goto end;
@@ -165,7 +197,7 @@ int evr_connection_worker(void *context){
     const size_t buffer_size = max(evr_cmd_header_t_n_size, evr_resp_header_t_n_size);
     char buffer[buffer_size];
     evr_cmd_header_t cmd;
-    while(1){
+    while(running){
         const int header_result = read_n(ctx.socket, buffer, evr_cmd_header_t_n_size);
         if(header_result == evr_end){
             log_debug("Worker %d ends because of remote termination", ctx.socket);

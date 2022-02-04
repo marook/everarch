@@ -184,6 +184,9 @@ int evr_persister_worker(void *context){
             }
             atomic_thread_fence(memory_order_seq_cst);
         }
+        if(!evr_persister.working){
+            break;
+        }
         if(cnd_wait(&evr_persister.has_tasks, &evr_persister.worker_lock) != thrd_success){
             result = evr_error;
             goto end_with_unlock;
