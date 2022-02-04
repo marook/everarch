@@ -33,12 +33,9 @@
 
 extern const size_t evr_max_chunks_per_blob;
 
-typedef uint32_t evr_blob_size_t;
-#define evr_blob_size_to_be htobe32
-
 typedef struct {
     evr_blob_key_t key;
-    evr_blob_size_t size;
+    size_t size;
     char **chunks;
 } evr_writing_blob_t;
 
