@@ -34,14 +34,14 @@ int store_into_dynamic_array(void *arg, const char *data, size_t data_len);
 int store_into_void(void *arg, const char *data, size_t data_len);
 evr_glacier_storage_configuration* clone_config(evr_glacier_storage_configuration *config);
 char* clone_string(const char* s);
-void free_glacier_ctx(evr_glacier_write_ctx *ctx);
+void free_glacier_ctx(struct evr_glacier_write_ctx *ctx);
 
 void test_evr_glacier_open_same_empty_glacier_twice(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     for(int i = 0; i < 2; i++){
         printf("Round %d…\n", i);
         evr_glacier_storage_configuration *round_config = clone_config(config);
-        evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
+        struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
         assert_not_null(ctx);
         assert_equal(ctx->current_bucket_index, 1);
         assert_greater_equal(ctx->current_bucket_f, 0);
@@ -53,16 +53,16 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
 
 void test_evr_glacier_create_context_twice_fails(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
-    evr_glacier_write_ctx *ctx1 = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx1 = evr_create_glacier_write_ctx(config);
     assert_not_null(ctx1);
-    evr_glacier_write_ctx *ctx2 = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx2 = evr_create_glacier_write_ctx(config);
     assert_null(ctx2);
     free_glacier_ctx(ctx1);
 }
 
 void test_evr_glacier_write_smal_blob(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
-    evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(config);
     assert_not_null(write_ctx);
     {
         log_info("Write a blob");
@@ -139,7 +139,7 @@ int store_into_void(void *arg, const char *data, size_t data_len){
 
 void test_evr_glacier_write_big_blob(){
     evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
-    evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
     assert_not_null(ctx);
     {
         log_info("Write a blob");
@@ -190,7 +190,7 @@ char* clone_string(const char* s){
     return c;
 }
 
-void free_glacier_ctx(evr_glacier_write_ctx *ctx){
+void free_glacier_ctx(struct evr_glacier_write_ctx *ctx){
     // TODO delete buckets dir
     evr_glacier_storage_configuration *config = ctx->config;
     assert_zero(evr_free_glacier_write_ctx(ctx));

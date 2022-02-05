@@ -31,7 +31,7 @@ typedef struct {
     evr_persister_task **reading;
     mtx_t worker_lock;
     cnd_t has_tasks;
-    evr_glacier_write_ctx *write_ctx;
+    struct evr_glacier_write_ctx *write_ctx;
     int working;
 } evr_persister_ctx;
 
