@@ -39,15 +39,16 @@ struct evr_writing_blob {
     char **chunks;
 };
 
-typedef struct {
+struct evr_glacier_read_ctx {
     evr_glacier_storage_configuration *config;
     sqlite3 *db;
     sqlite3_stmt *find_blob_stmt;
     char *read_buffer;
-} evr_glacier_read_ctx;
+};
 
 /**
- * evr_create_glacier_read_ctx creates a new evr_glacier_read_ctx.
+ * evr_create_glacier_read_ctx creates a new struct
+ * evr_glacier_read_ctx.
  *
  * config must not be modified or freed until
  * evr_free_glacier_read_ctx is called with the returned context.
@@ -58,9 +59,9 @@ typedef struct {
  *
  * The returned context must be freed using evr_free_glacier_read_ctx.
  */
-evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config);
+struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config);
 
-int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx);
+int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx);
 
 /**
  * evr_glacier_read_blob reads a blob with the given key.
@@ -75,7 +76,7 @@ int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx);
  * evr_ok on successful processing. on_data's data argument is only
  * allocated while on_data is executed.
  */
-int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
+int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
 typedef struct {
     evr_glacier_storage_configuration *config;

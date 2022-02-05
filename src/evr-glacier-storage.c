@@ -191,7 +191,7 @@ int evr_connection_worker(void *context){
     evr_connection_t ctx = *(evr_connection_t*)context;
     free(context);
     log_debug("Started worker %d", ctx.socket);
-    evr_glacier_read_ctx *rctx = NULL;
+    struct evr_glacier_read_ctx *rctx = NULL;
     // TODO i guess buffer is never used for storing responses. why do
     // we make sure it fits evr_resp_header_t_n_size
     const size_t buffer_size = max(evr_cmd_header_t_n_size, evr_resp_header_t_n_size);

@@ -59,8 +59,8 @@ int create_next_bucket(evr_glacier_write_ctx *ctx);
 
 int close_current_bucket(evr_glacier_write_ctx *ctx);
 
-evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config){
-    evr_glacier_read_ctx *ctx = (evr_glacier_read_ctx*)malloc(sizeof(evr_glacier_read_ctx) + evr_read_buffer_size);
+struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config){
+    struct evr_glacier_read_ctx *ctx = (struct evr_glacier_read_ctx*)malloc(sizeof(struct evr_glacier_read_ctx) + evr_read_buffer_size);
     if(!ctx){
         goto fail;
     }
@@ -83,7 +83,7 @@ evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configurat
     return NULL;
 }
 
-int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx){
+int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx){
     if(!ctx){
         return 0;
     }
@@ -100,7 +100,7 @@ int evr_free_glacier_read_ctx(evr_glacier_read_ctx *ctx){
     return ret;
 }
 
-int evr_glacier_read_blob(evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
+int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
     int ret = evr_error;
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto end_with_find_reset;
