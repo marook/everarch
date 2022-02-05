@@ -44,7 +44,7 @@ int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx){
     return evr_ok;
 }
 
-int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob){
+int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob){
     assert_not_null_msg(ctx, "evr_glacier_write_ctx must not be null");
     assert_not_null_msg(blob, "blob must not be null");
     if(append_blob_delay){
@@ -67,7 +67,7 @@ void test_queue_one_blob_success(){
     evr_glacier_append_blob_result = evr_ok;
     append_blob_delay = NULL;
     evr_temp_persister_start();
-    evr_writing_blob_t blob;
+    struct evr_writing_blob blob;
     evr_persister_task task;
     assert_ok(evr_persister_init_task(&task, &blob));
     assert_ok(evr_persister_queue_task(&task));
@@ -81,7 +81,7 @@ void test_queue_one_blob_write_error(){
     evr_glacier_append_blob_result = evr_error;
     append_blob_delay = NULL;
     evr_temp_persister_start();
-    evr_writing_blob_t blob;
+    struct evr_writing_blob blob;
     evr_persister_task task;
     assert_ok(evr_persister_init_task(&task, &blob));
     assert_ok(evr_persister_queue_task(&task));
@@ -117,7 +117,7 @@ void test_queue_many_blobs_slow_queue(){
 
 void queue_and_process_many_blobs(struct timespec *queue_delay){
     evr_temp_persister_start();
-    evr_writing_blob_t *blobs = malloc(sizeof(evr_writing_blob_t) * many_blobs_count);
+    struct evr_writing_blob *blobs = malloc(sizeof(struct evr_writing_blob) * many_blobs_count);
     assert_not_null(blobs);
     evr_persister_task *tasks = malloc(sizeof(evr_persister_task) * many_blobs_count);
     assert_not_null(tasks);

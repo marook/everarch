@@ -283,7 +283,7 @@ int evr_work_put_blob(evr_connection_t *ctx, evr_cmd_header_t *cmd){
         // TODO should we send a client error here?
         goto out;
     }
-    evr_writing_blob_t wblob;
+    struct evr_writing_blob wblob;
     const int key_result = read_n(ctx->socket, (char*)&wblob.key, evr_blob_key_size);
     if(key_result != evr_ok){
         goto out;

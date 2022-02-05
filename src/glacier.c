@@ -427,7 +427,7 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
     memcpy(p, path_suffix, path_suffix_len+1);
 }
 
-int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob) {
+int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob) {
     int ret = evr_error;
     size_t blob_size_size = 4;
     size_t header_disk_size = evr_blob_key_size + blob_size_size;

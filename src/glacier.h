@@ -33,11 +33,11 @@
 
 extern const size_t evr_max_chunks_per_blob;
 
-typedef struct {
+struct evr_writing_blob {
     evr_blob_key_t key;
     size_t size;
     char **chunks;
-} evr_writing_blob_t;
+};
 
 typedef struct {
     evr_glacier_storage_configuration *config;
@@ -108,7 +108,7 @@ int evr_free_glacier_write_ctx(evr_glacier_write_ctx *ctx);
  * The blob's position in the appended bucket is written into the
  * index db.
  */
-int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const evr_writing_blob_t *blob);
+int evr_glacier_append_blob(evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob);
 
 /**
  * evr_quick_check_glacier performs a quick sanity check of the

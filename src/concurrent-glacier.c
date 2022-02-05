@@ -96,7 +96,7 @@ int evr_persister_stop(){
     return evr_error;
 }
 
-int evr_persister_init_task(evr_persister_task *task, evr_writing_blob_t *blob){
+int evr_persister_init_task(evr_persister_task *task, struct evr_writing_blob *blob){
     task->blob = blob;
     if(mtx_init(&task->done, mtx_plain) != thrd_success){
         return evr_error;

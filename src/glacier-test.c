@@ -69,7 +69,7 @@ void test_evr_glacier_write_smal_blob(){
         void *buffer = malloc(256);
         assert_not_null(buffer);
         void *p = buffer;
-        evr_writing_blob_t *wb = (evr_writing_blob_t*)p;
+        struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 1, evr_blob_key_size);
         p = &wb[1];
         wb->chunks = (char**)p;
@@ -146,7 +146,7 @@ void test_evr_glacier_write_big_blob(){
         void *buffer = malloc(256);
         assert_not_null(buffer);
         void *p = buffer;
-        evr_writing_blob_t *wb = (evr_writing_blob_t*)p;
+        struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 1, evr_blob_key_size);
         p = &wb[1];
         wb->chunks = (char**)p;

@@ -37,7 +37,7 @@ int evr_persister_start(evr_glacier_storage_configuration *config);
 int evr_persister_stop();
 
 typedef struct {
-    evr_writing_blob_t *blob;
+    struct evr_writing_blob *blob;
 
     /**
      * done is locked by evr_persister_queue_task and released after
@@ -58,7 +58,7 @@ typedef struct {
  *
  * blob may not be freed until evr_persister_destroy_task is called.
  */
-int evr_persister_init_task(evr_persister_task *task, evr_writing_blob_t *blob);
+int evr_persister_init_task(evr_persister_task *task, struct evr_writing_blob *blob);
 
 int evr_persister_destroy_task(evr_persister_task *task);
 

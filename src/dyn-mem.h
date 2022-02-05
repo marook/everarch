@@ -66,7 +66,7 @@ void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c));
 
 /**
  * evr_chunk_size is the size of one chunk within the
- * evr_writing_blob_t struct in bytes.
+ * struct evr_writing_blob in bytes.
  */
 #define evr_chunk_size (1*1024*1024)
 #define evr_chunk_set_max_chunks (evr_max_blob_data_size / evr_chunk_size + 1)
