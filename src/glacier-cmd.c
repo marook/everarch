@@ -22,16 +22,16 @@
 
 int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer){
     const char *p = buffer;
-    header->type = *(evr_cmd_type_t*)p;
-    p = (char*)&((evr_cmd_type_t*)p)[1];
+    header->type = *(uint8_t*)p;
+    p = (char*)&((uint8_t*)p)[1];
     header->body_size = evr_cmd_size_to_h(*(evr_cmd_size_t*)p);
     return evr_ok;
 }
 
 int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header){
     char *p = buffer;
-    *(evr_cmd_type_t*)p = header->type;
-    p = (char*)&((evr_cmd_type_t*)p)[1];
+    *(uint8_t*)p = header->type;
+    p = (char*)&((uint8_t*)p)[1];
     *(evr_cmd_size_t*)p = evr_cmd_size_to_n(header->body_size);
     return evr_ok;
 }
