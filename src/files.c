@@ -116,7 +116,7 @@ int write_n(int fd, const void *buffer, size_t size){
     return evr_ok;
 }
 
-int write_chunk_set(int f, const chunk_set_t *cs){
+int write_chunk_set(int f, const struct chunk_set *cs){
     size_t remaining = cs->size_used;
     char * const *c = cs->chunks;
     while(remaining > 0){
@@ -146,9 +146,9 @@ int pipe_n(int dest, int src, size_t size){
     return evr_ok;
 }
 
-chunk_set_t *read_into_chunks(int fd, size_t size){
+struct chunk_set *read_into_chunks(int fd, size_t size){
     size_t chunks_len = ceil_div(size, evr_chunk_size);
-    chunk_set_t *cs = evr_allocate_chunk_set(chunks_len);
+    struct chunk_set *cs = evr_allocate_chunk_set(chunks_len);
     if(!cs){
         goto out;
     }
@@ -168,7 +168,7 @@ chunk_set_t *read_into_chunks(int fd, size_t size){
     return NULL;
 }
 
-int append_into_chunk_set(chunk_set_t *cs, int f){
+int append_into_chunk_set(struct chunk_set *cs, int f){
     while(1){
         int ci = cs->size_used / evr_chunk_size;
         size_t cip = cs->size_used % evr_chunk_size;

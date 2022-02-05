@@ -71,21 +71,21 @@ void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c));
 #define evr_chunk_size (1*1024*1024)
 #define evr_chunk_set_max_chunks (evr_max_blob_data_size / evr_chunk_size + 1)
 
-typedef struct {
+struct chunk_set {
     size_t chunks_len;
     size_t size_used;
     char *chunks[evr_chunk_set_max_chunks];
-} chunk_set_t;
+};
 
 /**
  * evr_allocate_chunks allocates n chunks.
  *
  * Returns NULL if the chunk set could not be allocated.
  */
-chunk_set_t *evr_allocate_chunk_set(size_t chunks_len);
+struct chunk_set *evr_allocate_chunk_set(size_t chunks_len);
 
-int evr_grow_chunk_set(chunk_set_t *cs, size_t new_chunks_len);
+int evr_grow_chunk_set(struct chunk_set *cs, size_t new_chunks_len);
 
-void evr_free_chunk_set(chunk_set_t *cs);
+void evr_free_chunk_set(struct chunk_set *cs);
 
 #endif

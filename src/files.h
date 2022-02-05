@@ -41,12 +41,12 @@ int read_n(int f, char *buffer, size_t bytes);
 
 int write_n(int fd, const void *buffer, size_t size);
 
-int write_chunk_set(int f, const chunk_set_t *cs);
+int write_chunk_set(int f, const struct chunk_set *cs);
 
 int pipe_n(int dest, int src, size_t size);
 
-chunk_set_t *read_into_chunks(int fd, size_t size);
+struct chunk_set *read_into_chunks(int fd, size_t size);
 
-int append_into_chunk_set(chunk_set_t *cs, int f);
+int append_into_chunk_set(struct chunk_set *cs, int f);
 
 #endif

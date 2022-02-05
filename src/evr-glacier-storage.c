@@ -295,7 +295,7 @@ int evr_work_put_blob(evr_connection_t *ctx, evr_cmd_header_t *cmd){
         log_debug("Worker %d retrieved cmd put %s with %d bytes blob", ctx->socket, fmt_key, blob_size);
     }
 #endif
-    chunk_set_t *blob = read_into_chunks(ctx->socket, blob_size);
+    struct chunk_set *blob = read_into_chunks(ctx->socket, blob_size);
     if(!blob){
         goto out;
     }

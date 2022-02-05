@@ -44,7 +44,7 @@ void test_read_empty_json_with_small_buffer(){
 void test_read_into_chunks_with_small_file(){
     int f = open("etc/configuration/empty.json", O_RDONLY);
     assert_truthy(f);
-    chunk_set_t *cs = read_into_chunks(f, 2);
+    struct chunk_set *cs = read_into_chunks(f, 2);
     close(f);
     assert_not_null(cs);
     assert_equal(cs->chunks_len, 1);
@@ -57,7 +57,7 @@ void test_read_into_chunks_with_small_file(){
 void test_append_into_chunk_set_with_small_file(){
     int f = open("etc/configuration/empty.json", O_RDONLY);
     assert_truthy(f);
-    chunk_set_t *cs = evr_allocate_chunk_set(0);
+    struct chunk_set *cs = evr_allocate_chunk_set(0);
     assert_not_null(cs);
     assert_ok(append_into_chunk_set(cs, f));
     close(f);

@@ -186,7 +186,7 @@ int evr_cli_get(char *fmt_key){
 
 int evr_cli_put(){
     int ret = evr_error;
-    chunk_set_t *blob = evr_allocate_chunk_set(0);
+    struct chunk_set *blob = evr_allocate_chunk_set(0);
     if(!blob){
         goto out;
     }

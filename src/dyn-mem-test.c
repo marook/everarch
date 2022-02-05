@@ -46,7 +46,7 @@ int is_ignored(int c){
 }
 
 void test_allocate_chunk_set(){
-    chunk_set_t *cs = evr_allocate_chunk_set(3);
+    struct chunk_set *cs = evr_allocate_chunk_set(3);
     assert_not_null(cs);
     assert_equal(cs->chunks_len, 3);
     // write into every byte of the chunk set to force an error in
