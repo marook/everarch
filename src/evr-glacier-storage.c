@@ -40,15 +40,15 @@
 
 int running = 1;
 
-typedef struct {
+struct evr_connection{
     int socket;
-} evr_connection_t;
+};
 
 void handle_sigterm(int signum);
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config);
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
-int evr_work_put_blob(evr_connection_t *ctx, evr_cmd_header_t *cmd);
+int evr_work_put_blob(struct evr_connection *ctx, evr_cmd_header_t *cmd);
 int send_get_response(void *arg, int exists, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
@@ -143,7 +143,7 @@ int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config){
                         return evr_error;
                     }
                     log_debug("Connection from %s:%d accepted (will be worker %d)", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), c);
-                    evr_connection_t *context = malloc(sizeof(evr_connection_t));
+                    struct evr_connection *context = malloc(sizeof(struct evr_connection));
                     if(!context){
                         goto context_alloc_fail;
                     }
@@ -188,7 +188,7 @@ int evr_glacier_make_tcp_socket(){
 
 int evr_connection_worker(void *context){
     int result = evr_error;
-    evr_connection_t ctx = *(evr_connection_t*)context;
+    struct evr_connection ctx = *(struct evr_connection*)context;
     free(context);
     log_debug("Started worker %d", ctx.socket);
     struct evr_glacier_read_ctx *rctx = NULL;
@@ -273,7 +273,7 @@ int evr_connection_worker(void *context){
     return result;
 }
 
-int evr_work_put_blob(evr_connection_t *ctx, evr_cmd_header_t *cmd){
+int evr_work_put_blob(struct evr_connection *ctx, evr_cmd_header_t *cmd){
     int ret = evr_error;
     if(cmd->body_size < evr_blob_key_size){
         goto out;
