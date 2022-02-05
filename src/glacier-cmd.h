@@ -41,20 +41,16 @@
 #define evr_cmd_type_get_blob 0x01
 #define evr_cmd_type_put_blob 0x02
 
-typedef uint32_t evr_cmd_size_t;
-#define evr_cmd_size_to_n htobe32
-#define evr_cmd_size_to_h be32toh
-
 typedef struct {
     int type;
-    evr_cmd_size_t body_size;
+    size_t body_size;
 } evr_cmd_header_t;
 
 /**
  * evr_cmd_header_t_n_size defines the serialized size of
  * evr_cmd_header_t in a network buffer.
  */
-#define evr_cmd_header_t_n_size (sizeof(uint8_t) + sizeof(evr_cmd_size_t))
+#define evr_cmd_header_t_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
 int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer);
 int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header);
@@ -69,14 +65,14 @@ typedef uint8_t evr_status_code_t;
 
 typedef struct {
     evr_status_code_t status_code;
-    evr_cmd_size_t body_size;
+    size_t body_size;
 } evr_resp_header_t;
 
 /**
  * evr_resp_header_t_n_size defines the serialized size of
  * evr_resp_header_t in a network buffer.
  */
-#define evr_resp_header_t_n_size (sizeof(evr_status_code_t) + sizeof(evr_cmd_size_t))
+#define evr_resp_header_t_n_size (sizeof(evr_status_code_t) + sizeof(uint32_t))
 
 int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer);
 int evr_format_resp_header(char *buffer, const evr_resp_header_t *header);
