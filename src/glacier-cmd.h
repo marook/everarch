@@ -55,8 +55,6 @@ typedef struct {
 int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer);
 int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header);
 
-typedef uint8_t evr_status_code_t;
-
 #define evr_status_code_ok 0x20
 #define evr_status_code_client_error 0x40
 #define evr_status_code_unknown_cmd 0x44
@@ -64,7 +62,7 @@ typedef uint8_t evr_status_code_t;
 #define evr_status_code_server_error 0x50
 
 typedef struct {
-    evr_status_code_t status_code;
+    int status_code;
     size_t body_size;
 } evr_resp_header_t;
 
@@ -72,7 +70,7 @@ typedef struct {
  * evr_resp_header_t_n_size defines the serialized size of
  * evr_resp_header_t in a network buffer.
  */
-#define evr_resp_header_t_n_size (sizeof(evr_status_code_t) + sizeof(uint32_t))
+#define evr_resp_header_t_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
 int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer);
 int evr_format_resp_header(char *buffer, const evr_resp_header_t *header);

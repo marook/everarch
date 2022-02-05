@@ -38,16 +38,16 @@ int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header){
 
 int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer){
     const char *p = buffer;
-    header->status_code = *(evr_status_code_t*)p;
-    p = (char*)&((evr_status_code_t*)p)[1];
+    header->status_code = *(uint8_t*)p;
+    p = (char*)&((uint8_t*)p)[1];
     header->body_size = be32toh(*(uint32_t*)p);
     return evr_ok;
 }
 
 int evr_format_resp_header(char *buffer, const evr_resp_header_t *header){
     char *p = buffer;
-    *(evr_status_code_t*)p = header->status_code;
-    p = (char*)&((evr_status_code_t*)p)[1];
+    *(uint8_t*)p = header->status_code;
+    p = (char*)&((uint8_t*)p)[1];
     *(uint32_t*)p = htobe32(header->body_size);
     return evr_ok;
 }
