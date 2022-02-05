@@ -25,7 +25,7 @@
 
 #define evr_persister_task_queue_length 32
 
-typedef struct {
+struct evr_persister_ctx {
     evr_persister_task *tasks[evr_persister_task_queue_length + 1];
     evr_persister_task **writing;
     evr_persister_task **reading;
@@ -33,9 +33,9 @@ typedef struct {
     cnd_t has_tasks;
     struct evr_glacier_write_ctx *write_ctx;
     int working;
-} evr_persister_ctx;
+};
 
-evr_persister_ctx evr_persister;
+struct evr_persister_ctx evr_persister;
 
 thrd_t evr_persister_thread;
 
