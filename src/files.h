@@ -27,15 +27,15 @@
  * *buffer must point to an existing buffer. *buffer may be null if
  * read_file returns with != 0.
  */
-int read_file(dynamic_array **buffer, const char *path, size_t max_size);
+int read_file(struct dynamic_array **buffer, const char *path, size_t max_size);
 
-int read_fd(dynamic_array **buffer, int fd, size_t max_size);
+int read_fd(struct dynamic_array **buffer, int fd, size_t max_size);
 
 /**
  * read_file_str reads a file just like read_file and \0 terminates
  * the string.
  */
-int read_file_str(dynamic_array **buffer, const char *path, size_t max_size);
+int read_file_str(struct dynamic_array **buffer, const char *path, size_t max_size);
 
 int read_n(int f, char *buffer, size_t bytes);
 

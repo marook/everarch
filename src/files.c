@@ -27,7 +27,7 @@
 #include "basics.h"
 #include "errors.h"
 
-int read_file(dynamic_array **buffer, const char *path, size_t max_size){
+int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
     int result = evr_error;
     int f = open(path, O_RDONLY);
     if(!f){
@@ -43,7 +43,7 @@ int read_file(dynamic_array **buffer, const char *path, size_t max_size){
     return result;
 }
 
-int read_fd(dynamic_array **buffer, int fd, size_t max_size) {
+int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
     while(1){
         if((*buffer)->size_allocated == (*buffer)->size_used){
             *buffer = grow_dynamic_array(*buffer);
@@ -67,7 +67,7 @@ int read_fd(dynamic_array **buffer, int fd, size_t max_size) {
     return evr_ok;
 }
 
-int read_file_str(dynamic_array **buffer, const char *path, size_t max_size){
+int read_file_str(struct dynamic_array **buffer, const char *path, size_t max_size){
     if(read_file(buffer, path, max_size)){
         return 1;
     }

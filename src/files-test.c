@@ -24,7 +24,7 @@
 #include "test.h"
 
 void test_read_empty_json_with_big_buffer(){
-    dynamic_array *buffer = alloc_dynamic_array(1024);
+    struct dynamic_array *buffer = alloc_dynamic_array(1024);
     assert_not_null(buffer);
     assert_zero(read_file_str(&buffer, "etc/configuration/empty.json", 1024));
     assert_str_eq((char*)buffer->data, "{}\n");
@@ -33,7 +33,7 @@ void test_read_empty_json_with_big_buffer(){
 }
 
 void test_read_empty_json_with_small_buffer(){
-    dynamic_array *buffer = alloc_dynamic_array(1);
+    struct dynamic_array *buffer = alloc_dynamic_array(1);
     assert_not_null(buffer);
     assert_zero(read_file_str(&buffer, "etc/configuration/empty.json", 1024));
     assert_str_eq((char*)buffer->data, "{}\n");

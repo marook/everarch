@@ -24,7 +24,7 @@
 
 #include "basics.h"
 
-typedef struct {
+struct dynamic_array {
     /**
      * size_allocated is the maximal number of bytes which are
      * allocated for data.
@@ -39,7 +39,7 @@ typedef struct {
     size_t size_used;
     
     void *data;
-} dynamic_array;
+};
 
 /**
  * alloc_dynamic_array allocates a dynamic_array using malloc.
@@ -48,7 +48,7 @@ typedef struct {
  *
  * The returned dynamic_array can be freed using free(…).
  */
-dynamic_array *alloc_dynamic_array(size_t initial_size);
+struct dynamic_array *alloc_dynamic_array(size_t initial_size);
 
 #define grow_dynamic_array(da) grow_dynamic_array_at_least(da, 0)
 
@@ -60,9 +60,9 @@ dynamic_array *alloc_dynamic_array(size_t initial_size);
  * Returns NULL if the memory could not be allocated. The former memory
  * is freed in that case.
  */
-dynamic_array *grow_dynamic_array_at_least(dynamic_array *da, size_t min_size);
+struct dynamic_array *grow_dynamic_array_at_least(struct dynamic_array *da, size_t min_size);
 
-void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c));
+void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c));
 
 /**
  * evr_chunk_size is the size of one chunk within the

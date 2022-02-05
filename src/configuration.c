@@ -105,7 +105,7 @@ int load_evr_glacier_storage_configurations(evr_glacier_storage_configuration *c
 }
 
 int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configuration *config, const char *config_path){
-    dynamic_array *buffer = alloc_dynamic_array(4096);
+    struct dynamic_array *buffer = alloc_dynamic_array(4096);
     if(!buffer){
         return 1;
     }

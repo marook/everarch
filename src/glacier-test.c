@@ -90,7 +90,7 @@ void test_evr_glacier_write_smal_blob(){
         log_info("Read the written blob");
         evr_blob_key_t key;
         memset(key, 1, evr_blob_key_size);
-        dynamic_array *data_buffer = alloc_dynamic_array(128);
+        struct dynamic_array *data_buffer = alloc_dynamic_array(128);
         assert_not_null(data_buffer);
         status_mock_ret = evr_ok;
         status_mock_expected_exists = 1;
@@ -120,7 +120,7 @@ int status_mock(void *arg, int exists, size_t blob_size){
 }
 
 int store_into_dynamic_array(void *arg, const char *data, size_t data_len){
-    dynamic_array **buffer = (dynamic_array**)arg;
+    struct dynamic_array **buffer = (struct dynamic_array**)arg;
     size_t new_size_used = (*buffer)->size_used + data_len;
     if(new_size_used > (*buffer)->size_allocated){
         *buffer = grow_dynamic_array_at_least(*buffer, new_size_used);

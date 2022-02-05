@@ -26,14 +26,14 @@
 int is_ignored(int c);
 
 void test_rtrim_empty_array(){
-    dynamic_array *a = alloc_dynamic_array(1);
+    struct dynamic_array *a = alloc_dynamic_array(1);
     rtrim_dynamic_array(a, is_ignored);
     assert_size_eq(a->size_used, 0);
     free(a);
 }
 
 void test_rtrim_end_of_array(){
-    dynamic_array *a = alloc_dynamic_array(1024);
+    struct dynamic_array *a = alloc_dynamic_array(1024);
     strcpy((char*)a->data, "test   ");
     a->size_used = strlen((char*)a->data) + 1;
     rtrim_dynamic_array(a, is_ignored);

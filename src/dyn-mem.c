@@ -24,9 +24,9 @@ inline size_t get_dynamic_array_size(size_t data_size);
 char *evr_alloc_chunk();
 void evr_free_chunk(char *chunk);
 
-dynamic_array *alloc_dynamic_array(size_t initial_size){
+struct dynamic_array *alloc_dynamic_array(size_t initial_size){
     size_t da_size = get_dynamic_array_size(initial_size);
-    dynamic_array *da = (dynamic_array*)malloc(da_size);
+    struct dynamic_array *da = (struct dynamic_array*)malloc(da_size);
     if(!da){
         return NULL;
     }
@@ -36,14 +36,14 @@ dynamic_array *alloc_dynamic_array(size_t initial_size){
     return da;
 }
 
-dynamic_array *grow_dynamic_array_at_least(dynamic_array *da, size_t min_size){
+struct dynamic_array *grow_dynamic_array_at_least(struct dynamic_array *da, size_t min_size){
     // + 1 because we want to avoid size not growing when small
     size_t new_size = (size_t)(da->size_allocated * 1.5) + 1;
     if(new_size < min_size){
         new_size = min_size;
     }
     size_t new_da_size = get_dynamic_array_size(new_size);
-    dynamic_array *new_da = (dynamic_array*)realloc(da, new_da_size);
+    struct dynamic_array *new_da = (struct dynamic_array*)realloc(da, new_da_size);
     if(!new_da){
         free(da);
         return NULL;
@@ -54,10 +54,10 @@ dynamic_array *grow_dynamic_array_at_least(dynamic_array *da, size_t min_size){
 }
 
 inline size_t get_dynamic_array_size(size_t data_size){
-    return sizeof(dynamic_array) + data_size;
+    return sizeof(struct dynamic_array) + data_size;
 }
 
-void rtrim_dynamic_array(dynamic_array *da, int (*istrimmed)(int c)){
+void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c)){
     char *it = &(((char*)da->data)[da->size_used]);
     for(; it-1 > (char*)da->data; it--){
         if(!istrimmed(*(it - 1))){
