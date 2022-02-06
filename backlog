@@ -1,4 +1,3 @@
-* function body opening braces in new lines
 * add blob predicate
 predicate is a one byte flag set. should contain one bit which
 indicates if the blob is only data or a claim (any maybe also data).
