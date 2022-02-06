@@ -21,7 +21,7 @@
 #include "test.h"
 
 void test_merge_evr_glacier_storage_configuration_file(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
+    struct evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
     assert_str_eq(config->cert_path, "~/.config/everarch/cert.pem");
     assert_str_eq(config->key_path, "~/.config/everarch/key.pem");
     assert_null(config->cert_root_path);
@@ -39,7 +39,7 @@ void test_merge_evr_glacier_storage_configuration_file(){
 }
 
 void test_load_evr_glacier_storage_configurations(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
+    struct evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
     const char *config_paths[] = {
         "etc/configuration/empty.json",
         "etc/configuration/no-such-file-exists-for-sure.json",

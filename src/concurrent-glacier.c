@@ -41,7 +41,7 @@ thrd_t evr_persister_thread;
 
 int evr_persister_worker(void *context);
 
-int evr_persister_start(evr_glacier_storage_configuration *config){
+int evr_persister_start(struct evr_glacier_storage_configuration *config){
     if(mtx_init(&evr_persister.worker_lock, mtx_plain) != thrd_success){
         goto worker_lock_init_fail;
     }

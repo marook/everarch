@@ -36,8 +36,8 @@ char *new_bucket_dir_path(){
     return s;
 }
 
-evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration(){
-    evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
+struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration(){
+    struct evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
     assert_not_null(config);
     if(config->bucket_dir_path){
         free(config->bucket_dir_path);

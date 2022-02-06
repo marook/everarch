@@ -23,11 +23,11 @@
 
 /**
  * create_temp_evr_glacier_storage_configuration allocates a new
- * evr_glacier_storage_configuration which points to a temporary
+ * struct evr_glacier_storage_configuration which points to a temporary
  * glacier directory.
  *
  * Every call can assume to point to an empty glacier.
  */
-evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration();
+struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration();
 
 #endif

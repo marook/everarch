@@ -46,8 +46,8 @@ char *get_object_string_property(const cJSON *obj, const char* key);
 int is_json_ignored(int c);
 int evr_single_wordexp(char **pathname);
 
-evr_glacier_storage_configuration *create_evr_glacier_storage_configuration(){
-    evr_glacier_storage_configuration *config = (evr_glacier_storage_configuration*)malloc(sizeof(evr_glacier_storage_configuration));
+struct evr_glacier_storage_configuration *create_evr_glacier_storage_configuration(){
+    struct evr_glacier_storage_configuration *config = (struct evr_glacier_storage_configuration*)malloc(sizeof(struct evr_glacier_storage_configuration));
     if(!config){
         return NULL;
     }
@@ -65,7 +65,7 @@ evr_glacier_storage_configuration *create_evr_glacier_storage_configuration(){
     return NULL;
 }
 
-void free_evr_glacier_storage_configuration(evr_glacier_storage_configuration *config){
+void free_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config){
     if(!config){
         return;
     }
@@ -76,7 +76,7 @@ void free_evr_glacier_storage_configuration(evr_glacier_storage_configuration *c
     free(config);
 }
 
-int load_evr_glacier_storage_configurations(evr_glacier_storage_configuration *config, const char **paths, size_t paths_len){
+int load_evr_glacier_storage_configurations(struct evr_glacier_storage_configuration *config, const char **paths, size_t paths_len){
     int ret = evr_error;
     const char **paths_end = &(paths[paths_len]);
     wordexp_t we;
@@ -104,7 +104,7 @@ int load_evr_glacier_storage_configurations(evr_glacier_storage_configuration *c
     return ret;
 }
 
-int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configuration *config, const char *config_path){
+int merge_evr_glacier_storage_configuration_file(struct evr_glacier_storage_configuration *config, const char *config_path){
     struct dynamic_array *buffer = alloc_dynamic_array(4096);
     if(!buffer){
         return 1;
@@ -155,7 +155,7 @@ char *get_object_string_property(const cJSON *obj, const char* key){
         goto fail;                              \
     }
 
-int expand_evr_glacier_storage_configuration(evr_glacier_storage_configuration *config){
+int expand_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config){
     int ret = evr_error;
     evr_single_expand_property(config->cert_path, out);
     evr_single_expand_property(config->key_path, out);

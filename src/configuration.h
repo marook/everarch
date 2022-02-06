@@ -28,7 +28,7 @@
  * All pointers within this structure must be freed using
  * free_evr_glacier_storage_configuration function.
  */
-typedef struct {
+struct evr_glacier_storage_configuration {
     char *cert_path;
     char *key_path;
     char *cert_root_path;
@@ -45,20 +45,20 @@ typedef struct {
      * %d is used to place the bucket index within the template.
      */
     char *bucket_dir_path;
-} evr_glacier_storage_configuration;
+};
 
-evr_glacier_storage_configuration *create_evr_glacier_storage_configuration();
+struct evr_glacier_storage_configuration *create_evr_glacier_storage_configuration();
 
-void free_evr_glacier_storage_configuration(evr_glacier_storage_configuration *config);
+void free_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config);
 
 /**
  * load_evr_glacier_storage_configurations loads and merges configs
  * from one or more files and expands it.
  */
-int load_evr_glacier_storage_configurations(evr_glacier_storage_configuration *config, const char **paths, size_t paths_len);
+int load_evr_glacier_storage_configurations(struct evr_glacier_storage_configuration *config, const char **paths, size_t paths_len);
 
-int merge_evr_glacier_storage_configuration_file(evr_glacier_storage_configuration *config, const char *config_path);
+int merge_evr_glacier_storage_configuration_file(struct evr_glacier_storage_configuration *config, const char *config_path);
 
-int expand_evr_glacier_storage_configuration(evr_glacier_storage_configuration *config);
+int expand_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config);
 
 #endif

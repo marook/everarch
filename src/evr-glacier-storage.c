@@ -45,7 +45,7 @@ struct evr_connection{
 };
 
 void handle_sigterm(int signum);
-int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config);
+int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config);
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
@@ -55,7 +55,7 @@ int pipe_data(void *arg, const char *data, size_t data_size);
 /**
  * config exists until the program is terminated.
  */
-evr_glacier_storage_configuration *config;
+struct evr_glacier_storage_configuration *config;
 
 int main(){
     int ret = evr_error;
@@ -110,7 +110,7 @@ void handle_sigterm(int signum){
     }
 }
 
-int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config){
+int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config){
     int s = evr_glacier_make_tcp_socket(evr_glacier_storage_port);
     if(s < 0){
         log_error("Failed to create socket");

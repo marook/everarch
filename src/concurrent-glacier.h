@@ -28,7 +28,7 @@
  *
  * config must not be freed until evr_persister_stop is called.
  */
-int evr_persister_start(evr_glacier_storage_configuration *config);
+int evr_persister_start(struct evr_glacier_storage_configuration *config);
 
 /**
  * evr_persister_stop gracefully stops the persister. Blocks until the

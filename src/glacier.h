@@ -40,7 +40,7 @@ struct evr_writing_blob {
 };
 
 struct evr_glacier_read_ctx {
-    evr_glacier_storage_configuration *config;
+    struct evr_glacier_storage_configuration *config;
     sqlite3 *db;
     sqlite3_stmt *find_blob_stmt;
     char *read_buffer;
@@ -59,7 +59,7 @@ struct evr_glacier_read_ctx {
  *
  * The returned context must be freed using evr_free_glacier_read_ctx.
  */
-struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(evr_glacier_storage_configuration *config);
+struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_storage_configuration *config);
 
 int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx);
 
@@ -79,7 +79,7 @@ int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx);
 int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
 struct evr_glacier_write_ctx {
-    evr_glacier_storage_configuration *config;
+    struct evr_glacier_storage_configuration *config;
     unsigned long current_bucket_index;
     int current_bucket_f;
     size_t current_bucket_pos;
@@ -95,7 +95,7 @@ struct evr_glacier_write_ctx {
  *
  * The returned context must be freed using evr_free_glacier_write_ctx.
  */
-struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configuration *config);
+struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_storage_configuration *config);
 
 int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx);
 
@@ -115,6 +115,6 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
  * evr_quick_check_glacier performs a quick sanity check of the
  * persisted glacier and creates it if not existing.
  */
-int evr_quick_check_glacier(evr_glacier_storage_configuration *config);
+int evr_quick_check_glacier(struct evr_glacier_storage_configuration *config);
 
 #endif

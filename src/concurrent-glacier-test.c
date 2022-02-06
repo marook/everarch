@@ -36,7 +36,7 @@ struct timespec short_delay = {
 
 struct timespec *append_blob_delay = NULL;
 
-struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(evr_glacier_storage_configuration *config){
+struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_storage_configuration *config){
     return (struct evr_glacier_write_ctx*)1;
 }
 
@@ -53,7 +53,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     return evr_glacier_append_blob_result;
 }
 
-evr_glacier_storage_configuration *test_config;
+struct evr_glacier_storage_configuration *test_config;
 
 void evr_temp_persister_start(){
     assert_ok(evr_persister_start(test_config));
