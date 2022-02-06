@@ -24,7 +24,7 @@
  * from the server.
  *
  * Commands and responses consist of a header and a body. See
- * struct evr_cmd_header and evr_resp_header_t for the headers. Command and
+ * struct evr_cmd_header and struct evr_resp_header for the headers. Command and
  * response body types depend on the command type.
  */
 
@@ -61,18 +61,18 @@ int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header);
 #define evr_status_code_blob_not_found 0x45
 #define evr_status_code_server_error 0x50
 
-typedef struct {
+struct evr_resp_header {
     int status_code;
     size_t body_size;
-} evr_resp_header_t;
+};
 
 /**
- * evr_resp_header_t_n_size defines the serialized size of
- * evr_resp_header_t in a network buffer.
+ * evr_resp_header_n_size defines the serialized size of
+ * struct evr_resp_header in a network buffer.
  */
-#define evr_resp_header_t_n_size (sizeof(uint8_t) + sizeof(uint32_t))
+#define evr_resp_header_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
-int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer);
-int evr_format_resp_header(char *buffer, const evr_resp_header_t *header);
+int evr_parse_resp_header(struct evr_resp_header *header, const char *buffer);
+int evr_format_resp_header(char *buffer, const struct evr_resp_header *header);
 
 #endif

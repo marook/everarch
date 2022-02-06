@@ -141,7 +141,7 @@ int evr_cli_get(char *fmt_key){
         log_error("Failed to connect to evr-glacier-storage server");
         goto fail;
     }
-    char buffer[max(evr_cmd_header_n_size, evr_resp_header_t_n_size)];
+    char buffer[max(evr_cmd_header_n_size, evr_resp_header_n_size)];
     struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_get_blob;
     cmd.body_size = evr_blob_key_size;
@@ -158,10 +158,10 @@ int evr_cli_get(char *fmt_key){
         goto cmd_format_fail;
     }
     log_debug("Reading storage response");
-    if(read_n(c, buffer, evr_resp_header_t_n_size) != evr_ok){
+    if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
         goto cmd_format_fail;
     }
-    evr_resp_header_t resp;
+    struct evr_resp_header resp;
     if(evr_parse_resp_header(&resp, buffer) != evr_ok){
         goto cmd_format_fail;
     }
@@ -207,7 +207,7 @@ int evr_cli_put(){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
     }
-    char buffer[max(evr_cmd_header_n_size + evr_blob_key_size, evr_resp_header_t_n_size)];
+    char buffer[max(evr_cmd_header_n_size + evr_blob_key_size, evr_resp_header_n_size)];
     struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_put_blob;
     cmd.body_size = evr_blob_key_size + blob->size_used;
@@ -229,10 +229,10 @@ int evr_cli_put(){
         goto out_with_close_c;
     }
     log_debug("Reading storage response");
-    if(read_n(c, buffer, evr_resp_header_t_n_size) != evr_ok){
+    if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
         goto out_with_close_c;
     }
-    evr_resp_header_t resp;
+    struct evr_resp_header resp;
     if(evr_parse_resp_header(&resp, buffer) != evr_ok){
         goto out_with_close_c;
     }

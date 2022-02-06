@@ -193,8 +193,8 @@ int evr_connection_worker(void *context){
     log_debug("Started worker %d", ctx.socket);
     struct evr_glacier_read_ctx *rctx = NULL;
     // TODO i guess buffer is never used for storing responses. why do
-    // we make sure it fits evr_resp_header_t_n_size
-    const size_t buffer_size = max(evr_cmd_header_n_size, evr_resp_header_t_n_size);
+    // we make sure it fits evr_resp_header_n_size
+    const size_t buffer_size = max(evr_cmd_header_n_size, evr_resp_header_n_size);
     char buffer[buffer_size];
     struct evr_cmd_header cmd;
     while(running){
@@ -323,14 +323,14 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     if(task.result != evr_ok){
         goto out_destroy_task;
     }
-    evr_resp_header_t resp;
+    struct evr_resp_header resp;
     resp.status_code = evr_status_code_ok;
     resp.body_size = 0;
-    char buffer[evr_resp_header_t_n_size];
+    char buffer[evr_resp_header_n_size];
     if(evr_format_resp_header(buffer, &resp) != evr_ok){
         goto out_destroy_task;
     }
-    if(write_n(ctx->socket, buffer, evr_resp_header_t_n_size) != evr_ok){
+    if(write_n(ctx->socket, buffer, evr_resp_header_n_size) != evr_ok){
         goto out_destroy_task;
     }
     ret = evr_ok;
@@ -347,7 +347,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
 int send_get_response(void *arg, int exists, size_t blob_size){
     int ret = evr_error;
     int *f = (int*)arg;
-    evr_resp_header_t resp;
+    struct evr_resp_header resp;
     if(exists){
         resp.status_code = evr_status_code_ok;
         resp.body_size = blob_size;
@@ -355,11 +355,11 @@ int send_get_response(void *arg, int exists, size_t blob_size){
         resp.status_code = evr_status_code_blob_not_found;
         resp.body_size = 0;
     }
-    char buffer[evr_resp_header_t_n_size];
+    char buffer[evr_resp_header_n_size];
     if(evr_format_resp_header(buffer, &resp) != evr_ok){
         goto end;
     }
-    if(write_n(*f, buffer, evr_resp_header_t_n_size) != evr_ok){
+    if(write_n(*f, buffer, evr_resp_header_n_size) != evr_ok){
         goto end;
     }
     ret = evr_ok;

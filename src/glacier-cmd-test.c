@@ -33,12 +33,12 @@ void test_format_parse_cmd_header(){
 }
 
 void test_format_parse_resp_header(){
-    evr_resp_header_t in;
+    struct evr_resp_header in;
     in.status_code = evr_status_code_unknown_cmd;
     in.body_size = 666;
-    char buffer[evr_resp_header_t_n_size];
+    char buffer[evr_resp_header_n_size];
     assert_ok(evr_format_resp_header(buffer, &in));
-    evr_resp_header_t out;
+    struct evr_resp_header out;
     assert_ok(evr_parse_resp_header(&out, buffer));
     assert_equal(out.status_code, evr_status_code_unknown_cmd);
     assert_equal(out.body_size, 666);

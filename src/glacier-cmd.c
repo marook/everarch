@@ -36,7 +36,7 @@ int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header){
     return evr_ok;
 }
 
-int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer){
+int evr_parse_resp_header(struct evr_resp_header *header, const char *buffer){
     const char *p = buffer;
     header->status_code = *(uint8_t*)p;
     p = (char*)&((uint8_t*)p)[1];
@@ -44,7 +44,7 @@ int evr_parse_resp_header(evr_resp_header_t *header, const char *buffer){
     return evr_ok;
 }
 
-int evr_format_resp_header(char *buffer, const evr_resp_header_t *header){
+int evr_format_resp_header(char *buffer, const struct evr_resp_header *header){
     char *p = buffer;
     *(uint8_t*)p = header->status_code;
     p = (char*)&((uint8_t*)p)[1];
