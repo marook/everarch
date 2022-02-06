@@ -20,7 +20,7 @@
 
 #include "errors.h"
 
-int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer){
+int evr_parse_cmd_header(struct evr_cmd_header *header, const char *buffer){
     const char *p = buffer;
     header->type = *(uint8_t*)p;
     p = (char*)&((uint8_t*)p)[1];
@@ -28,7 +28,7 @@ int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer){
     return evr_ok;
 }
 
-int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header){
+int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header){
     char *p = buffer;
     *(uint8_t*)p = header->type;
     p = (char*)&((uint8_t*)p)[1];

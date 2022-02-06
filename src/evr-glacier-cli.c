@@ -141,8 +141,8 @@ int evr_cli_get(char *fmt_key){
         log_error("Failed to connect to evr-glacier-storage server");
         goto fail;
     }
-    char buffer[max(evr_cmd_header_t_n_size, evr_resp_header_t_n_size)];
-    evr_cmd_header_t cmd;
+    char buffer[max(evr_cmd_header_n_size, evr_resp_header_t_n_size)];
+    struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_get_blob;
     cmd.body_size = evr_blob_key_size;
     if(evr_format_cmd_header(buffer, &cmd) != evr_ok){
@@ -151,7 +151,7 @@ int evr_cli_get(char *fmt_key){
     log_debug("Sending get %s command to server", fmt_key);
     // TODO combine the following two write_n calls into one as we
     // want to only create one ip data packet and not two
-    if(write_n(c, buffer, evr_cmd_header_t_n_size) != evr_ok){
+    if(write_n(c, buffer, evr_cmd_header_n_size) != evr_ok){
         goto cmd_format_fail;
     }
     if(write_n(c, key, evr_blob_key_size) != evr_ok){
@@ -207,14 +207,14 @@ int evr_cli_put(){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
     }
-    char buffer[max(evr_cmd_header_t_n_size + evr_blob_key_size, evr_resp_header_t_n_size)];
-    evr_cmd_header_t cmd;
+    char buffer[max(evr_cmd_header_n_size + evr_blob_key_size, evr_resp_header_t_n_size)];
+    struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_put_blob;
     cmd.body_size = evr_blob_key_size + blob->size_used;
     if(evr_format_cmd_header(buffer, &cmd) != evr_ok){
         goto out_with_close_c;
     }
-    memcpy(&buffer[evr_cmd_header_t_n_size], key, evr_blob_key_size);
+    memcpy(&buffer[evr_cmd_header_n_size], key, evr_blob_key_size);
 #ifdef EVR_LOG_DEBUG
     {
         evr_fmt_blob_key_t fmt_key;
@@ -222,7 +222,7 @@ int evr_cli_put(){
         log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
     }
 #endif
-    if(write_n(c, buffer, evr_cmd_header_t_n_size + evr_blob_key_size) != evr_ok){
+    if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size) != evr_ok){
         goto out_with_close_c;
     }
     if(write_chunk_set(c, blob) != evr_ok){

@@ -24,7 +24,7 @@
  * from the server.
  *
  * Commands and responses consist of a header and a body. See
- * evr_cmd_header_t and evr_resp_header_t for the headers. Command and
+ * struct evr_cmd_header and evr_resp_header_t for the headers. Command and
  * response body types depend on the command type.
  */
 
@@ -41,19 +41,19 @@
 #define evr_cmd_type_get_blob 0x01
 #define evr_cmd_type_put_blob 0x02
 
-typedef struct {
+struct evr_cmd_header {
     int type;
     size_t body_size;
-} evr_cmd_header_t;
+};
 
 /**
- * evr_cmd_header_t_n_size defines the serialized size of
- * evr_cmd_header_t in a network buffer.
+ * evr_cmd_header_n_size defines the serialized size of
+ * struct evr_cmd_header in a network buffer.
  */
-#define evr_cmd_header_t_n_size (sizeof(uint8_t) + sizeof(uint32_t))
+#define evr_cmd_header_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
-int evr_parse_cmd_header(evr_cmd_header_t *header, const char *buffer);
-int evr_format_cmd_header(char *buffer, const evr_cmd_header_t *header);
+int evr_parse_cmd_header(struct evr_cmd_header *header, const char *buffer);
+int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header);
 
 #define evr_status_code_ok 0x20
 #define evr_status_code_client_error 0x40

@@ -21,12 +21,12 @@
 #include "assert.h"
 
 void test_format_parse_cmd_header(){
-    evr_cmd_header_t in;
+    struct evr_cmd_header in;
     in.type = evr_cmd_type_get_blob;
     in.body_size = 42;
-    char buffer[evr_cmd_header_t_n_size];
+    char buffer[evr_cmd_header_n_size];
     assert_ok(evr_format_cmd_header(buffer, &in));
-    evr_cmd_header_t out;
+    struct evr_cmd_header out;
     assert_ok(evr_parse_cmd_header(&out, buffer));
     assert_equal(out.type, evr_cmd_type_get_blob);
     assert_equal(out.body_size, 42);

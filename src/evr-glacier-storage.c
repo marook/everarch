@@ -48,7 +48,7 @@ void handle_sigterm(int signum);
 int evr_glacier_tcp_server(const evr_glacier_storage_configuration *config);
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
-int evr_work_put_blob(struct evr_connection *ctx, evr_cmd_header_t *cmd);
+int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int send_get_response(void *arg, int exists, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
@@ -194,11 +194,11 @@ int evr_connection_worker(void *context){
     struct evr_glacier_read_ctx *rctx = NULL;
     // TODO i guess buffer is never used for storing responses. why do
     // we make sure it fits evr_resp_header_t_n_size
-    const size_t buffer_size = max(evr_cmd_header_t_n_size, evr_resp_header_t_n_size);
+    const size_t buffer_size = max(evr_cmd_header_n_size, evr_resp_header_t_n_size);
     char buffer[buffer_size];
-    evr_cmd_header_t cmd;
+    struct evr_cmd_header cmd;
     while(running){
-        const int header_result = read_n(ctx.socket, buffer, evr_cmd_header_t_n_size);
+        const int header_result = read_n(ctx.socket, buffer, evr_cmd_header_n_size);
         if(header_result == evr_end){
             log_debug("Worker %d ends because of remote termination", ctx.socket);
             result = evr_ok;
@@ -273,7 +273,7 @@ int evr_connection_worker(void *context){
     return result;
 }
 
-int evr_work_put_blob(struct evr_connection *ctx, evr_cmd_header_t *cmd){
+int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     int ret = evr_error;
     if(cmd->body_size < evr_blob_key_size){
         goto out;
