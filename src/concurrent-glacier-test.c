@@ -68,7 +68,7 @@ void test_queue_one_blob_success(){
     append_blob_delay = NULL;
     evr_temp_persister_start();
     struct evr_writing_blob blob;
-    evr_persister_task task;
+    struct evr_persister_task task;
     assert_ok(evr_persister_init_task(&task, &blob));
     assert_ok(evr_persister_queue_task(&task));
     assert_ok(evr_persister_wait_for_task(&task));
@@ -82,7 +82,7 @@ void test_queue_one_blob_write_error(){
     append_blob_delay = NULL;
     evr_temp_persister_start();
     struct evr_writing_blob blob;
-    evr_persister_task task;
+    struct evr_persister_task task;
     assert_ok(evr_persister_init_task(&task, &blob));
     assert_ok(evr_persister_queue_task(&task));
     assert_ok(evr_persister_wait_for_task(&task));
@@ -119,7 +119,7 @@ void queue_and_process_many_blobs(struct timespec *queue_delay){
     evr_temp_persister_start();
     struct evr_writing_blob *blobs = malloc(sizeof(struct evr_writing_blob) * many_blobs_count);
     assert_not_null(blobs);
-    evr_persister_task *tasks = malloc(sizeof(evr_persister_task) * many_blobs_count);
+    struct evr_persister_task *tasks = malloc(sizeof(struct evr_persister_task) * many_blobs_count);
     assert_not_null(tasks);
     log_info("Initializing tasks...");
     for(int i = 0; i < many_blobs_count; i++){
@@ -139,7 +139,7 @@ void queue_and_process_many_blobs(struct timespec *queue_delay){
     }
     log_info("Waiting for tasks...");
     for(int i = many_blobs_count - 1; i >= 0; i--){
-        evr_persister_task *task = &tasks[i];
+        struct evr_persister_task *task = &tasks[i];
         assert_ok(evr_persister_wait_for_task(task));
         assert_equal(task->result, evr_ok);
     }

@@ -26,9 +26,9 @@
 #define evr_persister_task_queue_length 32
 
 struct evr_persister_ctx {
-    evr_persister_task *tasks[evr_persister_task_queue_length + 1];
-    evr_persister_task **writing;
-    evr_persister_task **reading;
+    struct evr_persister_task *tasks[evr_persister_task_queue_length + 1];
+    struct evr_persister_task **writing;
+    struct evr_persister_task **reading;
     mtx_t worker_lock;
     cnd_t has_tasks;
     struct evr_glacier_write_ctx *write_ctx;
@@ -96,7 +96,7 @@ int evr_persister_stop(){
     return evr_error;
 }
 
-int evr_persister_init_task(evr_persister_task *task, struct evr_writing_blob *blob){
+int evr_persister_init_task(struct evr_persister_task *task, struct evr_writing_blob *blob){
     task->blob = blob;
     if(mtx_init(&task->done, mtx_plain) != thrd_success){
         return evr_error;
@@ -104,14 +104,14 @@ int evr_persister_init_task(evr_persister_task *task, struct evr_writing_blob *b
     return evr_ok;
 }
 
-int evr_persister_destroy_task(evr_persister_task *task){
+int evr_persister_destroy_task(struct evr_persister_task *task){
     mtx_destroy(&task->done);
     return evr_ok;
 }
 
-inline evr_persister_task** evr_persister_ctx_step(evr_persister_task **p);
+inline struct evr_persister_task** evr_persister_ctx_step(struct evr_persister_task **p);
 
-int evr_persister_queue_task(evr_persister_task *task){
+int evr_persister_queue_task(struct evr_persister_task *task){
     int result = evr_ok;
     // task->done is locked before locking
     // evr_persister.worker_lock. the goal is to outsource workload
@@ -125,8 +125,8 @@ int evr_persister_queue_task(evr_persister_task *task){
         goto fail;
     }
     atomic_thread_fence(memory_order_seq_cst);
-    evr_persister_task **allocated_task = evr_persister.writing;
-    evr_persister_task **next_writing = evr_persister_ctx_step(allocated_task);
+    struct evr_persister_task **allocated_task = evr_persister.writing;
+    struct evr_persister_task **next_writing = evr_persister_ctx_step(allocated_task);
     if(next_writing == evr_persister.reading){
         result = evr_temporary_occupied;
         if(mtx_unlock(&task->done) != thrd_success){
@@ -150,7 +150,7 @@ int evr_persister_queue_task(evr_persister_task *task){
     return evr_error;
 }
 
-int evr_persister_process_task(evr_persister_task *task);
+int evr_persister_process_task(struct evr_persister_task *task);
 
 int evr_persister_worker(void *context){
     log_debug("evr_persister_worker starting");
@@ -162,7 +162,7 @@ int evr_persister_worker(void *context){
     atomic_thread_fence(memory_order_seq_cst);
     while(evr_persister.working){
         while(evr_persister.working) {
-            evr_persister_task *task;
+            struct evr_persister_task *task;
             if(evr_persister.writing == evr_persister.reading){
                 break;
             } else {
@@ -202,7 +202,7 @@ int evr_persister_worker(void *context){
     return result;
 }
 
-inline evr_persister_task** evr_persister_ctx_step(evr_persister_task **p){
+inline struct evr_persister_task** evr_persister_ctx_step(struct evr_persister_task **p){
     p++;
     if(p == &(evr_persister.tasks[evr_persister_task_queue_length + 1])){
         p = evr_persister.tasks;
@@ -210,7 +210,7 @@ inline evr_persister_task** evr_persister_ctx_step(evr_persister_task **p){
     return p;
 }
 
-int evr_persister_process_task(evr_persister_task *task){
+int evr_persister_process_task(struct evr_persister_task *task){
     int result = evr_ok;
     if(evr_glacier_append_blob(evr_persister.write_ctx, task->blob) != evr_ok){
         result = evr_error;
@@ -226,7 +226,7 @@ int evr_persister_process_task(evr_persister_task *task){
     }
 }
 
-int evr_persister_wait_for_task(evr_persister_task *task){
+int evr_persister_wait_for_task(struct evr_persister_task *task){
     if(mtx_lock(&task->done) != thrd_success){
         return evr_error;
     }

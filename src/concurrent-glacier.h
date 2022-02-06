@@ -36,7 +36,7 @@ int evr_persister_start(evr_glacier_storage_configuration *config);
  */
 int evr_persister_stop();
 
-typedef struct {
+struct evr_persister_task {
     struct evr_writing_blob *blob;
 
     /**
@@ -51,16 +51,16 @@ typedef struct {
      * persisted. evr_error indicated blob could not be persisted.
      */
     int result;
-} evr_persister_task;
+};
 
 /**
  * evr_persister_init_task initializes task.
  *
  * blob may not be freed until evr_persister_destroy_task is called.
  */
-int evr_persister_init_task(evr_persister_task *task, struct evr_writing_blob *blob);
+int evr_persister_init_task(struct evr_persister_task *task, struct evr_writing_blob *blob);
 
-int evr_persister_destroy_task(evr_persister_task *task);
+int evr_persister_destroy_task(struct evr_persister_task *task);
 
 /**
  * evr_persister_queue_task schedules task for writing to glacier
@@ -72,7 +72,7 @@ int evr_persister_destroy_task(evr_persister_task *task);
  *
  * task may only be freed after done is unlocked.
  */
-int evr_persister_queue_task(evr_persister_task *task);
+int evr_persister_queue_task(struct evr_persister_task *task);
 
 /**
  * evr_persister_wait_for_task waits until task is done.
@@ -80,6 +80,6 @@ int evr_persister_queue_task(evr_persister_task *task);
  * Returns evr_ok even if the task's work has failed. Check
  * task->result manually if required.
  */
-int evr_persister_wait_for_task(evr_persister_task *task);
+int evr_persister_wait_for_task(struct evr_persister_task *task);
 
 #endif

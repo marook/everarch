@@ -308,7 +308,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         // match the blob's hash
         goto out_free_blob;
     }
-    evr_persister_task task;
+    struct evr_persister_task task;
     wblob.size = blob_size;
     wblob.chunks = blob->chunks;
     if(evr_persister_init_task(&task, &wblob) != evr_ok){
