@@ -51,13 +51,13 @@ static char args_doc[] = "CMD";
 #define cli_cmd_get 1
 #define cli_cmd_put 2
 
-typedef struct {
+struct cli_arguments {
     int cmd;
     char *key;
-} cli_args_t;
+};
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state){
-    cli_args_t *cli_args = (cli_args_t*)state->input;
+    struct cli_arguments *cli_args = (struct cli_arguments*)state->input;
     switch(key){
     default:
         return ARGP_ERR_UNKNOWN;
@@ -114,7 +114,7 @@ int evr_connect_to_storage();
 
 int main(int argc, char **argv){
     evr_log_fd = STDERR_FILENO;
-    cli_args_t cli_args;
+    struct cli_arguments cli_args;
     cli_args.cmd = cli_cmd_none;
     cli_args.key = NULL;
     argp_parse(&argp, argc, argv, 0, 0, &cli_args);
