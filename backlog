@@ -1,6 +1,3 @@
-* add blob predicate
-predicate is a one byte flag set. should contain one bit which
-indicates if the blob is only data or a claim (any maybe also data).
 * implement an integration test / benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
@@ -44,6 +41,11 @@ also possible would be ISO 8601 format with seconds precision like
 "2022-02-04T19:45:13+00:00".
 * implement a evr-file-storage service
 should provide put and get endpoints for files.
+* add option for flags to evr-glacier-cli put command
+right now flags=0 is always sent when putting a blob to the storage.
+
+the put flags should be specifyable using command line arguments in
+the evr-glacier-cli tool.
 * align chunk size with RLIMIT_FSIZE
 see [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
 regarding to it. also the chunk size should not grow over 1MB.

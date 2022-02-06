@@ -38,7 +38,27 @@
 
 #include "keys.h"
 
+/**
+ * evr_cmd_type_get_blob asks for a blob with a certain key.
+ *
+ * Expected cmd body is: <none>
+ *
+ * Expected response body is:
+ * - uint8_t flags
+ * - char *blob
+ */
 #define evr_cmd_type_get_blob 0x01
+
+/**
+ * evr_cmd_type_put_blob submits a blob with a certain key.
+ *
+ * Expected cmd body is:
+ * - uint8_t flags
+ * - evr_blob_key key
+ * - char *blob
+ *
+ * Expected response body is: <none>
+ */
 #define evr_cmd_type_put_blob 0x02
 
 struct evr_cmd_header {

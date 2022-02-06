@@ -27,9 +27,10 @@
 
 int status_mock_ret;
 int status_mock_expected_exists;
+int status_mock_expected_flags;
 int status_mock_expected_blob_size;
 
-int status_mock(void *arg, int exists, size_t blob_size);
+int status_mock(void *arg, int exists, int flags, size_t blob_size);
 int store_into_dynamic_array(void *arg, const char *data, size_t data_len);
 int store_into_void(void *arg, const char *data, size_t data_len);
 struct evr_glacier_storage_configuration* clone_config(struct evr_glacier_storage_configuration *config);
@@ -71,6 +72,7 @@ void test_evr_glacier_write_smal_blob(){
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 1, evr_blob_key_size);
+        wb->flags = 0;
         p = &wb[1];
         wb->chunks = (char**)p;
         p = (void*)(wb->chunks + 1);
@@ -81,7 +83,7 @@ void test_evr_glacier_write_smal_blob(){
         wb->size = data_len;
         assert_zero(evr_glacier_append_blob(write_ctx, wb));
         assert_equal(write_ctx->current_bucket_index, 1);
-        assert_equal(write_ctx->current_bucket_pos, 47);
+        assert_equal(write_ctx->current_bucket_pos, 48);
         free(buffer);
     }
     struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
@@ -94,6 +96,7 @@ void test_evr_glacier_write_smal_blob(){
         assert_not_null(data_buffer);
         status_mock_ret = evr_ok;
         status_mock_expected_exists = 1;
+        status_mock_expected_flags = 0;
         status_mock_expected_blob_size = 11;
         assert_zero(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_dynamic_array, &data_buffer));
         assert_equal(data_buffer->size_used, 11);
@@ -106,6 +109,7 @@ void test_evr_glacier_write_smal_blob(){
         memset(key, 2, evr_blob_key_size);
         status_mock_ret = evr_ok;
         status_mock_expected_exists = 0;
+        status_mock_expected_flags = 0;
         status_mock_expected_blob_size = 0;
         assert_equal(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_void, NULL), evr_not_found);
     }
@@ -113,8 +117,9 @@ void test_evr_glacier_write_smal_blob(){
     free_glacier_ctx(write_ctx);
 }
 
-int status_mock(void *arg, int exists, size_t blob_size){
+int status_mock(void *arg, int exists, int flags, size_t blob_size){
     assert_equal(exists, status_mock_expected_exists);
+    assert_equal(flags, status_mock_expected_flags);
     assert_equal(blob_size, status_mock_expected_blob_size);
     return status_mock_ret;
 }
@@ -148,6 +153,7 @@ void test_evr_glacier_write_big_blob(){
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 1, evr_blob_key_size);
+        wb->flags = 0;
         p = &wb[1];
         wb->chunks = (char**)p;
         p = (void*)(wb->chunks + 2);

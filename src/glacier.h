@@ -33,8 +33,15 @@
 
 extern const size_t evr_max_chunks_per_blob;
 
+/**
+ * evr_blob_flag_claim indicates the blob may also be interpreted as
+ * claim.
+ */
+#define evr_blob_flag_claim 0x01
+
 struct evr_writing_blob {
     evr_blob_key_t key;
+    int flags;
     size_t size;
     char **chunks;
 };
@@ -76,7 +83,7 @@ int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx);
  * evr_ok on successful processing. on_data's data argument is only
  * allocated while on_data is executed.
  */
-int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
+int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
 struct evr_glacier_write_ctx {
     struct evr_glacier_storage_configuration *config;

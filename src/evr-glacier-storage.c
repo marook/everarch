@@ -49,7 +49,7 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
-int send_get_response(void *arg, int exists, size_t blob_size);
+int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
 /**
@@ -278,7 +278,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     if(cmd->body_size < evr_blob_key_size){
         goto out;
     }
-    size_t blob_size = cmd->body_size - evr_blob_key_size;
+    size_t blob_size = cmd->body_size - evr_blob_key_size - sizeof(uint8_t);
     if(blob_size > evr_max_blob_data_size){
         // TODO should we send a client error here?
         goto out;
@@ -295,6 +295,10 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         log_debug("Worker %d retrieved cmd put %s with %d bytes blob", ctx->socket, fmt_key, blob_size);
     }
 #endif
+    uint8_t flags;
+    if(read_n(ctx->socket, (char*)&flags, sizeof(flags)) != evr_ok){
+        goto out;
+    }
     struct chunk_set *blob = read_into_chunks(ctx->socket, blob_size);
     if(!blob){
         goto out;
@@ -309,6 +313,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         goto out_free_blob;
     }
     struct evr_persister_task task;
+    wblob.flags = flags;
     wblob.size = blob_size;
     wblob.chunks = blob->chunks;
     if(evr_persister_init_task(&task, &wblob) != evr_ok){
@@ -344,22 +349,25 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     return ret;
 }
 
-int send_get_response(void *arg, int exists, size_t blob_size){
+int send_get_response(void *arg, int exists, int flags, size_t blob_size){
     int ret = evr_error;
     int *f = (int*)arg;
     struct evr_resp_header resp;
     if(exists){
         resp.status_code = evr_status_code_ok;
-        resp.body_size = blob_size;
+        resp.body_size = sizeof(uint8_t) + blob_size;
     } else {
         resp.status_code = evr_status_code_blob_not_found;
         resp.body_size = 0;
     }
-    char buffer[evr_resp_header_n_size];
+    char buffer[evr_resp_header_n_size + (exists ? sizeof(uint8_t) : 0)];
     if(evr_format_resp_header(buffer, &resp) != evr_ok){
         goto end;
     }
-    if(write_n(*f, buffer, evr_resp_header_n_size) != evr_ok){
+    if(exists){
+        *(uint8_t*)&buffer[evr_resp_header_n_size] = flags;
+    }
+    if(write_n(*f, buffer, sizeof(buffer)) != evr_ok){
         goto end;
     }
     ret = evr_ok;

@@ -172,7 +172,11 @@ int evr_cli_get(char *fmt_key){
     } else if(resp.status_code != evr_status_code_ok){
         goto cmd_format_fail;
     }
-    if(pipe_n(STDOUT_FILENO, c, resp.body_size) != evr_ok){
+    // read flags but don't use them
+    if(read_n(c, buffer, 1) != evr_ok){
+        goto cmd_format_fail;
+    }
+    if(pipe_n(STDOUT_FILENO, c, resp.body_size - 1) != evr_ok){
         goto cmd_format_fail;
     }
     result = evr_ok;
@@ -207,14 +211,18 @@ int evr_cli_put(){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
     }
-    char buffer[max(evr_cmd_header_n_size + evr_blob_key_size, evr_resp_header_n_size)];
+    char buffer[max(evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t), evr_resp_header_n_size)];
+    char *p = buffer;
     struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_put_blob;
     cmd.body_size = evr_blob_key_size + blob->size_used;
-    if(evr_format_cmd_header(buffer, &cmd) != evr_ok){
+    if(evr_format_cmd_header(p, &cmd) != evr_ok){
         goto out_with_close_c;
     }
-    memcpy(&buffer[evr_cmd_header_n_size], key, evr_blob_key_size);
+    p += evr_cmd_header_n_size;
+    memcpy(p, key, sizeof(key));
+    p += sizeof(key);
+    *(uint8_t*)p = 0; // flags
 #ifdef EVR_LOG_DEBUG
     {
         evr_fmt_blob_key_t fmt_key;
@@ -222,7 +230,7 @@ int evr_cli_put(){
         log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
     }
 #endif
-    if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size) != evr_ok){
+    if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t)) != evr_ok){
         goto out_with_close_c;
     }
     if(write_chunk_set(c, blob) != evr_ok){

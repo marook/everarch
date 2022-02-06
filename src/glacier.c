@@ -71,7 +71,7 @@ struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_stor
     if(evr_open_index_db(config, SQLITE_OPEN_READONLY, &(ctx->db))){
         goto fail_with_db;
     }
-    if(evr_prepare_stmt(ctx->db, "select bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?", &(ctx->find_blob_stmt))){
+    if(evr_prepare_stmt(ctx->db, "select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?", &(ctx->find_blob_stmt))){
         goto fail_with_db;
     }
     return ctx;
@@ -100,7 +100,7 @@ int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx){
     return ret;
 }
 
-int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
+int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
     int ret = evr_error;
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto end_with_find_reset;
@@ -108,7 +108,7 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
     int step_result = sqlite3_step(ctx->find_blob_stmt);
     if(step_result == SQLITE_DONE){
         ret = evr_not_found;
-        if(status(arg, 0, 0) != evr_ok){
+        if(status(arg, 0, 0, 0) != evr_ok){
             ret = evr_error;
         }
         goto end_with_find_reset;
@@ -116,9 +116,10 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
     if(step_result != SQLITE_ROW){
         goto end_with_find_reset;
     }
-    unsigned long bucket_index = sqlite3_column_int64(ctx->find_blob_stmt, 0);
-    size_t bucket_blob_offset = sqlite3_column_int(ctx->find_blob_stmt, 1);
-    size_t blob_size = sqlite3_column_int(ctx->find_blob_stmt, 2);
+    int flags = sqlite3_column_int(ctx->find_blob_stmt, 0);
+    unsigned long bucket_index = sqlite3_column_int64(ctx->find_blob_stmt, 1);
+    size_t bucket_blob_offset = sqlite3_column_int(ctx->find_blob_stmt, 2);
+    size_t blob_size = sqlite3_column_int(ctx->find_blob_stmt, 3);
     int bucket_f = evr_open_bucket(ctx->config, bucket_index, O_RDONLY);
     if(bucket_f == -1){
         goto end_with_find_reset;
@@ -126,7 +127,7 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
     if(lseek(bucket_f, bucket_blob_offset, SEEK_SET) == -1){
         goto end_with_open_bucket;
     }
-    if(status(arg, 1, blob_size) != evr_ok){
+    if(status(arg, 1, flags, blob_size) != evr_ok){
         ret = evr_error;
         goto end_with_open_bucket;
     }
@@ -203,7 +204,7 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
     if(evr_create_index_db(ctx)){
         goto fail_with_db;
     }
-    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, bucket_index, bucket_blob_offset, blob_size) values (?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
+    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size) values (?, ?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
         goto fail_with_db;
     }
     if(move_to_last_bucket(ctx)){
@@ -266,7 +267,7 @@ int evr_create_index_db(struct evr_glacier_write_ctx *ctx){
     //   which the blob data begins.
     // - blob_size is the size of the blob in bytes
     const char *structure_sql =
-        "create table if not exists blob_position (key blob primary key not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null)";
+        "create table if not exists blob_position (key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null)";
     char *error;
     if(sqlite3_exec(ctx->db, structure_sql, NULL, NULL, &error) != SQLITE_OK){
         log_error("Failed to create index db structure for glacier %s: %s", ctx->config->bucket_dir_path, error);
@@ -430,7 +431,7 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
 int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob) {
     int ret = evr_error;
     size_t blob_size_size = 4;
-    size_t header_disk_size = evr_blob_key_size + blob_size_size;
+    size_t header_disk_size = evr_blob_key_size + sizeof(uint8_t) + blob_size_size;
     size_t disk_size = header_disk_size + blob->size;
     if(disk_size > ctx->config->max_bucket_size){
         evr_fmt_blob_key_t fmt_key;
@@ -452,6 +453,8 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         void *p = header_buffer;
         memcpy(p, blob->key, sizeof(blob->key));
         p = (uint8_t*)p + sizeof(blob->key);
+        *((uint8_t*)p) = blob->flags;
+        p = (uint8_t*)p + 1;
         *((uint32_t*)p) = htobe32(blob->size);
     }
     // TODO change to write_n so data is always completely written
@@ -492,13 +495,16 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     if(sqlite3_bind_blob(ctx->insert_blob_stmt, 1, blob->key, sizeof(blob->key), SQLITE_TRANSIENT) != SQLITE_OK){
         goto fail_with_insert_reset;
     }
-    if(sqlite3_bind_int64(ctx->insert_blob_stmt, 2, ctx->current_bucket_index) != SQLITE_OK){
+    if(sqlite3_bind_int(ctx->insert_blob_stmt, 2, blob->flags) != SQLITE_OK){
         goto fail_with_insert_reset;
     }
-    if(sqlite3_bind_int(ctx->insert_blob_stmt, 3, blob_offset) != SQLITE_OK){
+    if(sqlite3_bind_int64(ctx->insert_blob_stmt, 3, ctx->current_bucket_index) != SQLITE_OK){
         goto fail_with_insert_reset;
     }
-    if(sqlite3_bind_int(ctx->insert_blob_stmt, 4, blob->size) != SQLITE_OK){
+    if(sqlite3_bind_int(ctx->insert_blob_stmt, 4, blob_offset) != SQLITE_OK){
+        goto fail_with_insert_reset;
+    }
+    if(sqlite3_bind_int(ctx->insert_blob_stmt, 5, blob->size) != SQLITE_OK){
         goto fail_with_insert_reset;
     }
     if(sqlite3_step(ctx->insert_blob_stmt) != SQLITE_DONE){
