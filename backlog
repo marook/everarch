@@ -1,7 +1,3 @@
-* remove typedefs for atomic types
-see [[https://www.kernel.org/doc/html/v4.10/process/coding-style.html][kernel coding style]] section 5b
-* rename structs from X_t to X
-pitrp said only the committe uses _t suffix.
 * function body opening braces in new lines
 * add blob predicate
 predicate is a one byte flag set. should contain one bit which
