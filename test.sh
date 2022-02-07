@@ -5,7 +5,7 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 cd "${script_dir}"
 
-echo "Start testing…"
+echo "Run unit tests…"
 for test_bin in src/*-test
 do
     test_name=`basename "${test_bin}"`
@@ -14,7 +14,7 @@ do
 done
 
 echo ''
-echo "Start valgrind testing…"
+echo "Run unit tests with valgrind…"
 for test_bin in src/*-test
 do
     test_name=`basename "${test_bin}"`
@@ -27,3 +27,16 @@ do
     echo "Testing ${test_name}…"
     valgrind --quiet --leak-check=yes "./${test_bin}"
 done
+
+echo ''
+echo 'Run integration tests…'
+for test_suite in testing/suite/*
+do
+    if [[ ! -d "${test_suite}" ]]
+    then
+        continue
+    fi
+    ( cd "${test_suite}" && ./run-suite )
+done
+
+echo SUCCESS

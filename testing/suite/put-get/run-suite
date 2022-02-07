@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e
+. ../config
+
+stop(){
+    kill -s sigint "${spid}"
+    wait "${spid}" || true
+    if [[ -e 'storage/lock' ]]
+    then
+        echo "storage/lock still existing after storage quit" >&2
+        exit 1
+    fi
+    rm -rf 'storage'
+}
+
+rm -rf 'storage'
+mkdir 'storage'
+
+evr-glacier-storage &
+spid=$!
+trap stop EXIT
+
+wait_for_glacier_storage
+ref=`echo "hello world!" | evr-glacier-cli put`
+body=`evr-glacier-cli get ${ref}`
+if [[ "hello world!" != "${body}" ]]
+then
+    echo "Unexpected get response: ${body}" >&2
+    exit 1
+fi

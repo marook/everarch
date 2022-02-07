@@ -223,13 +223,9 @@ int evr_cli_put(){
     memcpy(p, key, sizeof(key));
     p += sizeof(key);
     *(uint8_t*)p = 0; // flags
-#ifdef EVR_LOG_DEBUG
-    {
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
-        log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
-    }
-#endif
+    evr_fmt_blob_key_t fmt_key;
+    evr_fmt_blob_key(fmt_key, key);
+    log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
     if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t)) != evr_ok){
         goto out_with_close_c;
     }
@@ -248,6 +244,7 @@ int evr_cli_put(){
     if(resp.status_code != evr_status_code_ok){
         goto out_with_close_c;
     }
+    printf("%s\n", fmt_key);
     ret = evr_ok;
  out_with_close_c:
     if(close(c)){

@@ -1,0 +1,15 @@
+PATH="../../../src:${PATH}"
+
+wait_for_glacier_storage(){
+    wait_for_port 2361
+}
+
+wait_for_port(){
+    port="$1"
+    while true
+    do
+        nc -q 0 localhost "$1" < /dev/null && break
+        echo "Waiting for port $1…"
+        sleep 1
+    done
+}

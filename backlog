@@ -1,6 +1,3 @@
-* implement an integration test / benchmark
-should connect via network socket. send lots of blobs. request lots of
-blobs. count blobs per second. maybe different blob sizes etc.
 * move glacier storage client functions into glacier-client.[hc]
 right now the evr-glacier-cli.c contains functions for handling blob
 put and blob get commands. code should be centralized in
@@ -45,6 +42,9 @@ also possible would be ISO 8601 format with seconds precision like
 "2022-02-04T19:45:13+00:00".
 * implement a evr-file-storage service
 should provide put and get endpoints for files.
+* implement an evr-glacier-storage blob put/get benchmark
+should connect via network socket. send lots of blobs. request lots of
+blobs. count blobs per second. maybe different blob sizes etc.
 * add option for flags to evr-glacier-cli put command
 right now flags=0 is always sent when putting a blob to the storage.
 
