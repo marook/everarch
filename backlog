@@ -5,6 +5,11 @@ glacier-client.[ch] in order to be reused in other future clients like
 the file upload service.
 * implement blob signing
 struct chunk_set data should be signable using a pgp key.
+* implement rolling checksum functions
+the file claim creation late will need a function which splits a
+stream into multiple smaller blobs.
+
+librsync should be used for the implementation.
 * implement claim parse and format functions
 claims should be encoded in XML. this provides the benefit that xml
 namespaces for claim types can be used. also xml is a format here to
