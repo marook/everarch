@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+. ../config
+while [[ -e 'running' ]]
+do
+    dd if=/dev/random bs=1024 count=6 2>/dev/null | evr-glacier-cli put &>/dev/null
+done
