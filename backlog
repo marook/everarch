@@ -22,8 +22,9 @@ a file claim might look like the following when pretty printed
 <?xml version="1.0" encoding="UTF-8"?>
 <claim-set
   xmlns="https://ma300k.de/everarch/claims/"
-  created="Fri, 04 Feb 2022 18:26:13 +0000">
-    <file name="some-file.txt">
+  xmlns:dc="http://purl.org/dc/terms/"
+  dc:created="2022-02-04T19:45:13+00:00">
+    <file dc:title="some-file.txt">
         <body>
             <segment ref="sha3-224-…"/>
             <segment ref="sha3-224-…"/>
