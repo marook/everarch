@@ -83,6 +83,8 @@ struct chunk_set {
  */
 struct chunk_set *evr_allocate_chunk_set(size_t chunks_len);
 
+int evr_init_chunk_set(struct chunk_set *cs, size_t chunks_len);
+
 int evr_grow_chunk_set(struct chunk_set *cs, size_t new_chunks_len);
 
 void evr_free_chunk_set(struct chunk_set *cs);

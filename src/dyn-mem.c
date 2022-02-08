@@ -68,12 +68,17 @@ void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c)){
 }
 
 struct chunk_set* evr_allocate_chunk_set(size_t chunks_len){
-    if(chunks_len > evr_chunk_set_max_chunks){
+    struct chunk_set *cs = malloc(sizeof(struct chunk_set));
+    if(evr_init_chunk_set(cs, chunks_len) != evr_ok){
+        free(cs);
         return NULL;
     }
-    struct chunk_set *cs = malloc(sizeof(struct chunk_set));
-    if(!cs){
-        return NULL;
+    return cs;
+}
+
+int evr_init_chunk_set(struct chunk_set *cs, size_t chunks_len){
+    if(chunks_len > evr_chunk_set_max_chunks){
+        return evr_error;
     }
     cs->chunks_len = chunks_len;
     cs->size_used = 0;
@@ -83,11 +88,10 @@ struct chunk_set* evr_allocate_chunk_set(size_t chunks_len){
             for(size_t j = 0; j < i; ++j){
                 evr_free_chunk(cs->chunks[j]);
             }
-            free(cs);
-            return NULL;
+            return evr_error;
         }
     }
-    return cs;
+    return evr_ok;
 }
 
 int evr_grow_chunk_set(struct chunk_set *cs, size_t new_chunks_len){
