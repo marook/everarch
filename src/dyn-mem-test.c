@@ -25,8 +25,17 @@
 
 int is_ignored(int c);
 
+void test_fill_dynamic_array(){
+    struct dynamic_array *a = alloc_dynamic_array(1);
+    assert_not_null(a);
+    a->size_used = 1;
+    *(char*)a->data = 42;
+    free(a);
+}
+
 void test_rtrim_empty_array(){
     struct dynamic_array *a = alloc_dynamic_array(1);
+    assert_not_null(a);
     rtrim_dynamic_array(a, is_ignored);
     assert_size_eq(a->size_used, 0);
     free(a);
@@ -34,6 +43,7 @@ void test_rtrim_empty_array(){
 
 void test_rtrim_end_of_array(){
     struct dynamic_array *a = alloc_dynamic_array(1024);
+    assert_not_null(a);
     strcpy((char*)a->data, "test   ");
     a->size_used = strlen((char*)a->data) + 1;
     rtrim_dynamic_array(a, is_ignored);
@@ -59,6 +69,7 @@ void test_allocate_chunk_set(){
 }
 
 int main(){
+    run_test(test_fill_dynamic_array);
     run_test(test_rtrim_empty_array);
     run_test(test_rtrim_end_of_array);
     run_test(test_allocate_chunk_set);
