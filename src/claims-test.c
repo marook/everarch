@@ -32,7 +32,7 @@ void test_empty_claim(){
     struct evr_claim_set cs;
     assert_ok(evr_init_claim_set(&cs, &t0));
     assert_ok(evr_finalize_claim_set(&cs));
-    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://ma300k.de/everarch/claims/\"/>\n");
+    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\"/>\n");
     assert_ok(evr_free_claim_set(&cs));
 }
 
@@ -48,7 +48,7 @@ void test_file_claim(){
     };
     assert_ok(evr_append_file_claim(&cs, &claim));
     assert_ok(evr_finalize_claim_set(&cs));
-    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://ma300k.de/everarch/claims/\"><file dc:title=\"test.txt\"><body><segment ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\"/></body></file></claim-set>\n");
+    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\"><file dc:title=\"test.txt\"><body><segment ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\"/></body></file></claim-set>\n");
     assert_ok(evr_free_claim_set(&cs));
 }
 

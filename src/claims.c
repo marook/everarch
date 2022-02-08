@@ -22,7 +22,7 @@
 
 const char *evr_claim_encoding = "utf-8";
 const char *evr_iso_8601_timestamp = "%FT%TZ";
-const char *evr_claims_ns = "https://ma300k.de/everarch/claims/";
+const char *evr_claims_ns = "https://evr.ma300k.de/claims/";
 
 int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created){
     cs->out = xmlBufferCreate();
