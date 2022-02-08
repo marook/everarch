@@ -47,7 +47,8 @@ struct evr_claim_set {
 
 struct evr_file_claim {
     /**
-     * title could be the file name.
+     * title could be the file name. May also be null if the file has
+     * no name.
      */
     char *title;
 
