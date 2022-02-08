@@ -1,6 +1,7 @@
-AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS)
+AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS)
 
 bin_PROGRAMS = \
+	claims-test \
 	concurrent-glacier-test \
 	dyn-mem-test \
 	evr-glacier-cli \
@@ -9,6 +10,13 @@ bin_PROGRAMS = \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test
+
+claims_test_SOURCES = \
+	assert.c \
+	claims.c \
+	claims-test.c \
+	keys.c
+claims_test_LDADD = $(XML_LIBS) $(GCRYPT_LIBS)
 
 concurrent_glacier_test_SOURCES = \
 	assert.c \

@@ -35,6 +35,10 @@ PKG_CHECK_MODULES([EVERARCH], [
     sqlite3
 ])
 
+AM_PATH_GPGME(1, , AC_MSG_ERROR(GnuPG Made Easy library not found))
+
+PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9])
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
     Makefile
