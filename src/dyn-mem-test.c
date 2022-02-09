@@ -51,6 +51,29 @@ void test_rtrim_end_of_array(){
     free(a);
 }
 
+void test_grow_dynamic_array_at_least_existing(){
+    struct dynamic_array *a = alloc_dynamic_array(1);
+    assert_not_null(a);
+    assert_equal(a->size_allocated, 1);
+    a->size_used = 1;
+    *(char*)a->data = 42;
+    a = grow_dynamic_array_at_least(a, 2);
+    assert_not_null(a);
+    assert_equal(a->size_allocated, 2);
+    assert_equal(a->size_used, 1);
+    assert_equal(*(char*)a->data, 42);
+    free(a);
+}
+
+void test_grow_dynamic_array_at_least_null(){
+    struct dynamic_array *a = NULL;
+    a = grow_dynamic_array_at_least(a, 1);
+    assert_not_null(a);
+    assert_equal(a->size_allocated, 1);
+    assert_equal(a->size_used, 0);
+    free(a);
+}
+
 int is_ignored(int c){
     return c == 0 || isspace(c);
 }
@@ -72,6 +95,8 @@ int main(){
     run_test(test_fill_dynamic_array);
     run_test(test_rtrim_empty_array);
     run_test(test_rtrim_end_of_array);
+    run_test(test_grow_dynamic_array_at_least_existing);
+    run_test(test_grow_dynamic_array_at_least_null);
     run_test(test_allocate_chunk_set);
     return 0;
 }

@@ -18,6 +18,8 @@
 
 #include "dyn-mem.h"
 
+#include <string.h>
+
 #include "errors.h"
 
 inline size_t get_dynamic_array_size(size_t data_size);
@@ -38,17 +40,27 @@ struct dynamic_array *alloc_dynamic_array(size_t initial_size){
 
 struct dynamic_array *grow_dynamic_array_at_least(struct dynamic_array *da, size_t min_size){
     // + 1 because we want to avoid size not growing when small
-    size_t new_size = (size_t)(da->size_allocated * 1.5) + 1;
+    size_t new_size = da ? (size_t)(da->size_allocated * 1.5) + 1 : 0;
     if(new_size < min_size){
         new_size = min_size;
     }
     size_t new_da_size = get_dynamic_array_size(new_size);
-    struct dynamic_array *new_da = (struct dynamic_array*)realloc(da, new_da_size);
+    struct dynamic_array *new_da;
+    if(da) {
+        new_da = (struct dynamic_array*)realloc(da, new_da_size);
+    } else {
+        new_da = (struct dynamic_array*)malloc(new_da_size);
+    }
     if(!new_da){
-        free(da);
+        if(da){
+            free(da);
+        }
         return NULL;
     }
     new_da->size_allocated = new_size;
+    if(!da){
+        new_da->size_used = 0;
+    }
     new_da->data = &(new_da[1]);
     return new_da;
 }
@@ -65,6 +77,19 @@ void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c)){
         }
     }
     da->size_used = it - (char*)da->data;
+}
+
+struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, char* data, size_t data_size){
+    size_t new_size_used = da->size_used + data_size;
+    if(new_size_used > da->size_allocated){
+        da = grow_dynamic_array_at_least(da, new_size_used);
+        if(!da){
+            return NULL;
+        }
+    }
+    memcpy(&((char*)da->data)[da->size_used], data, data_size);
+    da->size_used = new_size_used;
+    return da;
 }
 
 struct chunk_set* evr_allocate_chunk_set(size_t chunks_len){

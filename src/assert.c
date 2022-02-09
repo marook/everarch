@@ -111,6 +111,10 @@ void assert_str_eq(const char *actual, const char *expected){
     }
 }
 
+void assert_str_contains(const char *haystack, const char *needle){
+    assert_not_null(strstr(haystack, needle));
+}
+
 void assert_int_eq(int actual, int expected){
     assert_eq("%d");
 }

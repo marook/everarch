@@ -1,4 +1,4 @@
-AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS)
+AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
 
 bin_PROGRAMS = \
 	claims-test \
@@ -9,7 +9,8 @@ bin_PROGRAMS = \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
-	keys-test
+	keys-test \
+	signatures-test
 
 claims_test_SOURCES = \
 	assert.c \
@@ -88,3 +89,10 @@ keys_test_SOURCES = \
 	keys-test.c \
 	logger.c
 keys_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+
+signatures_test_SOURCES = \
+	assert.c \
+	dyn-mem.c \
+	signatures.c \
+	signatures-test.c
+signatures_test_LDADD = $(GPGME_LIBS)

@@ -16,27 +16,17 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __assert_h__
-#define __assert_h__
+#ifndef __evr_signatures_h__
+#define __evr_signatures_h__
 
-#include <stdarg.h>
-#include <stdlib.h>
+#include "dyn-mem.h"
 
-void fail(const char *format, ...);
-void vfail(const char* format, va_list args);
+/**
+ * evr_init_signatures must be called once in the process before any
+ * sign operation.
+ */
+void evr_init_signatures();
 
-void assert_zero(int i);
-void assert_ok(int result);
-void assert_equal(int actual, int expected);
-void assert_equal_msg(int actual, int expected, const char *format, ...);
-void assert_greater_equal(int actual, int min);
-void assert_truthy(int i);
-void assert_null(const void *p);
-void assert_not_null(const void *p);
-void assert_not_null_msg(const void *p, const char *format, ...);
-void assert_str_eq(const char *actual, const char *expected);
-void assert_str_contains(const char *haystack, const char *needle);
-void assert_int_eq(int actual, int expected);
-void assert_size_eq(size_t actual, size_t expected);
+int evr_sign(struct dynamic_array **dest, const char *s);
 
 #endif
