@@ -39,8 +39,6 @@ void test_empty_claim(){
 }
 
 void test_file_claim_with_filename(){
-    struct evr_claim_set cs;
-    assert_ok(evr_init_claim_set(&cs, &t0));
     evr_blob_key_t key;
     memset(key, 0, sizeof(key));
     const struct evr_file_claim claim = {
@@ -52,8 +50,6 @@ void test_file_claim_with_filename(){
 }
 
 void test_file_claim_with_null_filename(){
-    struct evr_claim_set cs;
-    assert_ok(evr_init_claim_set(&cs, &t0));
     evr_blob_key_t key;
     memset(key, 0, sizeof(key));
     const struct evr_file_claim claim = {
@@ -65,8 +61,6 @@ void test_file_claim_with_null_filename(){
 }
 
 void test_file_claim_with_empty_filename(){
-    struct evr_claim_set cs;
-    assert_ok(evr_init_claim_set(&cs, &t0));
     evr_blob_key_t key;
     memset(key, 0, sizeof(key));
     const struct evr_file_claim claim = {
