@@ -15,6 +15,12 @@ stream into multiple smaller blobs.
 librsync should be used for the implementation.
 * implement a evr-file-storage service
 should provide put and get endpoints for files.
+* add setup hints to README
+** gpg signing key
+hint the user that the default gpg signing key is used for signing
+claims. don't lose it and be aware of etc.
+** config file locations
+indicate where config files should be placed and how they should look
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
