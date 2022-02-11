@@ -43,4 +43,12 @@ Add the test program to src/Makefile.am.
 ------------------------------------------------------------------------
 License
 
-See COPYING for details.
+See COPYING for details about everarch files copying conditions.
+
+There are a few files which got a differen license. See their header
+comments for more details. These files include at least:
+
+src/rollsum.h
+src/rollsum.c
+
+My sincere thank you goes out to the original authors.

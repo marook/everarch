@@ -10,6 +10,7 @@ bin_PROGRAMS = \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
+	rollsum-test \
 	signatures-test
 
 claims_test_SOURCES = \
@@ -61,7 +62,8 @@ files_test_SOURCES = \
 	assert.c \
 	dyn-mem.c \
 	files.c \
-	files-test.c
+	files-test.c \
+	logger.c
 files_test_LDADD = $(EVERARCH_LIBS)
 
 glacier_cmd_test_SOURCES = \
@@ -89,6 +91,12 @@ keys_test_SOURCES = \
 	keys-test.c \
 	logger.c
 keys_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+
+rollsum_test_SOURCES = \
+	assert.c \
+	logger.c \
+	rollsum.c \
+	rollsum-test.c
 
 signatures_test_SOURCES = \
 	assert.c \

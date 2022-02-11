@@ -30,6 +30,7 @@ void assert_ok(int result);
 void assert_equal(int actual, int expected);
 void assert_equal_msg(int actual, int expected, const char *format, ...);
 void assert_greater_equal(int actual, int min);
+void assert_greater_then(int actual, int min);
 void assert_truthy(int i);
 void assert_null(const void *p);
 void assert_not_null(const void *p);

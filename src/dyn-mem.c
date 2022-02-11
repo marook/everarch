@@ -34,7 +34,7 @@ struct dynamic_array *alloc_dynamic_array(size_t initial_size){
     }
     da->size_allocated = initial_size;
     da->size_used = 0;
-    da->data = &(da[1]);
+    da->data = (char*)&(da[1]);
     return da;
 }
 
@@ -61,7 +61,7 @@ struct dynamic_array *grow_dynamic_array_at_least(struct dynamic_array *da, size
     if(!da){
         new_da->size_used = 0;
     }
-    new_da->data = &(new_da[1]);
+    new_da->data = (char*)&(new_da[1]);
     return new_da;
 }
 
@@ -77,6 +77,17 @@ void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c)){
         }
     }
     da->size_used = it - (char*)da->data;
+}
+
+int dynamic_array_remove(struct dynamic_array *da, size_t offset, size_t size){
+    size_t end = offset + size;
+    if(end < da->size_used){
+        memmove(&da->data[offset], &da->data[offset + size], da->size_used - end);
+    } else if(end > da->size_used){
+        return evr_error;
+    }
+    da->size_used -= size;
+    return evr_ok;
 }
 
 struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, char* data, size_t data_size){

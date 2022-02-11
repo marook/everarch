@@ -30,6 +30,7 @@ void test_fill_dynamic_array(){
     assert_not_null(a);
     a->size_used = 1;
     *(char*)a->data = 42;
+    assert_equal(*(char*)a->data, 42);
     free(a);
 }
 
@@ -74,6 +75,19 @@ void test_grow_dynamic_array_at_least_null(){
     free(a);
 }
 
+void test_dynamic_array_remove(){
+    struct dynamic_array *a = alloc_dynamic_array(100);
+    assert_not_null(a);
+    for(size_t i = 0; i < a->size_allocated; ++i){
+        a->data[i] = i;
+    }
+    a->size_used = a->size_allocated;
+    assert_ok(dynamic_array_remove(a, 20, 40));
+    assert_equal(a->data[19], 19);
+    assert_equal(a->data[20], 60);
+    free(a);
+}
+
 int is_ignored(int c){
     return c == 0 || isspace(c);
 }
@@ -97,6 +111,7 @@ int main(){
     run_test(test_rtrim_end_of_array);
     run_test(test_grow_dynamic_array_at_least_existing);
     run_test(test_grow_dynamic_array_at_least_null);
+    run_test(test_dynamic_array_remove);
     run_test(test_allocate_chunk_set);
     return 0;
 }

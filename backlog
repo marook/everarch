@@ -6,11 +6,6 @@ right now the evr-glacier-cli.c contains functions for handling blob
 put and blob get commands. code should be centralized in
 glacier-client.[ch] in order to be reused in other future clients like
 the file upload service.
-* implement rolling checksum functions
-the file claim creation late will need a function which splits a
-stream into multiple smaller blobs.
-
-librsync should be used for the implementation.
 * implement a evr-file-storage service
 should provide put and get endpoints for files.
 * add setup hints to README

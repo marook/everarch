@@ -38,7 +38,7 @@ struct dynamic_array {
      */
     size_t size_used;
     
-    void *data;
+    char *data;
 };
 
 /**
@@ -63,6 +63,8 @@ struct dynamic_array *alloc_dynamic_array(size_t initial_size);
 struct dynamic_array *grow_dynamic_array_at_least(struct dynamic_array *da, size_t min_size);
 
 void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c));
+
+int dynamic_array_remove(struct dynamic_array *da, size_t offset, size_t size);
 
 struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, char* data, size_t data_size);
 

@@ -49,4 +49,13 @@ struct chunk_set *read_into_chunks(int fd, size_t size);
 
 int append_into_chunk_set(struct chunk_set *cs, int f);
 
+/**
+ * evr_rollsum_split reads from f in a streaming manner. Calls slice
+ * callback if RollSum indicates a new block.
+ *
+ * Returns evr_ok if max_size has been read. Returns evr_end if less
+ * than max_size has been read because of eof.
+ */
+int evr_rollsum_split(int f, size_t max_size, int (*slice)(const char *buf, size_t size));
+
 #endif

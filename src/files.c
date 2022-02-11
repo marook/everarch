@@ -23,9 +23,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "basics.h"
 #include "errors.h"
+#include "rollsum.h"
 
 int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
     int result = evr_error;
@@ -33,7 +35,8 @@ int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
     if(!f){
         goto open_fail;
     }
-    if(read_fd(buffer, f, max_size) != evr_ok){
+    int read_res = read_fd(buffer, f, max_size);
+    if(read_res != evr_end && read_res != evr_ok){
         goto read_fail;
     }
     result = evr_ok;
@@ -44,6 +47,7 @@ int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
 }
 
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
+    size_t total_read = 0;
     while(1){
         if((*buffer)->size_allocated == (*buffer)->size_used){
             *buffer = grow_dynamic_array(*buffer);
@@ -51,20 +55,20 @@ int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
                 return evr_error;
             }
         }
-        size_t max_read = min((*buffer)->size_allocated, max_size) - (*buffer)->size_used;
-        void *out = &(((char*)(*buffer)->data)[(*buffer)->size_used]);
+        size_t max_read = min(max_size, (*buffer)->size_allocated - (*buffer)->size_used);
+        char *out = &(*buffer)->data[(*buffer)->size_used];
         ssize_t bytes_read = read(fd, out, max_read);
         if(bytes_read == 0){
-            break;
+            return evr_end;
         } else if(bytes_read < 0){
             return evr_error;
         }
         (*buffer)->size_used += bytes_read;
-        if((*buffer)->size_used == max_size){
-            return evr_error;
+        total_read += bytes_read;
+        if(total_read == max_size){
+            return evr_ok;
         }
     }
-    return evr_ok;
 }
 
 int read_file_str(struct dynamic_array **buffer, const char *path, size_t max_size){
@@ -187,4 +191,106 @@ int append_into_chunk_set(struct chunk_set *cs, int f){
         cs->size_used += bytes_read;
     }
     return evr_ok;
+}
+
+/**
+ * evr_split_window_size defines the window for the Rollsum. Must be
+ * power of 2.
+ */
+#define evr_split_window_size 64
+
+/**
+ * avg_blob_size indicates the average size at which bigger blobs
+ * should be splitted using RollSum.
+ *
+ * The actual value is taken from perkeep's commit
+ * 15ad53c5459e036c795348e7bb927d63ce259c13 which changes the const
+ * blobSize. The perkeep history shows that Brad reduced the original
+ * perkeep 32k (1<<15) value to 8k (1<<13). Unfortunately there is no
+ * reason why written into the commit.
+ */
+#define avg_slice_size (256 << 10) // 256k
+/**
+ * min_first_slice_size is the minimum size of the first slice in any
+ * file. This is bigger than the min_slice_size because many file
+ * types store important metadata in the beginning of the file. Think
+ * of file(1) command, EXIF metadata in JPEGs, ID3 in mp3 files.
+ */
+#define min_first_slice_size (256 << 10) // 256k
+#define min_slice_size       ( 64 << 10) //  64k
+#define max_slice_size       ( 10 << 20) //  10M
+
+inline int evr_want_split(const struct Rollsum *rs){
+    return (rs->s2 & (avg_slice_size - 1)) == (-1 & (avg_slice_size - 1));
+}
+
+int evr_rollsum_split(int f, size_t max_read, int (*slice)(const char *buf, size_t size)){
+    int ret = evr_error;
+    struct dynamic_array *buf = alloc_dynamic_array(1*1024*1024);
+    if(!buf){
+        goto out;
+    }
+    unsigned char window[evr_split_window_size];
+    memset(window, 0, evr_split_window_size);
+    size_t window_pos = 0;
+    struct Rollsum rs;
+    RollsumInit(&rs);
+    while(1){
+        if(buf->size_used == buf->size_allocated){
+            // buffer is full. which indicates we could not reach a
+            // split position within the current buffer size. so we
+            // grow it.
+            buf = grow_dynamic_array(buf);
+            if(!buf){
+                goto out;
+            }
+        }
+        size_t split_test_start = buf->size_used;
+        size_t want_read = min(max_read, buf->size_allocated) - buf->size_used;
+        int read_res = read_fd(&buf, f, want_read);
+        if(read_res != evr_ok && read_res != evr_end){
+            goto out_with_free_buf;
+        }
+        size_t next_slice_start = 0;
+        for(size_t p = split_test_start; p < buf->size_used; ++p){
+            unsigned char b = (unsigned char)buf->data[p];
+            RollsumRotate(&rs, window[window_pos], b);
+            window[window_pos] = b;
+            window_pos = (window_pos + 1) & (evr_split_window_size - 1);
+            size_t slice_size = p - next_slice_start;
+            if(slice_size > min_slice_size && (slice_size >= max_slice_size || evr_want_split(&rs))){
+                if(slice_size > 0){
+                    if(slice(&buf->data[next_slice_start], slice_size) != evr_ok){
+                        goto out_with_free_buf;
+                    }
+                    next_slice_start = p;
+                }
+            }
+        }
+        if(next_slice_start > 0){
+            if(dynamic_array_remove(buf, 0, next_slice_start) != evr_ok){
+                goto out_with_free_buf;
+            }
+            max_read -= next_slice_start;
+            next_slice_start = 0;
+        }
+        if(read_res == evr_end || buf->size_used == max_read){
+            // flush the remaining buffer as one slice
+            if(slice(buf->data, buf->size_used) != evr_ok){
+                goto out_with_free_buf;
+            }
+            if(read_res == evr_end){
+                ret = evr_end;
+            } else {
+                ret = evr_ok;
+            }
+            break;
+        }
+    }
+ out_with_free_buf:
+    if(buf){
+        free(buf);
+    }
+ out:
+    return ret;
 }

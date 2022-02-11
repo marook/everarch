@@ -22,6 +22,25 @@
 #include "assert.h"
 #include "files.h"
 #include "test.h"
+#include "errors.h"
+#include "logger.h"
+
+void test_read_fd_partial_file(){
+    struct dynamic_array *buf = alloc_dynamic_array(1024);
+    assert_not_null(buf);
+    int f = open("/dev/random", O_RDONLY);
+    assert_greater_then(f, -1);
+    assert_ok(read_fd(&buf, f, 1024));
+    assert_not_null(buf);
+    assert_equal(buf->size_used, 1024);
+    char sum = 0;
+    for(size_t i = 0; i < buf->size_used; ++i){
+        sum += buf->data[i];
+    }
+    log_debug("Accessed every byte in buf (%d)", sum);
+    close(f);
+    free(buf);
+}
 
 void test_read_empty_json_with_big_buffer(){
     struct dynamic_array *buffer = alloc_dynamic_array(1024);
@@ -68,13 +87,49 @@ void test_append_into_chunk_set_with_small_file(){
     assert_equal(cs->chunks[0][1], '}');
     assert_equal(cs->chunks[0][2], '\n');
     evr_free_chunk_set(cs);
-    
+}
+
+int slice_counter;
+int small_slices_counter;
+
+int visit_slice(const char *buf, size_t size);
+
+void test_rollsum_split(){
+    slice_counter = 0;
+    small_slices_counter = 0;
+    int f = open("/dev/random", O_RDONLY);
+    size_t max_read = 10 << 20;
+    assert_ok(evr_rollsum_split(f, max_read, visit_slice));
+    close(f);
+    assert_greater_then(2, small_slices_counter);
+    log_info("Splitted into slices with average size of %d bytes", max_read / slice_counter);
+}
+
+int visit_slice(const char *buf, size_t size){
+    slice_counter += 1;
+    if(size < 64 << 10){ // 64k
+        small_slices_counter += 1;
+    }
+    assert_greater_then(10 << 20, size); // 10M
+    const char *end = &buf[size];
+    int sum = 0;
+    for(const char *it = buf; it != end; ++it){
+        sum += *it;
+    }
+    if(size == 0 && sum > 0){
+        // bogus operation so we make sure the for loop above is not
+        // optimized away by the smart compiler.
+        fail("Never ever");
+    }
+    return evr_ok;
 }
 
 int main(){
+    run_test(test_read_fd_partial_file);
     run_test(test_read_empty_json_with_big_buffer);
     run_test(test_read_empty_json_with_small_buffer);
     run_test(test_read_into_chunks_with_small_file);
     run_test(test_append_into_chunk_set_with_small_file);
+    run_test(test_rollsum_split);
     return 0;
 }

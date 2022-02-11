@@ -76,6 +76,12 @@ void assert_greater_equal(int actual, int min){
     }
 }
 
+void assert_greater_then(int actual, int min){
+    if(actual <= min){
+        fail("Expected %d to be > %d\n", actual, min);
+    }
+}
+
 void assert_truthy(int i){
     if(!i){
         fail("Expected %d to be truthy\n", i);
