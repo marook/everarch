@@ -91,22 +91,38 @@ void test_append_into_chunk_set_with_small_file(){
 
 int slice_counter;
 int small_slices_counter;
+size_t slice_size_sum;
 
 int visit_slice(const char *buf, size_t size);
 
-void test_rollsum_split(){
+void test_rollsum_split_infinite_file(){
     slice_counter = 0;
     small_slices_counter = 0;
+    slice_size_sum = 0;
     int f = open("/dev/random", O_RDONLY);
     size_t max_read = 10 << 20;
     assert_ok(evr_rollsum_split(f, max_read, visit_slice));
     close(f);
     assert_greater_then(2, small_slices_counter);
+    assert_equal(slice_size_sum, max_read);
     log_info("Splitted into slices with average size of %d bytes", max_read / slice_counter);
+}
+
+void test_rollsum_split_tiny_file(){
+    slice_counter = 0;
+    small_slices_counter = 0;
+    slice_size_sum = 0;
+    int f = open("etc/configuration/empty.json", O_RDONLY);
+    assert_equal(evr_rollsum_split(f, 10, visit_slice), evr_end);
+    close(f);
+    assert_greater_then(2, small_slices_counter);
+    assert_equal(slice_counter, 1);
+    assert_equal(slice_size_sum, 3);
 }
 
 int visit_slice(const char *buf, size_t size){
     slice_counter += 1;
+    slice_size_sum += size;
     if(size < 64 << 10){ // 64k
         small_slices_counter += 1;
     }
@@ -130,6 +146,7 @@ int main(){
     run_test(test_read_empty_json_with_small_buffer);
     run_test(test_read_into_chunks_with_small_file);
     run_test(test_append_into_chunk_set_with_small_file);
-    run_test(test_rollsum_split);
+    run_test(test_rollsum_split_infinite_file);
+    run_test(test_rollsum_split_tiny_file);
     return 0;
 }
