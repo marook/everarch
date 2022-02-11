@@ -1,13 +1,47 @@
-* remove _t suffix from evr_blob_key_t and evr_fmt_blob_key_t
-simply removing the suffix will make the type evr_fmt_blob_key clash
-with the equally named formatting function.
+* evr_cmd_type_put_blob blob already exists behavior
+right now evr_cmd_type_put_blob fails if the key of the put blob
+already exists in the glacier.
+
+evr_cmd_type_put_blob should indicate that the blob already exists
+before uploading the blob. even if the blob exists the put flags must
+be & combined with the existing flags.
+
+-> evr_cmd_type_put_blob cmd (key, flags)
+<- evr_put_blob_stat_resp_header (exists)
+a) end
+  -> indicate end
+b) upload blob
+  -> indicate upload blob
+  -> upload body
+* implement file upload in evr-storage-client
+evr-storage-client should split a given file into slices, upload them
+and upload a file claim.
+* store upload timestamp with blobs
+last modification timestamp must be stored with blobs in
+evr-glacier-storage. the timestamp must be saved in the buckets and
+the sqlite index.
+
+should later be used to indicate to a client blobs which have changed
+since a last visit. this will allow the index clients to only request
+unseen blobs.
+* add evr_cmd_type_watch command to evr-glacier-storage
+the watch command should keep a tcp connection open which provides the
+client with keys of blobs which got modified. the server responses
+must contain the modification timestamp of the reported blob.
+
+this will later be used to live update index servers.
+
+the watch command should support the following filters:
+- only report claim blobs
+- only report modifications since a certain timestamp
+* implement a evr-file-index service
+watch a evr-glacier-storage server and build up an index of file
+claims.
 * move glacier storage client functions into glacier-client.[hc]
 right now the evr-glacier-cli.c contains functions for handling blob
 put and blob get commands. code should be centralized in
 glacier-client.[ch] in order to be reused in other future clients like
 the file upload service.
-* implement a evr-file-storage service
-should provide put and get endpoints for files.
 * add setup hints to README
 ** gpg signing key
 hint the user that the default gpg signing key is used for signing
@@ -17,6 +51,9 @@ indicate where config files should be placed and how they should look
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
+* remove _t suffix from evr_blob_key_t and evr_fmt_blob_key_t
+simply removing the suffix will make the type evr_fmt_blob_key clash
+with the equally named formatting function.
 * add option for flags to evr-glacier-cli put command
 right now flags=0 is always sent when putting a blob to the storage.
 
