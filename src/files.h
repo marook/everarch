@@ -45,6 +45,8 @@ int write_chunk_set(int f, const struct chunk_set *cs);
 
 int pipe_n(int dest, int src, size_t size);
 
+int dump_n(int f, size_t bytes);
+
 struct chunk_set *read_into_chunks(int fd, size_t size);
 
 int append_into_chunk_set(struct chunk_set *cs, int f);

@@ -211,38 +211,85 @@ int evr_cli_put(){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
     }
-    char buffer[max(evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t), evr_resp_header_n_size)];
-    char *p = buffer;
-    struct evr_cmd_header cmd;
-    cmd.type = evr_cmd_type_put_blob;
-    cmd.body_size = evr_blob_key_size + blob->size_used;
-    if(evr_format_cmd_header(p, &cmd) != evr_ok){
-        goto out_with_close_c;
-    }
-    p += evr_cmd_header_n_size;
-    memcpy(p, key, sizeof(key));
-    p += sizeof(key);
-    *(uint8_t*)p = 0; // flags
+    char buffer[max(max(evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t), evr_resp_header_n_size), evr_stat_blob_resp_n_size)];
     evr_fmt_blob_key_t fmt_key;
     evr_fmt_blob_key(fmt_key, key);
-    log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
-    if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t)) != evr_ok){
-        goto out_with_close_c;
+    {
+        char *p = buffer;
+        struct evr_cmd_header cmd;
+        cmd.type = evr_cmd_type_stat_blob;
+        cmd.body_size = evr_blob_key_size;
+        if(evr_format_cmd_header(p, &cmd) != evr_ok){
+            goto out_with_close_c;
+        }
+        p += evr_cmd_header_n_size;
+        memcpy(p, key, sizeof(key));
+        log_debug("Sending stat %s command", fmt_key);
+        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size) != evr_ok){
+            goto out_with_close_c;
+        }
     }
-    if(write_chunk_set(c, blob) != evr_ok){
-        goto out_with_close_c;
+    {
+        log_debug("Reading storage response");
+        if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
+            goto out_with_close_c;
+        }
+        struct evr_resp_header resp;
+        if(evr_parse_resp_header(&resp, buffer) != evr_ok){
+            goto out_with_close_c;
+        }
+        log_debug("Storage responded with status code 0x%x", resp.status_code);
+        if(resp.status_code == evr_status_code_ok){
+            log_error("blob already exists");
+            if(resp.body_size != evr_stat_blob_resp_n_size){
+                goto out_with_close_c;
+            }
+            if(dump_n(c, evr_stat_blob_resp_n_size) != evr_ok){
+                goto out_with_close_c;
+            }
+            goto out_with_close_c;
+        }
+        if(resp.status_code != evr_status_code_blob_not_found){
+            goto out_with_close_c;
+        }
+        log_debug("Storage indicated blob does not yet exist");
+        if(resp.body_size != 0){
+            goto out_with_close_c;
+        }
     }
-    log_debug("Reading storage response");
-    if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
-        goto out_with_close_c;
+    {
+        char *p = buffer;
+        struct evr_cmd_header cmd;
+        cmd.type = evr_cmd_type_put_blob;
+        cmd.body_size = evr_blob_key_size + blob->size_used;
+        if(evr_format_cmd_header(p, &cmd) != evr_ok){
+            goto out_with_close_c;
+        }
+        p += evr_cmd_header_n_size;
+        memcpy(p, key, sizeof(key));
+        p += sizeof(key);
+        *(uint8_t*)p = 0; // flags
+        log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
+        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t)) != evr_ok){
+            goto out_with_close_c;
+        }
+        if(write_chunk_set(c, blob) != evr_ok){
+            goto out_with_close_c;
+        }
     }
-    struct evr_resp_header resp;
-    if(evr_parse_resp_header(&resp, buffer) != evr_ok){
-        goto out_with_close_c;
-    }
-    log_debug("Storage responded with status code 0x%x", resp.status_code);
-    if(resp.status_code != evr_status_code_ok){
-        goto out_with_close_c;
+    {
+        log_debug("Reading storage response");
+        if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
+            goto out_with_close_c;
+        }
+        struct evr_resp_header resp;
+        if(evr_parse_resp_header(&resp, buffer) != evr_ok){
+            goto out_with_close_c;
+        }
+        log_debug("Storage responded with status code 0x%x", resp.status_code);
+        if(resp.status_code != evr_status_code_ok){
+            goto out_with_close_c;
+        }
     }
     printf("%s\n", fmt_key);
     ret = evr_ok;

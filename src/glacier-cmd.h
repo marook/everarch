@@ -61,6 +61,18 @@
  */
 #define evr_cmd_type_put_blob 0x02
 
+/**
+ * evr_cmd_type_stat_blob asks for metadata about a blob with a
+ * certain key.
+ *
+ * Expected cmd body is:
+ * - evr_blob_key key
+ *
+ * Expected response body is:
+ * - struct evr_stat_blob_resp
+ */
+#define evr_cmd_type_stat_blob 0x03
+
 struct evr_cmd_header {
     int type;
     size_t body_size;
@@ -94,5 +106,15 @@ struct evr_resp_header {
 
 int evr_parse_resp_header(struct evr_resp_header *header, const char *buffer);
 int evr_format_resp_header(char *buffer, const struct evr_resp_header *header);
+
+struct evr_stat_blob_resp {
+    int flags;
+    size_t blob_size;
+};
+
+#define evr_stat_blob_resp_n_size (sizeof(uint8_t) + sizeof(uint32_t))
+
+int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, const char *buf);
+int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp);
 
 #endif

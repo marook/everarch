@@ -1,18 +1,3 @@
-* evr_cmd_type_put_blob blob already exists behavior
-right now evr_cmd_type_put_blob fails if the key of the put blob
-already exists in the glacier.
-
-evr_cmd_type_put_blob should indicate that the blob already exists
-before uploading the blob. even if the blob exists the put flags must
-be & combined with the existing flags.
-
--> evr_cmd_type_put_blob cmd (key, flags)
-<- evr_put_blob_stat_resp_header (exists)
-a) end
-  -> indicate end
-b) upload blob
-  -> indicate upload blob
-  -> upload body
 * implement file upload in evr-storage-client
 evr-storage-client should split a given file into slices, upload them
 and upload a file claim.

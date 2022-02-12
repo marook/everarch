@@ -49,6 +49,8 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
 int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
+int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
+int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx);
 int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
@@ -213,7 +215,7 @@ int evr_connection_worker(void *context){
         switch(cmd.type){
         default:
             // unknown command
-            log_error("Worker %d retieved unknown cmd 0x%x", ctx.socket, cmd.type);
+            log_error("Worker %d retieved unknown cmd 0x%02x", ctx.socket, cmd.type);
             // TODO respond evr_status_code_unknown_cmd
             result = evr_ok;
             goto end;
@@ -234,12 +236,8 @@ int evr_connection_worker(void *context){
                 log_debug("Worker %d retrieved cmd get %s", ctx.socket, fmt_key);
             }
 #endif
-            if(!rctx){
-                log_debug("Worker %d creates a glacier read ctx", ctx.socket);
-                rctx = evr_create_glacier_read_ctx(config);
-                if(!rctx){
-                    goto end;
-                }
+            if(evr_ensure_worker_rctx_exists(&rctx, &ctx) != evr_ok){
+                goto end;
             }
             int read_res = evr_glacier_read_blob(rctx, key, send_get_response, pipe_data, &ctx.socket);
 #ifdef EVR_LOG_DEBUG
@@ -257,6 +255,10 @@ int evr_connection_worker(void *context){
         }
         case evr_cmd_type_put_blob:
             if(evr_work_put_blob(&ctx, &cmd) != evr_ok){
+                goto end;
+            }
+        case evr_cmd_type_stat_blob:
+            if(evr_work_stat_blob(&ctx, &cmd, &rctx) != evr_ok){
                 goto end;
             }
         }
@@ -284,8 +286,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         goto out;
     }
     struct evr_writing_blob wblob;
-    const int key_result = read_n(ctx->socket, (char*)&wblob.key, evr_blob_key_size);
-    if(key_result != evr_ok){
+    if(read_n(ctx->socket, (char*)&wblob.key, evr_blob_key_size) != evr_ok){
         goto out;
     }
 #ifdef EVR_LOG_DEBUG
@@ -347,6 +348,77 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     evr_free_chunk_set(blob);
  out:
     return ret;
+}
+
+int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx){
+    int ret = evr_error;
+    if(cmd->body_size != evr_blob_key_size){
+        goto out;
+    }
+    evr_blob_key_t key;
+    if(read_n(ctx->socket, (char*)&key, evr_blob_key_size) != evr_ok){
+        goto out;
+    }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, key);
+        log_debug("Worker %d retrieved cmd stat %s", ctx->socket, fmt_key);
+    }
+#endif
+    if(evr_ensure_worker_rctx_exists(rctx, ctx) != evr_ok){
+        goto out;
+    }
+    struct evr_glacier_blob_stat stat;
+    int stat_ret = evr_glacier_stat_blob(*rctx, key, &stat);
+    struct evr_resp_header resp;
+    if(stat_ret == evr_not_found){
+        resp.status_code = evr_status_code_blob_not_found;
+        resp.body_size = 0;
+        char buf[evr_resp_header_n_size];
+        if(evr_format_resp_header(buf, &resp) != evr_ok){
+            goto out;
+        }
+        if(write_n(ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
+            goto out;
+        }
+    } else if(stat_ret == evr_ok){
+        const size_t buf_size = evr_resp_header_n_size + evr_stat_blob_resp_n_size;
+        char buf[buf_size];
+        char *p = buf;
+        resp.status_code = evr_status_code_ok;
+        resp.body_size = evr_stat_blob_resp_n_size;
+        if(evr_format_resp_header(p, &resp) != evr_ok){
+            goto out;
+        }
+        p += evr_resp_header_n_size;
+        struct evr_stat_blob_resp stat_resp;
+        stat_resp.flags = stat.flags;
+        stat_resp.blob_size = stat.blob_size;
+        if(evr_format_stat_blob_resp(p, &stat_resp) != evr_ok){
+            goto out;
+        }
+        if(write_n(ctx->socket, buf, buf_size) != evr_ok){
+            goto out;
+        }
+    } else {
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx){
+    if(*rctx){
+        return evr_ok;
+    }
+    log_debug("Worker %d creates a glacier read ctx", ctx->socket);
+    *rctx = evr_create_glacier_read_ctx(config);
+    if(!*rctx){
+        return evr_error;
+    }
+    return evr_ok;
 }
 
 int send_get_response(void *arg, int exists, int flags, size_t blob_size){

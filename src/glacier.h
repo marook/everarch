@@ -70,6 +70,20 @@ struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_stor
 
 int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx);
 
+struct evr_glacier_blob_stat {
+    int flags;
+    size_t blob_size;
+};
+
+/**
+ * evr_glacier_stat_blob retieves metadata for a blob with a given
+ * key.
+ *
+ * Returns evr_ok if the blob was found. Returns evr_not_found if no
+ * blob with the given key exists. Otherwise evr_error.
+ */
+int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, struct evr_glacier_blob_stat *stat);
+
 /**
  * evr_glacier_read_blob reads a blob with the given key.
  *

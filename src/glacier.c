@@ -100,6 +100,29 @@ int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx){
     return ret;
 }
 
+int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, struct evr_glacier_blob_stat *stat){
+    int ret = evr_error;
+    if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto end_with_find_reset;
+    }
+    int step_result = sqlite3_step(ctx->find_blob_stmt);
+    if(step_result == SQLITE_DONE){
+        ret = evr_not_found;
+        goto end_with_find_reset;
+    }
+    if(step_result != SQLITE_ROW){
+        goto end_with_find_reset;
+    }
+    stat->flags = sqlite3_column_int(ctx->find_blob_stmt, 0);
+    stat->blob_size = sqlite3_column_int(ctx->find_blob_stmt, 3);
+    ret = evr_ok;
+ end_with_find_reset:
+    if(sqlite3_reset(ctx->find_blob_stmt) != SQLITE_OK){
+        ret = evr_error;
+    }
+    return ret;
+}
+
 int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
     int ret = evr_error;
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){

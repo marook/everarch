@@ -20,34 +20,56 @@
 
 #include "errors.h"
 
+#define pull_p(type)                       \
+    *(type*)p;                             \
+    p = (char*)&((type*)p)[1];
+
+#define pull_p_map(type, map)                   \
+    map(*(type*)p);                             \
+    p = (char*)&((type*)p)[1];
+
+#define push_p(type, target)                    \
+    *(type*)p = target;                         \
+    p = (char*)&((type*)p)[1];
+
 int evr_parse_cmd_header(struct evr_cmd_header *header, const char *buffer){
     const char *p = buffer;
-    header->type = *(uint8_t*)p;
-    p = (char*)&((uint8_t*)p)[1];
-    header->body_size = be32toh(*(uint32_t*)p);
+    header->type = pull_p(uint8_t);
+    header->body_size = pull_p_map(uint32_t, be32toh);
     return evr_ok;
 }
 
 int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header){
     char *p = buffer;
-    *(uint8_t*)p = header->type;
-    p = (char*)&((uint8_t*)p)[1];
-    *(uint32_t*)p = htobe32(header->body_size);
+    push_p(uint8_t, header->type);
+    push_p(uint32_t, htobe32(header->body_size));
     return evr_ok;
 }
 
 int evr_parse_resp_header(struct evr_resp_header *header, const char *buffer){
     const char *p = buffer;
-    header->status_code = *(uint8_t*)p;
-    p = (char*)&((uint8_t*)p)[1];
-    header->body_size = be32toh(*(uint32_t*)p);
+    header->status_code = pull_p(uint8_t);
+    header->body_size = pull_p_map(uint32_t, be32toh);
     return evr_ok;
 }
 
 int evr_format_resp_header(char *buffer, const struct evr_resp_header *header){
     char *p = buffer;
-    *(uint8_t*)p = header->status_code;
-    p = (char*)&((uint8_t*)p)[1];
-    *(uint32_t*)p = htobe32(header->body_size);
+    push_p(uint8_t, header->status_code);
+    push_p(uint32_t, htobe32(header->body_size));
+    return evr_ok;
+}
+
+int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, const char *buf){
+    const char *p = buf;
+    resp->flags = pull_p(uint8_t);
+    resp->blob_size = pull_p_map(uint32_t, be32toh);
+    return evr_ok;
+}
+
+int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp){
+    char *p = buf;
+    push_p(uint8_t, resp->flags);
+    push_p(uint32_t, resp->blob_size);
     return evr_ok;
 }

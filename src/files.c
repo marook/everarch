@@ -135,7 +135,7 @@ int write_chunk_set(int f, const struct chunk_set *cs){
 }
 
 int pipe_n(int dest, int src, size_t size){
-    char buffer[2048];
+    char buffer[4096];
     size_t remaining = size;
     while(remaining > 0){
         ssize_t bytes_read = read(src, buffer, min(remaining, sizeof(buffer)));
@@ -146,6 +146,22 @@ int pipe_n(int dest, int src, size_t size){
         if(write_n(dest, buffer, bytes_read) != evr_ok){
             return evr_error;
         }
+    }
+    return evr_ok;
+}
+
+int dump_n(int f, size_t bytes){
+    char buf[min(bytes, 4096)];
+    size_t remaining = bytes;
+    while(remaining > 0){
+        size_t nbytes = read(f, buf, min(sizeof(buf), remaining));
+        if(nbytes < 0){
+            return evr_error;
+        }
+        if(nbytes == 0){
+            return evr_end;
+        }
+        remaining -= nbytes;
     }
     return evr_ok;
 }
