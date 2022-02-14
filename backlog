@@ -1,11 +1,3 @@
-* store upload timestamp with blobs
-last modification timestamp must be stored with blobs in
-evr-glacier-storage. the timestamp must be saved in the buckets and
-the sqlite index.
-
-should later be used to indicate to a client blobs which have changed
-since a last visit. this will allow the index clients to only request
-unseen blobs.
 * add evr_cmd_type_watch command to evr-glacier-storage
 the watch command should keep a tcp connection open which provides the
 client with keys of blobs which got modified. the server responses

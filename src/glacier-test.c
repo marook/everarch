@@ -83,7 +83,7 @@ void test_evr_glacier_write_smal_blob(){
         wb->size = data_len;
         assert_zero(evr_glacier_append_blob(write_ctx, wb));
         assert_equal(write_ctx->current_bucket_index, 1);
-        assert_equal(write_ctx->current_bucket_pos, 48);
+        assert_equal(write_ctx->current_bucket_pos, 56);
         free(buffer);
     }
     struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);

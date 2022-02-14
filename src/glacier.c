@@ -27,6 +27,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "logger.h"
 #include "dyn-mem.h"
@@ -227,7 +228,7 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
     if(evr_create_index_db(ctx)){
         goto fail_with_db;
     }
-    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size) values (?, ?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
+    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size, last_modified) values (?, ?, ?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
         goto fail_with_db;
     }
     if(move_to_last_bucket(ctx)){
@@ -289,8 +290,9 @@ int evr_create_index_db(struct evr_glacier_write_ctx *ctx){
     // - bucket_blob_offset is the offset within the bucket file at
     //   which the blob data begins.
     // - blob_size is the size of the blob in bytes
+    // - last_modified last modified timestamp in unix epoch format.
     const char *structure_sql =
-        "create table if not exists blob_position (key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null)";
+        "create table if not exists blob_position (key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null, last_modified integer not null)";
     char *error;
     if(sqlite3_exec(ctx->db, structure_sql, NULL, NULL, &error) != SQLITE_OK){
         log_error("Failed to create index db structure for glacier %s: %s", ctx->config->bucket_dir_path, error);
@@ -453,8 +455,11 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
 
 int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob) {
     int ret = evr_error;
+    time_t t;
+    time(&t);
+    uint64_t t64 = (uint64_t)t;
     size_t blob_size_size = 4;
-    size_t header_disk_size = evr_blob_key_size + sizeof(uint8_t) + blob_size_size;
+    size_t header_disk_size = evr_blob_key_size + sizeof(uint8_t) + sizeof(uint64_t) + blob_size_size;
     size_t disk_size = header_disk_size + blob->size;
     if(disk_size > ctx->config->max_bucket_size){
         evr_fmt_blob_key_t fmt_key;
@@ -478,6 +483,8 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         p = (uint8_t*)p + sizeof(blob->key);
         *((uint8_t*)p) = blob->flags;
         p = (uint8_t*)p + 1;
+        *((uint64_t*)p) = htobe64(t64);
+        p = (uint64_t*)p + 1;
         *((uint32_t*)p) = htobe32(blob->size);
     }
     // TODO change to write_n so data is always completely written
@@ -528,6 +535,9 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         goto fail_with_insert_reset;
     }
     if(sqlite3_bind_int(ctx->insert_blob_stmt, 5, blob->size) != SQLITE_OK){
+        goto fail_with_insert_reset;
+    }
+    if(sqlite3_bind_int64(ctx->insert_blob_stmt, 6, t64) != SQLITE_OK){
         goto fail_with_insert_reset;
     }
     if(sqlite3_step(ctx->insert_blob_stmt) != SQLITE_DONE){
