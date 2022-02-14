@@ -33,6 +33,15 @@ hint the user that the default gpg signing key is used for signing
 claims. don't lose it and be aware of etc.
 ** config file locations
 indicate where config files should be placed and how they should look
+* replace struct chunk_set with linked list
+dny-mem.h should provide one growable random access data structure and
+one growable linked list data structure.
+
+especially struct dynamic_array is not very well fitted for growing
+because of the evr_chunk_set_max_chunks limitation.
+
+struct dynamic_array should be renamed to hint the random access
+usage. maybe rabuf instead of dynamic_array and llbuf for chunk_set.
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
