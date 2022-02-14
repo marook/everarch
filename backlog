@@ -1,6 +1,3 @@
-* implement file upload in evr-storage-client
-evr-storage-client should split a given file into slices, upload them
-and upload a file claim.
 * store upload timestamp with blobs
 last modification timestamp must be stored with blobs in
 evr-glacier-storage. the timestamp must be saved in the buckets and

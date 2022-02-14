@@ -93,4 +93,12 @@ int evr_grow_chunk_set(struct chunk_set *cs, size_t new_chunks_len);
 
 void evr_free_chunk_set(struct chunk_set *cs);
 
+/**
+ * evr_chunk_setify populates a chunk_set cs so it represents the
+ * content of buf. cs in only valid as long buf is allocated.
+ *
+ * cs may not be freed using evr_free_chunk_set.
+ */
+int evr_chunk_setify(struct chunk_set *cs, char *buf, size_t size);
+
 #endif

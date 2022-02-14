@@ -10,22 +10,25 @@ stop(){
         echo "storage/lock still existing after storage quit" >&2
         exit 1
     fi
-    rm -rf 'storage'
+    rm -rf 'storage' 'files'
 }
 
-rm -rf 'storage'
-mkdir 'storage'
+rm -rf 'storage' 'files'
+mkdir 'storage' 'files'
+
+echo 'hello world!' > './files/hello.txt'
 
 evr-glacier-storage &
 spid=$!
 trap stop EXIT
 
 wait_for_glacier_storage
-ref=`echo "hello world!" | evr-glacier-cli put`
+ref=`evr-glacier-cli post-file './files/hello.txt'`
 echo "evr-glacier-cli reported ref ${ref}"
-body=`evr-glacier-cli get ${ref}`
-if [[ "hello world!" != "${body}" ]]
+claim=`evr-glacier-cli get ${ref}`
+echo "claim: ${claim}"
+if [[ -z "${claim}" ]]
 then
-    echo "Unexpected get response: ${body}" >&2
+    echo "Claim was empty" >&2
     exit 1
 fi

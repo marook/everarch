@@ -257,10 +257,12 @@ int evr_connection_worker(void *context){
             if(evr_work_put_blob(&ctx, &cmd) != evr_ok){
                 goto end;
             }
+            break;
         case evr_cmd_type_stat_blob:
             if(evr_work_stat_blob(&ctx, &cmd, &rctx) != evr_ok){
                 goto end;
             }
+            break;
         }
     }
     result = evr_ok;
@@ -311,6 +313,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     if(memcmp(wblob.key, calced_key, 0)){
         // TODO indicate to the client that the key does not
         // match the blob's hash
+        log_debug("Client and server blob keys did not match");
         goto out_free_blob;
     }
     struct evr_persister_task task;

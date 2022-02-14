@@ -33,12 +33,6 @@
 
 extern const size_t evr_max_chunks_per_blob;
 
-/**
- * evr_blob_flag_claim indicates the blob may also be interpreted as
- * claim.
- */
-#define evr_blob_flag_claim 0x01
-
 struct evr_writing_blob {
     evr_blob_key_t key;
     int flags;

@@ -27,6 +27,13 @@
  */
 void evr_init_signatures();
 
+/**
+ * evr_sign will sign s and write the signed string s in text mode
+ * into dest.
+ *
+ * *dest may point to NULL. The struct dynamic_array will be allocated
+ * in that case.
+ */
 int evr_sign(struct dynamic_array **dest, const char *s);
 
 #endif

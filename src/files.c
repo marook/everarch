@@ -240,7 +240,7 @@ inline int evr_want_split(const struct Rollsum *rs){
     return (rs->s2 & (avg_slice_size - 1)) == (-1 & (avg_slice_size - 1));
 }
 
-int evr_rollsum_split(int f, size_t max_read, int (*slice)(const char *buf, size_t size)){
+int evr_rollsum_split(int f, size_t max_read, int (*slice)(char *buf, size_t size, void *ctx), void *ctx){
     int ret = evr_error;
     struct dynamic_array *buf = alloc_dynamic_array(1*1024*1024);
     if(!buf){
@@ -276,7 +276,7 @@ int evr_rollsum_split(int f, size_t max_read, int (*slice)(const char *buf, size
             size_t slice_size = p - next_slice_start;
             if(slice_size > min_slice_size && (slice_size >= max_slice_size || evr_want_split(&rs))){
                 if(slice_size > 0){
-                    if(slice(&buf->data[next_slice_start], slice_size) != evr_ok){
+                    if(slice(&buf->data[next_slice_start], slice_size, ctx) != evr_ok){
                         goto out_with_free_buf;
                     }
                     next_slice_start = p;
@@ -292,7 +292,7 @@ int evr_rollsum_split(int f, size_t max_read, int (*slice)(const char *buf, size
         }
         if(read_res == evr_end || buf->size_used == max_read){
             // flush the remaining buffer as one slice
-            if(slice(buf->data, buf->size_used) != evr_ok){
+            if(slice(buf->data, buf->size_used, ctx) != evr_ok){
                 goto out_with_free_buf;
             }
             if(read_res == evr_end){

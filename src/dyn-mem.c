@@ -165,3 +165,18 @@ char *evr_alloc_chunk(){
 void evr_free_chunk(char *chunk){
     free(chunk);
 }
+
+int evr_chunk_setify(struct chunk_set *cs, char *buf, size_t size){
+    int ret = evr_error;
+    cs->chunks_len = size / evr_chunk_size + 1;
+    if(cs->chunks_len > evr_chunk_set_max_chunks){
+        goto out;
+    }
+    cs->size_used = size;
+    for(int i = 0; i < cs->chunks_len; ++i){
+        cs->chunks[i] = buf + i * evr_chunk_size;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}

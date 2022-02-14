@@ -36,6 +36,8 @@ do
     then
         continue
     fi
+    test_name=`basename "${test_suite}"`
+    echo "Run integration test ${test_name}…"
     ( cd "${test_suite}" && ./run-suite )
 done
 

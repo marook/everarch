@@ -65,14 +65,22 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
     if(xmlTextWriterStartElement(cs->writer, BAD_CAST "body") < 0){
         goto out;
     }
-    evr_blob_key_t *end = &claim->segments[claim->segments_len];
+    const struct evr_file_slice *end = &claim->slices[claim->slices_len];
     evr_fmt_blob_key_t fmt_key;
-    for(evr_blob_key_t *s = claim->segments; s != end; ++s){
-        if(xmlTextWriterStartElement(cs->writer, BAD_CAST "segment") < 0){
+    char buf[9 + 1];
+    for(const struct evr_file_slice *s = claim->slices; s != end; ++s){
+        if(xmlTextWriterStartElement(cs->writer, BAD_CAST "slice") < 0){
             goto out;
         }
-        evr_fmt_blob_key(fmt_key, *s);
+        evr_fmt_blob_key(fmt_key, s->key);
         if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "ref", BAD_CAST fmt_key) < 0){
+            goto out;
+        }
+        if(s->size >= 100 << 20){
+            goto out;
+        }
+        sprintf(buf, "%lu", s->size);
+        if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "size", BAD_CAST buf) < 0){
             goto out;
         }
         // end segment element

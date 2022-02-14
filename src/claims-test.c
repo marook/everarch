@@ -39,36 +39,39 @@ void test_empty_claim(){
 }
 
 void test_file_claim_with_filename(){
-    evr_blob_key_t key;
-    memset(key, 0, sizeof(key));
+    struct evr_file_slice slice;
+    memset(slice.key, 0, sizeof(slice.key));
+    slice.size = 1;
     const struct evr_file_claim claim = {
         "test.txt",
         1,
-        &key,
+        &slice,
     };
-    assert_file_claim(&claim, "<file dc:title=\"test.txt\"><body><segment ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\"/></body></file>");
+    assert_file_claim(&claim, "<file dc:title=\"test.txt\"><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
 void test_file_claim_with_null_filename(){
-    evr_blob_key_t key;
-    memset(key, 0, sizeof(key));
+    struct evr_file_slice slice;
+    memset(slice.key, 0, sizeof(slice.key));
+    slice.size = 1;
     const struct evr_file_claim claim = {
         NULL,
         1,
-        &key,
+        &slice,
     };
-    assert_file_claim(&claim, "<file><body><segment ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\"/></body></file>");
+    assert_file_claim(&claim, "<file><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
 void test_file_claim_with_empty_filename(){
-    evr_blob_key_t key;
-    memset(key, 0, sizeof(key));
+    struct evr_file_slice slice;
+    memset(slice.key, 0, sizeof(slice.key));
+    slice.size = 1;
     const struct evr_file_claim claim = {
         "",
         1,
-        &key,
+        &slice,
     };
-    assert_file_claim(&claim, "<file><body><segment ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\"/></body></file>");
+    assert_file_claim(&claim, "<file><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
 void assert_file_claim(const struct evr_file_claim *claim, const char *expected_file_document){

@@ -45,6 +45,11 @@ struct evr_claim_set {
     xmlTextWriterPtr writer;
 };
 
+struct evr_file_slice {
+    evr_blob_key_t key;
+    size_t size;
+};
+
 struct evr_file_claim {
     /**
      * title could be the file name. May also be null if the file has
@@ -52,9 +57,9 @@ struct evr_file_claim {
      */
     char *title;
 
-    size_t segments_len;
+    size_t slices_len;
     
-    evr_blob_key_t *segments;
+    struct evr_file_slice *slices;
 };
 
 int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created);

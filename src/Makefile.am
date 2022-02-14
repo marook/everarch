@@ -38,13 +38,15 @@ dyn_mem_test_SOURCES = \
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
 evr_glacier_cli_SOURCES = \
+	claims.c \
 	dyn-mem.c \
 	evr-glacier-cli.c \
 	files.c \
 	glacier-cmd.c \
 	keys.c \
-	logger.c
-evr_glacier_cli_LDADD = $(GCRYPT_LIBS)
+	logger.c \
+	signatures.c
+evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	concurrent-glacier.c \
