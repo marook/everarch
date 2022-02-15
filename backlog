@@ -8,6 +8,16 @@ this will later be used to live update index servers.
 the watch command should support the following filters:
 - only report claim blobs
 - only report modifications since a certain timestamp
+* add signature checking for blobs
+signature of existing blobs should be validated. content should be
+extracted after check so the for example claim can be read.
+* add claim parsing
+parse a xml document claim blob. callbacks for claim set delivering
+creation timestamp. also a callback for each contained claim which
+provides the XML elemen.
+
+a second function which can detect if the claim is a file claim and
+parse it into struct evr_file_claim.
 * implement a evr-file-index service
 watch a evr-glacier-storage server and build up an index of file
 claims.
