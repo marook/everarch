@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include <limits.h>
 
 #include "logger.h"
 #include "dyn-mem.h"
@@ -69,14 +70,19 @@ struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_stor
     ctx->read_buffer = (char*)(ctx + 1);
     ctx->db = NULL;
     ctx->find_blob_stmt = NULL;
+    ctx->list_blobs_stmt = NULL;
     if(evr_open_index_db(config, SQLITE_OPEN_READONLY, &(ctx->db))){
         goto fail_with_db;
     }
     if(evr_prepare_stmt(ctx->db, "select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?", &(ctx->find_blob_stmt))){
         goto fail_with_db;
     }
+    if(evr_prepare_stmt(ctx->db, "select key, flags, last_modified from blob_position where last_modified >= ?", &(ctx->list_blobs_stmt))){
+        goto fail_with_db;
+    }
     return ctx;
  fail_with_db:
+    sqlite3_finalize(ctx->list_blobs_stmt);
     sqlite3_finalize(ctx->find_blob_stmt);
     sqlite3_close(ctx->db);
     free(ctx);
@@ -86,16 +92,22 @@ struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_stor
 
 int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx){
     if(!ctx){
-        return 0;
+        return evr_ok;
     }
-    int ret = 1;
+    int ret = evr_error;
+    if(sqlite3_finalize(ctx->list_blobs_stmt) != SQLITE_OK){
+        // TODO evr_panic?
+        goto end;
+    }
     if(sqlite3_finalize(ctx->find_blob_stmt) != SQLITE_OK){
+        // TODO evr_panic?
         goto end;
     }
     if(evr_close_index_db(ctx->config, ctx->db)){
+        // TODO evr_panic?
         goto end;
     }
-    ret = 0;
+    ret = evr_ok;
  end:
     free(ctx);
     return ret;
@@ -172,6 +184,47 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
     }
  end_with_find_reset:
     if(sqlite3_reset(ctx->find_blob_stmt) != SQLITE_OK){
+        ret = evr_error;
+    }
+    return ret;
+}
+
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_key_t key, int flags, unsigned long long last_modified), int flags_filter, unsigned long long last_modified_after, void *vctx){
+    int ret = evr_error;
+    if(last_modified_after > (unsigned long long)LLONG_MAX){
+        // sqlite3 api only provides bind for signed int64. so we must
+        // make sure that value does not overflow.
+        goto out;
+    }
+    if(sqlite3_bind_int64(ctx->list_blobs_stmt, 1, last_modified_after) != SQLITE_OK){
+        goto out;
+    }
+    while(1){
+        int step_ret = sqlite3_step(ctx->list_blobs_stmt);
+        if(step_ret == SQLITE_DONE){
+            break;
+        }
+        if(step_ret != SQLITE_ROW){
+            goto out;
+        }
+        int flags = sqlite3_column_int(ctx->list_blobs_stmt, 1);
+        if((flags & flags_filter) != flags_filter){
+            continue;
+        }
+        int key_col_size = sqlite3_column_bytes(ctx->list_blobs_stmt, 0);
+        if(key_col_size != evr_blob_key_size){
+            goto out;
+        }
+        const evr_blob_key_t *key = sqlite3_column_blob(ctx->list_blobs_stmt, 0);
+        
+        unsigned long long last_modified = sqlite3_column_int64(ctx->list_blobs_stmt, 2);
+        if(visit(vctx, *key, flags, last_modified) != evr_ok){
+            goto out;
+        }
+    }
+    ret = evr_ok;
+ out:
+    if(sqlite3_reset(ctx->list_blobs_stmt) != SQLITE_OK){
         ret = evr_error;
     }
     return ret;
@@ -453,11 +506,12 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
     memcpy(p, path_suffix, path_suffix_len+1);
 }
 
-int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob) {
+int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, unsigned long long *last_modified) {
     int ret = evr_error;
     time_t t;
     time(&t);
     uint64_t t64 = (uint64_t)t;
+    *last_modified = t64;
     size_t blob_size_size = 4;
     size_t header_disk_size = evr_blob_key_size + sizeof(uint8_t) + sizeof(uint64_t) + blob_size_size;
     size_t disk_size = header_disk_size + blob->size;

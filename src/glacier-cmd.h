@@ -73,6 +73,21 @@
  */
 #define evr_cmd_type_stat_blob 0x03
 
+/**
+ * evr_cmd_type_watch_blobs requests notifications about created and
+ * modified blobs.
+ *
+ * Expected cmd body is:
+ * - uint8_t flags_filter
+ * - uint64_t last_modified_after
+ *
+ * Expected response body is:
+ * - struct evr_stat_blob_resp with body_size 0
+ * - evr_blob_key_t key + uint64_t last_modified of modified blob in an
+ *   endless stream
+ */
+#define evr_cmd_type_watch_blobs 0x04
+
 struct evr_cmd_header {
     int type;
     size_t body_size;
@@ -116,5 +131,30 @@ struct evr_stat_blob_resp {
 
 int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, const char *buf);
 int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp);
+
+struct evr_blob_filter {
+    /**
+     * flags_filter is a set of bits which must be set at least so
+     * that the blob is passed by the filter.
+     */
+    int flags_filter;
+
+    /**
+     * last_modified_after is the unix epoch timestamp in seconds
+     * after which a blob must have been modified in order to be
+     * passed by the filter.
+     *
+     * Future last_modified_after values will not report any
+     * modifications already persisted into the glacier storage. But
+     * live modifications on blobs will be reported even if they lie
+     * behind last_modified_after.
+     */
+    unsigned long long last_modified_after;
+};
+
+#define evr_blob_filter_n_size (sizeof(uint8_t) + sizeof(uint64_t))
+
+int evr_parse_blob_filter(struct evr_blob_filter *f, const char *buf);
+int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f);
 
 #endif

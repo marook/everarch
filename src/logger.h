@@ -29,6 +29,8 @@
 
 #include "config.h"
 
+#include <stdlib.h>
+
 /**
  * evr_log_fd is the file descriptor to which all log statements are
  * written.
@@ -54,5 +56,11 @@ extern int evr_log_fd;
 #define log_error(args...) evr_log("E", args)
 
 void evr_log(const char *level, const char *fmt, ...);
+
+#define evr_panic(args...)                      \
+    {                                           \
+        evr_log("P", args);                     \
+        exit(1);                                \
+    }
 
 #endif

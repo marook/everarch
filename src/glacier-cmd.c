@@ -73,3 +73,17 @@ int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp){
     push_p(uint32_t, resp->blob_size);
     return evr_ok;
 }
+
+int evr_parse_blob_filter(struct evr_blob_filter *f, const char *buf){
+    const char *p = buf;
+    f->flags_filter = pull_p(uint8_t);
+    f->last_modified_after = pull_p_map(uint64_t, be64toh);
+    return evr_ok;
+}
+
+int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f){
+    char *p = buf;
+    push_p(uint8_t, f->flags_filter);
+    push_p(uint64_t, htobe64(f->last_modified_after));
+    return evr_ok;
+}

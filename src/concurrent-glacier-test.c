@@ -44,12 +44,14 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
     return evr_ok;
 }
 
-int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob){
+int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, unsigned long long *last_modified){
     assert_not_null_msg(ctx, "evr_glacier_write_ctx must not be null");
     assert_not_null_msg(blob, "blob must not be null");
+    assert_not_null_msg(last_modified, "last_modified was not supplied");
     if(append_blob_delay){
         assert_equal(thrd_sleep(append_blob_delay, NULL), 0);
     }
+    *last_modified = 123;
     return evr_glacier_append_blob_result;
 }
 
@@ -73,6 +75,7 @@ void test_queue_one_blob_success(){
     assert_ok(evr_persister_queue_task(&task));
     assert_ok(evr_persister_wait_for_task(&task));
     assert_ok(task.result);
+    assert_equal(task.last_modified, 123);
     assert_ok(evr_persister_destroy_task(&task));
     evr_temp_persister_stop();
 }

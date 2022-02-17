@@ -24,6 +24,7 @@
 #include "logger.h"
 
 #define evr_persister_task_queue_length 32
+#define evr_persister_watchers_len 32
 
 struct evr_persister_ctx {
     struct evr_persister_task *tasks[evr_persister_task_queue_length + 1];
@@ -33,6 +34,9 @@ struct evr_persister_ctx {
     cnd_t has_tasks;
     struct evr_glacier_write_ctx *write_ctx;
     int working;
+    mtx_t watchers_lock;
+    evr_persister_watcher watchers[evr_persister_watchers_len];
+    void *watchers_ctx[evr_persister_watchers_len];
 };
 
 struct evr_persister_ctx evr_persister;
@@ -45,12 +49,21 @@ int evr_persister_start(struct evr_glacier_storage_configuration *config){
     if(mtx_init(&evr_persister.worker_lock, mtx_plain) != thrd_success){
         goto worker_lock_init_fail;
     }
+    if(cnd_init(&evr_persister.has_tasks) != thrd_success){
+        goto out_with_free_worker_lock;
+    }
+    if(mtx_init(&evr_persister.watchers_lock, mtx_plain) != thrd_success){
+        goto out_with_free_has_tasks;
+    }
     evr_persister.writing = evr_persister.tasks;
     evr_persister.reading = evr_persister.tasks;
     evr_persister.working = 1;
+    for(size_t i = 0; i < evr_persister_watchers_len; ++i){
+        evr_persister.watchers[i] = NULL;
+    }
     evr_persister.write_ctx = evr_create_glacier_write_ctx(config);
     if(!evr_persister.write_ctx){
-        goto create_write_ctx_fail;
+        goto out_with_free_watchers_lock;
     }
     atomic_thread_fence(memory_order_release);
     if(thrd_create(&evr_persister_thread, evr_persister_worker, NULL) != thrd_success){
@@ -60,7 +73,11 @@ int evr_persister_start(struct evr_glacier_storage_configuration *config){
     return evr_ok;
  thread_create_fail:
     evr_free_glacier_write_ctx(evr_persister.write_ctx);
- create_write_ctx_fail:
+ out_with_free_watchers_lock:
+    mtx_destroy(&evr_persister.watchers_lock);
+ out_with_free_has_tasks:
+    cnd_destroy(&evr_persister.has_tasks);
+ out_with_free_worker_lock:
     mtx_destroy(&evr_persister.worker_lock);
  worker_lock_init_fail:
     return evr_error;
@@ -89,6 +106,7 @@ int evr_persister_stop(){
     if(evr_free_glacier_write_ctx(evr_persister.write_ctx) != evr_ok){
         goto fail;
     }
+    cnd_destroy(&evr_persister.has_tasks);
     mtx_destroy(&evr_persister.worker_lock);
     log_debug("evr persister stopped");
     return evr_ok;
@@ -178,6 +196,21 @@ int evr_persister_worker(void *context){
                 result = evr_error;
                 goto end_without_unlock;
             }
+            if(mtx_lock(&evr_persister.watchers_lock) != thrd_success){
+                goto end_without_unlock;
+            }
+            for(int wd = 0; wd < evr_persister_watchers_len; ++wd){
+                evr_persister_watcher w = evr_persister.watchers[wd];
+                if(!w){
+                    continue;
+                }
+                void *wctx = evr_persister.watchers_ctx[wd];
+                w(wctx, wd, task->blob->key, task->blob->flags, task->last_modified);
+            }
+            if(mtx_unlock(&evr_persister.watchers_lock) != thrd_success){
+                evr_panic("Failed to unlock evr_persister.watchers_lock after fire watchers");
+                return evr_error;
+            }
             if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
                 result = evr_error;
                 goto end_without_unlock;
@@ -212,13 +245,12 @@ inline struct evr_persister_task** evr_persister_ctx_step(struct evr_persister_t
 
 int evr_persister_process_task(struct evr_persister_task *task){
     int result = evr_ok;
-    if(evr_glacier_append_blob(evr_persister.write_ctx, task->blob) != evr_ok){
+    if(evr_glacier_append_blob(evr_persister.write_ctx, task->blob, &task->last_modified) != evr_ok){
         result = evr_error;
         goto end;
     }
  end:
     task->result = result;
-    atomic_thread_fence(memory_order_release);
     if(mtx_unlock(&task->done) != thrd_success){
         return evr_error;
     } else {
@@ -232,4 +264,42 @@ int evr_persister_wait_for_task(struct evr_persister_task *task){
     }
     atomic_thread_fence(memory_order_acquire);
     return evr_ok;
+}
+
+int evr_persister_add_watcher(evr_persister_watcher watcher, void *ctx){
+    int wd = -1;
+    if(mtx_lock(&evr_persister.watchers_lock) != thrd_success){
+        goto out;
+    }
+    for(int i = 0; i < evr_persister_watchers_len; ++i){
+        evr_persister_watcher *w = &evr_persister.watchers[i];
+        if(*w){
+            continue;
+        }
+        *w = watcher;
+        evr_persister.watchers_ctx[i] = ctx;
+        wd = i;
+        break;
+    }
+    if(mtx_unlock(&evr_persister.watchers_lock) != thrd_success){
+        evr_panic("Failed to unlock evr_persister.watchers_lock");
+        return -1;
+    }
+ out:
+    return wd;
+}
+
+int evr_persister_rm_watcher(int wd){
+    int ret = evr_error;
+    if(mtx_lock(&evr_persister.watchers_lock) != thrd_success){
+        goto out;
+    }
+    evr_persister.watchers[wd] = NULL;
+    if(mtx_unlock(&evr_persister.watchers_lock) != thrd_success){
+        evr_panic("Failed to unlock evr_persister.watchers_lock");
+        return -1;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
 }

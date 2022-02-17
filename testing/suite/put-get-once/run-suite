@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -o pipefail
 . ../config
 
 stop(){
@@ -10,10 +11,10 @@ stop(){
         echo "storage/lock still existing after storage quit" >&2
         exit 1
     fi
-    rm -rf 'storage'
+    rm -rf 'storage' 'early-watch.actual.log' 'late-watch.actual.log' 'past-watch.actual.log' 'watch.actual.log'
 }
 
-rm -rf 'storage'
+rm -rf 'storage' 'early-watch.actual.log' 'late-watch.actual.log' 'past-watch.actual.log' 'watch.actual.log'
 mkdir 'storage'
 
 evr-glacier-storage &
@@ -21,6 +22,14 @@ spid=$!
 trap stop EXIT
 
 wait_for_glacier_storage
+
+# tests that watch will report blobs modified while the watch was
+# live.
+( evr-glacier-cli watch > early-watch.actual.log ) &
+ewpid=$!
+
+sleep 1
+
 ref=`echo "hello world!" | evr-glacier-cli put`
 echo "evr-glacier-cli reported ref ${ref}"
 body=`evr-glacier-cli get ${ref}`
@@ -29,3 +38,34 @@ then
     echo "Unexpected get response: ${body}" >&2
     exit 1
 fi
+
+( evr-glacier-cli watch > late-watch.actual.log ) &
+lwpid=$!
+
+# tests that watch will report blobs modified before the watch was
+# initiated.
+( evr-glacier-cli watch --last-modified-after 0 > past-watch.actual.log ) &
+pwpid=$!
+
+sleep 1
+
+kill "${ewpid}"
+kill "${lwpid}"
+kill "${pwpid}"
+
+if [[ -s late-watch.actual.log ]]
+then
+    echo "Expected late-watch.actual.log to be empty but was:" >&2
+    cat late-watch.actual.log >&2
+    exit 1
+fi
+
+for f in early-watch.actual.log past-watch.actual.log
+do
+    awk '{FS = " "} {print $1}' < $f > watch.actual.log
+    if ! diff watch.expected.log watch.actual.log
+    then
+        echo "Expected watch.expected.log to equal $f" >&2
+        exit 1
+    fi
+done

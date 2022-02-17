@@ -1,13 +1,3 @@
-* add evr_cmd_type_watch command to evr-glacier-storage
-the watch command should keep a tcp connection open which provides the
-client with keys of blobs which got modified. the server responses
-must contain the modification timestamp of the reported blob.
-
-this will later be used to live update index servers.
-
-the watch command should support the following filters:
-- only report claim blobs
-- only report modifications since a certain timestamp
 * add signature checking for blobs
 signature of existing blobs should be validated. content should be
 extracted after check so the for example claim can be read.
@@ -41,6 +31,12 @@ because of the evr_chunk_set_max_chunks limitation.
 
 struct dynamic_array should be renamed to hint the random access
 usage. maybe rabuf instead of dynamic_array and llbuf for chunk_set.
+* replace own queues with lib io_uring
+inter thread communitcation queues have been implemented in struct
+evr_work_watch_ctx and struct evr_persister_ctx.
+
+for the sake of using well tested code we should check migrating our
+own queues to lib io_uring. mentioned by pitrp.
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.

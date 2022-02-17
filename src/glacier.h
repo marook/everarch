@@ -44,6 +44,7 @@ struct evr_glacier_read_ctx {
     struct evr_glacier_storage_configuration *config;
     sqlite3 *db;
     sqlite3_stmt *find_blob_stmt;
+    sqlite3_stmt *list_blobs_stmt;
     char *read_buffer;
 };
 
@@ -93,6 +94,8 @@ int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
  */
 int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_key_t key, int flags, unsigned long long last_modified), int flags_filter, unsigned long long last_modified_after, void *vctx);
+
 struct evr_glacier_write_ctx {
     struct evr_glacier_storage_configuration *config;
     unsigned long current_bucket_index;
@@ -123,8 +126,27 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx);
  *
  * The blob's position in the appended bucket is written into the
  * index db.
+ *
+ * last_modified is set to the blob's last modified timestamp after
+ * the function returns.
  */
-int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob);
+int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, unsigned long long *last_modified);
+
+/**
+ * evr_glacier_add_watcher registers a callback which fires after a
+ * blob got modified.
+ *
+ * Returns a negative value on error and a watch descriptor (wd) on
+ * success.
+ */
+int evr_glacier_add_watcher(struct evr_glacier_write_ctx *ctx, void (*watcher)(void *wctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified), void *wctx);
+
+/**
+ * evr_glacier_rm_watcher unregisters a watch callback.
+ *
+ * Returns evr_ok on success. Otherwise evr_error.
+ */
+int evr_glacier_rm_watcher(struct evr_glacier_write_ctx *ctx, int wd);
 
 /**
  * evr_quick_check_glacier performs a quick sanity check of the

@@ -51,6 +51,12 @@ struct evr_persister_task {
      * persisted. evr_error indicated blob could not be persisted.
      */
     int result;
+
+    /**
+     * last_modified contains the blob's last modification timestamp
+     * after done is unlocked.
+     */
+    unsigned long long last_modified;
 };
 
 /**
@@ -81,5 +87,24 @@ int evr_persister_queue_task(struct evr_persister_task *task);
  * task->result manually if required.
  */
 int evr_persister_wait_for_task(struct evr_persister_task *task);
+
+typedef void (*evr_persister_watcher)(void *ctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified);
+
+/**
+ * evr_persister_add_watcher registers a callback which fires after a
+ * blob got modified.
+ *
+ * Returns a negative value on error and a watch descriptor (wd) on
+ * success.
+ */
+int evr_persister_add_watcher(evr_persister_watcher watcher, void *ctx);
+
+/**
+ * evr_persister_rm_watcher unregisters a watch callback.
+ *
+ * Returns evr_ok on success. Otherwise evr_error.
+ */
+int evr_persister_rm_watcher(int wd);
+
 
 #endif
