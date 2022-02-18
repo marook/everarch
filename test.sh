@@ -25,7 +25,7 @@ do
         continue
     fi
     echo "Testing ${test_name}…"
-    valgrind --quiet --leak-check=yes "./${test_bin}"
+    valgrind --quiet --leak-check=yes --error-exitcode=1 "./${test_bin}"
 done
 
 echo ''
