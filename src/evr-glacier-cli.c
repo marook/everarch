@@ -390,10 +390,10 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     if(evr_chunk_setify(&blob, buf, size) != evr_ok){
         goto out;
     }
-    if(evr_calc_blob_key(fs->key, size, blob.chunks) != evr_ok){
+    if(evr_calc_blob_key(fs->ref, size, blob.chunks) != evr_ok){
         goto out;
     }
-    if(evr_stat_and_put(ctx->c, fs->key, 0, &blob) != evr_ok){
+    if(evr_stat_and_put(ctx->c, fs->ref, 0, &blob) != evr_ok){
         goto out;
     }
     fs->size = size;

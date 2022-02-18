@@ -17,7 +17,8 @@ claims_test_SOURCES = \
 	assert.c \
 	claims.c \
 	claims-test.c \
-	keys.c
+	keys.c \
+	logger.c
 claims_test_LDADD = $(XML_LIBS) $(GCRYPT_LIBS)
 
 concurrent_glacier_test_SOURCES = \

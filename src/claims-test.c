@@ -16,9 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include "assert.h"
 #include "claims.h"
 #include "test.h"
+#include "keys.h"
 
 time_t t0 = 0;
 
@@ -40,7 +43,7 @@ void test_empty_claim(){
 
 void test_file_claim_with_filename(){
     struct evr_file_slice slice;
-    memset(slice.key, 0, sizeof(slice.key));
+    memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
     const struct evr_file_claim claim = {
         "test.txt",
@@ -52,7 +55,7 @@ void test_file_claim_with_filename(){
 
 void test_file_claim_with_null_filename(){
     struct evr_file_slice slice;
-    memset(slice.key, 0, sizeof(slice.key));
+    memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
     const struct evr_file_claim claim = {
         NULL,
@@ -64,7 +67,7 @@ void test_file_claim_with_null_filename(){
 
 void test_file_claim_with_empty_filename(){
     struct evr_file_slice slice;
-    memset(slice.key, 0, sizeof(slice.key));
+    memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
     const struct evr_file_claim claim = {
         "",
@@ -83,11 +86,52 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
     assert_ok(evr_free_claim_set(&cs));
 }
 
+void test_parse_file_claim_claim_set(){
+    const char *buf =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<file dc:title=\"test.txt\"><body><slice ref=\"sha3-224-12300000000000000000000000000000000000000000000000000321\" size=\"1\"/></body></file>"
+        "<file xmlns=\"https://evr.ma300k.de/something-which-will-never-ever-exist\"></file>"
+        "</claim-set>\n";
+    size_t buf_size = strlen(buf);
+    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    assert_not_null(doc);
+    time_t created;
+    xmlNode *csn = evr_get_root_claim_set(doc);
+    assert_not_null(csn);
+    assert_ok(evr_parse_created(&created, csn));
+    assert_equal(created, 7);
+    int file_claims_found = 0;
+    int unknown_claims_found = 0;
+    for(xmlNode *cn = evr_first_claim(csn); cn; cn = evr_next_claim(cn)){
+        if(evr_is_evr_element(cn, "file")){
+            ++file_claims_found;
+            struct evr_file_claim *c = evr_parse_file_claim(cn);
+            assert_not_null(c);
+            assert_str_eq(c->title, "test.txt");
+            assert_equal(c->slices_len, 1);
+            evr_fmt_blob_key_t fmt_key;
+            evr_fmt_blob_key(fmt_key, c->slices[0].ref);
+            assert_str_eq(fmt_key, "sha3-224-12300000000000000000000000000000000000000000000000000321");
+            assert_equal(c->slices[0].size, 1);
+            free(c);
+        } else {
+            ++unknown_claims_found;
+        }
+    }
+    assert_equal_msg(file_claims_found, 1, "No file claims found");
+    assert_equal_msg(unknown_claims_found, 1, "No unknown claims found");
+    xmlFreeDoc(doc);
+}
+
 int main(){
+    xmlInitParser();
     run_test(test_empty_claim_without_finalize);
     run_test(test_empty_claim);
     run_test(test_file_claim_with_filename);
     run_test(test_file_claim_with_null_filename);
     run_test(test_file_claim_with_empty_filename);
+    run_test(test_parse_file_claim_claim_set);
+    xmlCleanupParser();
     return 0;
 }

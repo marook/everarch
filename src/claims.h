@@ -30,6 +30,8 @@
 #ifndef __evr_claims_h__
 #define __evr_claims_h__
 
+#include "config.h"
+
 #include <time.h>
 #include <libxml/xmlwriter.h>
 
@@ -46,7 +48,7 @@ struct evr_claim_set {
 };
 
 struct evr_file_slice {
-    evr_blob_key_t key;
+    evr_blob_key_t ref;
     size_t size;
 };
 
@@ -69,5 +71,51 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
 int evr_finalize_claim_set(struct evr_claim_set *cs);
 
 int evr_free_claim_set(struct evr_claim_set *cs);
+
+/**
+ * evr_parse_claim_set parses a claim set document from the given
+ * buffer.
+ *
+ * Usually you want to do the following (except you add error handling
+ * of course):
+ *
+ * xmlInitParser(); // just once at startup
+ * …
+ * doc = evr_parse_claim_set(…)
+ * time_t created;
+ * evr_parse_created(&created, xmlDocGetRootElement(doc));
+ * for(cn = evr_first_claim(); cn; cn = evr_next_claim(cn)){
+ *   …
+ *   if(evr_is_evr_element(cn, "file"){
+ *     struct evr_file_claim c;
+ *     evr_parse_file_claim(&c, cn);
+ *     …
+ *   }
+ *   …
+ * }
+ * xmlFreeDoc(doc);
+ * …
+ * xmlCleanupParser(); // just before exit once
+ */
+xmlDocPtr evr_parse_claim_set(const char *buf, size_t buf_size);
+
+xmlNode *evr_get_root_claim_set(xmlDocPtr doc);
+
+int evr_parse_created(time_t *t, xmlNode *node);
+
+xmlNode *evr_first_claim(xmlNode *claim_set);
+
+xmlNode *evr_next_claim(xmlNode *claim_node);
+
+int evr_is_evr_element(xmlNode *n, char *name);
+
+/**
+ * evr_parse_file_claim parses a claim node into a struct
+ * evr_file_claim.
+ *
+ * Returns NULL on errors. Otherwise a evr_file_claim. The caller must
+ * free the returned evr_file_claim.
+ */
+struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node);
 
 #endif

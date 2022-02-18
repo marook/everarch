@@ -1,10 +1,3 @@
-* add claim parsing
-parse a xml document claim blob. callbacks for claim set delivering
-creation timestamp. also a callback for each contained claim which
-provides the XML elemen.
-
-a second function which can detect if the claim is a file claim and
-parse it into struct evr_file_claim.
 * implement a evr-file-index service
 watch a evr-glacier-storage server and build up an index of file
 claims.
