@@ -1,3 +1,4 @@
+* implement a get-file command in evr-glacier-cli
 * implement a evr-file-index service
 watch a evr-glacier-storage server and build up an index of file
 claims.
