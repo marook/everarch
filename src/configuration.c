@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "configuration.h"
+#include "config.h"
 
 #include <cjson/cJSON.h>
 #include <ctype.h>
@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <wordexp.h>
 
+#include "configuration.h"
 #include "files.h"
 #include "logger.h"
 #include "errors.h"

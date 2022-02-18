@@ -31,9 +31,19 @@ void evr_init_signatures();
  * evr_sign will sign s and write the signed string s in text mode
  * into dest.
  *
+ * evr_sign may add a trailing newline to the signed string. You may
+ * retrieve the newline after extracting the signed string later using
+ * evr_verify.
+ *
  * *dest may point to NULL. The struct dynamic_array will be allocated
  * in that case.
  */
 int evr_sign(struct dynamic_array **dest, const char *s);
+
+/**
+ * evr_verify will verify the signature attached to message s. Also it
+ * will write the message without signature wrapping into dest.
+ */
+int evr_verify(struct dynamic_array **dest, const char *s, size_t s_maxlen);
 
 #endif

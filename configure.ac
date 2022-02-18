@@ -7,6 +7,7 @@ AC_PROG_CC
 PKG_PROG_PKG_CONFIG
 
 AC_DEFINE(_DEFAULT_SOURCE, 1, This macro can be defined to ensure that the "default" definitions are provided.)
+AC_DEFINE(_POSIX_C_SOURCE, 200809L, We want to use for example strnlen)
 AC_DEFINE(_GNU_SOURCE, 1, We use for example fcntl's F_GETSIG)
 AC_DEFINE(EVR_LOG_DEBUG, , Turns on log message output on level debug)
 

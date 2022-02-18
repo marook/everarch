@@ -1,6 +1,3 @@
-* add signature checking for blobs
-signature of existing blobs should be validated. content should be
-extracted after check so the for example claim can be read.
 * add claim parsing
 parse a xml document claim blob. callbacks for claim set delivering
 creation timestamp. also a callback for each contained claim which
