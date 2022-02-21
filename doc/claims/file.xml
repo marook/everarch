@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<file xmlns:dc="http://purl.org/dc/terms/" xmlns="https://evr.ma300k.de/claims/" dc:title="test.txt">
+  <body>
+    <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="1"/>
+    <slice ref="sha3-224-12300000000000000000000000ffff00000000000000000000000321" size="122"/>
+  </body>
+</file>

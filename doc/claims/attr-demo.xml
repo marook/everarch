@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    attr-demo.xml shows examples how to modify declared key/value
+    pairs for blobs.
+
+    The attr element is usually the output of indexer rule claim's xsl
+    transformations.
+-->
+<attr
+    xmlns="https://evr.ma300k.de/claims/"
+    ref="sha3-224-…"
+    >
+  <!-- adds the value v to the set of values for k -->
+  <a op="+" k="tag" v="todo"/>
+  <!-- empties the set of values for k -->
+  <a op="-" k="someKey"/>
+  <!-- removes the value v from the set of values for k -->
+  <a op="-" k="someKey" v="someVal"/>
+  <!-- replaces the set of values for k with v -->
+  <a op="=" k="replacedKey" v="replacedVal"/>
+</attr>

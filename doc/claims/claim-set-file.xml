@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    file-claim-set.xml is a complete claim-set with multilpe
+    claims.
+-->
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="1970-01-01T00:00:07Z"
+    >
+  <file dc:title="test.txt">
+    <body>
+      <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="1"/>
+    </body>
+  </file>
+  <file xmlns="https://evr.ma300k.de/something-which-will-never-ever-exist"></file>
+</claim-set>

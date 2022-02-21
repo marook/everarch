@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    attr-defs.xml is an indexer rule claim set.
+
+    it defines how values for the given attribute keys should be
+    interpreted.
+-->
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="1970-01-01T00:00:07Z"
+    >
+  <attr-def k="tag" type="str"/>
+  <attr-def k="body-size" type="int"/>
+</claim-set>

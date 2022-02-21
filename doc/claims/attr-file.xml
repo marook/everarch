@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    attr-file.xml is an example attr claim which is based on a
+    hypotetical file claim.
+-->
+<attr
+    xmlns="https://evr.ma300k.de/claims/"
+    ref="sha3-224-00000000000000000000000000000000000000000000000000000000"
+    >
+  <a op="=" k="title" v="test.txt"/>
+  <a op="=" k="body-size" v="123"/>
+</attr>
