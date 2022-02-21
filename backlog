@@ -1,7 +1,53 @@
+* define a sample xslt for file claim to attribute claim
+we already have a file-claim defined in everarch. there should be a
+new attribute claim which looks somehow like that:
+
+#+BEGIN_SRC xml
+<attr ref="sha3-224-…">
+  <a op="+" k="tag" v="todo"/>
+  <a op="-" k="someKey"/>
+  <a op="-" k="someKey" v="someVal"/>
+  <a op="=" k="replacedKey" v="replacedVal"/>
+</attr>
+#+END_SRC
+
+each attribute key needs a definition claim before being indexable:
+#+BEGIN_SRC xml
+<attr-def k="tag" type="str"/>
+<attr-def k="size" type="int"/>
+#+END_SRC
+
+there should be an example xslt which transforms a file claim into an
+attribute claim like the one above. title should be transformed into a
+title attribute. the sum of all slice sizes should be transformed into
+a file size attribute.
+
+there should be a file doc/claims.org which documents the different
+claim types together with examples.
+* define an attr indexer rule claim
+an indexer claim is a claim for an attribute index. it contains an
+xslt which transforms one specific claim type into an attr claim.
+
+#+BEGIN_SRC xml
+<attr-rule target-ns="https://evr.ma300k.de/claims/" target-name="file">
+  <transformation>
+    …
+  </transformation>
+</attr-rule>
+#+END_SRC
 * implement a get-file command in evr-glacier-cli
-* implement a evr-file-index service
-watch a evr-glacier-storage server and build up an index of file
+* introduce index-rule claim flag
+add a flag bit which allows to declare claims for an indexer.
+* implement an evr-attr-index service
+watch a evr-glacier-storage server and build up an index of attr
 claims.
+* store flags and blob size redundant in buckets
+right now flags and blob size in the evr-glacier-storage are storend
+once for every blob and without any checksum.
+
+there should be either a checksum for the two fields or it should be
+stored redundant. this should reduce the risk of breaking a whole
+bucket if one blob in it has a bit error.
 * move glacier storage client functions into glacier-client.[hc]
 right now the evr-glacier-cli.c contains functions for handling blob
 put and blob get commands. code should be centralized in
