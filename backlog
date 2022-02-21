@@ -4,6 +4,12 @@ add a flag bit which allows to declare claims for an indexer.
 * implement an evr-attr-index service
 watch a evr-glacier-storage server and build up an index of attr
 claims.
+* define query language for evr-glacier-storage server
+something like "tag:peng color:blue" or "-tag:nsfw" or
+"tag:todo || tag:backlog"
+
+implement an ast and parser for the query language.
+* evr-attr-index should listen on a socket for querries
 * store flags and blob size redundant in buckets
 right now flags and blob size in the evr-glacier-storage are storend
 once for every blob and without any checksum.
