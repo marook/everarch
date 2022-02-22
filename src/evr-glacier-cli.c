@@ -48,6 +48,7 @@ static char doc[] =
     "Possible commands are get, put, post-file or watch.\n\n"
     "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout\n\n"
     "The put command retrieves a blob via stdin and sends it to the evr-glacier-storage.\n\n"
+    "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
     "The post-file command expects one file name argument for upload to the evr-glacier-storage.\n\n"
     "The watch command prints modified blob keys.";
 
@@ -62,8 +63,9 @@ static struct argp_option options[] = {
 #define cli_cmd_none 0
 #define cli_cmd_get 1
 #define cli_cmd_put 2
-#define cli_cmd_post_file 3
-#define cli_cmd_watch_blobs 4
+#define cli_cmd_get_file 3
+#define cli_cmd_post_file 4
+#define cli_cmd_watch_blobs 5
 
 struct cli_arguments {
     int cmd;
@@ -106,6 +108,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
                 cli_args->cmd = cli_cmd_get;
             } else if(strcmp("put", arg) == 0){
                 cli_args->cmd = cli_cmd_put;
+            } else if(strcmp("get-file", arg) == 0){
+                cli_args->cmd = cli_cmd_get_file;
             } else if(strcmp("post-file", arg) == 0){
                 cli_args->cmd = cli_cmd_post_file;
             } else if(strcmp("watch", arg) == 0){
@@ -116,7 +120,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             }
             break;
         case 1:
-            if(cli_args->cmd == cli_cmd_get){
+            if(cli_args->cmd == cli_cmd_get || cli_args->cmd == cli_cmd_get_file){
                 cli_args->key = arg;
             } else if(cli_args->cmd == cli_cmd_post_file){
                 cli_args->file = arg;
@@ -133,6 +137,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             argp_usage (state);
             return ARGP_ERR_UNKNOWN;
         case cli_cmd_get:
+        case cli_cmd_get_file:
         case cli_cmd_post_file:
             if (state->arg_num < 2) {
                 // not enough arguments
@@ -153,6 +158,10 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 
 int evr_cli_get(char *fmt_key);
 int evr_cli_put();
+int evr_cli_get_file(char *fmt_key);
+int evr_write_cmd_get_blob(int fd, evr_blob_key_t key);
+xmlDocPtr evr_read_claim_resp(int fd);
+int evr_read_resp_header(struct evr_resp_header *resp, int fd);
 int evr_cli_post_file(char *file);
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after);
 int evr_connect_to_storage();
@@ -176,6 +185,8 @@ int main(int argc, char **argv){
         return evr_cli_get(cli_args.key);
     case cli_cmd_put:
         return evr_cli_put();
+    case cli_cmd_get_file:
+        return evr_cli_get_file(cli_args.key);
     case cli_cmd_post_file:
         return evr_cli_post_file(cli_args.file);
     case cli_cmd_watch_blobs:
@@ -196,31 +207,13 @@ int evr_cli_get(char *fmt_key){
         log_error("Failed to connect to evr-glacier-storage server");
         goto fail;
     }
-    char buffer[max(evr_cmd_header_n_size, evr_resp_header_n_size)];
-    struct evr_cmd_header cmd;
-    cmd.type = evr_cmd_type_get_blob;
-    cmd.body_size = evr_blob_key_size;
-    if(evr_format_cmd_header(buffer, &cmd) != evr_ok){
-        goto cmd_format_fail;
-    }
-    log_debug("Sending get %s command to server", fmt_key);
-    // TODO combine the following two write_n calls into one as we
-    // want to only create one ip data packet and not two
-    if(write_n(c, buffer, evr_cmd_header_n_size) != evr_ok){
-        goto cmd_format_fail;
-    }
-    if(write_n(c, key, evr_blob_key_size) != evr_ok){
-        goto cmd_format_fail;
-    }
-    log_debug("Reading storage response");
-    if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
+    if(evr_write_cmd_get_blob(c, key) != evr_ok){
         goto cmd_format_fail;
     }
     struct evr_resp_header resp;
-    if(evr_parse_resp_header(&resp, buffer) != evr_ok){
+    if(evr_read_resp_header(&resp, c) != evr_ok){
         goto cmd_format_fail;
     }
-    log_debug("Storage responded with status code 0x%x and body size %d", resp.status_code, resp.body_size);
     if(resp.status_code == evr_status_code_blob_not_found){
         log_error("not found");
         goto cmd_format_fail;
@@ -228,7 +221,8 @@ int evr_cli_get(char *fmt_key){
         goto cmd_format_fail;
     }
     // read flags but don't use them
-    if(read_n(c, buffer, 1) != evr_ok){
+    char buf[1];
+    if(read_n(c, buf, sizeof(buf)) != evr_ok){
         goto cmd_format_fail;
     }
     if(pipe_n(STDOUT_FILENO, c, resp.body_size - 1) != evr_ok){
@@ -289,6 +283,166 @@ struct post_file_ctx {
 };
 
 int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0);
+
+int evr_cli_get_file(char *fmt_key){
+    int ret = evr_error;
+    evr_init_signatures();
+    xmlInitParser();
+    evr_blob_key_t key;
+    if(evr_parse_blob_key(key, fmt_key) != evr_ok){
+        goto out;
+    }
+    int c = evr_connect_to_storage();
+    if(c < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out;
+    }
+    if(evr_write_cmd_get_blob(c, key) != evr_ok){
+        goto out;
+    }
+    xmlDocPtr doc = evr_read_claim_resp(c);
+    if(!doc){
+        log_error("No XML document found in blob");
+        goto out;
+    }
+    xmlNode *cs = evr_get_root_claim_set(doc);
+    if(!cs){
+        log_error("No claim set found in blob");
+        goto out_with_free_doc;
+    }
+    xmlNode *fc = evr_first_claim(cs);
+    while(1){
+        if(!fc){
+            log_error("No file claim found in claim set");
+            goto out_with_free_doc;
+        }
+        if(evr_is_evr_element(fc, "file")){
+            break;
+        }
+        fc = evr_next_claim(fc);
+    }
+    xmlNode *fbody = evr_find_next_element(fc->children, "body");
+    if(!fbody){
+        log_error("No body found in file claim");
+        goto out_with_free_doc;
+    }
+    xmlNode *slice = evr_find_next_element(fbody->children, "slice");
+    evr_blob_key_t ref;
+    struct evr_resp_header resp;
+    char buf[1];
+    while(1){
+        if(!slice){
+            break;
+        }
+        char *fmt_ref = (char*)xmlGetProp(slice, BAD_CAST "ref");
+        if(!fmt_ref){
+            goto out_with_free_doc;
+        }
+        int pkret = evr_parse_blob_key(ref, fmt_ref);
+        xmlFree(fmt_ref);
+        if(pkret != evr_ok){
+            goto out_with_free_doc;
+        }
+        if(evr_write_cmd_get_blob(c, ref) != evr_ok){
+            goto out_with_free_doc;
+        }
+        if(evr_read_resp_header(&resp, c) != evr_ok){
+            goto out_with_free_doc;
+        }
+        if(resp.status_code != evr_status_code_ok){
+            evr_fmt_blob_key_t fmt_key;
+            evr_fmt_blob_key(fmt_key, ref);
+            log_error("Failed to fetch file slice blob with key %s. Response status code was 0x%02x.", fmt_key, resp.status_code);
+            goto out_with_free_doc;
+        }
+        // read flags but don't use them
+        if(read_n(c, buf, 1) != evr_ok){
+            goto out_with_free_doc;
+        }
+        if(pipe_n(STDOUT_FILENO, c, resp.body_size - 1) != evr_ok){
+            goto out_with_free_doc;
+        }
+        slice = evr_find_next_element(slice->next, "slice");
+    }
+    ret = evr_ok;
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out:
+    xmlCleanupParser();
+    return ret;
+}
+
+int evr_write_cmd_get_blob(int fd, evr_blob_key_t key){
+    int ret = evr_error;
+    char buf[evr_cmd_header_n_size + evr_blob_key_size];
+    struct evr_cmd_header cmd;
+    cmd.type = evr_cmd_type_get_blob;
+    cmd.body_size = evr_blob_key_size;
+    if(evr_format_cmd_header(buf, &cmd) != evr_ok){
+        goto out;
+    }
+    memcpy(&buf[evr_cmd_header_n_size], key, evr_blob_key_size);
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, key);
+        log_debug("Sending get %s command to server", fmt_key);
+    }
+#endif
+    if(write_n(fd, buf, sizeof(buf)) != evr_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+xmlDocPtr evr_read_claim_resp(int fd){
+    xmlDocPtr doc = NULL;
+    struct evr_resp_header resp;
+    if(evr_read_resp_header(&resp, fd) != evr_ok){
+        goto out;
+    }
+    if(resp.status_code != evr_status_code_ok){
+        log_error("Failed to read claim. Responded status code was 0x%02x", resp.status_code);
+        goto out;
+    }
+    char *buf = malloc(resp.body_size);
+    if(!buf){
+        goto out;
+    }
+    if(read_n(fd, buf, resp.body_size) != evr_ok){
+        goto out_with_free_buf;
+    }
+    struct dynamic_array *claim = NULL;
+    // first buf byte is blob flags which we ignore
+    const size_t flags_size = 1;
+    if(evr_verify(&claim, &buf[flags_size], resp.body_size - flags_size) != evr_ok){
+        goto out_with_free_buf;
+    }
+    doc = evr_parse_claim_set(claim->data, claim->size_used);
+    free(claim);
+ out_with_free_buf:
+    free(buf);
+ out:
+    return doc;
+}
+
+int evr_read_resp_header(struct evr_resp_header *resp, int fd){
+    int ret = evr_error;
+    log_debug("Reading storage response");
+    char buf[evr_resp_header_n_size];
+    if(read_n(fd, buf, sizeof(buf)) != evr_ok){
+        goto out;
+    }
+    if(evr_parse_resp_header(resp, buf) != evr_ok){
+        goto out;
+    }
+    log_debug("Storage responded with status code 0x%02x and body size %d", resp->status_code, resp->body_size);
+    ret = evr_ok;
+ out:
+    return ret;
+}
 
 int evr_cli_post_file(char *file){
     int ret = evr_error;

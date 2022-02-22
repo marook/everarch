@@ -118,4 +118,15 @@ int evr_is_evr_element(xmlNode *n, char *name);
  */
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node);
 
+/**
+ * evr_find_next_element searches for a node with name
+ * name_filter. Starting with n and following with every following
+ * sibling of n.
+ *
+ * name_filter can only match names in the everarch claims
+ * namespace. name_filter may be NULL if the element name filter
+ * should be ignored.
+ */
+xmlNode *evr_find_next_element(xmlNode *n, char *name_filter);
+
 #endif

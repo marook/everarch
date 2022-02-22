@@ -90,6 +90,29 @@ void test_evr_glacier_write_smal_blob(){
         assert_greater_then(last_modified, 1644937656);
         free(buffer);
     }
+    {
+        log_info("Write another unrelated blob");
+        void *buffer = malloc(256);
+        assert_not_null(buffer);
+        void *p = buffer;
+        struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
+        memset(wb->key, 2, evr_blob_key_size);
+        wb->flags = 0;
+        p = &wb[1];
+        wb->chunks = (char**)p;
+        p = (void*)(wb->chunks + 1);
+        wb->chunks[0] = (char*)p;
+        const char *data = "xxx";
+        size_t data_len = strlen(data);
+        memcpy(wb->chunks[0], data, data_len);
+        wb->size = data_len;
+        unsigned long long last_modified;
+        assert_zero(evr_glacier_append_blob(write_ctx, wb, &last_modified));
+        assert_equal(write_ctx->current_bucket_index, 1);
+        assert_equal(write_ctx->current_bucket_pos, 100);
+        assert_greater_then(last_modified, 1644937656);
+        free(buffer);
+    }
     struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
     assert_not_null(read_ctx);
     {
@@ -110,7 +133,7 @@ void test_evr_glacier_write_smal_blob(){
     {
         log_info("Read not existing key");
         evr_blob_key_t key;
-        memset(key, 2, evr_blob_key_size);
+        memset(key, 3, evr_blob_key_size);
         status_mock_ret = evr_ok;
         status_mock_expected_exists = 0;
         status_mock_expected_flags = 0;

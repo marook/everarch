@@ -22,13 +22,27 @@ evr-glacier-storage &
 spid=$!
 trap stop EXIT
 
+test_file_put_pop(){
+    local base_name="$1"
+    ref=`evr-glacier-cli post-file "files/${base_name}.txt"`
+    echo "evr-glacier-cli reported ref ${ref}"
+    claim=`evr-glacier-cli get ${ref}`
+    echo "claim: ${claim}"
+    if [[ -z "${claim}" ]]
+    then
+        echo "Claim was empty" >&2
+        exit 1
+    fi
+    echo "evr-glacier-cli get-file ${ref}"
+    evr-glacier-cli get-file "${ref}" > "files/${base_name}.get.txt"
+    echo "Comparing posted with get file"
+    diff "files/${base_name}.txt" "files/${base_name}.get.txt"
+}
+
 wait_for_glacier_storage
-ref=`evr-glacier-cli post-file './files/hello.txt'`
-echo "evr-glacier-cli reported ref ${ref}"
-claim=`evr-glacier-cli get ${ref}`
-echo "claim: ${claim}"
-if [[ -z "${claim}" ]]
-then
-    echo "Claim was empty" >&2
-    exit 1
-fi
+
+test_file_put_pop "hello"
+
+# produce a 32mb file
+dd if=/dev/random bs=4096 count=8192 of=files/big.txt
+test_file_put_pop "big"

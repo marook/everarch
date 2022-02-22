@@ -161,8 +161,6 @@ int evr_parse_created(time_t *t, xmlNode *node){
     return ret;
 }
 
-xmlNode *evr_find_next_element(xmlNode *n, char *name_filter);
-
 xmlNode *evr_first_claim(xmlNode *claim_set){
     return evr_find_next_element(claim_set->children, NULL);
 }

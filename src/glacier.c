@@ -168,7 +168,7 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
         goto end_with_open_bucket;
     }
     for(ssize_t bytes_read = 0; bytes_read < blob_size;){
-        ssize_t buffer_bytes_read = read(bucket_f, ctx->read_buffer, evr_read_buffer_size);
+        ssize_t buffer_bytes_read = read(bucket_f, ctx->read_buffer, min(evr_read_buffer_size, blob_size - bytes_read));
         if(buffer_bytes_read == -1){
             goto end_with_open_bucket;
         }

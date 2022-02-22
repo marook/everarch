@@ -19,6 +19,8 @@
 #ifndef __files_h__
 #define __files_h__
 
+#include "config.h"
+
 #include "dyn-mem.h"
 
 /**
