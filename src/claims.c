@@ -35,6 +35,12 @@ int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created){
     if(cs->writer == NULL){
         goto out_with_free_out;
     }
+    // claims must be indented because humans can better read it, but
+    // also because gpgme's sign operation truncates lines over ~20k
+    // characters length.
+    if(xmlTextWriterSetIndent(cs->writer, 1) != 0){
+        goto out_with_free_writer;
+    }
     if(xmlTextWriterStartDocument(cs->writer, NULL, evr_claim_encoding, NULL) < 0){
         goto out_with_free_writer;
     }

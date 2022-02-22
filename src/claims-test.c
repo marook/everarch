@@ -82,7 +82,31 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
     assert_ok(evr_init_claim_set(&cs, &t0));
     assert_ok(evr_append_file_claim(&cs, claim));
     assert_ok(evr_finalize_claim_set(&cs));
-    assert_not_null(strstr((char*)cs.out->content, expected_file_document));
+    char *content = (char*)cs.out->content;
+    size_t content_len = strlen(content);
+    char *stripped_content = malloc(content_len + 1);
+    char *src = content;
+    char *dst = stripped_content;
+    // 0 = within text
+    // 1 = newline followed of only spaces yet
+    int state = 0;
+    while(1){
+        if(*src == '\n'){
+            state = 1;
+        } else if(*src != ' ' && *src != '\n'){
+            state = 0;
+        }
+        if(state == 0){
+            *dst = *src;
+            ++dst;
+        }
+        ++src;
+        if(*src == '\0'){
+            break;
+        }
+    }
+    assert_not_null(strstr(stripped_content, expected_file_document));
+    free(stripped_content);
     assert_ok(evr_free_claim_set(&cs));
 }
 
