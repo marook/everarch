@@ -378,9 +378,10 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     struct post_file_ctx *ctx = ctx0;
     size_t allocated_slices_len = ctx->slices->size_allocated / sizeof(struct evr_file_slice);
     size_t used_slices_len = ctx->slices->size_used / sizeof(struct evr_file_slice);
-    if(allocated_slices_len >= used_slices_len){
+    if(allocated_slices_len <= used_slices_len){
         ctx->slices = grow_dynamic_array_at_least(ctx->slices, ctx->slices->size_allocated + 100 * sizeof(struct evr_file_slice));
         if(!ctx->slices){
+            log_error("Failed to grow slices buffer");
             goto out;
         }
         used_slices_len = ctx->slices->size_used / sizeof(struct evr_file_slice);
