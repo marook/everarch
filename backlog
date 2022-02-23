@@ -1,5 +1,3 @@
-* introduce index-rule claim flag
-add a flag bit which allows to declare claims for an indexer.
 * implement an evr-attr-index service
 watch a evr-glacier-storage server and build up an index of attr
 claims.

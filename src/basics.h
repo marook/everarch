@@ -34,4 +34,10 @@
  */
 #define evr_blob_flag_claim 0x01
 
+/**
+ * evr_blob_flag_index_rule_claim indicates the blob contains at least
+ * one claim which defines how an index should interpret claims.
+ */
+#define evr_blob_flag_index_rule_claim 0x02
+
 #endif
