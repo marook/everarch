@@ -148,6 +148,39 @@ void test_parse_file_claim_claim_set(){
     xmlFreeDoc(doc);
 }
 
+void test_parse_attr_def_claim(){
+    const char *buf =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<attr-def k=\"my-str-key\" type=\"str\"/>"
+        "<attr-def k=\"my-int-key\" type=\"int\"/>"
+        "<attr-def k=\"my-int-key\" type=\"yo-mama\"/>"
+        "</claim-set>\n";
+    size_t buf_size = strlen(buf);
+    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    assert_not_null(doc);
+    xmlNode *csn = evr_get_root_claim_set(doc);
+    assert_not_null(csn);
+    xmlNode *cn = evr_first_claim(csn);
+    assert_not_null(cn);
+    struct evr_attr_def_claim *c;
+    c = evr_parse_attr_def_claim(cn);
+    assert_not_null(c);
+    assert_str_eq(c->key, "my-str-key");
+    assert_int_eq(c->type, evr_type_str);
+    free(c);
+    cn = evr_next_claim(cn);
+    assert_not_null(cn);
+    c = evr_parse_attr_def_claim(cn);
+    assert_not_null(c);
+    assert_str_eq(c->key, "my-int-key");
+    assert_int_eq(c->type, evr_type_int);
+    free(c);
+    cn = evr_next_claim(cn);
+    assert_null(evr_parse_attr_def_claim(cn));
+    xmlFreeDoc(doc);
+}
+
 int main(){
     xmlInitParser();
     run_test(test_empty_claim_without_finalize);
@@ -156,6 +189,7 @@ int main(){
     run_test(test_file_claim_with_null_filename);
     run_test(test_file_claim_with_empty_filename);
     run_test(test_parse_file_claim_claim_set);
+    run_test(test_parse_attr_def_claim);
     xmlCleanupParser();
     return 0;
 }

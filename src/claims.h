@@ -64,6 +64,14 @@ struct evr_file_claim {
     struct evr_file_slice *slices;
 };
 
+#define evr_type_str 0x01
+#define evr_type_int 0x02
+
+struct evr_attr_def_claim {
+    char *key;
+    int type;
+};
+
 int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created);
 
 int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim *claim);
@@ -117,6 +125,8 @@ int evr_is_evr_element(xmlNode *n, char *name);
  * free the returned evr_file_claim.
  */
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node);
+
+struct evr_attr_def_claim *evr_parse_attr_def_claim(xmlNode *claim_node);
 
 /**
  * evr_find_next_element searches for a node with name

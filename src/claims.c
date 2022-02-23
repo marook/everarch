@@ -268,6 +268,43 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     return NULL;
 }
 
+struct evr_attr_def_claim *evr_parse_attr_def_claim(xmlNode *claim_node){
+    struct evr_attr_def_claim *c = NULL;
+    char *key = (char*)xmlGetProp(claim_node, BAD_CAST "k");
+    if(!key){
+        goto out;
+    }
+    char *type_name = (char*)xmlGetProp(claim_node, BAD_CAST "type");
+    if(!type_name){
+        goto out_with_free_key;
+    }
+    int type;
+    if(strcmp(type_name, "str") == 0){
+        type = evr_type_str;
+    } else if(strcmp(type_name, "int") == 0){
+        type = evr_type_int;
+    } else {
+        log_error("Found unknown type '%s' in attr-def claim", type_name);
+        goto out_with_free_type_name;
+    }
+    size_t key_size = strlen(key) + 1;
+    char *buf = malloc(sizeof(struct evr_attr_def_claim) + key_size);
+    if(!buf){
+        goto out_with_free_type_name;
+    }
+    c = (struct evr_attr_def_claim*)buf;
+    buf = (char*)&((struct evr_attr_def_claim*)buf)[1];
+    c->key = buf;
+    memcpy(c->key, key, key_size);
+    c->type = type;
+ out_with_free_type_name:
+    xmlFree(type_name);
+ out_with_free_key:
+    xmlFree(key);
+ out:
+    return c;
+}
+
 xmlNode *evr_find_next_element(xmlNode *n, char *name_filter){
     for(xmlNode *c = n; c; c = c->next){
         if(c->type != XML_ELEMENT_NODE){

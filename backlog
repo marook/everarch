@@ -1,4 +1,3 @@
-* add struct and parser for attr-def claim
 * add struct and parser for attr claim
 * add functions for accessing attr-mapping
 ** one function for accessing the stylesheet
