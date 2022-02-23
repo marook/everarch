@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    file-attr-rule.xml contains a attr-rule claim which transforms
-    file claims into attr claims.
+    file-attr-mapping.xml contains a attr-mapping claim which
+    transforms file claims into attr claims.
 -->
-<evr:attr-rule
+<evr:attr-mapping
     xmlns:evr="https://evr.ma300k.de/claims/"
     target-ns="https://evr.ma300k.de/claims/"
     target-name="file"
@@ -22,4 +22,4 @@
       </evr:attr>
     </xsl:template>
   </xsl:stylesheet>
-</evr:attr-rule>
+</evr:attr-mapping>
