@@ -19,6 +19,8 @@
 #ifndef __evr_keys_h__
 #define __evr_keys_h__
 
+#include "config.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

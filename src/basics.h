@@ -19,6 +19,8 @@
 #ifndef __basics_h__
 #define __basics_h__
 
+#include "config.h"
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) < (b) ? (b) : (a))
 
@@ -39,5 +41,15 @@
  * one claim which defines how an index should interpret claims.
  */
 #define evr_blob_flag_index_rule_claim 0x02
+
+/**
+ * evr_trim will make start and end point to a whitespace trimmed part
+ * of s. end points to the character after the last non whitespace
+ * character.
+ *
+ * On pure whitespace strings start and end will point to the same
+ * address.
+ */
+void evr_trim(char **start, char **end, char *s);
 
 #endif

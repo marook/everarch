@@ -19,6 +19,8 @@
 #ifndef __dyn_mem_h__
 #define __dyn_mem_h__
 
+#include "config.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 

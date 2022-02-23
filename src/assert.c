@@ -125,6 +125,10 @@ void assert_int_eq(int actual, int expected){
     assert_eq("%d");
 }
 
+void assert_p_eq(void *actual, void *expected){
+    assert_eq("%p");
+}
+
 void assert_size_eq(size_t actual, size_t expected){
     assert_eq("%ld");
 }

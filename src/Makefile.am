@@ -1,6 +1,7 @@
 AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
 
 bin_PROGRAMS = \
+	basics-test \
 	claims-test \
 	concurrent-glacier-test \
 	dyn-mem-test \
@@ -12,6 +13,11 @@ bin_PROGRAMS = \
 	keys-test \
 	rollsum-test \
 	signatures-test
+
+basics_test_SOURCES = \
+	assert.c \
+	basics.c \
+	basics-test.c
 
 claims_test_SOURCES = \
 	assert.c \
