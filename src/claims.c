@@ -305,6 +305,108 @@ struct evr_attr_def_claim *evr_parse_attr_def_claim(xmlNode *claim_node){
     return c;
 }
 
+struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
+    struct evr_attr_claim *c = NULL;
+    char *fmt_ref = (char*)xmlGetProp(claim_node, BAD_CAST "ref");
+    if(!fmt_ref){
+        goto out;
+    }
+    evr_blob_key_t ref;
+    int parse_ref_ret = evr_parse_blob_key(ref, fmt_ref);
+    xmlFree(fmt_ref);
+    if(parse_ref_ret != evr_ok){
+        goto out;
+    }
+    size_t attr_count = 0;
+    size_t attr_str_size_sum = 0;
+    xmlNode *attr = claim_node->children;
+    while(1){
+        attr = evr_find_next_element(attr, "a");
+        if(!attr){
+            break;
+        }
+        ++attr_count;
+        char *key = (char*)xmlGetProp(attr, BAD_CAST "k");
+        if(!key){
+            log_error("attr claim's a element is missing k attribute");
+            goto out;
+        }
+        attr_str_size_sum += strlen(key) + 1;
+        xmlFree(key);
+        char *value = (char*)xmlGetProp(attr, BAD_CAST "v");
+        if(value){
+            attr_str_size_sum += strlen(value) + 1;
+            xmlFree(value);
+        }
+        attr = attr->next;
+    }
+    char *buf = malloc(sizeof(struct evr_attr_claim) + attr_count * sizeof(struct evr_attr) + attr_str_size_sum);
+    if(!buf){
+        goto out;
+    }
+    c = (struct evr_attr_claim *)buf;
+    buf = (char *)&((struct evr_attr_claim*)buf)[1];
+    memcpy(c->ref, ref, evr_blob_key_size);
+    c->attr_len = attr_count;
+    c->attr = (struct evr_attr *)buf;
+    buf = (char *)&((struct evr_attr*)buf)[attr_count];
+    struct evr_attr *next_attr = c->attr;
+    attr = claim_node->children;
+    while(1){
+        attr = evr_find_next_element(attr, "a");
+        if(!attr){
+            break;
+        }
+        char *op_str = (char*)xmlGetProp(attr, BAD_CAST "op");
+        if(!op_str){
+            log_error("Operator is missing on attr");
+            goto fail_with_free_c;
+        }
+        int op;
+        if(strcmp(op_str, "=") == 0){
+            op = evr_attr_op_replace;
+        } else if(strcmp(op_str, "+") == 0){
+            op = evr_attr_op_add;
+        } else if(strcmp(op_str, "-") == 0){
+            op = evr_attr_op_rm;
+        } else {
+            log_error("Unknown attr operator '%s'", op_str);
+            xmlFree(op_str);
+            goto fail_with_free_c;
+        }
+        xmlFree(op_str);
+        char *key = (char*)xmlGetProp(attr, BAD_CAST "k");
+        if(!key){
+            // no logging here because the size calculation above
+            // already checks the presence of k
+            goto fail_with_free_c;
+        }
+        char *value = (char*)xmlGetProp(attr, BAD_CAST "v");
+        next_attr->op = op;
+        size_t key_size = strlen(key) + 1;
+        next_attr->key = buf;
+        memcpy(next_attr->key, key, key_size);
+        buf += key_size;
+        if(value){
+            next_attr->value = buf;
+            size_t value_size = strlen(value) + 1;
+            memcpy(next_attr->value, value, value_size);
+            buf += value_size;
+        } else {
+            next_attr->value = NULL;
+        }
+        xmlFree(value);
+        xmlFree(key);
+        ++next_attr;
+        attr = attr->next;
+    }
+ out:
+    return c;
+ fail_with_free_c:
+    free(c);
+    return NULL;
+}
+
 xmlNode *evr_find_next_element(xmlNode *n, char *name_filter){
     for(xmlNode *c = n; c; c = c->next){
         if(c->type != XML_ELEMENT_NODE){

@@ -72,6 +72,22 @@ struct evr_attr_def_claim {
     int type;
 };
 
+#define evr_attr_op_replace 0x01
+#define evr_attr_op_add 0x02
+#define evr_attr_op_rm 0x03
+
+struct evr_attr {
+    int op;
+    char *key;
+    char *value;
+};
+
+struct evr_attr_claim {
+    evr_blob_key_t ref;
+    size_t attr_len;
+    struct evr_attr *attr;
+};
+
 int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created);
 
 int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim *claim);
@@ -127,6 +143,8 @@ int evr_is_evr_element(xmlNode *n, char *name);
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node);
 
 struct evr_attr_def_claim *evr_parse_attr_def_claim(xmlNode *claim_node);
+
+struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node);
 
 /**
  * evr_find_next_element searches for a node with name

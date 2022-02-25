@@ -7,7 +7,6 @@ Usage: evr-glacier-cli [OPTION...] CMD
 Try `evr-glacier-cli --help' or `evr-glacier-cli --usage' for more
 information.
 #+END_SRC
-* add struct and parser for attr claim
 * add functions for accessing attr-mapping
 ** one function for accessing the stylesheet
 ** one struct and parser function for extracting target element
