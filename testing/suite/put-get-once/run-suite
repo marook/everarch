@@ -47,11 +47,17 @@ lwpid=$!
 ( evr-glacier-cli watch --last-modified-after 0 > past-watch.actual.log ) &
 pwpid=$!
 
+now=`date +%s`
+future=`expr 1000 + ${now}`
+( evr-glacier-cli watch --last-modified-after "${future}" > future-watch.actual.log ) &
+fwpid=$!
+
 sleep 1
 
 kill "${ewpid}"
 kill "${lwpid}"
 kill "${pwpid}"
+kill "${fwpid}"
 
 if [[ -s late-watch.actual.log ]]
 then
@@ -69,3 +75,10 @@ do
         exit 1
     fi
 done
+
+if [[ -s future-watch.actual.log ]]
+then
+    echo "Expected future-watch.actual.log to be empty but was:" >&2
+    cat future-watch.actual.log >&2
+    exit 1
+fi

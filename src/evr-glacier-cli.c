@@ -92,7 +92,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
     case 'm': {
         size_t arg_len = strlen(arg);
         size_t parsed_len = sscanf(arg, "%llu", &cli_args->last_modified_after);
-        if(arg_len == 0 || arg_len != parsed_len){
+        if(arg_len == 0 || parsed_len != 1){
             argp_usage(state);
             return ARGP_ERR_UNKNOWN;
         }
@@ -580,7 +580,7 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
-    log_debug("Sending watch command to server with flags filter %02x and last_modified_after %llu", f.flags_filter, f.last_modified_after);
+    log_debug("Sending watch command to server with flags filter 0x%02x and last_modified_after %llu", f.flags_filter, f.last_modified_after);
     if(write_n(c, buf, evr_cmd_header_n_size + evr_blob_filter_n_size) != evr_ok){
         goto out_with_close_c;
     }
@@ -591,7 +591,7 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
     if(evr_parse_resp_header(&resp, buf) != evr_ok){
         goto out_with_close_c;
     }
-    log_debug("Storage responded with status code 0x%x and body size %d", resp.status_code, resp.body_size);
+    log_debug("Storage responded with status code 0x%02x and body size %d", resp.status_code, resp.body_size);
     if(resp.status_code != evr_status_code_ok){
         goto out_with_close_c;
     }

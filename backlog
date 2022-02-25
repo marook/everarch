@@ -1,12 +1,3 @@
-* watch with current last-modified-after value fails :bug:
-the following call fails:
-
-#+BEGIN_SRC
-$ ./src/evr-glacier-cli --last-modified-after=1645687978 watch
-Usage: evr-glacier-cli [OPTION...] CMD
-Try `evr-glacier-cli --help' or `evr-glacier-cli --usage' for more
-information.
-#+END_SRC
 * add functions for accessing attr-mapping
 ** one function for accessing the stylesheet
 ** one struct and parser function for extracting target element
