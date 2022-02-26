@@ -1,7 +1,5 @@
-* add functions for accessing attr-mapping
-** one function for accessing the stylesheet
-** one struct and parser function for extracting target element
-* add functions for transforming claims using attr-mapping
+* add struct and parser for mapping
+* add functions to perform mapping
 * define query language and result format for evr-attr-index server
 something like "tag:peng color:blue" or "-tag:nsfw" or
 "tag:todo || tag:backlog"
