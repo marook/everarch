@@ -646,15 +646,16 @@ int evr_stat_and_put(int c, evr_blob_key_t key, int flags, struct chunk_set *blo
     evr_fmt_blob_key(fmt_key, key);
 #endif
     {
-        char *p = buffer;
+        struct evr_buf_pos bp;
+        evr_init_buf_pos(&bp, buffer);
         struct evr_cmd_header cmd;
         cmd.type = evr_cmd_type_stat_blob;
         cmd.body_size = evr_blob_key_size;
-        if(evr_format_cmd_header(p, &cmd) != evr_ok){
+        if(evr_format_cmd_header(bp.pos, &cmd) != evr_ok){
             goto out;
         }
-        p += evr_cmd_header_n_size;
-        memcpy(p, key, evr_blob_key_size);
+        bp.pos += evr_cmd_header_n_size;
+        evr_push_n(&bp, key, evr_blob_key_size);
         log_debug("Sending stat %s command", fmt_key);
         if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size) != evr_ok){
             goto out;
