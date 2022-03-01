@@ -1,5 +1,8 @@
-* add struct and parser for mapping
-* add functions to perform mapping
+* add struct and parser for claim-attributes
+** compost struct evr_attr_def_claim
+* add functions to perform claim-attributes stlyesheet mapping
+later the index will need to read xml claim documents and transform
+them using the xslt stylesheet from the claim-attributes.
 * define query language and result format for evr-attr-index server
 something like "tag:peng color:blue" or "-tag:nsfw" or
 "tag:todo || tag:backlog"

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    claim-attributes.xml contains a attr index definition claim.
+
+    attr-def elements define the type of certain attribute values.
+
+    It is used to map any claim into evr attr claims using a stylesheet
+    and make them indexable by the attr index.
+-->
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="1970-01-01T00:00:07Z"
+    >
+  <claim-attributes>
+    <attr-def k="tag" type="str"/>
+    <attr-def k="body-size" type="int"/>
+    <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+  </claim-attributes>
+</claim-set>
