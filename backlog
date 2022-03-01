@@ -1,6 +1,19 @@
-* add functions to perform claim-attributes stlyesheet mapping
-later the index will need to read xml claim documents and transform
-them using the xslt stylesheet from the claim-attributes.
+* add 'end of batch' flag in watch responses
+* implement an evr-attr-index service skeleton
+* add index claim watch thread to evr-attr-index
+should watch a glacier for index claims. should parse all index claims
+and keep the one with the latest created date in a batch.
+
+should fetch and xml parse the xslt for the index claim.
+
+index claim and xslt should be provided to consumers.
+* add index populate thread to evr-attr-index
+should wait for index claims from index claim watch thread.
+
+then build a sqlite index db based on index claim. watch a glacier for
+claims and populate the sqlite db until the batch ends.
+
+the recent sqlite db should be provided do consumers.
 * define query language and result format for evr-attr-index server
 something like "tag:peng color:blue" or "-tag:nsfw" or
 "tag:todo || tag:backlog"
@@ -14,11 +27,6 @@ would shadow a ref attribute defined in a claim.
 ** TODO how can we defined what kind of results we want?
 maybe only a limited set of attributes is required? maybe some
 aggregation functions should be invoked?
-* implement an evr-attr-index service
-watch a evr-glacier-storage server and build up an index of attr
-claims.
-** TODO walk attr-defs and build custom sqlite db
-** TODO walk claims, transform them and populate sqlite db
 * evr-attr-index should listen on a socket for querries
 * introduce evr-attr-cli cmd with index query feature
 command line client which sends querries to a evr-attr-index and lists
