@@ -67,9 +67,15 @@ struct evr_file_claim {
 #define evr_type_str 0x01
 #define evr_type_int 0x02
 
-struct evr_attr_def_claim {
+struct evr_attr_def {
     char *key;
     int type;
+};
+
+struct evr_attr_spec_claim {
+    size_t attr_def_len;
+    struct evr_attr_def *attr_def;
+    evr_blob_key_t stylesheet_blob_ref;
 };
 
 #define evr_attr_op_replace 0x01
@@ -133,6 +139,8 @@ xmlNode *evr_next_claim(xmlNode *claim_node);
 
 int evr_is_evr_element(xmlNode *n, char *name);
 
+struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node);
+
 /**
  * evr_parse_file_claim parses a claim node into a struct
  * evr_file_claim.
@@ -141,8 +149,6 @@ int evr_is_evr_element(xmlNode *n, char *name);
  * free the returned evr_file_claim.
  */
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node);
-
-struct evr_attr_def_claim *evr_parse_attr_def_claim(xmlNode *claim_node);
 
 struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node);
 

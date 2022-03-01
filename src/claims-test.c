@@ -148,39 +148,6 @@ void test_parse_file_claim_claim_set(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_def_claim(){
-    const char *buf =
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
-        "<attr-def k=\"my-str-key\" type=\"str\"/>"
-        "<attr-def k=\"my-int-key\" type=\"int\"/>"
-        "<attr-def k=\"my-int-key\" type=\"yo-mama\"/>"
-        "</claim-set>\n";
-    size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
-    xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
-    xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
-    struct evr_attr_def_claim *c;
-    c = evr_parse_attr_def_claim(cn);
-    assert_not_null(c);
-    assert_str_eq(c->key, "my-str-key");
-    assert_int_eq(c->type, evr_type_str);
-    free(c);
-    cn = evr_next_claim(cn);
-    assert_not_null(cn);
-    c = evr_parse_attr_def_claim(cn);
-    assert_not_null(c);
-    assert_str_eq(c->key, "my-int-key");
-    assert_int_eq(c->type, evr_type_int);
-    free(c);
-    cn = evr_next_claim(cn);
-    assert_null(evr_parse_attr_def_claim(cn));
-    xmlFreeDoc(doc);
-}
-
 void test_parse_attr_claim(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -217,6 +184,39 @@ void test_parse_attr_claim(){
     xmlFreeDoc(doc);
 }
 
+void test_parse_attr_spec_claim(){
+    const char *buf =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<attr-spec>"
+        "<attr-def k=\"tag\" type=\"str\"/>"
+        "<attr-def k=\"body-size\" type=\"int\"/>"
+        "<stylesheet blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
+        "</attr-spec>"
+        "</claim-set>\n";
+    size_t buf_size = strlen(buf);
+    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    assert_not_null(doc);
+    xmlNode *csn = evr_get_root_claim_set(doc);
+    assert_not_null(csn);
+    xmlNode *cn = evr_first_claim(csn);
+    assert_not_null(cn);
+    struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
+    assert_not_null(c);
+    assert_int_eq(c->attr_def_len, 2);
+    struct evr_attr_def *tag_def = &c->attr_def[0];
+    assert_str_eq(tag_def->key, "tag");
+    assert_int_eq(tag_def->type, evr_type_str);
+    struct evr_attr_def *size_def = &c->attr_def[1];
+    assert_str_eq(size_def->key, "body-size");
+    assert_int_eq(size_def->type, evr_type_int);
+    evr_fmt_blob_key_t fmt_stylesheet_blob_ref;
+    evr_fmt_blob_key(fmt_stylesheet_blob_ref, c->stylesheet_blob_ref);
+    assert_str_eq(fmt_stylesheet_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
+    free(c);
+    xmlFreeDoc(doc);
+}
+
 int main(){
     xmlInitParser();
     run_test(test_empty_claim_without_finalize);
@@ -225,8 +225,8 @@ int main(){
     run_test(test_file_claim_with_null_filename);
     run_test(test_file_claim_with_empty_filename);
     run_test(test_parse_file_claim_claim_set);
-    run_test(test_parse_attr_def_claim);
     run_test(test_parse_attr_claim);
+    run_test(test_parse_attr_spec_claim);
     xmlCleanupParser();
     return 0;
 }

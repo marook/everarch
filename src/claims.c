@@ -18,6 +18,7 @@
 
 #include "claims.h"
 
+#include "basics.h"
 #include "errors.h"
 #include "logger.h"
 
@@ -191,6 +192,94 @@ int evr_is_evr_element(xmlNode *n, char *name){
     return ret;
 }
 
+struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
+    struct evr_attr_spec_claim *c = NULL;
+    size_t attr_def_count = 0;
+    size_t attr_def_str_size_sum = 0;
+    xmlNode *attr_def_node = claim_node->children;
+    while(1){
+        attr_def_node = evr_find_next_element(attr_def_node, "attr-def");
+        if(!attr_def_node){
+            break;
+        }
+        ++attr_def_count;
+        char *key = (char*)xmlGetProp(attr_def_node, BAD_CAST "k");
+        if(!key){
+            log_error("attr-def is missing k attribute");
+            goto out;
+        }
+        attr_def_str_size_sum += strlen(key) + 1;
+        xmlFree(key);
+        attr_def_node = attr_def_node->next;
+    }
+    xmlNode *stylesheet_node = evr_find_next_element(claim_node->children, "stylesheet");
+    if(!stylesheet_node){
+        log_error("Missing stylesheet element in attr-spec claim");
+        goto out;
+    }
+    char *fmt_stylesheet_ref = (char*)xmlGetProp(stylesheet_node, BAD_CAST "blob");
+    evr_blob_key_t stylesheet_ref;
+    int parse_stylesheet_ref_result = evr_parse_blob_key(stylesheet_ref, fmt_stylesheet_ref);
+    xmlFree(fmt_stylesheet_ref);
+    if(parse_stylesheet_ref_result != evr_ok){
+        goto out;
+    }
+    struct evr_buf_pos bp;
+    evr_malloc_buf_pos(&bp, sizeof(struct evr_attr_spec_claim) + attr_def_count * sizeof(struct evr_attr_def) + attr_def_str_size_sum);
+    if(!bp.buf){
+        goto out;
+    }
+    c = (struct evr_attr_spec_claim*)bp.pos;
+    bp.pos += sizeof(struct evr_attr_spec_claim);
+    c->attr_def_len = attr_def_count;
+    c->attr_def = (struct evr_attr_def*)bp.pos;
+    bp.pos += attr_def_count * sizeof(struct evr_attr_def);
+    memcpy(c->stylesheet_blob_ref, stylesheet_ref, evr_blob_key_size);
+    struct evr_attr_def *next_attr_def = c->attr_def;
+    attr_def_node = claim_node->children;
+    while(1){
+        attr_def_node = evr_find_next_element(attr_def_node, "attr-def");
+        if(!attr_def_node){
+            break;
+        }
+        char *type_name = (char*)xmlGetProp(attr_def_node, BAD_CAST "type");
+        if(!type_name){
+            log_error("attr-def is missing type attribute");
+            goto fail_with_free_c;
+        }
+        int type;
+        if(strcmp(type_name, "str") == 0){
+            type = evr_type_str;
+        } else if(strcmp(type_name, "int") == 0){
+            type = evr_type_int;
+        } else {
+            log_error("Found unknown type '%s' in attr-def", type_name);
+            xmlFree(type_name);
+            goto fail_with_free_c;
+        }
+        xmlFree(type_name);
+        char *key = (char*)xmlGetProp(attr_def_node, BAD_CAST "k");
+        if(!key){
+            goto fail_with_free_c;
+        }
+        size_t key_size = strlen(key) + 1;
+        next_attr_def->key = bp.pos;
+        bp.pos += key_size;
+        memcpy(next_attr_def->key, key, key_size);
+        xmlFree(key);
+        next_attr_def->type = type;
+        ++next_attr_def;
+        attr_def_node = attr_def_node->next;
+    }
+ out:
+    return c;
+ fail_with_free_c:
+    free(c);
+    return NULL;
+}
+
+size_t evr_count_elements(xmlNode *start, char *name);
+
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     struct evr_file_claim *c = NULL;
     char *title = (char*)xmlGetNsProp(claim_node, BAD_CAST "title", BAD_CAST evr_dc_ns);
@@ -202,17 +291,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     if(!body){
         goto out_with_free_title;
     }
-    size_t slices_count = 0;
-    xmlNode *slice = body->children;
-    while(1){
-        slice = evr_find_next_element(slice, "slice");
-        if(slice){
-            ++slices_count;
-            slice = slice->next;
-        } else {
-            break;
-        }
-    }
+    size_t slices_count = evr_count_elements(body->children, "slice");
     size_t title_size = strlen(title) + 1;
     char *buf = malloc(sizeof(struct evr_file_claim) + title_size + slices_count * sizeof(struct evr_file_slice));
     if(!buf){
@@ -226,7 +305,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     c->slices_len = slices_count;
     c->slices = (struct evr_file_slice*)buf;
     int si = 0;
-    slice = body->children;
+    xmlNode *slice = body->children;
     while(1){
         slice = evr_find_next_element(slice, "slice");
         if(!slice){
@@ -268,41 +347,18 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     return NULL;
 }
 
-struct evr_attr_def_claim *evr_parse_attr_def_claim(xmlNode *claim_node){
-    struct evr_attr_def_claim *c = NULL;
-    char *key = (char*)xmlGetProp(claim_node, BAD_CAST "k");
-    if(!key){
-        goto out;
+size_t evr_count_elements(xmlNode *start, char *name){
+    size_t count = 0;
+    while(1){
+        start = evr_find_next_element(start, name);
+        if(start){
+            ++count;
+            start = start->next;
+        } else {
+            break;
+        }
     }
-    char *type_name = (char*)xmlGetProp(claim_node, BAD_CAST "type");
-    if(!type_name){
-        goto out_with_free_key;
-    }
-    int type;
-    if(strcmp(type_name, "str") == 0){
-        type = evr_type_str;
-    } else if(strcmp(type_name, "int") == 0){
-        type = evr_type_int;
-    } else {
-        log_error("Found unknown type '%s' in attr-def claim", type_name);
-        goto out_with_free_type_name;
-    }
-    size_t key_size = strlen(key) + 1;
-    char *buf = malloc(sizeof(struct evr_attr_def_claim) + key_size);
-    if(!buf){
-        goto out_with_free_type_name;
-    }
-    c = (struct evr_attr_def_claim*)buf;
-    buf = (char*)&((struct evr_attr_def_claim*)buf)[1];
-    c->key = buf;
-    memcpy(c->key, key, key_size);
-    c->type = type;
- out_with_free_type_name:
-    xmlFree(type_name);
- out_with_free_key:
-    xmlFree(key);
- out:
-    return c;
+    return count;
 }
 
 struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){

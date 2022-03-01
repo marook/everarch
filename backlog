@@ -1,5 +1,3 @@
-* add struct and parser for claim-attributes
-** compost struct evr_attr_def_claim
 * add functions to perform claim-attributes stlyesheet mapping
 later the index will need to read xml claim documents and transform
 them using the xslt stylesheet from the claim-attributes.
