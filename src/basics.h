@@ -52,4 +52,57 @@
  */
 void evr_trim(char **start, char **end, char *s);
 
+struct evr_buf_pos {
+    char *buf;
+    char *pos;
+};
+
+#define evr_init_buf_pos(bp, buffer)            \
+    do {                                        \
+        (bp)->buf = (buffer);                   \
+        (bp)->pos = (buffer);                   \
+    } while(0)
+
+#define evr_malloc_buf_pos(bp, size)            \
+    do {                                        \
+        (bp)->buf = malloc(size);               \
+        (bp)->pos = (bp)->buf;                  \
+    } while(0)
+
+#define evr_pull_as(bp, val, type)              \
+    do {                                        \
+        *(val) = *(type*)((bp)->pos);           \
+        (bp)->pos += sizeof(type);              \
+    } while(0)
+
+#define evr_pull_n(bp, val, size)               \
+    do {                                        \
+        memcpy(val, (bp)->pos, size);           \
+        (bp)->pos += size;                      \
+    } while(0)
+
+#define evr_pull_map(bp, val, type, map)        \
+    do {                                        \
+        evr_pull_as(bp, val, type);             \
+        *(val) = map(*(val));                   \
+    } while(0)
+
+#define evr_push_as(bp, val, type)              \
+    do {                                        \
+        *(type*)((bp)->pos) = *val;             \
+        (bp)->pos += sizeof(type);              \
+    } while (0)
+
+#define evr_push_n(bp, val, size)               \
+    do {                                        \
+        memcpy((bp)->pos, val, size);           \
+        (bp)->pos += size;                      \
+    } while (0)
+
+#define evr_push_map(bp, val, type, map)        \
+    do {                                        \
+        type tmp = map(*(val));                 \
+        evr_push_as(bp, &tmp, type);            \
+    } while (0)
+
 #endif

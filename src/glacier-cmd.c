@@ -18,72 +18,70 @@
 
 #include "glacier-cmd.h"
 
+#include "basics.h"
 #include "errors.h"
 
-#define pull_p(type)                       \
-    *(type*)p;                             \
-    p = (char*)&((type*)p)[1];
-
-#define pull_p_map(type, map)                   \
-    map(*(type*)p);                             \
-    p = (char*)&((type*)p)[1];
-
-#define push_p(type, target)                    \
-    *(type*)p = target;                         \
-    p = (char*)&((type*)p)[1];
-
-int evr_parse_cmd_header(struct evr_cmd_header *header, const char *buffer){
-    const char *p = buffer;
-    header->type = pull_p(uint8_t);
-    header->body_size = pull_p_map(uint32_t, be32toh);
+int evr_parse_cmd_header(struct evr_cmd_header *header, char *buffer){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buffer);
+    evr_pull_as(&bp, &header->type, uint8_t);
+    evr_pull_map(&bp, &header->body_size, uint32_t, be32toh);
     return evr_ok;
 }
 
 int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header){
-    char *p = buffer;
-    push_p(uint8_t, header->type);
-    push_p(uint32_t, htobe32(header->body_size));
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buffer);
+    evr_push_as(&bp, &header->type, uint8_t);
+    uint32_t tmp = htobe32(header->body_size);
+    evr_push_as(&bp, &tmp, uint32_t);
     return evr_ok;
 }
 
-int evr_parse_resp_header(struct evr_resp_header *header, const char *buffer){
-    const char *p = buffer;
-    header->status_code = pull_p(uint8_t);
-    header->body_size = pull_p_map(uint32_t, be32toh);
+int evr_parse_resp_header(struct evr_resp_header *header, char *buffer){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buffer);
+    evr_pull_as(&bp, &header->status_code, uint8_t);
+    evr_pull_map(&bp, &header->body_size, uint32_t, be32toh);
     return evr_ok;
 }
 
 int evr_format_resp_header(char *buffer, const struct evr_resp_header *header){
-    char *p = buffer;
-    push_p(uint8_t, header->status_code);
-    push_p(uint32_t, htobe32(header->body_size));
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buffer);
+    evr_push_as(&bp, &header->status_code, uint8_t);
+    evr_push_map(&bp, &header->body_size, uint32_t, htobe32);
     return evr_ok;
 }
 
-int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, const char *buf){
-    const char *p = buf;
-    resp->flags = pull_p(uint8_t);
-    resp->blob_size = pull_p_map(uint32_t, be32toh);
+int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, char *buf){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_pull_as(&bp, &resp->flags, uint8_t);
+    evr_pull_map(&bp, &resp->blob_size, uint32_t, be32toh);
     return evr_ok;
 }
 
 int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp){
-    char *p = buf;
-    push_p(uint8_t, resp->flags);
-    push_p(uint32_t, resp->blob_size);
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_push_as(&bp, &resp->flags, uint8_t);
+    evr_push_map(&bp, &resp->blob_size, uint32_t, htobe32);
     return evr_ok;
 }
 
-int evr_parse_blob_filter(struct evr_blob_filter *f, const char *buf){
-    const char *p = buf;
-    f->flags_filter = pull_p(uint8_t);
-    f->last_modified_after = pull_p_map(uint64_t, be64toh);
+int evr_parse_blob_filter(struct evr_blob_filter *f, char *buf){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_pull_as(&bp, &f->flags_filter, uint8_t);
+    evr_pull_map(&bp, &f->last_modified_after, uint64_t, be64toh);
     return evr_ok;
 }
 
 int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f){
-    char *p = buf;
-    push_p(uint8_t, f->flags_filter);
-    push_p(uint64_t, htobe64(f->last_modified_after));
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_push_as(&bp, &f->flags_filter, uint8_t);
+    evr_push_map(&bp, &f->last_modified_after, uint64_t, htobe64);
     return evr_ok;
 }

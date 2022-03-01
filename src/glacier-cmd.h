@@ -99,7 +99,7 @@ struct evr_cmd_header {
  */
 #define evr_cmd_header_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
-int evr_parse_cmd_header(struct evr_cmd_header *header, const char *buffer);
+int evr_parse_cmd_header(struct evr_cmd_header *header, char *buffer);
 int evr_format_cmd_header(char *buffer, const struct evr_cmd_header *header);
 
 #define evr_status_code_ok 0x20
@@ -119,7 +119,7 @@ struct evr_resp_header {
  */
 #define evr_resp_header_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
-int evr_parse_resp_header(struct evr_resp_header *header, const char *buffer);
+int evr_parse_resp_header(struct evr_resp_header *header, char *buffer);
 int evr_format_resp_header(char *buffer, const struct evr_resp_header *header);
 
 struct evr_stat_blob_resp {
@@ -129,7 +129,7 @@ struct evr_stat_blob_resp {
 
 #define evr_stat_blob_resp_n_size (sizeof(uint8_t) + sizeof(uint32_t))
 
-int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, const char *buf);
+int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, char *buf);
 int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp);
 
 struct evr_blob_filter {
@@ -154,7 +154,7 @@ struct evr_blob_filter {
 
 #define evr_blob_filter_n_size (sizeof(uint8_t) + sizeof(uint64_t))
 
-int evr_parse_blob_filter(struct evr_blob_filter *f, const char *buf);
+int evr_parse_blob_filter(struct evr_blob_filter *f, char *buf);
 int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f);
 
 #endif
