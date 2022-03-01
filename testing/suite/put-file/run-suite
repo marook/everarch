@@ -35,8 +35,9 @@ test_file_put_pop(){
     fi
     echo "evr-glacier-cli get-file ${ref}"
     evr-glacier-cli get-file "${ref}" > "files/${base_name}.get.txt"
-    echo "Comparing posted with get file"
+    echo "Comparing ${base_name} posted with get file"
     diff "files/${base_name}.txt" "files/${base_name}.get.txt"
+    echo "${base_name} file looks good"
 }
 
 wait_for_glacier_storage
