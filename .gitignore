@@ -23,5 +23,6 @@ Makefile.in
 # compilation artifacts
 *.o
 /src/*-test
+/src/evr-attr-index
 /src/evr-glacier-cli
 /src/evr-glacier-storage

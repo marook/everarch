@@ -5,6 +5,7 @@ bin_PROGRAMS = \
 	claims-test \
 	concurrent-glacier-test \
 	dyn-mem-test \
+	evr-attr-index \
 	evr-glacier-cli \
 	evr-glacier-storage \
 	files-test \
@@ -43,6 +44,10 @@ dyn_mem_test_SOURCES = \
 	dyn-mem.c \
 	dyn-mem-test.c
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
+
+evr_attr_index_SOURCES = \
+	evr-attr-index.c \
+	logger.c
 
 evr_glacier_cli_SOURCES = \
 	claims.c \

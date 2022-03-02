@@ -1,4 +1,3 @@
-* implement an evr-attr-index service skeleton
 * add index claim watch thread to evr-attr-index
 should watch a glacier for index claims. should parse all index claims
 and keep the one with the latest created date in a batch.
