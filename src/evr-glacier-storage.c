@@ -50,6 +50,7 @@ struct evr_connection{
 struct evr_modified_blob {
     evr_blob_key_t key;
     unsigned long long last_modified;
+    int flags;
 };
 
 /**
@@ -70,7 +71,7 @@ int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
 int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
-int evr_handle_blob_list(void *ctx, const evr_blob_key_t key, int flags, unsigned long long last_modified);
+int evr_handle_blob_list(void *ctx, const evr_blob_key_t key, int flags, unsigned long long last_modified, int last_blob);
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx);
 void evr_handle_blob_modified(void *ctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified);
 int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx);
@@ -468,7 +469,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     if(cmd->body_size != evr_blob_filter_n_size){
         goto out;
     }
-    char buf[max(max(evr_blob_filter_n_size, evr_resp_header_n_size), evr_blob_key_size + sizeof(uint64_t))];
+    char buf[max(max(evr_blob_filter_n_size, evr_resp_header_n_size), evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t))];
     if(read_n(ctx->socket, buf, evr_blob_filter_n_size) != evr_ok){
         goto out;
     }
@@ -540,11 +541,14 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
                 log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket, fmt_key);
             }
 #endif
-            char *p = buf;
-            memcpy(p, blob.key, evr_blob_key_size);
-            p += evr_blob_key_size;
-            *((uint64_t*)p) = htobe64(blob.last_modified);
-            if(write_n(ctx->socket, buf, evr_blob_key_size + sizeof(uint64_t)) != evr_ok){
+            struct evr_buf_pos bp;
+            evr_init_buf_pos(&bp, buf);
+            memcpy(bp.pos, blob.key, evr_blob_key_size);
+            bp.pos += evr_blob_key_size;
+            evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
+            int flags = evr_watch_flag_eob;
+            evr_push_as(&bp, &flags, uint8_t);
+            if(write_n(ctx->socket, buf, evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
                 goto out_with_rm_watcher;
             }
             if(mtx_lock(&wctx.queue_lock) != thrd_success){
@@ -607,7 +611,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     return ret;
 }
 
-int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsigned long long last_modified){
+int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsigned long long last_modified, int last_blob){
     int ret = evr_error;
     struct evr_list_blobs_ctx *ctx = ctx0;
     if(ctx->blobs_used == evr_list_blobs_blobs_len){
@@ -618,6 +622,7 @@ int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsign
     struct evr_modified_blob *b = &ctx->blobs[ctx->blobs_used];
     memcpy(b->key, key, evr_blob_key_size);
     b->last_modified = last_modified;
+    b->flags = last_blob && evr_watch_flag_eob;
     ctx->blobs_used += 1;
     ret = evr_ok;
  out:
@@ -627,14 +632,15 @@ int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsign
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx){
     int ret = evr_error;
     if(ctx->blobs_used > 0){
-        char buf[ctx->blobs_used * (evr_blob_key_size + sizeof(uint64_t))];
-        char *p = buf;
+        char buf[ctx->blobs_used * (evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t))];
+        struct evr_buf_pos bp;
+        evr_init_buf_pos(&bp, buf);
         for(size_t i = 0; i < ctx->blobs_used; ++i){
             struct evr_modified_blob *b = &ctx->blobs[i];
-            memcpy(p, b->key, evr_blob_key_size);
-            p += evr_blob_key_size;
-            *((uint64_t*)p) = htobe64(b->last_modified);
-            p = (char*)&((uint64_t*)p)[1];
+            memcpy(bp.pos, b->key, evr_blob_key_size);
+            bp.pos += evr_blob_key_size;
+            evr_push_map(&bp, &b->last_modified, uint64_t, htobe64);
+            evr_push_as(&bp, &b->flags, uint8_t);
         }
         if(write_n(ctx->connection->socket, buf, sizeof(buf)) != evr_ok){
             goto out;

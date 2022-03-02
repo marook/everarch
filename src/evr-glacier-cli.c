@@ -560,7 +560,7 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
 
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after){
     int ret = evr_error;
-    char buf[max(max(evr_cmd_header_n_size + evr_blob_filter_n_size, evr_blob_key_size + sizeof(uint64_t)), evr_stat_blob_resp_n_size)];
+    char buf[max(max(evr_cmd_header_n_size + evr_blob_filter_n_size, evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t)), evr_stat_blob_resp_n_size)];
     char *p = buf;
     struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_watch_blobs;
@@ -599,15 +599,20 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
         goto out_with_close_c;
     }
     evr_fmt_blob_key_t fmt_key;
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
     while(1){
-        if(read_n(c, buf, evr_blob_key_size + sizeof(uint64_t)) != evr_ok){
+        if(read_n(c, buf, evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
             goto out_with_close_c;
         }
-        char *p = buf;
-        evr_fmt_blob_key(fmt_key, *(evr_blob_key_t*)p);
-        p += evr_blob_key_size;
-        unsigned long long last_modified = be64toh(*(uint64_t*)p);
-        printf("%s %llu\n", fmt_key, last_modified);
+        evr_reset_buf_pos(&bp);
+        evr_fmt_blob_key(fmt_key, *(evr_blob_key_t*)bp.pos);
+        bp.pos += evr_blob_key_size;
+        unsigned long long last_modified;
+        evr_pull_map(&bp, &last_modified, uint64_t, be64toh);
+        int flags;
+        evr_pull_as(&bp, &flags, uint8_t);
+        printf("%s %llu %02x\n", fmt_key, last_modified, flags);
         fflush(stdout);
     }
     ret = evr_ok;

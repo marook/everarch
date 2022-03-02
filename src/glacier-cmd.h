@@ -83,10 +83,16 @@
  *
  * Expected response body is:
  * - struct evr_stat_blob_resp with body_size 0
- * - evr_blob_key_t key + uint64_t last_modified of modified blob in an
- *   endless stream
+ * - evr_blob_key_t key + uint64_t last_modified + uint8_t flags of
+ *   modified blob in an endless stream
  */
 #define evr_cmd_type_watch_blobs 0x04
+
+/**
+ * evr_watch_flag_eob indicates the responded blob key is the end of a
+ * batch of responded blob keys.
+ */
+#define evr_watch_flag_eob 0x01
 
 struct evr_cmd_header {
     int type;

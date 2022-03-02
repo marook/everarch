@@ -38,6 +38,7 @@ then
     echo "Unexpected get response: ${body}" >&2
     exit 1
 fi
+echo 'another one' | evr-glacier-cli put
 
 ( evr-glacier-cli watch > late-watch.actual.log ) &
 lwpid=$!
@@ -66,15 +67,23 @@ then
     exit 1
 fi
 
-for f in early-watch.actual.log past-watch.actual.log
+for prefix in early past
 do
-    awk '{FS = " "} {print $1}' < $f > watch.actual.log
+    awk '{FS = " "} {print $1}' < "${prefix}-watch.actual.log" > watch.actual.log
     if ! diff watch.expected.log watch.actual.log
     then
-        echo "Expected watch.expected.log to equal $f" >&2
+        echo "Expected watch.expected.log to equal ${prefix}-watch.actual.log" >&2
+        exit 1
+    fi
+    awk '{FS = " "} {print $3}' < "${prefix}-watch.actual.log" > watch-flags.actual.log
+    if ! diff "${prefix}-watch-flags.expected.log" watch-flags.actual.log
+    then
+        echo "Expected ${prefix}-watch-flags.expected.log to equal $f" >&2
         exit 1
     fi
 done
+
+
 
 if [[ -s future-watch.actual.log ]]
 then

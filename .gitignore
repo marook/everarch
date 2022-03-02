@@ -1,5 +1,6 @@
 # generally ignored artifacts
-*.log
+/*.log
+*.actual.log
 
 # build system artifacts
 Makefile

@@ -63,6 +63,11 @@ struct evr_buf_pos {
         (bp)->pos = (buffer);                   \
     } while(0)
 
+#define evr_reset_buf_pos(bp)                   \
+    do {                                        \
+        (bp)->pos = (bp)->buf;                  \
+    } while(0)
+
 #define evr_malloc_buf_pos(bp, size)            \
     do {                                        \
         (bp)->buf = malloc(size);               \
@@ -104,5 +109,21 @@ struct evr_buf_pos {
         type tmp = map(*(val));                 \
         evr_push_as(bp, &tmp, type);            \
     } while (0)
+
+#define evr_log_buf_pos(bp)                                             \
+    do {                                                                \
+        size_t size = (bp)->pos - (bp)->buf;                            \
+        char dump[size * 3 + 1];                                        \
+        char *s = dump;                                                 \
+        for(char *it = (bp)->buf; it != (bp)->pos; ++it){               \
+            s += snprintf(s, 4, "%02x ", (unsigned char)*it);           \
+        }                                                               \
+        if(s != dump){                                                  \
+            *(s - 1) = '\0';                                            \
+        } else {                                                        \
+            *s = '\0';                                                  \
+        }                                                               \
+        log_debug("struct evr_buf_pos %p with len %lu dump: %s", bp, (bp)->pos - (bp)->buf, dump); \
+    } while(0)
 
 #endif

@@ -189,7 +189,7 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
     return ret;
 }
 
-int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_key_t key, int flags, unsigned long long last_modified), int flags_filter, unsigned long long last_modified_after, void *vctx){
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_key_t key, int flags, unsigned long long last_modified, int last_blob), int flags_filter, unsigned long long last_modified_after, void *vctx){
     int ret = evr_error;
     if(last_modified_after > (unsigned long long)LLONG_MAX){
         // sqlite3 api only provides bind for signed int64. so we must
@@ -199,8 +199,8 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
     if(sqlite3_bind_int64(ctx->list_blobs_stmt, 1, last_modified_after) != SQLITE_OK){
         goto out;
     }
+    int step_ret = sqlite3_step(ctx->list_blobs_stmt);
     while(1){
-        int step_ret = sqlite3_step(ctx->list_blobs_stmt);
         if(step_ret == SQLITE_DONE){
             break;
         }
@@ -215,10 +215,12 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
         if(key_col_size != evr_blob_key_size){
             goto out;
         }
-        const evr_blob_key_t *key = sqlite3_column_blob(ctx->list_blobs_stmt, 0);
-        
+        evr_blob_key_t key;
+        const void *sqkey = sqlite3_column_blob(ctx->list_blobs_stmt, 0);
+        memcpy(key, sqkey, evr_blob_key_size);
         unsigned long long last_modified = sqlite3_column_int64(ctx->list_blobs_stmt, 2);
-        if(visit(vctx, *key, flags, last_modified) != evr_ok){
+        step_ret = sqlite3_step(ctx->list_blobs_stmt);
+        if(visit(vctx, key, flags, last_modified, step_ret == SQLITE_DONE) != evr_ok){
             goto out;
         }
     }
