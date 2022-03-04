@@ -27,6 +27,7 @@
 #define ceil_div(dividend, divisor) ((dividend + (divisor - 1)) / divisor)
 
 #define evr_glacier_storage_port 2361
+#define evr_glacier_attr_index_port 2362
 
 #define evr_max_blob_data_size (16*1024*1024)
 

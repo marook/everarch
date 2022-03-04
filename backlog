@@ -1,10 +1,4 @@
-* add index claim watch thread to evr-attr-index
-should watch a glacier for index claims. should parse all index claims
-and keep the one with the latest created date in a batch.
-
-should fetch and xml parse the xslt for the index claim.
-
-index claim and xslt should be provided to consumers.
+* add watch with flags filter integration test
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
 

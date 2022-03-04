@@ -46,13 +46,23 @@ dyn_mem_test_SOURCES = \
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
 evr_attr_index_SOURCES = \
+	claims.c \
+	dyn-mem.c \
 	evr-attr-index.c \
-	logger.c
+	evr-glacier-client.c \
+	files.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c \
+	server.c \
+	signatures.c
+evr_attr_index_LDADD = $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS)
 
 evr_glacier_cli_SOURCES = \
 	claims.c \
 	dyn-mem.c \
 	evr-glacier-cli.c \
+	evr-glacier-client.c \
 	files.c \
 	glacier-cmd.c \
 	keys.c \
@@ -69,7 +79,8 @@ evr_glacier_storage_SOURCES = \
 	glacier.c \
 	glacier-cmd.c \
 	keys.c \
-	logger.c
+	logger.c \
+	server.c
 evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 files_test_SOURCES = \

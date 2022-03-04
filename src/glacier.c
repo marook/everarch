@@ -209,6 +209,7 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
         }
         int flags = sqlite3_column_int(ctx->list_blobs_stmt, 1);
         if((flags & flags_filter) != flags_filter){
+            step_ret = sqlite3_step(ctx->list_blobs_stmt);
             continue;
         }
         int key_col_size = sqlite3_column_bytes(ctx->list_blobs_stmt, 0);

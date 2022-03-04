@@ -88,12 +88,6 @@
  */
 #define evr_cmd_type_watch_blobs 0x04
 
-/**
- * evr_watch_flag_eob indicates the responded blob key is the end of a
- * batch of responded blob keys.
- */
-#define evr_watch_flag_eob 0x01
-
 struct evr_cmd_header {
     int type;
     size_t body_size;
@@ -162,5 +156,21 @@ struct evr_blob_filter {
 
 int evr_parse_blob_filter(struct evr_blob_filter *f, char *buf);
 int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f);
+
+/**
+ * evr_watch_flag_eob indicates the responded blob key is the end of a
+ * batch of responded blob keys.
+ */
+#define evr_watch_flag_eob 0x01
+
+struct evr_watch_blobs_body {
+    evr_blob_key_t key;
+    unsigned long long last_modified;
+    int flags;
+};
+
+#define evr_watch_blobs_body_n_size (evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t))
+
+int evr_parse_watch_blobs_body(struct evr_watch_blobs_body *body, char *buf);
 
 #endif

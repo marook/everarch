@@ -22,8 +22,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <argp.h>
@@ -39,15 +37,17 @@
 #include "files.h"
 #include "claims.h"
 #include "signatures.h"
+#include "evr-glacier-client.h"
 
 const char *argp_program_version = "evr-glacier-cli " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
 static char doc[] =
     "evr-glacier-cli is a command line client for interacting with evr-glacier-storage servers.\n\n"
-    "Possible commands are get, put, post-file or watch.\n\n"
+    "Possible commands are get, put, sign-put, post-file or watch.\n\n"
     "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout\n\n"
     "The put command retrieves a blob via stdin and sends it to the evr-glacier-storage.\n\n"
+    "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
     "The post-file command expects one file name argument for upload to the evr-glacier-storage.\n\n"
     "The watch command prints modified blob keys.";
@@ -55,6 +55,7 @@ static char doc[] =
 static char args_doc[] = "CMD";
 
 static struct argp_option options[] = {
+    {"flags", 'f', "F", 0, "Use the given flags when put a blob to evr-glacier-storage."},
     {"flags-filter", 'f', "F", 0, "Only watch blobs which have set at least the given flag bits."},
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
     {0}
@@ -63,15 +64,16 @@ static struct argp_option options[] = {
 #define cli_cmd_none 0
 #define cli_cmd_get 1
 #define cli_cmd_put 2
-#define cli_cmd_get_file 3
-#define cli_cmd_post_file 4
-#define cli_cmd_watch_blobs 5
+#define cli_cmd_sign_put 3
+#define cli_cmd_get_file 4
+#define cli_cmd_post_file 5
+#define cli_cmd_watch_blobs 6
 
 struct cli_arguments {
     int cmd;
     char *key;
     char *file;
-    int flags_filter;
+    int flags;
     unsigned long long last_modified_after;
 };
 
@@ -82,7 +84,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
         return ARGP_ERR_UNKNOWN;
     case 'f': {
         size_t arg_len = strlen(arg);
-        size_t parsed_len = sscanf(arg, "%d", &cli_args->flags_filter);
+        size_t parsed_len = sscanf(arg, "%d", &cli_args->flags);
         if(arg_len == 0 || arg_len != parsed_len){
             argp_usage(state);
             return ARGP_ERR_UNKNOWN;
@@ -108,6 +110,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
                 cli_args->cmd = cli_cmd_get;
             } else if(strcmp("put", arg) == 0){
                 cli_args->cmd = cli_cmd_put;
+            } else if(strcmp("sign-put", arg) == 0){
+                cli_args->cmd = cli_cmd_sign_put;
             } else if(strcmp("get-file", arg) == 0){
                 cli_args->cmd = cli_cmd_get_file;
             } else if(strcmp("post-file", arg) == 0){
@@ -146,6 +150,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             }
             break;
         case cli_cmd_put:
+        case cli_cmd_sign_put:
         case cli_cmd_watch_blobs:
             break;
         }
@@ -157,14 +162,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
 int evr_cli_get(char *fmt_key);
-int evr_cli_put();
+int evr_cli_put(int flags);
+int evr_cli_sign_put(int flags);
 int evr_cli_get_file(char *fmt_key);
 int evr_write_cmd_get_blob(int fd, evr_blob_key_t key);
-xmlDocPtr evr_read_claim_resp(int fd);
-int evr_read_resp_header(struct evr_resp_header *resp, int fd);
 int evr_cli_post_file(char *file);
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after);
-int evr_connect_to_storage();
 int evr_stat_and_put(int c, evr_blob_key_t key, int flags, struct chunk_set *blob);
 
 int main(int argc, char **argv){
@@ -173,7 +176,7 @@ int main(int argc, char **argv){
     cli_args.cmd = cli_cmd_none;
     cli_args.key = NULL;
     cli_args.file = NULL;
-    cli_args.flags_filter = 0;
+    cli_args.flags = 0;
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
     cli_args.last_modified_after = LLONG_MAX;
@@ -184,13 +187,15 @@ int main(int argc, char **argv){
     case cli_cmd_get:
         return evr_cli_get(cli_args.key);
     case cli_cmd_put:
-        return evr_cli_put();
+        return evr_cli_put(cli_args.flags);
+    case cli_cmd_sign_put:
+        return evr_cli_sign_put(cli_args.flags);
     case cli_cmd_get_file:
         return evr_cli_get_file(cli_args.key);
     case cli_cmd_post_file:
         return evr_cli_post_file(cli_args.file);
     case cli_cmd_watch_blobs:
-        return evr_cli_watch_blobs(cli_args.flags_filter, cli_args.last_modified_after);
+        return evr_cli_watch_blobs(cli_args.flags, cli_args.last_modified_after);
     }
     return 0;
 }
@@ -207,11 +212,8 @@ int evr_cli_get(char *fmt_key){
         log_error("Failed to connect to evr-glacier-storage server");
         goto fail;
     }
-    if(evr_write_cmd_get_blob(c, key) != evr_ok){
-        goto cmd_format_fail;
-    }
     struct evr_resp_header resp;
-    if(evr_read_resp_header(&resp, c) != evr_ok){
+    if(evr_req_cmd_get_blob(c, key, &resp) != evr_ok){
         goto cmd_format_fail;
     }
     if(resp.status_code == evr_status_code_blob_not_found){
@@ -237,7 +239,7 @@ int evr_cli_get(char *fmt_key){
     return result;
 }
 
-int evr_cli_put(){
+int evr_cli_put(int flags){
     int ret = evr_error;
     struct chunk_set *blob = evr_allocate_chunk_set(0);
     if(!blob){
@@ -260,7 +262,7 @@ int evr_cli_put(){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
     }
-    if(evr_stat_and_put(c, key, 0, blob) != evr_ok){
+    if(evr_stat_and_put(c, key, flags, blob) != evr_ok){
         goto out_with_close_c;
     }
     evr_fmt_blob_key_t fmt_key;
@@ -273,6 +275,69 @@ int evr_cli_put(){
     }
  out_with_free_blob:
     evr_free_chunk_set(blob);
+ out:
+    return ret;
+}
+
+int evr_cli_sign_put(int flags){
+    int ret = evr_error;
+    evr_init_signatures();
+    struct dynamic_array *raw_buf = alloc_dynamic_array(16 << 10);
+    if(!raw_buf){
+        goto out;
+    }
+    int read_res = read_fd(&raw_buf, STDIN_FILENO, evr_max_blob_data_size + 1);
+    if(read_res == evr_ok){
+        log_error("Input exceeds maximum blob size of %d bytes", evr_max_blob_data_size);
+        goto out_with_free_raw_buf;
+    } else if(read_res != evr_end){
+        goto out_with_free_raw_buf;
+    }
+    if(raw_buf->size_used + 1 > raw_buf->size_allocated){
+        raw_buf = grow_dynamic_array_at_least(raw_buf, raw_buf->size_used + 1);
+        if(!raw_buf){
+            goto out;
+        }
+    }
+    raw_buf->data[raw_buf->size_used] = '\0';
+    struct dynamic_array *signed_buf = NULL;
+    if(evr_sign(&signed_buf, raw_buf->data) != evr_ok){
+        goto out_with_free_signed_buf;
+    }
+    if(signed_buf->size_used > evr_max_blob_data_size){
+        log_error("Signed input exceeds maximum blob size of %d bytes", evr_max_blob_data_size);
+        goto out_with_free_signed_buf;
+    }
+    struct chunk_set signed_cs;
+    if(evr_chunk_setify(&signed_cs, signed_buf->data, signed_buf->size_used) != evr_ok){
+        goto out_with_free_signed_buf;
+    }
+    evr_blob_key_t key;
+    if(evr_calc_blob_key(key, signed_cs.size_used, signed_cs.chunks) != evr_ok){
+        goto out_with_free_signed_buf;
+    }
+    int c = evr_connect_to_storage();
+    if(c < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out_with_free_signed_buf;
+    }
+    if(evr_stat_and_put(c, key, flags, &signed_cs) != evr_ok){
+        goto out_with_close_c;
+    }
+    evr_fmt_blob_key_t fmt_key;
+    evr_fmt_blob_key(fmt_key, key);
+    printf("%s\n", fmt_key);
+    ret = evr_ok;
+ out_with_close_c:
+    close(c);
+ out_with_free_signed_buf:
+    if(signed_buf){
+        free(signed_buf);
+    }
+ out_with_free_raw_buf:
+    if(raw_buf){
+        free(raw_buf);
+    }
  out:
     return ret;
 }
@@ -297,12 +362,11 @@ int evr_cli_get_file(char *fmt_key){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
-    if(evr_write_cmd_get_blob(c, key) != evr_ok){
-        goto out;
-    }
-    xmlDocPtr doc = evr_read_claim_resp(c);
+    xmlDocPtr doc = evr_fetch_signed_xml(c, key);
     if(!doc){
-        log_error("No XML document found in blob");
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, key);
+        log_error("No validly signed XML found for key %s", fmt_key);
         goto out;
     }
     xmlNode *cs = evr_get_root_claim_set(doc);
@@ -346,7 +410,7 @@ int evr_cli_get_file(char *fmt_key){
         if(evr_write_cmd_get_blob(c, ref) != evr_ok){
             goto out_with_free_doc;
         }
-        if(evr_read_resp_header(&resp, c) != evr_ok){
+        if(evr_read_resp_header(c, &resp) != evr_ok){
             goto out_with_free_doc;
         }
         if(resp.status_code != evr_status_code_ok){
@@ -369,78 +433,6 @@ int evr_cli_get_file(char *fmt_key){
     xmlFreeDoc(doc);
  out:
     xmlCleanupParser();
-    return ret;
-}
-
-int evr_write_cmd_get_blob(int fd, evr_blob_key_t key){
-    int ret = evr_error;
-    char buf[evr_cmd_header_n_size + evr_blob_key_size];
-    struct evr_cmd_header cmd;
-    cmd.type = evr_cmd_type_get_blob;
-    cmd.body_size = evr_blob_key_size;
-    if(evr_format_cmd_header(buf, &cmd) != evr_ok){
-        goto out;
-    }
-    memcpy(&buf[evr_cmd_header_n_size], key, evr_blob_key_size);
-#ifdef EVR_LOG_DEBUG
-    {
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
-        log_debug("Sending get %s command to server", fmt_key);
-    }
-#endif
-    if(write_n(fd, buf, sizeof(buf)) != evr_ok){
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-xmlDocPtr evr_read_claim_resp(int fd){
-    xmlDocPtr doc = NULL;
-    struct evr_resp_header resp;
-    if(evr_read_resp_header(&resp, fd) != evr_ok){
-        goto out;
-    }
-    if(resp.status_code != evr_status_code_ok){
-        log_error("Failed to read claim. Responded status code was 0x%02x", resp.status_code);
-        goto out;
-    }
-    char *buf = malloc(resp.body_size);
-    if(!buf){
-        goto out;
-    }
-    if(read_n(fd, buf, resp.body_size) != evr_ok){
-        goto out_with_free_buf;
-    }
-    struct dynamic_array *claim = NULL;
-    // first buf byte is blob flags which we ignore
-    const size_t flags_size = 1;
-    if(evr_verify(&claim, &buf[flags_size], resp.body_size - flags_size) != evr_ok){
-        goto out_with_free_buf;
-    }
-    doc = evr_parse_claim_set(claim->data, claim->size_used);
-    free(claim);
- out_with_free_buf:
-    free(buf);
- out:
-    return doc;
-}
-
-int evr_read_resp_header(struct evr_resp_header *resp, int fd){
-    int ret = evr_error;
-    log_debug("Reading storage response");
-    char buf[evr_resp_header_n_size];
-    if(read_n(fd, buf, sizeof(buf)) != evr_ok){
-        goto out;
-    }
-    if(evr_parse_resp_header(resp, buf) != evr_ok){
-        goto out;
-    }
-    log_debug("Storage responded with status code 0x%02x and body size %d", resp->status_code, resp->body_size);
-    ret = evr_ok;
- out:
     return ret;
 }
 
@@ -560,59 +552,25 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
 
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after){
     int ret = evr_error;
-    char buf[max(max(evr_cmd_header_n_size + evr_blob_filter_n_size, evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t)), evr_stat_blob_resp_n_size)];
-    char *p = buf;
-    struct evr_cmd_header cmd;
-    cmd.type = evr_cmd_type_watch_blobs;
-    cmd.body_size = evr_blob_filter_n_size;
-    if(evr_format_cmd_header(buf, &cmd) != evr_ok){
-        goto out;
-    }
-    p += evr_cmd_header_n_size;
     struct evr_blob_filter f;
     f.flags_filter = flags_filter;
     f.last_modified_after = last_modified_after;
-    if(evr_format_blob_filter(p, &f) != evr_ok){
-        goto out;
-    }
     int c = evr_connect_to_storage();
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
-    log_debug("Sending watch command to server with flags filter 0x%02x and last_modified_after %llu", f.flags_filter, f.last_modified_after);
-    if(write_n(c, buf, evr_cmd_header_n_size + evr_blob_filter_n_size) != evr_ok){
+    if(evr_req_cmd_watch_blobs(c, &f) != evr_ok){
         goto out_with_close_c;
     }
-    if(read_n(c, buf, evr_stat_blob_resp_n_size) != evr_ok){
-        goto out_with_close_c;
-    }
-    struct evr_resp_header resp;
-    if(evr_parse_resp_header(&resp, buf) != evr_ok){
-        goto out_with_close_c;
-    }
-    log_debug("Storage responded with status code 0x%02x and body size %d", resp.status_code, resp.body_size);
-    if(resp.status_code != evr_status_code_ok){
-        goto out_with_close_c;
-    }
-    if(resp.body_size != 0){
-        goto out_with_close_c;
-    }
+    struct evr_watch_blobs_body body;
     evr_fmt_blob_key_t fmt_key;
-    struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, buf);
     while(1){
-        if(read_n(c, buf, evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
+        if(evr_read_watch_blobs_body(c, &body) != evr_ok){
             goto out_with_close_c;
         }
-        evr_reset_buf_pos(&bp);
-        evr_fmt_blob_key(fmt_key, *(evr_blob_key_t*)bp.pos);
-        bp.pos += evr_blob_key_size;
-        unsigned long long last_modified;
-        evr_pull_map(&bp, &last_modified, uint64_t, be64toh);
-        int flags;
-        evr_pull_as(&bp, &flags, uint8_t);
-        printf("%s %llu %02x\n", fmt_key, last_modified, flags);
+        evr_fmt_blob_key(fmt_key, body.key);
+        printf("%s %llu %02x\n", fmt_key, body.last_modified, body.flags);
         fflush(stdout);
     }
     ret = evr_ok;
@@ -622,25 +580,6 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
     }
  out:
     return ret;
-}
-
-int evr_connect_to_storage(){
-    int s = socket(PF_INET, SOCK_STREAM, 0);
-    if(s < 0){
-        goto socket_fail;
-    }
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(evr_glacier_storage_port);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if(connect(s, (struct sockaddr*)&addr, sizeof(addr)) != 0){
-        goto connect_fail;
-    }
-    return s;
- connect_fail:
-    close(s);
- socket_fail:
-    return -1;
 }
 
 int evr_stat_and_put(int c, evr_blob_key_t key, int flags, struct chunk_set *blob){

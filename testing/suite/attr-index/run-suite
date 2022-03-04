@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e
+set -o pipefail
+. ../config
+
+stop(){
+    if [[ -n "${ipid}" ]]
+    then
+        kill -s sigint "${ipid}"
+        wait "${ipid}" || true
+    fi
+    kill -s sigint "${spid}"
+    wait "${spid}" || true
+    if [[ -e 'storage/lock' ]]
+    then
+        echo "storage/lock still existing after storage quit" >&2
+        exit 1
+    fi
+    rm -rf 'storage'
+}
+
+rm -rf 'storage'
+mkdir 'storage'
+
+evr-glacier-storage &
+spid=$!
+trap stop EXIT
+
+wait_for_glacier_storage
+
+echo "Uploading basic attr-spec…"
+basic_xslt_ref=`evr-glacier-cli put < basic.xslt`
+evr-glacier-cli -f 3 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:00:00Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <stylesheet blob="${basic_xslt_ref}"/>
+  </attr-spec>
+</claim-set>
+EOF
+# TODO produce "old stylesheet" and attr-spec
+
+echo "Starting evr-attr-index…"
+evr-attr-index &
+ipid=$!
+
+# TODO build up index
+sleep 1

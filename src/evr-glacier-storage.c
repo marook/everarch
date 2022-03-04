@@ -40,6 +40,7 @@
 #include "glacier.h"
 #include "files.h"
 #include "concurrent-glacier.h"
+#include "server.h"
 
 sig_atomic_t running = 1;
 
@@ -66,7 +67,6 @@ struct evr_list_blobs_ctx {
 
 void handle_sigterm(int signum);
 int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config);
-int evr_glacier_make_tcp_socket();
 int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
@@ -138,13 +138,14 @@ void handle_sigterm(int signum){
 }
 
 int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config){
-    int s = evr_glacier_make_tcp_socket(evr_glacier_storage_port);
+    int s = evr_make_tcp_socket(evr_glacier_storage_port);
     if(s < 0){
         log_error("Failed to create socket");
         return evr_error;
     }
     if(listen(s, 7) < 0){
         log_error("Failed to listen on localhost:%d", evr_glacier_storage_port);
+        // TODO don't we have to close s here?
         return evr_error;
     }
     log_info("Listening on localhost:%d", evr_glacier_storage_port);
@@ -156,8 +157,10 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
         int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL);
         if(sret == -1){
             // select returns -1 on sigint.
+            // TODO don't we have to close s here?
             return evr_end;
         } else if(sret < 0){
+            // TODO don't we have to close s here?
             return evr_error;
         }
         for(int i = 0; i < FD_SETSIZE; ++i){
@@ -167,6 +170,7 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
                     socklen_t size = sizeof(client_addr);
                     int c = accept(s, (struct sockaddr*)&client_addr, &size);
                     if(c < 0){
+                        // TODO don't we have to close s here?
                         return evr_error;
                     }
                     log_debug("Connection from %s:%d accepted (will be worker %d)", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), c);
@@ -194,29 +198,8 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
             }
         }
     }
+    // TODO don't we have to close s here?
     return evr_ok;
-}
-
-int evr_glacier_make_tcp_socket(){
-    int s = socket(PF_INET, SOCK_STREAM, 0);
-    if(s < 0){
-        return -1;
-    }
-    int enable = 1;
-    if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
-        close(s);
-        return -1;
-    }
-        
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(evr_glacier_storage_port);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if(bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0){
-        log_error("Failed to bind to localhost:%d", evr_glacier_storage_port);
-        return -1;
-    }
-    return s;
 }
 
 int evr_connection_worker(void *context){
@@ -327,17 +310,17 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     if(read_n(ctx->socket, (char*)&wblob.key, evr_blob_key_size) != evr_ok){
         goto out;
     }
-#ifdef EVR_LOG_DEBUG
-    {
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, wblob.key);
-        log_debug("Worker %d retrieved cmd put %s with %d bytes blob", ctx->socket, fmt_key, blob_size);
-    }
-#endif
     uint8_t flags;
     if(read_n(ctx->socket, (char*)&flags, sizeof(flags)) != evr_ok){
         goto out;
     }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_fmt_blob_key_t fmt_key;
+        evr_fmt_blob_key(fmt_key, wblob.key);
+        log_debug("Worker %d retrieved cmd put %s with flags 0x%02x and %d bytes blob", ctx->socket, fmt_key, flags, blob_size);
+    }
+#endif
     struct chunk_set *blob = read_into_chunks(ctx->socket, blob_size);
     if(!blob){
         goto out;
@@ -477,7 +460,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     if(evr_parse_blob_filter(&f, buf) != evr_ok){
         goto out;
     }
-    log_debug("Worker %d retrieved cmd watch with flags_filter %d and last_modified_after %llu", ctx->socket, f.flags_filter, f.last_modified_after);
+    log_debug("Worker %d retrieved cmd watch with flags_filter 0x%02x and last_modified_after %llu", ctx->socket, f.flags_filter, f.last_modified_after);
     struct evr_resp_header resp;
     resp.status_code = evr_status_code_ok;
     resp.body_size = 0;
