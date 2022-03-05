@@ -1,4 +1,13 @@
 * add watch with flags filter integration test
+* allow self refs in attr claims
+the ref attribute should be optional. a missing ref attribute
+indicates a self ref.
+* add functions for creating attr index db
+there should be one table for each supported attr type.
+
+columns of the table should be: ref, key, value, valid_from,
+valid_until.
+* add functions for populating attr index db
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
 
