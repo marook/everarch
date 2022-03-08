@@ -363,15 +363,18 @@ size_t evr_count_elements(xmlNode *start, char *name){
 
 struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     struct evr_attr_claim *c = NULL;
+    int ref_type;
     char *fmt_ref = (char*)xmlGetProp(claim_node, BAD_CAST "ref");
-    if(!fmt_ref){
-        goto out;
-    }
     evr_blob_key_t ref;
-    int parse_ref_ret = evr_parse_blob_key(ref, fmt_ref);
-    xmlFree(fmt_ref);
-    if(parse_ref_ret != evr_ok){
-        goto out;
+    if(fmt_ref){
+        ref_type = evr_ref_type_blob;
+        int parse_ref_ret = evr_parse_blob_key(ref, fmt_ref);
+        xmlFree(fmt_ref);
+        if(parse_ref_ret != evr_ok){
+            goto out;
+        }
+    } else {
+        ref_type = evr_ref_type_self;
     }
     size_t attr_count = 0;
     size_t attr_str_size_sum = 0;
@@ -401,8 +404,11 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
         goto out;
     }
     c = (struct evr_attr_claim *)buf;
+    c->ref_type = ref_type;
     buf = (char *)&((struct evr_attr_claim*)buf)[1];
-    memcpy(c->ref, ref, evr_blob_key_size);
+    if(ref_type == evr_ref_type_blob){
+        memcpy(c->ref, ref, evr_blob_key_size);
+    }
     c->attr_len = attr_count;
     c->attr = (struct evr_attr *)buf;
     buf = (char *)&((struct evr_attr*)buf)[attr_count];
