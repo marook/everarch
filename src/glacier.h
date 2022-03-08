@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <sqlite3.h>
 
-#include "configuration.h"
+#include "glacier-storage-configuration.h"
 #include "errors.h"
 #include "keys.h"
 

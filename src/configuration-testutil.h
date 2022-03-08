@@ -19,7 +19,7 @@
 #ifndef __evr_configuration_testutil_h__
 #define __evr_configuration_testutil_h__
 
-#include "configuration.h"
+#include "glacier-storage-configuration.h"
 
 /**
  * create_temp_evr_glacier_storage_configuration allocates a new

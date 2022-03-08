@@ -33,7 +33,7 @@
 #include <poll.h>
 
 #include "basics.h"
-#include "configuration.h"
+#include "glacier-storage-configuration.h"
 #include "errors.h"
 #include "logger.h"
 #include "glacier-cmd.h"

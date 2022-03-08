@@ -16,8 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __configuration_h__
-#define __configuration_h__
+#ifndef __glacier_storage_configuration_h__
+#define __glacier_storage_configuration_h__
+
+#include "config.h"
 
 #include <stddef.h>
 

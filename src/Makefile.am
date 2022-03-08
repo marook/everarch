@@ -32,10 +32,10 @@ concurrent_glacier_test_SOURCES = \
 	assert.c \
 	concurrent-glacier-test.c \
 	concurrent-glacier.c \
-	configuration.c \
 	configuration-testutil.c \
 	dyn-mem.c \
 	files.c \
+	glacier-storage-configuration.c \
 	logger.c
 concurrent_glacier_test_LDADD = $(EVERARCH_LIBS)
 
@@ -72,12 +72,12 @@ evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	concurrent-glacier.c \
-	configuration.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \
 	files.c \
 	glacier.c \
 	glacier-cmd.c \
+	glacier-storage-configuration.c \
 	keys.c \
 	logger.c \
 	server.c
@@ -100,12 +100,12 @@ glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
-	configuration.c \
+	configuration-testutil.c \
 	dyn-mem.c \
 	files.c \
 	glacier.c \
+	glacier-storage-configuration.c \
 	glacier-test.c \
-	configuration-testutil.c \
 	keys.c \
 	logger.c
 glacier_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
