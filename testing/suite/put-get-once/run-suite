@@ -38,7 +38,7 @@ then
     echo "Unexpected get response: ${body}" >&2
     exit 1
 fi
-echo 'another one' | evr-glacier-cli put
+echo 'another one' | evr-glacier-cli put --flags 1
 
 ( evr-glacier-cli watch > late-watch.actual.log ) &
 lwpid=$!
@@ -53,12 +53,16 @@ future=`expr 1000 + ${now}`
 ( evr-glacier-cli watch --last-modified-after "${future}" > future-watch.actual.log ) &
 fwpid=$!
 
+( evr-glacier-cli watch --flags-filter 1 --last-modified-after 0 > claims-watch.actual.log ) &
+cwpid=$!
+
 sleep 1
 
 kill "${ewpid}"
 kill "${lwpid}"
 kill "${pwpid}"
 kill "${fwpid}"
+kill "${cwpid}"
 
 if [[ -s late-watch.actual.log ]]
 then
@@ -83,7 +87,12 @@ do
     fi
 done
 
-
+awk '{FS = " "} {print $1}' < "claims-watch.actual.log" > watch.actual.log
+if ! diff 'claims-watch.expected.log' 'watch.actual.log'
+then
+    echo "Expected claims-watch.expected.log to equal watch.actual.log" >&2
+    exit 1
+fi
 
 if [[ -s future-watch.actual.log ]]
 then

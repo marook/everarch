@@ -1,4 +1,3 @@
-* add watch with flags filter integration test
 * allow self refs in attr claims
 the ref attribute should be optional. a missing ref attribute
 indicates a self ref.
