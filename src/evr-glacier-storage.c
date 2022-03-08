@@ -41,6 +41,7 @@
 #include "files.h"
 #include "concurrent-glacier.h"
 #include "server.h"
+#include "configurations.h"
 
 sig_atomic_t running = 1;
 
@@ -100,7 +101,7 @@ int main(){
         "~/.config/everarch/glacier-storage.json",
         "glacier-storage.json",
     };
-    if(load_evr_glacier_storage_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*)) != evr_ok){
+    if(evr_load_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*), merge_evr_glacier_storage_configuration_file, expand_evr_glacier_storage_configuration) != evr_ok){
         log_error("Failed to load configuration");
         goto out;
     }

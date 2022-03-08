@@ -1,6 +1,7 @@
 AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
 
 bin_PROGRAMS = \
+	attr-index-db-test \
 	basics-test \
 	claims-test \
 	concurrent-glacier-test \
@@ -14,6 +15,21 @@ bin_PROGRAMS = \
 	keys-test \
 	rollsum-test \
 	signatures-test
+
+attr_index_db_test_SOURCES = \
+	assert.c \
+	attr-index-db.c \
+	attr-index-db-configuration.c \
+	attr-index-db-test.c \
+	configuration-testutil.c \
+	configurations.c \
+	dyn-mem.c \
+	files.c \
+	glacier.c \
+	glacier-storage-configuration.c \
+	keys.c \
+	logger.c
+attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 basics_test_SOURCES = \
 	assert.c \
@@ -30,9 +46,11 @@ claims_test_LDADD = $(XML_LIBS) $(GCRYPT_LIBS)
 
 concurrent_glacier_test_SOURCES = \
 	assert.c \
+	attr-index-db-configuration.c \
 	concurrent-glacier-test.c \
 	concurrent-glacier.c \
 	configuration-testutil.c \
+	configurations.c \
 	dyn-mem.c \
 	files.c \
 	glacier-storage-configuration.c \
@@ -72,6 +90,7 @@ evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	concurrent-glacier.c \
+	configurations.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \
 	files.c \
@@ -100,7 +119,9 @@ glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
+	attr-index-db-configuration.c \
 	configuration-testutil.c \
+	configurations.c \
 	dyn-mem.c \
 	files.c \
 	glacier.c \

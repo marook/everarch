@@ -105,6 +105,18 @@ struct evr_buf_pos {
         (bp)->pos += size;                      \
     } while (0)
 
+#define evr_push_concat(bp, s)                  \
+    do {                                        \
+        size_t len = strlen(s);                 \
+        evr_push_n(bp, s, len);                 \
+    } while(0)
+
+#define evr_push_eos(bp)                        \
+    do {                                        \
+        const char eos = '\0';                  \
+        evr_push_as(bp, &eos, char);            \
+    } while(0)
+
 #define evr_push_map(bp, val, type, map)        \
     do {                                        \
         type tmp = map(*(val));                 \

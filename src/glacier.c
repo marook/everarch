@@ -348,7 +348,8 @@ int evr_create_index_db(struct evr_glacier_write_ctx *ctx){
     // - blob_size is the size of the blob in bytes
     // - last_modified last modified timestamp in unix epoch format.
     const char *structure_sql =
-        "create table if not exists blob_position (key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null, last_modified integer not null)";
+        "create table if not exists blob_position "
+        "(key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null, last_modified integer not null)";
     char *error;
     if(sqlite3_exec(ctx->db, structure_sql, NULL, NULL, &error) != SQLITE_OK){
         log_error("Failed to create index db structure for glacier %s: %s", ctx->config->bucket_dir_path, error);

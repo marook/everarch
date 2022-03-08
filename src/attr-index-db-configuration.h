@@ -16,21 +16,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __evr_configuration_testutil_h__
-#define __evr_configuration_testutil_h__
+#ifndef __attr_index_db_configuration_h__
+#define __attr_index_db_configuration_h__
 
-#include "attr-index-db-configuration.h"
-#include "glacier-storage-configuration.h"
+#include "config.h"
 
-/**
- * create_temp_evr_glacier_storage_configuration allocates a new
- * struct evr_glacier_storage_configuration which points to a temporary
- * glacier directory.
- *
- * Every call can assume to point to an empty glacier.
- */
-struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration();
+struct evr_attr_index_db_configuration {
+    char *state_dir_path;
+};
 
-struct evr_attr_index_db_configuration *create_temp_attr_index_db_configuration();
+struct evr_attr_index_db_configuration *evr_create_attr_index_db_configuration();
+
+void evr_free_attr_index_db_configuration(struct evr_attr_index_db_configuration *config);
+
+int evr_merge_attr_index_db_configuration(void *config, const char *config_path);
+
+int evr_expand_attr_index_db_configuration(void *config);
 
 #endif

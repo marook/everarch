@@ -42,7 +42,7 @@ void free_glacier_ctx(struct evr_glacier_write_ctx *ctx);
 void test_evr_glacier_open_same_empty_glacier_twice(){
     struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     for(int i = 0; i < 2; i++){
-        printf("Round %d…\n", i);
+        log_info("Round %d…", i);
         struct evr_glacier_storage_configuration *round_config = clone_config(config);
         struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
         assert_not_null(ctx);

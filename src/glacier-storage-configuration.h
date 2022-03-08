@@ -53,14 +53,12 @@ struct evr_glacier_storage_configuration *create_evr_glacier_storage_configurati
 
 void free_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config);
 
+int merge_evr_glacier_storage_configuration_file(void *config, const char *config_path);
+
 /**
- * load_evr_glacier_storage_configurations loads and merges configs
- * from one or more files and expands it.
+ * expand_evr_glacier_storage_configuration expands placeholders in
+ * evr_glacier_storage_configuration paths.
  */
-int load_evr_glacier_storage_configurations(struct evr_glacier_storage_configuration *config, const char **paths, size_t paths_len);
-
-int merge_evr_glacier_storage_configuration_file(struct evr_glacier_storage_configuration *config, const char *config_path);
-
-int expand_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config);
+int expand_evr_glacier_storage_configuration(void *config);
 
 #endif

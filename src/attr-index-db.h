@@ -16,21 +16,33 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef __evr_configuration_testutil_h__
-#define __evr_configuration_testutil_h__
+#ifndef __attr_index_db_h__
+#define __attr_index_db_h__
+
+#include "config.h"
+
+#include <sqlite3.h>
 
 #include "attr-index-db-configuration.h"
-#include "glacier-storage-configuration.h"
+#include "claims.h"
+
+struct evr_attr_ops {
+    sqlite3_stmt *insert_attr;
+};
+
+struct evr_attr_index_db {
+    sqlite3 *db;
+    struct evr_attr_ops str_ops;
+    struct evr_attr_ops int_ops;
+};
+
+struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name);
+
+int evr_free_glacier_index_db(struct evr_attr_index_db *db);
 
 /**
- * create_temp_evr_glacier_storage_configuration allocates a new
- * struct evr_glacier_storage_configuration which points to a temporary
- * glacier directory.
- *
- * Every call can assume to point to an empty glacier.
+ * evr_setup_attr_index_db sets up an empty attr-index db.
  */
-struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration();
-
-struct evr_attr_index_db_configuration *create_temp_attr_index_db_configuration();
+int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec);
 
 #endif
