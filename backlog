@@ -1,11 +1,6 @@
 * add functions for populating attr index db
-* add index populate thread to evr-attr-index
-should wait for index claims from index claim watch thread.
-
-then build a sqlite index db based on index claim. watch a glacier for
-claims and populate the sqlite db until the batch ends.
-
-the recent sqlite db should be provided do consumers.
+implement a simple query function which retrieves ref and timestamp
+and deliveres attr/value pairs.
 * define query language and result format for evr-attr-index server
 something like "tag:peng color:blue" or "-tag:nsfw" or
 "tag:todo || tag:backlog"
@@ -19,6 +14,13 @@ would shadow a ref attribute defined in a claim.
 ** TODO how can we defined what kind of results we want?
 maybe only a limited set of attributes is required? maybe some
 aggregation functions should be invoked?
+* add index populate thread to evr-attr-index
+should wait for index claims from index claim watch thread.
+
+then build a sqlite index db based on index claim. watch a glacier for
+claims and populate the sqlite db until the batch ends.
+
+the recent sqlite db should be provided to consumers.
 * evr-attr-index should listen on a socket for querries
 * introduce evr-attr-cli cmd with index query feature
 command line client which sends querries to a evr-attr-index and lists
