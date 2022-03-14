@@ -1,6 +1,3 @@
-* add functions for populating attr index db
-implement a simple query function which retrieves ref and timestamp
-and deliveres attr/value pairs.
 * define query language and result format for evr-attr-index server
 something like "tag:peng color:blue" or "-tag:nsfw" or
 "tag:todo || tag:backlog"

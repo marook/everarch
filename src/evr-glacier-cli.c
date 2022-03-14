@@ -85,7 +85,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
     case 'f': {
         size_t arg_len = strlen(arg);
         size_t parsed_len = sscanf(arg, "%d", &cli_args->flags);
-        if(arg_len == 0 || arg_len != parsed_len){
+        if(arg_len == 0 || parsed_len != 1){
             argp_usage(state);
             return ARGP_ERR_UNKNOWN;
         }

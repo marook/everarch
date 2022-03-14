@@ -54,7 +54,16 @@ void assert_zero(int i){
 }
 
 void assert_ok(int result){
-    assert_equal(result, evr_ok);
+    assert_equal_msg(result, evr_ok, "Expected result to be evr_ok but was 0x%02x\n", result);
+}
+
+void assert_ok_msg(int result, const char *format, ...){
+    if(result != evr_ok){
+        va_list args;
+        va_start(args, format);
+        vfail(format, args);
+        va_end(args);
+    }
 }
 
 void assert_equal(int actual, int expected){
@@ -123,6 +132,15 @@ void assert_str_contains(const char *haystack, const char *needle){
 
 void assert_int_eq(int actual, int expected){
     assert_eq("%d");
+}
+
+void assert_int_eq_msg(int actual, int expected, const char *format, ...){
+    if(actual != expected){
+        va_list args;
+        va_start(args, format);
+        vfail(format, args);
+        va_end(args);
+    }
 }
 
 void assert_p_eq(void *actual, void *expected){

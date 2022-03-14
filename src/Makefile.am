@@ -23,6 +23,7 @@ attr_index_db_test_SOURCES = \
 	attr-index-db-test.c \
 	configuration-testutil.c \
 	configurations.c \
+	db.c \
 	dyn-mem.c \
 	files.c \
 	glacier.c \
@@ -91,6 +92,7 @@ evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS)
 evr_glacier_storage_SOURCES = \
 	concurrent-glacier.c \
 	configurations.c \
+	db.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \
 	files.c \
@@ -122,6 +124,7 @@ glacier_test_SOURCES = \
 	attr-index-db-configuration.c \
 	configuration-testutil.c \
 	configurations.c \
+	db.c \
 	dyn-mem.c \
 	files.c \
 	glacier.c \

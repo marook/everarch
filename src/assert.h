@@ -27,6 +27,7 @@ void vfail(const char* format, va_list args);
 
 void assert_zero(int i);
 void assert_ok(int result);
+void assert_ok_msg(int result, const char *format, ...);
 void assert_equal(int actual, int expected);
 void assert_equal_msg(int actual, int expected, const char *format, ...);
 void assert_greater_equal(int actual, int min);
@@ -38,6 +39,7 @@ void assert_not_null_msg(const void *p, const char *format, ...);
 void assert_str_eq(const char *actual, const char *expected);
 void assert_str_contains(const char *haystack, const char *needle);
 void assert_int_eq(int actual, int expected);
+void assert_int_eq_msg(int actual, int expected, const char *format, ...);
 void assert_p_eq(void *actual, void *expected);
 void assert_size_eq(size_t actual, size_t expected);
 

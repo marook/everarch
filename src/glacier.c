@@ -32,6 +32,7 @@
 
 #include "logger.h"
 #include "dyn-mem.h"
+#include "db.h"
 
 // TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
@@ -48,8 +49,6 @@ int evr_close_index_db(struct evr_glacier_storage_configuration *config, sqlite3
 int unlink_lock_file(struct evr_glacier_write_ctx *ctx);
 
 int evr_create_index_db(struct evr_glacier_write_ctx *ctx);
-
-int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt);
 
 int move_to_last_bucket(struct evr_glacier_write_ctx *ctx);
 
@@ -354,15 +353,6 @@ int evr_create_index_db(struct evr_glacier_write_ctx *ctx){
     if(sqlite3_exec(ctx->db, structure_sql, NULL, NULL, &error) != SQLITE_OK){
         log_error("Failed to create index db structure for glacier %s: %s", ctx->config->bucket_dir_path, error);
         sqlite3_free(error);
-        return 1;
-    }
-    return 0;
-}
-
-int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
-    if(sqlite3_prepare_v2(db, sql, -1, stmt, NULL) != SQLITE_OK){
-        const char *sqlite_error_msg = sqlite3_errmsg(db);
-        log_error("Failed to prepare statement \"%s\": %s", sql, sqlite_error_msg);
         return 1;
     }
     return 0;
