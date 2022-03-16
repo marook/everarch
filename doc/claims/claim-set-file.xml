@@ -14,4 +14,10 @@
     </body>
   </file>
   <file xmlns="https://evr.ma300k.de/something-which-will-never-ever-exist"></file>
+  <file dc:title="second file.txt">
+    <body>
+      <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="99"/>
+      <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="1"/>
+    </body>
+  </file>
 </claim-set>

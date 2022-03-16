@@ -1,6 +1,17 @@
+* add claim index to attr-index-db's sqlite db
+must also be added to attr claim structures in claims.h.
+* add claim table to attr-index-db
+it should just store all possible ref and claim index
+combinations. should late be used for building sql queries from the
+attr query language.
 * define query language and result format for evr-attr-index server
-something like "tag:peng color:blue" or "-tag:nsfw" or
-"tag:todo || tag:backlog"
+expression examples:
+
+#+BEGIN_SRC
+tag=peng color=blue size<=12 is_image(mime_type) -key -key2=peng
+-tag=nsfw
+(tag=todo || tag=backlog) tag=howto
+#+END_SRC
 
 implement an ast and parser for the query language.
 
@@ -8,9 +19,13 @@ define a format for results the query can find.
 ** TODO how can we search for a single blob
 something like "ref:sha3-224-…" but without the issue that "ref:"
 would shadow a ref attribute defined in a claim.
-** TODO how can we defined what kind of results we want?
+** DONE how can we defined what kind of results we want?
 maybe only a limited set of attributes is required? maybe some
 aggregation functions should be invoked?
+
+-> a minimalistic query will always just return refs of matching
+   claims. it will probably make sense to specify a set of attribute
+   keys which should also be responded.
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
 
