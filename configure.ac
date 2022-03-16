@@ -1,9 +1,11 @@
 AC_INIT([everarch], [0.1], [markus.peroebner@gmail.com])
-AC_CONFIG_SRCDIR([src/evr-glacier-storage.c])
 AM_INIT_AUTOMAKE
+AC_CONFIG_SRCDIR([src/evr-glacier-storage.c])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC
+AC_PROG_LEX
+AC_PROG_YACC
 PKG_PROG_PKG_CONFIG
 
 AC_DEFINE(_DEFAULT_SOURCE, 1, This macro can be defined to ensure that the "default" definitions are provided.)
