@@ -1,3 +1,8 @@
+* merge attr-index-db's attr_str and attr_int tables
+queries will be much easier if int and str values are located in the
+same table. so the value column should be replaced with a val_str and
+val_int column. val_int should only be populated for keys which are
+defined as integers.
 * add claim index to attr-index-db's sqlite db
 must also be added to attr claim structures in claims.h.
 * add claim table to attr-index-db
