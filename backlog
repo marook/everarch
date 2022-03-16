@@ -22,6 +22,23 @@ the recent sqlite db should be provided to consumers.
 * introduce evr-attr-cli cmd with index query feature
 command line client which sends querries to a evr-attr-index and lists
 found blobs.
+* introduce content sourced attritutes
+attr specs should contain declarations for content sourced
+attributes. content sourced attributes are scripts which are executed
+with every claim and can produce an attr claim as output.
+
+the attr spec for content based attributes might look like this:
+
+#+BEGIN_SRC xml
+<attr-spec>
+  <attr-def k="tag" type="str"/>
+  <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+  <attr-factory blob="sha3-224-00000000000000000000000000000000000000000000000000000001"/>
+</attr-spec>
+#+END_SRC
+
+the attr-factory must point to an executable. for example an elf
+binary, shell or python script.
 * store flags and blob size redundant in buckets
 right now flags and blob size in the evr-glacier-storage are storend
 once for every blob and without any checksum.
