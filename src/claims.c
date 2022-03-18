@@ -376,6 +376,24 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     } else {
         ref_type = evr_ref_type_self;
     }
+    char *fmt_claim_index = (char*)xmlGetProp(claim_node, BAD_CAST "claim");
+    size_t claim_index;
+    if(fmt_claim_index){
+        int scan_res = sscanf(fmt_claim_index, "%lu", &claim_index);
+        if(scan_res != 1){
+            log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_claim_index);
+            xmlFree(fmt_claim_index);
+            goto out;
+        }
+        xmlFree(fmt_claim_index);
+    } else {
+        claim_index = 0;
+        xmlNode *sibling = claim_node->prev;
+        while(sibling){
+            ++claim_index;
+            sibling = sibling->prev;
+        }
+    }
     size_t attr_count = 0;
     size_t attr_str_size_sum = 0;
     xmlNode *attr = claim_node->children;
@@ -409,6 +427,7 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     if(ref_type == evr_ref_type_blob){
         memcpy(c->ref, ref, evr_blob_key_size);
     }
+    c->claim_index = claim_index;
     c->attr_len = attr_count;
     c->attr = (struct evr_attr *)buf;
     buf = (char *)&((struct evr_attr*)buf)[attr_count];

@@ -94,6 +94,7 @@ struct evr_attr {
 struct evr_attr_claim {
     int ref_type;
     evr_blob_key_t ref;
+    size_t claim_index;
     size_t attr_len;
     struct evr_attr *attr;
 };

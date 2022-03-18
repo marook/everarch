@@ -1,5 +1,3 @@
-* add claim index to attr-index-db's sqlite db
-must also be added to attr claim structures in claims.h.
 * add claim table to attr-index-db
 it should just store all possible ref and claim index
 combinations. should late be used for building sql queries from the
