@@ -26,21 +26,14 @@
 #include "attr-index-db-configuration.h"
 #include "claims.h"
 
-struct evr_attr_ops {
-    int (*bind)(sqlite3_stmt *stmt, int pos, const char *value);
-    const char *(*column)(sqlite3_stmt *stmt, int pos, char *buf, size_t buf_size);
-    sqlite3_stmt *find_past_attr_siblings;
-    sqlite3_stmt *find_future_attr_siblings;
-    sqlite3_stmt *insert;
-    sqlite3_stmt *update_valid_until;
-    sqlite3_stmt *find_ref_attrs;
-};
-
 struct evr_attr_index_db {
     sqlite3 *db;
     sqlite3_stmt *find_attr_type_for_key;
-    struct evr_attr_ops str_ops;
-    struct evr_attr_ops int_ops;
+    sqlite3_stmt *find_past_attr_siblings;
+    sqlite3_stmt *find_future_attr_siblings;
+    sqlite3_stmt *insert_attr;
+    sqlite3_stmt *update_attr_valid_until;
+    sqlite3_stmt *find_ref_attrs;
 };
 
 struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name);
@@ -62,7 +55,7 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_blob_k
 
 typedef int (*evr_attr_visitor)(const evr_blob_key_t ref, const char *key, const char *value);
 
-int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_blob_key_t ref, struct evr_attr_ops *ops, evr_attr_visitor visit);
+int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_blob_key_t ref, evr_attr_visitor visit);
 
 /**
  * evr_visit_attr_query visits statements which select attribute ref,
