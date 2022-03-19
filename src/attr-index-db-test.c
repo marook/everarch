@@ -26,7 +26,7 @@
 #include "attr-index-db.h"
 
 #define permutations 3
-#define attr_len 3
+#define merge_attrs_len 3
 
 int found_tag_a = 0;
 int found_tag_b = 0;
@@ -37,17 +37,17 @@ void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void assert_tag_eq(int actual, int expected, char *name);
 
 void test_open_new_attr_index_db_twice(){
-    const time_t merge_attrs_t[attr_len] = {
+    const time_t merge_attrs_t[merge_attrs_len] = {
         10,
         20,
         30,
     };
-    struct evr_attr merge_attrs[attr_len] = {
+    struct evr_attr merge_attrs[merge_attrs_len] = {
         { evr_attr_op_replace, "tag", "A" },
         { evr_attr_op_add, "tag", "B" },
         { evr_attr_op_rm, "tag", NULL },
     };
-    const int attr_merge_permutations[permutations][attr_len] = {
+    const int attr_merge_permutations[permutations][merge_attrs_len] = {
         { 0, 1, 2 },
         { 1, 0, 2 },
         { 2, 1, 0 },
@@ -77,7 +77,7 @@ void test_open_new_attr_index_db_twice(){
             }
             assert_ok_msg(evr_prepare_attr_index_db(db), "evr_prepare_attr_index_db failed\n");
             if(round == 0){
-                for(size_t rai = 0; rai < attr_len; ++rai){
+                for(size_t rai = 0; rai < merge_attrs_len; ++rai){
                     size_t aai = attr_merge_permutations[pi][rai];
                     time_t t = merge_attrs_t[aai];
                     struct evr_attr *attr = &merge_attrs[aai];
@@ -148,7 +148,30 @@ void assert_attrs(int expected_found_tag_a, int expected_found_tag_b){
     assert_int_eq_msg(found_tag_b, expected_found_tag_b, "Expected found_b to be %d but was %d\n", expected_found_tag_b, found_tag_b);
 }
 
+void test_add_two_attr_claims_for_same_target(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, "ye-db");
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 0;
+    spec.attr_def = NULL;
+    assert_ok_msg(evr_setup_attr_index_db(db, &spec), "evr_setup_attr_index_db failed\n");
+    assert_ok_msg(evr_prepare_attr_index_db(db), "evr_prepare_attr_index_db failed\n");
+    struct evr_attr_claim c;
+    c.ref_type = evr_ref_type_blob;
+    assert_ok(evr_parse_blob_key(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000"));
+    c.claim_index = 1;
+    c.attr_len = 0;
+    c.attr = NULL;
+    for(int i = 0; i < 2; ++i){
+        log_info("Claim merge #%d", i+1);
+        assert_ok(evr_merge_attr_index_claim(db, 10, &c));
+    }
+    assert_ok(evr_free_glacier_index_db(db));
+    evr_free_attr_index_db_configuration(cfg);
+}
+
 int main(){
     run_test(test_open_new_attr_index_db_twice);
+    run_test(test_add_two_attr_claims_for_same_target);
     return 0;
 }

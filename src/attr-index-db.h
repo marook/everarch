@@ -32,6 +32,7 @@ struct evr_attr_index_db {
     sqlite3_stmt *find_past_attr_siblings;
     sqlite3_stmt *find_future_attr_siblings;
     sqlite3_stmt *insert_attr;
+    sqlite3_stmt *insert_claim;
     sqlite3_stmt *update_attr_valid_until;
     sqlite3_stmt *find_ref_attrs;
 };
@@ -50,6 +51,8 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  * evr_attr_index_db for merge calls.
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
+
+int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim);
 
 int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_blob_key_t ref, struct evr_attr *attr, size_t attr_len);
 

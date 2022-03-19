@@ -41,6 +41,7 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_config
     db->find_past_attr_siblings = NULL;
     db->find_future_attr_siblings = NULL;
     db->insert_attr = NULL;
+    db->insert_claim = NULL;
     db->update_attr_valid_until = NULL;
     db->find_ref_attrs = NULL;
     const char ext[] = ".db"; 
@@ -82,6 +83,7 @@ int evr_free_glacier_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
     evr_finalize_stmt(find_ref_attrs);
     evr_finalize_stmt(update_attr_valid_until);
+    evr_finalize_stmt(insert_claim);
     evr_finalize_stmt(insert_attr);
     evr_finalize_stmt(find_future_attr_siblings);
     evr_finalize_stmt(find_past_attr_siblings);
@@ -102,6 +104,8 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     const char *sql[] = {
         "create table attr_def (key text primary key not null, type integer not null)",
         "create table attr (ref blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
+        "create table claim (ref blob not null, idx integer not null)",
+        "create unique index claim_unique on claim (ref, idx)",
         NULL
     };
     char *error;
@@ -145,6 +149,42 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     return ret;
  out_with_free_error:
     sqlite3_free(error);
+    return ret;
+}
+
+int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim){
+    int ret = evr_error;
+    if(claim->ref_type != evr_ref_type_blob){
+        log_error("Only attr claims with blob ref can be merged into attr-index");
+        goto out;
+    }
+    if(evr_merge_attr_index_attr(db, t, claim->ref, claim->attr, claim->attr_len) != evr_ok){
+        goto out;
+    }
+    if(sqlite3_bind_blob(db->insert_claim, 1, claim->ref, evr_blob_key_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto out_with_reset_insert_claim;
+    }
+    if(sqlite3_bind_int(db->insert_claim, 2, claim->claim_index) != SQLITE_OK){
+        goto out_with_reset_insert_claim;
+    }
+    // sqlite3_step is called here instead of evr_step_stmt because we
+    // don't want evr_step_stmt to report SQLITE_CONSTRAINT result as
+    // an error.
+    int step_res = sqlite3_step(db->insert_claim);
+    if(step_res != SQLITE_DONE && step_res != SQLITE_CONSTRAINT){
+        // SQLITE_CONSTRAINT is ok because it most likely tells us
+        // that the same row already exists.
+        goto out_with_reset_insert_claim;
+    }
+    ret = evr_ok;
+    int reset_res;
+ out_with_reset_insert_claim:
+    reset_res = sqlite3_reset(db->insert_claim);
+    if(reset_res != SQLITE_OK && reset_res != SQLITE_CONSTRAINT){
+        evr_panic("Failed to reset insert_claim statement");
+        ret = evr_error;
+    }
+ out:
     return ret;
 }
 
@@ -202,6 +242,9 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "insert into attr (ref, key, val_str, val_int, valid_from, valid_until, trunc) values (?, ?, ?, ?, ?, ?, ?)", &db->insert_attr) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "insert into claim (ref, idx) values (?, ?)", &db->insert_claim) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "update attr set valid_until = ? where rowid = ?", &db->update_attr_valid_until) != evr_ok){

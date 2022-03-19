@@ -1,7 +1,3 @@
-* add claim table to attr-index-db
-it should just store all possible ref and claim index
-combinations. should late be used for building sql queries from the
-attr query language.
 * define query language and result format for evr-attr-index server
 expression examples:
 
