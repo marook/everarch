@@ -89,3 +89,41 @@ int evr_calc_blob_ref(evr_blob_ref key, size_t size, char **chunks){
     return result;
     
 }
+
+void evr_build_claim_ref(evr_claim_ref cref, evr_blob_ref bref, int claim){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, (char*)cref);
+    evr_push_n(&bp, bref, evr_blob_ref_size);
+    evr_push_map(&bp, &claim, uint16_t, htobe16);
+}
+
+void evr_fmt_claim_ref(char *dest, const evr_claim_ref cref){
+    evr_fmt_blob_ref(dest, cref);
+    int claim = be16toh(*(uint16_t*)&cref[evr_blob_ref_size]);
+    char *s = &dest[evr_blob_ref_str_size - 1];
+    sprintf(s, evr_claim_ref_str_separator "%04x", claim);
+}
+
+int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref){
+    int ret = evr_error;
+    if(strlen(fmt_ref) != evr_claim_ref_str_size - 1){
+        goto out;
+    }
+    evr_blob_ref_str bref_str;
+    memcpy(bref_str, fmt_ref, evr_blob_ref_str_size - 1);
+    bref_str[evr_blob_ref_str_size - 1] = '\0';
+    evr_parse_blob_ref(cref, bref_str);
+    const char *s = &fmt_ref[evr_blob_ref_str_size - 1];
+    if(strncmp(evr_claim_ref_str_separator, s, evr_claim_ref_str_separator_len) != 0){
+        goto out;
+    }
+    s += evr_claim_ref_str_separator_len;
+    int claim_index;
+    if(sscanf(s, "%04x", &claim_index) != 1){
+        goto out;
+    }
+    *(uint16_t*)&cref[evr_blob_ref_size] = htobe16(claim_index);
+    ret = evr_ok;
+ out:
+    return ret;
+}

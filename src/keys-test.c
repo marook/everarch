@@ -54,9 +54,32 @@ void test_calc_blob_key(){
     assert_str_eq(fmt_key, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
 }
 
+void test_build_fmt_claim_ref(){
+    evr_blob_ref bref;
+    evr_parse_blob_ref(bref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
+    evr_claim_ref cref;
+    evr_build_claim_ref(cref, bref, 65000);
+    evr_claim_ref_str cref_str;
+    evr_fmt_claim_ref(cref_str, cref);
+    assert_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+    evr_build_claim_ref(cref, bref, 0);
+    evr_fmt_claim_ref(cref_str, cref);
+    assert_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-0000");
+}
+
+void test_parse_fmt_claim_ref(){
+    evr_claim_ref in;
+    evr_parse_claim_ref(in, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+    evr_claim_ref_str out_str;
+    evr_fmt_claim_ref(out_str, in);
+    assert_str_eq(out_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+}
+
 int main(){
     run_test(test_evr_fmt_key_into);
     run_test(test_evr_parse_blob_ref);
     run_test(test_calc_blob_key);
+    run_test(test_build_fmt_claim_ref);
+    run_test(test_parse_fmt_claim_ref);
     return 0;
 }

@@ -54,11 +54,11 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim);
 
-int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_blob_ref ref, struct evr_attr *attr, size_t attr_len);
+int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
 
-typedef int (*evr_attr_visitor)(const evr_blob_ref ref, const char *key, const char *value);
+typedef int (*evr_attr_visitor)(const evr_claim_ref ref, const char *key, const char *value);
 
-int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_blob_ref ref, evr_attr_visitor visit);
+int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, evr_attr_visitor visit);
 
 /**
  * evr_visit_attr_query visits statements which select attribute ref,

@@ -32,7 +32,7 @@ int found_tag_a = 0;
 int found_tag_b = 0;
 
 void reset_visit_attrs();
-int visit_attrs(const evr_blob_ref ref, const char *key, const char *value);
+int visit_attrs(const evr_claim_ref ref, const char *key, const char *value);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void assert_tag_eq(int actual, int expected, char *name);
 
@@ -52,10 +52,10 @@ void test_open_new_attr_index_db_twice(){
         { 1, 0, 2 },
         { 2, 1, 0 },
     };
-    evr_blob_ref ref;
-    evr_parse_blob_ref(ref, "sha3-224-10000000000000000000000000000000000000000000000000000000");
-    evr_blob_ref other_ref;
-    evr_parse_blob_ref(other_ref, "sha3-224-00000000000000000000000000000000000000000000000000000001");
+    evr_claim_ref ref;
+    assert_ok(evr_parse_claim_ref(ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000"));
+    evr_claim_ref other_ref;
+    assert_ok(evr_parse_claim_ref(other_ref, "sha3-224-00000000000000000000000000000000000000000000000000000001-0000"));
     for(size_t pi = 0; pi < permutations; ++pi){
         log_info("Permutation %d…", pi);
         struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
@@ -127,10 +127,10 @@ void reset_visit_attrs(){
     found_tag_b = 0;
 }
 
-int visit_attrs(const evr_blob_ref ref, const char *key, const char *value){
-    evr_blob_ref_str fmt_ref;
-    evr_fmt_blob_ref(fmt_ref, ref);
-    assert_str_eq(fmt_ref, "sha3-224-10000000000000000000000000000000000000000000000000000000");
+int visit_attrs(const evr_claim_ref ref, const char *key, const char *value){
+    evr_claim_ref_str fmt_ref;
+    evr_fmt_claim_ref(fmt_ref, ref);
+    assert_str_eq(fmt_ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000");
     assert_str_eq(key, "tag");
     assert_not_null(value);
     if(strcmp(value, "A") == 0){

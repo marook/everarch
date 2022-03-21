@@ -1,9 +1,3 @@
-* combine ref and claim index into cref
-most likely this will be 28 bytes of key + 2 bytes of unsigned int
-index.
-
-change the types in the attr-index-db. add formatter and parser for
-cref.
 * define query language and result format for evr-attr-index server
 expression examples:
 
