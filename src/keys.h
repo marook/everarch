@@ -25,40 +25,38 @@
 #include <stdint.h>
 #include <string.h>
 
-#define evr_blob_key_bits 224
-#define evr_blob_key_size (evr_blob_key_bits / 8)
+#define evr_blob_ref_bit_size 224
+#define evr_blob_ref_size (evr_blob_ref_bit_size / 8)
+typedef uint8_t evr_blob_ref[evr_blob_ref_size];
 
-typedef uint8_t evr_blob_key_t[evr_blob_key_size];
-
-#define evr_fmt_blob_key_prefix "sha3-224-"
-#define evr_fmt_blob_key_prefix_strlen 9
+#define evr_blob_ref_str_prefix "sha3-224-"
+#define evr_blob_ref_str_prefix_len 9
 
 /**
- * evr_fmt_blob_key_size is the size required to store a human
+ * evr_blob_ref_str_size is the size required to store a human
  * readable formatted blob key in a string.
  *
  * The formular consists of: <prefix> <hex key> \0
  */
-#define evr_fmt_blob_key_size (evr_fmt_blob_key_prefix_strlen + 2 * evr_blob_key_size + 1)
-
-typedef char evr_fmt_blob_key_t[evr_fmt_blob_key_size];
+#define evr_blob_ref_str_size (evr_blob_ref_str_prefix_len + 2 * evr_blob_ref_size + 1)
+typedef char evr_blob_ref_str[evr_blob_ref_str_size];
 
 /**
- * evr_format_blob_key formats key in a human readable way into dest.
+ * evr_fmt_blob_ref formats key in a human readable way into dest.
  *
  * Formatted keys may look like "sha224-deadbeef".
  *
- * Make sure you have at least evr_fmt_blob_key_size bytes available.
+ * Make sure you have at least evr_blob_ref_str_size bytes available.
  */
-void evr_fmt_blob_key(char *dest, const evr_blob_key_t key);
+void evr_fmt_blob_ref(char *dest, const evr_blob_ref key);
 
 /**
- * evr_parse_blob_key parses a key in a human readable way from
+ * evr_parse_blob_ref parses a key in a human readable way from
  * fmt_key.
  */
-int evr_parse_blob_key(evr_blob_key_t key, const char *fmt_key);
+int evr_parse_blob_ref(evr_blob_ref key, const char *fmt_key);
 
 // TODO change API from size+chunks to evr_chunk_set which now contains size_used
-int evr_calc_blob_key(evr_blob_key_t key, size_t size, char **chunks);
+int evr_calc_blob_ref(evr_blob_ref key, size_t size, char **chunks);
 
 #endif

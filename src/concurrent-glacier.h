@@ -88,7 +88,7 @@ int evr_persister_queue_task(struct evr_persister_task *task);
  */
 int evr_persister_wait_for_task(struct evr_persister_task *task);
 
-typedef void (*evr_persister_watcher)(void *ctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified);
+typedef void (*evr_persister_watcher)(void *ctx, int wd, evr_blob_ref key, int flags, unsigned long long last_modified);
 
 /**
  * evr_persister_add_watcher registers a callback which fires after a

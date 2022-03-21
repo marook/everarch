@@ -103,9 +103,6 @@ own queues to lib io_uring. mentioned by pitrp.
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
-* remove _t suffix from evr_blob_key_t and evr_fmt_blob_key_t
-simply removing the suffix will make the type evr_fmt_blob_key clash
-with the equally named formatting function.
 * add option for flags to evr-glacier-cli put command
 right now flags=0 is always sent when putting a blob to the storage.
 

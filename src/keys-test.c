@@ -26,19 +26,19 @@
 #include "logger.h"
 
 void test_evr_fmt_key_into(){
-    evr_fmt_blob_key_t fmt_key;
-    evr_blob_key_t key;
-    memset(key, 0, evr_blob_key_size);
-    evr_fmt_blob_key(fmt_key, key);
+    evr_blob_ref_str fmt_key;
+    evr_blob_ref key;
+    memset(key, 0, evr_blob_ref_size);
+    evr_fmt_blob_ref(fmt_key, key);
     assert_str_eq(fmt_key, "sha3-224-00000000000000000000000000000000000000000000000000000000");
-    memset(key, 255, evr_blob_key_size);
-    evr_fmt_blob_key(fmt_key, key);
+    memset(key, 255, evr_blob_ref_size);
+    evr_fmt_blob_ref(fmt_key, key);
     assert_str_eq(fmt_key, "sha3-224-ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 }
 
-void test_evr_parse_blob_key(){
-    evr_blob_key_t key;
-    assert_ok(evr_parse_blob_key(key, "sha3-224-010203ff000000000000000000000000000000000000000000000000"));
+void test_evr_parse_blob_ref(){
+    evr_blob_ref key;
+    assert_ok(evr_parse_blob_ref(key, "sha3-224-010203ff000000000000000000000000000000000000000000000000"));
     assert_equal(key[0], 0x01);
     assert_equal(key[1], 0x02);
     assert_equal(key[2], 0x03);
@@ -46,17 +46,17 @@ void test_evr_parse_blob_key(){
 }
 
 void test_calc_blob_key(){
-    evr_blob_key_t key;
-    evr_fmt_blob_key_t fmt_key;
+    evr_blob_ref key;
+    evr_blob_ref_str fmt_key;
     char *chunks = "hello world";
-    assert_ok(evr_calc_blob_key(key, strlen(chunks), (char**)&chunks));
-    evr_fmt_blob_key(fmt_key, key);
+    assert_ok(evr_calc_blob_ref(key, strlen(chunks), (char**)&chunks));
+    evr_fmt_blob_ref(fmt_key, key);
     assert_str_eq(fmt_key, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
 }
 
 int main(){
     run_test(test_evr_fmt_key_into);
-    run_test(test_evr_parse_blob_key);
+    run_test(test_evr_parse_blob_ref);
     run_test(test_calc_blob_key);
     return 0;
 }

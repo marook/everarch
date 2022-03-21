@@ -40,13 +40,13 @@
 
 int evr_connect_to_storage();
 
-xmlDocPtr evr_fetch_xml(int fd, evr_blob_key_t key);
+xmlDocPtr evr_fetch_xml(int fd, evr_blob_ref key);
 
-xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_key_t key);
+xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_ref key);
 
-int evr_req_cmd_get_blob(int fd, evr_blob_key_t key, struct evr_resp_header *resp);
+int evr_req_cmd_get_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp);
 
-int evr_write_cmd_get_blob(int fd, evr_blob_key_t key);
+int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
 
 int evr_req_cmd_watch_blobs(int fd, struct evr_blob_filter *filter);
 

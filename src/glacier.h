@@ -34,7 +34,7 @@
 extern const size_t evr_max_chunks_per_blob;
 
 struct evr_writing_blob {
-    evr_blob_key_t key;
+    evr_blob_ref key;
     int flags;
     size_t size;
     char **chunks;
@@ -77,7 +77,7 @@ struct evr_glacier_blob_stat {
  * Returns evr_ok if the blob was found. Returns evr_not_found if no
  * blob with the given key exists. Otherwise evr_error.
  */
-int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, struct evr_glacier_blob_stat *stat);
+int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref key, struct evr_glacier_blob_stat *stat);
 
 /**
  * evr_glacier_read_blob reads a blob with the given key.
@@ -92,9 +92,9 @@ int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t
  * evr_ok on successful processing. on_data's data argument is only
  * allocated while on_data is executed.
  */
-int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_key_t key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
+int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
-int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_key_t key, int flags, unsigned long long last_modified, int last_blob), int flags_filter, unsigned long long last_modified_after, void *vctx);
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, unsigned long long last_modified, int last_blob), int flags_filter, unsigned long long last_modified_after, void *vctx);
 
 struct evr_glacier_write_ctx {
     struct evr_glacier_storage_configuration *config;
@@ -139,7 +139,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
  * Returns a negative value on error and a watch descriptor (wd) on
  * success.
  */
-int evr_glacier_add_watcher(struct evr_glacier_write_ctx *ctx, void (*watcher)(void *wctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified), void *wctx);
+int evr_glacier_add_watcher(struct evr_glacier_write_ctx *ctx, void (*watcher)(void *wctx, int wd, evr_blob_ref key, int flags, unsigned long long last_modified), void *wctx);
 
 /**
  * evr_glacier_rm_watcher unregisters a watch callback.

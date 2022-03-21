@@ -75,13 +75,13 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
         goto out;
     }
     const struct evr_file_slice *end = &claim->slices[claim->slices_len];
-    evr_fmt_blob_key_t fmt_key;
+    evr_blob_ref_str fmt_key;
     char buf[9 + 1];
     for(const struct evr_file_slice *s = claim->slices; s != end; ++s){
         if(xmlTextWriterStartElement(cs->writer, BAD_CAST "slice") < 0){
             goto out;
         }
-        evr_fmt_blob_key(fmt_key, s->ref);
+        evr_fmt_blob_ref(fmt_key, s->ref);
         if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "ref", BAD_CAST fmt_key) < 0){
             goto out;
         }
@@ -218,8 +218,8 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
         goto out;
     }
     char *fmt_stylesheet_ref = (char*)xmlGetProp(stylesheet_node, BAD_CAST "blob");
-    evr_blob_key_t stylesheet_ref;
-    int parse_stylesheet_ref_result = evr_parse_blob_key(stylesheet_ref, fmt_stylesheet_ref);
+    evr_blob_ref stylesheet_ref;
+    int parse_stylesheet_ref_result = evr_parse_blob_ref(stylesheet_ref, fmt_stylesheet_ref);
     xmlFree(fmt_stylesheet_ref);
     if(parse_stylesheet_ref_result != evr_ok){
         goto out;
@@ -234,7 +234,7 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     c->attr_def_len = attr_def_count;
     c->attr_def = (struct evr_attr_def*)bp.pos;
     bp.pos += attr_def_count * sizeof(struct evr_attr_def);
-    memcpy(c->stylesheet_blob_ref, stylesheet_ref, evr_blob_key_size);
+    memcpy(c->stylesheet_blob_ref, stylesheet_ref, evr_blob_ref_size);
     struct evr_attr_def *next_attr_def = c->attr_def;
     attr_def_node = claim_node->children;
     while(1){
@@ -317,7 +317,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
             log_error("No ref attribute found on slice element.");
             goto out_with_free_c;
         }
-        if(evr_parse_blob_key(s->ref, fmt_ref) != evr_ok){
+        if(evr_parse_blob_ref(s->ref, fmt_ref) != evr_ok){
             log_error("Illegal ref in claim '%s'", fmt_ref);
             xmlFree(fmt_ref);
             goto out_with_free_c;
@@ -365,10 +365,10 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     struct evr_attr_claim *c = NULL;
     int ref_type;
     char *fmt_ref = (char*)xmlGetProp(claim_node, BAD_CAST "ref");
-    evr_blob_key_t ref;
+    evr_blob_ref ref;
     if(fmt_ref){
         ref_type = evr_ref_type_blob;
-        int parse_ref_ret = evr_parse_blob_key(ref, fmt_ref);
+        int parse_ref_ret = evr_parse_blob_ref(ref, fmt_ref);
         xmlFree(fmt_ref);
         if(parse_ref_ret != evr_ok){
             goto out;
@@ -425,7 +425,7 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     c->ref_type = ref_type;
     buf = (char *)&((struct evr_attr_claim*)buf)[1];
     if(ref_type == evr_ref_type_blob){
-        memcpy(c->ref, ref, evr_blob_key_size);
+        memcpy(c->ref, ref, evr_blob_ref_size);
     }
     c->claim_index = claim_index;
     c->attr_len = attr_count;

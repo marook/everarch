@@ -83,7 +83,7 @@
  *
  * Expected response body is:
  * - struct evr_stat_blob_resp with body_size 0
- * - evr_blob_key_t key + uint64_t last_modified + uint8_t flags of
+ * - evr_blob_ref key + uint64_t last_modified + uint8_t flags of
  *   modified blob in an endless stream
  */
 #define evr_cmd_type_watch_blobs 0x04
@@ -164,12 +164,12 @@ int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f);
 #define evr_watch_flag_eob 0x01
 
 struct evr_watch_blobs_body {
-    evr_blob_key_t key;
+    evr_blob_ref key;
     unsigned long long last_modified;
     int flags;
 };
 
-#define evr_watch_blobs_body_n_size (evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t))
+#define evr_watch_blobs_body_n_size (evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t))
 
 int evr_parse_watch_blobs_body(struct evr_watch_blobs_body *body, char *buf);
 

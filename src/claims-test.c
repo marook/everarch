@@ -134,8 +134,8 @@ void test_parse_file_claim_claim_set(){
             assert_not_null(c);
             assert_str_eq(c->title, "test.txt");
             assert_equal(c->slices_len, 1);
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, c->slices[0].ref);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, c->slices[0].ref);
             assert_str_eq(fmt_key, "sha3-224-12300000000000000000000000000000000000000000000000000321");
             assert_equal(c->slices[0].size, 1);
             free(c);
@@ -167,8 +167,8 @@ void test_parse_attr_claim_with_blob_ref(){
     assert_not_null(cn);
     struct evr_attr_claim *c = evr_parse_attr_claim(cn);
     assert_not_null(c);
-    evr_fmt_blob_key_t fmt_ref;
-    evr_fmt_blob_key(fmt_ref, c->ref);
+    evr_blob_ref_str fmt_ref;
+    evr_fmt_blob_ref(fmt_ref, c->ref);
     assert_int_eq(c->ref_type, evr_ref_type_blob);
     assert_str_eq(fmt_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
     assert_int_eq(c->claim_index, 0);
@@ -286,8 +286,8 @@ void test_parse_attr_spec_claim(){
     struct evr_attr_def *size_def = &c->attr_def[1];
     assert_str_eq(size_def->key, "body-size");
     assert_int_eq(size_def->type, evr_type_int);
-    evr_fmt_blob_key_t fmt_stylesheet_blob_ref;
-    evr_fmt_blob_key(fmt_stylesheet_blob_ref, c->stylesheet_blob_ref);
+    evr_blob_ref_str fmt_stylesheet_blob_ref;
+    evr_fmt_blob_ref(fmt_stylesheet_blob_ref, c->stylesheet_blob_ref);
     assert_str_eq(fmt_stylesheet_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
     free(c);
     xmlFreeDoc(doc);

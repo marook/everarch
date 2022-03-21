@@ -47,15 +47,15 @@ int evr_connect_to_storage(){
     return -1;
 }
 
-xmlDocPtr evr_fetch_xml(int fd, evr_blob_key_t key){
+xmlDocPtr evr_fetch_xml(int fd, evr_blob_ref key){
     xmlDocPtr doc = NULL;
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(fd, key, &resp) != evr_ok){
         goto out;
     }
     if(resp.status_code != evr_status_code_ok){
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, key);
         log_error("Failed to read blob %s. Responded status code was 0x%02x", resp.status_code);
         goto out;
     }
@@ -75,15 +75,15 @@ xmlDocPtr evr_fetch_xml(int fd, evr_blob_key_t key){
     return doc;
 }
 
-xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_key_t key){
+xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_ref key){
     xmlDocPtr doc = NULL;
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(fd, key, &resp) != evr_ok){
         goto out;
     }
     if(resp.status_code != evr_status_code_ok){
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, key);
         log_error("Failed to read blob %s. Responded status code was 0x%02x", resp.status_code);
         goto out;
     }
@@ -108,7 +108,7 @@ xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_key_t key){
     return doc;
 }
 
-int evr_req_cmd_get_blob(int fd, evr_blob_key_t key, struct evr_resp_header *resp){
+int evr_req_cmd_get_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp){
     int ret = evr_error;
     if(evr_write_cmd_get_blob(fd, key) != evr_ok){
         goto out;
@@ -125,20 +125,20 @@ int evr_req_cmd_get_blob(int fd, evr_blob_key_t key, struct evr_resp_header *res
     return ret;
 }
 
-int evr_write_cmd_get_blob(int fd, evr_blob_key_t key){
+int evr_write_cmd_get_blob(int fd, evr_blob_ref key){
     int ret = evr_error;
-    char buf[evr_cmd_header_n_size + evr_blob_key_size];
+    char buf[evr_cmd_header_n_size + evr_blob_ref_size];
     struct evr_cmd_header cmd;
     cmd.type = evr_cmd_type_get_blob;
-    cmd.body_size = evr_blob_key_size;
+    cmd.body_size = evr_blob_ref_size;
     if(evr_format_cmd_header(buf, &cmd) != evr_ok){
         goto out;
     }
-    memcpy(&buf[evr_cmd_header_n_size], key, evr_blob_key_size);
+    memcpy(&buf[evr_cmd_header_n_size], key, evr_blob_ref_size);
 #ifdef EVR_LOG_DEBUG
     {
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, key);
         log_debug("Sending get %s command to server", fmt_key);
     }
 #endif

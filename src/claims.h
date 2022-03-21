@@ -48,7 +48,7 @@ struct evr_claim_set {
 };
 
 struct evr_file_slice {
-    evr_blob_key_t ref;
+    evr_blob_ref ref;
     size_t size;
 };
 
@@ -75,7 +75,7 @@ struct evr_attr_def {
 struct evr_attr_spec_claim {
     size_t attr_def_len;
     struct evr_attr_def *attr_def;
-    evr_blob_key_t stylesheet_blob_ref;
+    evr_blob_ref stylesheet_blob_ref;
 };
 
 #define evr_attr_op_replace 0x01
@@ -93,7 +93,7 @@ struct evr_attr {
 
 struct evr_attr_claim {
     int ref_type;
-    evr_blob_key_t ref;
+    evr_blob_ref ref;
     size_t claim_index;
     size_t attr_len;
     struct evr_attr *attr;

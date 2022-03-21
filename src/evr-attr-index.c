@@ -46,7 +46,7 @@ struct evr_attr_spec_handover_ctx {
      * that no claim is handed over right now.
      */
     struct evr_attr_spec_claim *claim;
-    evr_blob_key_t claim_key;
+    evr_blob_ref claim_key;
     time_t created;
     xmlDocPtr stylesheet;
 };
@@ -215,7 +215,7 @@ int evr_watch_index_claims_worker(void *arg){
     }
     struct evr_watch_blobs_body body;
     struct evr_attr_spec_claim *latest_spec = NULL;
-    evr_blob_key_t latest_spec_key;
+    evr_blob_ref latest_spec_key;
     time_t latest_spec_created = 0;
     // cs is the connection used for finding the most recent
     // attr-spec claim
@@ -244,8 +244,8 @@ int evr_watch_index_claims_worker(void *arg){
         }
 #ifdef EVR_LOG_INFO
         do {
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, body.key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, body.key);
             log_info("Checking index claim %s for attr-spec", fmt_key);
         } while(0);
 #endif
@@ -258,22 +258,22 @@ int evr_watch_index_claims_worker(void *arg){
         }
         xmlDocPtr claim_doc = evr_fetch_signed_xml(cs, body.key);
         if(!claim_doc){
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, body.key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, body.key);
             log_error("Index claim not fetchable for blob key %s", fmt_key);
             goto out_with_free_latest_spec;
         }
         xmlNode *cs_node = evr_get_root_claim_set(claim_doc);
         if(!cs_node){
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, body.key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, body.key);
             log_error("Index claim does not contain claim-set for blob key %s", fmt_key);
             goto out_with_free_claim_doc;
         }
         time_t created;
         if(evr_parse_created(&created, cs_node) != evr_ok){
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, body.key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, body.key);
             log_error("Failed to parse created date from claim-set for blob key %s", fmt_key);
             goto out_with_free_claim_doc;
         }
@@ -287,7 +287,7 @@ int evr_watch_index_claims_worker(void *arg){
                 if(!latest_spec){
                     goto out_with_free_claim_doc;
                 }
-                memcpy(latest_spec_key, body.key, evr_blob_key_size);
+                memcpy(latest_spec_key, body.key, evr_blob_ref_size);
                 latest_spec_created = created;
             }
         }
@@ -297,8 +297,8 @@ int evr_watch_index_claims_worker(void *arg){
         }
         xmlDocPtr xslt_doc = evr_fetch_xml(cs, latest_spec->stylesheet_blob_ref);
         if(!xslt_doc){
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, body.key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, body.key);
             log_error("Failed to fetch stylesheet for attr-spec with blob key %s", fmt_key);
             goto out_with_free_latest_spec;
         }
@@ -326,13 +326,13 @@ int evr_watch_index_claims_worker(void *arg){
         // handover ctx is available
 #ifdef EVR_LOG_DEBUG
         {
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, latest_spec_key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, latest_spec_key);
             log_debug("Handover latest attr-spec %s", fmt_key);
         }
 #endif
         ctx->claim = latest_spec;
-        memcpy(ctx->claim_key, latest_spec_key, evr_blob_key_size);
+        memcpy(ctx->claim_key, latest_spec_key, evr_blob_ref_size);
         ctx->created = latest_spec_created;
         ctx->stylesheet = xslt_doc;
         if(cnd_signal(&ctx->on_push_spec) != thrd_success){
@@ -393,8 +393,8 @@ int evr_build_index_worker(void *arg){
             }
         }
         struct evr_attr_spec_claim *claim = ctx->claim;
-        evr_blob_key_t claim_key;
-        memcpy(claim_key, ctx->claim_key, evr_blob_key_size);
+        evr_blob_ref claim_key;
+        memcpy(claim_key, ctx->claim_key, evr_blob_ref_size);
         // TODO time_t created = ctx->created;;
         xmlDocPtr stylesheet = ctx->stylesheet;
         ctx->claim = NULL;
@@ -408,8 +408,8 @@ int evr_build_index_worker(void *arg){
         }
 #ifdef EVR_LOG_DEBUG
         {
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, claim_key);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, claim_key);
             log_debug("Start building attr index for %s", fmt_key);
         }
 #endif

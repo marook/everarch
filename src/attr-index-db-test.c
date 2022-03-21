@@ -32,7 +32,7 @@ int found_tag_a = 0;
 int found_tag_b = 0;
 
 void reset_visit_attrs();
-int visit_attrs(const evr_blob_key_t ref, const char *key, const char *value);
+int visit_attrs(const evr_blob_ref ref, const char *key, const char *value);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void assert_tag_eq(int actual, int expected, char *name);
 
@@ -52,10 +52,10 @@ void test_open_new_attr_index_db_twice(){
         { 1, 0, 2 },
         { 2, 1, 0 },
     };
-    evr_blob_key_t ref;
-    evr_parse_blob_key(ref, "sha3-224-10000000000000000000000000000000000000000000000000000000");
-    evr_blob_key_t other_ref;
-    evr_parse_blob_key(other_ref, "sha3-224-00000000000000000000000000000000000000000000000000000001");
+    evr_blob_ref ref;
+    evr_parse_blob_ref(ref, "sha3-224-10000000000000000000000000000000000000000000000000000000");
+    evr_blob_ref other_ref;
+    evr_parse_blob_ref(other_ref, "sha3-224-00000000000000000000000000000000000000000000000000000001");
     for(size_t pi = 0; pi < permutations; ++pi){
         log_info("Permutation %d…", pi);
         struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
@@ -72,7 +72,7 @@ void test_open_new_attr_index_db_twice(){
                 struct evr_attr_spec_claim spec;
                 spec.attr_def_len = 2;
                 spec.attr_def = attr_def;
-                memset(spec.stylesheet_blob_ref, 0, evr_blob_key_size);
+                memset(spec.stylesheet_blob_ref, 0, evr_blob_ref_size);
                 assert_ok_msg(evr_setup_attr_index_db(db, &spec), "evr_setup_attr_index_db failed\n");
             }
             assert_ok_msg(evr_prepare_attr_index_db(db), "evr_prepare_attr_index_db failed\n");
@@ -127,9 +127,9 @@ void reset_visit_attrs(){
     found_tag_b = 0;
 }
 
-int visit_attrs(const evr_blob_key_t ref, const char *key, const char *value){
-    evr_fmt_blob_key_t fmt_ref;
-    evr_fmt_blob_key(fmt_ref, ref);
+int visit_attrs(const evr_blob_ref ref, const char *key, const char *value){
+    evr_blob_ref_str fmt_ref;
+    evr_fmt_blob_ref(fmt_ref, ref);
     assert_str_eq(fmt_ref, "sha3-224-10000000000000000000000000000000000000000000000000000000");
     assert_str_eq(key, "tag");
     assert_not_null(value);
@@ -158,7 +158,7 @@ void test_add_two_attr_claims_for_same_target(){
     assert_ok_msg(evr_prepare_attr_index_db(db), "evr_prepare_attr_index_db failed\n");
     struct evr_attr_claim c;
     c.ref_type = evr_ref_type_blob;
-    assert_ok(evr_parse_blob_key(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000"));
+    assert_ok(evr_parse_blob_ref(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000"));
     c.claim_index = 1;
     c.attr_len = 0;
     c.attr = NULL;

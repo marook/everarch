@@ -73,7 +73,7 @@ void test_evr_glacier_write_smal_blob(){
         assert_not_null(buffer);
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
-        memset(wb->key, 1, evr_blob_key_size);
+        memset(wb->key, 1, evr_blob_ref_size);
         wb->flags = 0;
         p = &wb[1];
         wb->chunks = (char**)p;
@@ -96,7 +96,7 @@ void test_evr_glacier_write_smal_blob(){
         assert_not_null(buffer);
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
-        memset(wb->key, 2, evr_blob_key_size);
+        memset(wb->key, 2, evr_blob_ref_size);
         wb->flags = 0;
         p = &wb[1];
         wb->chunks = (char**)p;
@@ -117,8 +117,8 @@ void test_evr_glacier_write_smal_blob(){
     assert_not_null(read_ctx);
     {
         log_info("Read the written blob");
-        evr_blob_key_t key;
-        memset(key, 1, evr_blob_key_size);
+        evr_blob_ref key;
+        memset(key, 1, evr_blob_ref_size);
         struct dynamic_array *data_buffer = alloc_dynamic_array(128);
         assert_not_null(data_buffer);
         status_mock_ret = evr_ok;
@@ -132,8 +132,8 @@ void test_evr_glacier_write_smal_blob(){
     }
     {
         log_info("Read not existing key");
-        evr_blob_key_t key;
-        memset(key, 3, evr_blob_key_size);
+        evr_blob_ref key;
+        memset(key, 3, evr_blob_ref_size);
         status_mock_ret = evr_ok;
         status_mock_expected_exists = 0;
         status_mock_expected_flags = 0;
@@ -179,7 +179,7 @@ void test_evr_glacier_write_big_blob(){
         assert_not_null(buffer);
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
-        memset(wb->key, 1, evr_blob_key_size);
+        memset(wb->key, 1, evr_blob_ref_size);
         wb->flags = 0;
         p = &wb[1];
         wb->chunks = (char**)p;

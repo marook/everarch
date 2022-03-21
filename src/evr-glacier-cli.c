@@ -165,10 +165,10 @@ int evr_cli_get(char *fmt_key);
 int evr_cli_put(int flags);
 int evr_cli_sign_put(int flags);
 int evr_cli_get_file(char *fmt_key);
-int evr_write_cmd_get_blob(int fd, evr_blob_key_t key);
+int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
 int evr_cli_post_file(char *file);
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after);
-int evr_stat_and_put(int c, evr_blob_key_t key, int flags, struct chunk_set *blob);
+int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob);
 
 int main(int argc, char **argv){
     evr_log_fd = STDERR_FILENO;
@@ -202,8 +202,8 @@ int main(int argc, char **argv){
 
 int evr_cli_get(char *fmt_key){
     int result = evr_error;
-    evr_blob_key_t key;
-    if(evr_parse_blob_key(key, fmt_key) != evr_ok){
+    evr_blob_ref key;
+    if(evr_parse_blob_ref(key, fmt_key) != evr_ok){
         log_error("Invalid key format");
         goto fail;
     }
@@ -253,8 +253,8 @@ int evr_cli_put(int flags){
         log_error("Input exceeds maximum blob size of %d bytes", evr_max_blob_data_size);
         goto out_with_free_blob;
     }
-    evr_blob_key_t key;
-    if(evr_calc_blob_key(key, blob->size_used, blob->chunks) != evr_ok){
+    evr_blob_ref key;
+    if(evr_calc_blob_ref(key, blob->size_used, blob->chunks) != evr_ok){
         goto out_with_free_blob;
     }
     int c = evr_connect_to_storage();
@@ -265,8 +265,8 @@ int evr_cli_put(int flags){
     if(evr_stat_and_put(c, key, flags, blob) != evr_ok){
         goto out_with_close_c;
     }
-    evr_fmt_blob_key_t fmt_key;
-    evr_fmt_blob_key(fmt_key, key);
+    evr_blob_ref_str fmt_key;
+    evr_fmt_blob_ref(fmt_key, key);
     printf("%s\n", fmt_key);
     ret = evr_ok;
  out_with_close_c:
@@ -312,8 +312,8 @@ int evr_cli_sign_put(int flags){
     if(evr_chunk_setify(&signed_cs, signed_buf->data, signed_buf->size_used) != evr_ok){
         goto out_with_free_signed_buf;
     }
-    evr_blob_key_t key;
-    if(evr_calc_blob_key(key, signed_cs.size_used, signed_cs.chunks) != evr_ok){
+    evr_blob_ref key;
+    if(evr_calc_blob_ref(key, signed_cs.size_used, signed_cs.chunks) != evr_ok){
         goto out_with_free_signed_buf;
     }
     int c = evr_connect_to_storage();
@@ -324,8 +324,8 @@ int evr_cli_sign_put(int flags){
     if(evr_stat_and_put(c, key, flags, &signed_cs) != evr_ok){
         goto out_with_close_c;
     }
-    evr_fmt_blob_key_t fmt_key;
-    evr_fmt_blob_key(fmt_key, key);
+    evr_blob_ref_str fmt_key;
+    evr_fmt_blob_ref(fmt_key, key);
     printf("%s\n", fmt_key);
     ret = evr_ok;
  out_with_close_c:
@@ -353,8 +353,8 @@ int evr_cli_get_file(char *fmt_key){
     int ret = evr_error;
     evr_init_signatures();
     xmlInitParser();
-    evr_blob_key_t key;
-    if(evr_parse_blob_key(key, fmt_key) != evr_ok){
+    evr_blob_ref key;
+    if(evr_parse_blob_ref(key, fmt_key) != evr_ok){
         goto out;
     }
     int c = evr_connect_to_storage();
@@ -364,8 +364,8 @@ int evr_cli_get_file(char *fmt_key){
     }
     xmlDocPtr doc = evr_fetch_signed_xml(c, key);
     if(!doc){
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, key);
         log_error("No validly signed XML found for key %s", fmt_key);
         goto out;
     }
@@ -391,7 +391,7 @@ int evr_cli_get_file(char *fmt_key){
         goto out_with_free_doc;
     }
     xmlNode *slice = evr_find_next_element(fbody->children, "slice");
-    evr_blob_key_t ref;
+    evr_blob_ref ref;
     struct evr_resp_header resp;
     char buf[1];
     while(1){
@@ -402,7 +402,7 @@ int evr_cli_get_file(char *fmt_key){
         if(!fmt_ref){
             goto out_with_free_doc;
         }
-        int pkret = evr_parse_blob_key(ref, fmt_ref);
+        int pkret = evr_parse_blob_ref(ref, fmt_ref);
         xmlFree(fmt_ref);
         if(pkret != evr_ok){
             goto out_with_free_doc;
@@ -414,8 +414,8 @@ int evr_cli_get_file(char *fmt_key){
             goto out_with_free_doc;
         }
         if(resp.status_code != evr_status_code_ok){
-            evr_fmt_blob_key_t fmt_key;
-            evr_fmt_blob_key(fmt_key, ref);
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, ref);
             log_error("Failed to fetch file slice blob with key %s. Response status code was 0x%02x.", fmt_key, resp.status_code);
             goto out_with_free_doc;
         }
@@ -484,15 +484,15 @@ int evr_cli_post_file(char *file){
     if(evr_chunk_setify(&sc_blob, sc->data, sc->size_used) != evr_ok){
         goto out_with_free_sc;
     }
-    evr_blob_key_t key;
-    if(evr_calc_blob_key(key, sc_blob.size_used, sc_blob.chunks) != evr_ok){
+    evr_blob_ref key;
+    if(evr_calc_blob_ref(key, sc_blob.size_used, sc_blob.chunks) != evr_ok){
         goto out_with_free_sc;
     }
     if(evr_stat_and_put(ctx.c, key, evr_blob_flag_claim, &sc_blob) != evr_ok){
         goto out_with_free_sc;
     }
-    evr_fmt_blob_key_t fmt_key;
-    evr_fmt_blob_key(fmt_key, key);
+    evr_blob_ref_str fmt_key;
+    evr_fmt_blob_ref(fmt_key, key);
     printf("%s\n", fmt_key);
     ret = evr_ok;
  out_with_free_sc:
@@ -537,7 +537,7 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     if(evr_chunk_setify(&blob, buf, size) != evr_ok){
         goto out;
     }
-    if(evr_calc_blob_key(fs->ref, size, blob.chunks) != evr_ok){
+    if(evr_calc_blob_ref(fs->ref, size, blob.chunks) != evr_ok){
         goto out;
     }
     if(evr_stat_and_put(ctx->c, fs->ref, 0, &blob) != evr_ok){
@@ -564,12 +564,12 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
         goto out_with_close_c;
     }
     struct evr_watch_blobs_body body;
-    evr_fmt_blob_key_t fmt_key;
+    evr_blob_ref_str fmt_key;
     while(1){
         if(evr_read_watch_blobs_body(c, &body) != evr_ok){
             goto out_with_close_c;
         }
-        evr_fmt_blob_key(fmt_key, body.key);
+        evr_fmt_blob_ref(fmt_key, body.key);
         printf("%s %llu %02x\n", fmt_key, body.last_modified, body.flags);
         fflush(stdout);
     }
@@ -582,26 +582,26 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
     return ret;
 }
 
-int evr_stat_and_put(int c, evr_blob_key_t key, int flags, struct chunk_set *blob){
+int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob){
     int ret = evr_error;
-    char buffer[max(max(evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t), evr_resp_header_n_size), evr_stat_blob_resp_n_size)];
+    char buffer[max(max(evr_cmd_header_n_size + evr_blob_ref_size + sizeof(uint8_t), evr_resp_header_n_size), evr_stat_blob_resp_n_size)];
 #ifdef EVR_LOG_DEBUG
-    evr_fmt_blob_key_t fmt_key;
-    evr_fmt_blob_key(fmt_key, key);
+    evr_blob_ref_str fmt_key;
+    evr_fmt_blob_ref(fmt_key, key);
 #endif
     {
         struct evr_buf_pos bp;
         evr_init_buf_pos(&bp, buffer);
         struct evr_cmd_header cmd;
         cmd.type = evr_cmd_type_stat_blob;
-        cmd.body_size = evr_blob_key_size;
+        cmd.body_size = evr_blob_ref_size;
         if(evr_format_cmd_header(bp.pos, &cmd) != evr_ok){
             goto out;
         }
         bp.pos += evr_cmd_header_n_size;
-        evr_push_n(&bp, key, evr_blob_key_size);
+        evr_push_n(&bp, key, evr_blob_ref_size);
         log_debug("Sending stat %s command", fmt_key);
-        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size) != evr_ok){
+        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_ref_size) != evr_ok){
             goto out;
         }
     }
@@ -639,16 +639,16 @@ int evr_stat_and_put(int c, evr_blob_key_t key, int flags, struct chunk_set *blo
         char *p = buffer;
         struct evr_cmd_header cmd;
         cmd.type = evr_cmd_type_put_blob;
-        cmd.body_size = evr_blob_key_size + sizeof(uint8_t) + blob->size_used;
+        cmd.body_size = evr_blob_ref_size + sizeof(uint8_t) + blob->size_used;
         if(evr_format_cmd_header(p, &cmd) != evr_ok){
             goto out;
         }
         p += evr_cmd_header_n_size;
-        memcpy(p, key, evr_blob_key_size);
-        p += evr_blob_key_size;
+        memcpy(p, key, evr_blob_ref_size);
+        p += evr_blob_ref_size;
         *(uint8_t*)p = flags;
         log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
-        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_key_size + sizeof(uint8_t)) != evr_ok){
+        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_ref_size + sizeof(uint8_t)) != evr_ok){
             goto out;
         }
         if(write_chunk_set(c, blob) != evr_ok){

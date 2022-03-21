@@ -89,7 +89,7 @@ int evr_format_blob_filter(char *buf, const struct evr_blob_filter *f){
 int evr_parse_watch_blobs_body(struct evr_watch_blobs_body *body, char *buf){
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, buf);
-    evr_pull_n(&bp, body->key, evr_blob_key_size);
+    evr_pull_n(&bp, body->key, evr_blob_ref_size);
     evr_pull_map(&bp, &body->last_modified, uint64_t, be64toh);
     evr_pull_as(&bp, &body->flags, uint8_t);
     return evr_ok;

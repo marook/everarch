@@ -25,12 +25,12 @@
 #include "errors.h"
 #include "dyn-mem.h"
 
-void evr_fmt_blob_key(char *dest, const evr_blob_key_t key) {
+void evr_fmt_blob_ref(char *dest, const evr_blob_ref key) {
     char *p = dest;
-    size_t prefix_len = strlen(evr_fmt_blob_key_prefix);
-    memcpy(p, evr_fmt_blob_key_prefix, prefix_len);
+    size_t prefix_len = strlen(evr_blob_ref_str_prefix);
+    memcpy(p, evr_blob_ref_str_prefix, prefix_len);
     p += prefix_len;
-    const uint8_t *end = &key[evr_blob_key_size];
+    const uint8_t *end = &key[evr_blob_ref_size];
     for(const uint8_t *k = key; k != end; k++){
         sprintf(p, "%02x", *k);
         p += 2;
@@ -38,20 +38,20 @@ void evr_fmt_blob_key(char *dest, const evr_blob_key_t key) {
     *p++ = '\0';
 }
 
-int evr_parse_blob_key(evr_blob_key_t key, const char *fmt_key){
+int evr_parse_blob_ref(evr_blob_ref key, const char *fmt_key){
     const char *p = fmt_key;
-    if(strncmp(evr_fmt_blob_key_prefix, fmt_key, strlen(evr_fmt_blob_key_prefix)) != 0){
+    if(strncmp(evr_blob_ref_str_prefix, fmt_key, strlen(evr_blob_ref_str_prefix)) != 0){
         return evr_error;
     }
-    p += strlen(evr_fmt_blob_key_prefix);
+    p += strlen(evr_blob_ref_str_prefix);
     size_t hash_len = strlen(p);
-    if(hash_len != 2 * evr_blob_key_size){
+    if(hash_len != 2 * evr_blob_ref_size){
         return evr_error;
     }
     char buffer[3];
     buffer[2] = '\0';
     int v;
-    for(int i = 0; i < evr_blob_key_size; ++i){
+    for(int i = 0; i < evr_blob_ref_size; ++i){
         buffer[0] = p[0];
         buffer[1] = p[1];
         if(sscanf(buffer, "%02x", &v) != 1){
@@ -66,7 +66,7 @@ int evr_parse_blob_key(evr_blob_key_t key, const char *fmt_key){
     return evr_ok;
 }
 
-int evr_calc_blob_key(evr_blob_key_t key, size_t size, char **chunks){
+int evr_calc_blob_ref(evr_blob_ref key, size_t size, char **chunks){
     int result = evr_error;
     gcry_md_hd_t hash_ctx;
     if(gcry_md_open(&hash_ctx, GCRY_MD_SHA3_224, 0) != GPG_ERR_NO_ERROR){
@@ -82,7 +82,7 @@ int evr_calc_blob_key(evr_blob_key_t key, size_t size, char **chunks){
     }
     gcry_md_final(hash_ctx);
     unsigned char *digest = gcry_md_read(hash_ctx, 0);
-    memcpy(key, digest, evr_blob_key_size);
+    memcpy(key, digest, evr_blob_ref_size);
     result = evr_ok;
     gcry_md_close(hash_ctx);
  md_open_fail:

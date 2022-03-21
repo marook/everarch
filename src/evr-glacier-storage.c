@@ -50,7 +50,7 @@ struct evr_connection{
 };
 
 struct evr_modified_blob {
-    evr_blob_key_t key;
+    evr_blob_ref key;
     unsigned long long last_modified;
     int flags;
 };
@@ -58,7 +58,7 @@ struct evr_modified_blob {
 /**
  * evr_list_blobs_blobs_len's value tries to fill one IP packet well.
  */
-#define evr_list_blobs_blobs_len (1000 / (evr_blob_key_size + sizeof(uint64_t)))
+#define evr_list_blobs_blobs_len (1000 / (evr_blob_ref_size + sizeof(uint64_t)))
 
 struct evr_list_blobs_ctx {
     struct evr_connection *connection;
@@ -72,9 +72,9 @@ int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
 int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
-int evr_handle_blob_list(void *ctx, const evr_blob_key_t key, int flags, unsigned long long last_modified, int last_blob);
+int evr_handle_blob_list(void *ctx, const evr_blob_ref key, int flags, unsigned long long last_modified, int last_blob);
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx);
-void evr_handle_blob_modified(void *ctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified);
+void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, unsigned long long last_modified);
 int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx);
 int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
@@ -235,19 +235,19 @@ int evr_connection_worker(void *context){
             result = evr_ok;
             goto end;
         case evr_cmd_type_get_blob: {
-            size_t body_size = evr_blob_key_size;
+            size_t body_size = evr_blob_ref_size;
             if(cmd.body_size != body_size){
                 goto end;
             }
-            evr_blob_key_t key;
+            evr_blob_ref key;
             const int body_result = read_n(ctx.socket, (char*)&key, body_size);
             if(body_result != evr_ok){
                 goto end;
             }
 #ifdef EVR_LOG_DEBUG
             {
-                evr_fmt_blob_key_t fmt_key;
-                evr_fmt_blob_key(fmt_key, key);
+                evr_blob_ref_str fmt_key;
+                evr_fmt_blob_ref(fmt_key, key);
                 log_debug("Worker %d retrieved cmd get %s", ctx.socket, fmt_key);
             }
 #endif
@@ -257,8 +257,8 @@ int evr_connection_worker(void *context){
             int read_res = evr_glacier_read_blob(rctx, key, send_get_response, pipe_data, &ctx.socket);
 #ifdef EVR_LOG_DEBUG
             if(read_res == evr_not_found) {
-                evr_fmt_blob_key_t fmt_key;
-                evr_fmt_blob_key(fmt_key, key);
+                evr_blob_ref_str fmt_key;
+                evr_fmt_blob_ref(fmt_key, key);
                 log_debug("Worker %d did not find key %s", ctx.socket, fmt_key);
             }
 #endif
@@ -299,16 +299,16 @@ int evr_connection_worker(void *context){
 
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     int ret = evr_error;
-    if(cmd->body_size < evr_blob_key_size){
+    if(cmd->body_size < evr_blob_ref_size){
         goto out;
     }
-    size_t blob_size = cmd->body_size - evr_blob_key_size - sizeof(uint8_t);
+    size_t blob_size = cmd->body_size - evr_blob_ref_size - sizeof(uint8_t);
     if(blob_size > evr_max_blob_data_size){
         // TODO should we send a client error here?
         goto out;
     }
     struct evr_writing_blob wblob;
-    if(read_n(ctx->socket, (char*)&wblob.key, evr_blob_key_size) != evr_ok){
+    if(read_n(ctx->socket, (char*)&wblob.key, evr_blob_ref_size) != evr_ok){
         goto out;
     }
     uint8_t flags;
@@ -317,8 +317,8 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     }
 #ifdef EVR_LOG_DEBUG
     {
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, wblob.key);
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, wblob.key);
         log_debug("Worker %d retrieved cmd put %s with flags 0x%02x and %d bytes blob", ctx->socket, fmt_key, flags, blob_size);
     }
 #endif
@@ -326,8 +326,8 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     if(!blob){
         goto out;
     }
-    evr_blob_key_t calced_key;
-    if(evr_calc_blob_key(calced_key, blob_size, blob->chunks) != evr_ok){
+    evr_blob_ref calced_key;
+    if(evr_calc_blob_ref(calced_key, blob_size, blob->chunks) != evr_ok){
         goto out_free_blob;
     }
     if(memcmp(wblob.key, calced_key, 0)){
@@ -375,17 +375,17 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
 
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx){
     int ret = evr_error;
-    if(cmd->body_size != evr_blob_key_size){
+    if(cmd->body_size != evr_blob_ref_size){
         goto out;
     }
-    evr_blob_key_t key;
-    if(read_n(ctx->socket, (char*)&key, evr_blob_key_size) != evr_ok){
+    evr_blob_ref key;
+    if(read_n(ctx->socket, (char*)&key, evr_blob_ref_size) != evr_ok){
         goto out;
     }
 #ifdef EVR_LOG_DEBUG
     {
-        evr_fmt_blob_key_t fmt_key;
-        evr_fmt_blob_key(fmt_key, key);
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, key);
         log_debug("Worker %d retrieved cmd stat %s", ctx->socket, fmt_key);
     }
 #endif
@@ -453,7 +453,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     if(cmd->body_size != evr_blob_filter_n_size){
         goto out;
     }
-    char buf[max(max(evr_blob_filter_n_size, evr_resp_header_n_size), evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t))];
+    char buf[max(max(evr_blob_filter_n_size, evr_resp_header_n_size), evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t))];
     if(read_n(ctx->socket, buf, evr_blob_filter_n_size) != evr_ok){
         goto out;
     }
@@ -520,19 +520,19 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
             }
 #ifdef EVR_LOG_DEBUG
             {
-                evr_fmt_blob_key_t fmt_key;
-                evr_fmt_blob_key(fmt_key, blob.key);
+                evr_blob_ref_str fmt_key;
+                evr_fmt_blob_ref(fmt_key, blob.key);
                 log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket, fmt_key);
             }
 #endif
             struct evr_buf_pos bp;
             evr_init_buf_pos(&bp, buf);
-            memcpy(bp.pos, blob.key, evr_blob_key_size);
-            bp.pos += evr_blob_key_size;
+            memcpy(bp.pos, blob.key, evr_blob_ref_size);
+            bp.pos += evr_blob_ref_size;
             evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
             int flags = evr_watch_flag_eob;
             evr_push_as(&bp, &flags, uint8_t);
-            if(write_n(ctx->socket, buf, evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
+            if(write_n(ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
                 goto out_with_rm_watcher;
             }
             if(mtx_lock(&wctx.queue_lock) != thrd_success){
@@ -595,7 +595,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     return ret;
 }
 
-int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsigned long long last_modified, int last_blob){
+int evr_handle_blob_list(void *ctx0, const evr_blob_ref key, int flags, unsigned long long last_modified, int last_blob){
     int ret = evr_error;
     struct evr_list_blobs_ctx *ctx = ctx0;
     if(ctx->blobs_used == evr_list_blobs_blobs_len){
@@ -604,7 +604,7 @@ int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsign
         }
     }
     struct evr_modified_blob *b = &ctx->blobs[ctx->blobs_used];
-    memcpy(b->key, key, evr_blob_key_size);
+    memcpy(b->key, key, evr_blob_ref_size);
     b->last_modified = last_modified;
     b->flags = last_blob && evr_watch_flag_eob;
     ctx->blobs_used += 1;
@@ -616,13 +616,13 @@ int evr_handle_blob_list(void *ctx0, const evr_blob_key_t key, int flags, unsign
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx){
     int ret = evr_error;
     if(ctx->blobs_used > 0){
-        char buf[ctx->blobs_used * (evr_blob_key_size + sizeof(uint64_t) + sizeof(uint8_t))];
+        char buf[ctx->blobs_used * (evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t))];
         struct evr_buf_pos bp;
         evr_init_buf_pos(&bp, buf);
         for(size_t i = 0; i < ctx->blobs_used; ++i){
             struct evr_modified_blob *b = &ctx->blobs[i];
-            memcpy(bp.pos, b->key, evr_blob_key_size);
-            bp.pos += evr_blob_key_size;
+            memcpy(bp.pos, b->key, evr_blob_ref_size);
+            bp.pos += evr_blob_ref_size;
             evr_push_map(&bp, &b->last_modified, uint64_t, htobe64);
             evr_push_as(&bp, &b->flags, uint8_t);
         }
@@ -636,7 +636,7 @@ int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx){
     return ret;
 }
 
-void evr_handle_blob_modified(void *ctx, int wd, evr_blob_key_t key, int flags, unsigned long long last_modified){
+void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, unsigned long long last_modified){
     struct evr_work_watch_ctx *wctx = ctx;
     if((wctx->filter->flags_filter & flags) != wctx->filter->flags_filter){
         return;
@@ -651,7 +651,7 @@ void evr_handle_blob_modified(void *ctx, int wd, evr_blob_key_t key, int flags, 
         wctx->status = evr_temporary_occupied;
     } else {
         struct evr_modified_blob *b = &wctx->blobs[wctx->writing_blobs_i];
-        memcpy(b->key, key, evr_blob_key_size);
+        memcpy(b->key, key, evr_blob_ref_size);
         b->last_modified = last_modified;
         wctx->writing_blobs_i = next_writing_blobs_i;
     }
