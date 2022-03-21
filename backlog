@@ -1,3 +1,9 @@
+* combine ref and claim index into cref
+most likely this will be 28 bytes of key + 2 bytes of unsigned int
+index.
+
+change the types in the attr-index-db. add formatter and parser for
+cref.
 * define query language and result format for evr-attr-index server
 expression examples:
 
@@ -20,6 +26,19 @@ aggregation functions should be invoked?
 -> a minimalistic query will always just return refs of matching
    claims. it will probably make sense to specify a set of attribute
    keys which should also be responded.
+** DONE how can we map the query to select statements?
+#+BEGIN_SRC sql
+;; tag=peng
+select cref from claim where
+  cref in (select cref from attr where key = ? and val_str = ?)
+;; [(txt, 'tag'), (txt, 'peng')]
+
+;; tag=a && tag=b
+select cref from claim where
+  (cref in (select cref from attr where key = ? and val_str = ?)
+   and cref in (select cref from attr where key = ? and val_str = ?))
+;; [(txt, 'tag'), (txt, 'a'), (txt, 'tag'), (txt, 'b')]
+#+END_SRC
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
 
