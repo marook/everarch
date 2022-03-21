@@ -25,4 +25,7 @@
 %option nounput
 
 %%
+
+"&&"    { return bool_and; }
+
 %%

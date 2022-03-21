@@ -17,17 +17,28 @@
  */
 
 %{
-    #include "logger.h"
+#include "logger.h"
 
-    int yylex (void);
-    void yyerror (char const *e){
-        // TODO transport errors towards request or something
-        log_error("parser error: %s", e);
-    }
+int yylex (void);
+void yyerror (char const *e){
+  // TODO transport errors towards request or something
+  log_error("parser error: %s", e);
+}
 %}
 
+// TODO %define api.value.type {struct evr_query_node}
+
+%token attr_key
+%token bool_and
+%token str
+
 %%
-query: '\n'
-;
+
+query: condition;
+
+condition:
+  condition bool_and condition
+| attr_key '=' str
+  ;
 
 %%
