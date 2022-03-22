@@ -29,9 +29,24 @@ select cref from claim where
 
 ;; tag=a && tag=b
 select cref from claim where
-  (cref in (select cref from attr where key = ? and val_str = ?)
-   and cref in (select cref from attr where key = ? and val_str = ?))
+  (
+       cref in (select cref from attr where key = ? and val_str = ?)
+   and cref in (select cref from attr where key = ? and val_str = ?)
+  )
 ;; [(txt, 'tag'), (txt, 'a'), (txt, 'tag'), (txt, 'b')]
+#+END_SRC
+
+[[https://lloydrochester.com/post/flex-bison/json-parse-ast/][Parse JSON into an Abstract Syntax Tree using Flex/Bison]] shows how to
+parse a JSON ast with bison.
+
+#+BEGIN_SRC c
+union evr_attr_query_param {
+  // TODO
+}
+
+struct evr_attr_query_node {
+  char *cond;
+}
 #+END_SRC
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
