@@ -17,8 +17,57 @@
  */
 
 #include "attr-query-parser.h"
+#include "attr-query-lexer.h"
+#include "attr-query-sql.h"
+#include "logger.h"
+#include "errors.h"
+
+// This appears to be a bug. This typedef breaks a dependency cycle
+// between the headers.
+// See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
+typedef void * yyscan_t;
+
+int append(const char *cnd);
 
 int main(){
-    // TODO
-    return 0;
+    int ret = 1;
+    struct evr_attr_query_node *root = NULL;
+    yyscan_t scanner;
+    if(yylex_init(&scanner)){
+        goto out;
+    }
+    if(!yy_scan_string("a=b && c=d", scanner)){
+        goto out_with_destroy_scanner;
+    }
+    yypstate *ystate = yypstate_new();
+    if(!ystate){
+        goto out_with_destroy_scanner;
+    }
+    int status;
+    YYSTYPE pushed_value;
+    do {
+        status = yypush_parse(ystate, yylex(&pushed_value, scanner), &pushed_value, &root);
+    } while(status == YYPUSH_MORE);
+    if(root) {
+        if(root->append_cnd(NULL, root, append) != evr_ok){
+            log_error("append_cnd failed");
+            goto out;
+        }
+        evr_free_attr_query_node(root);
+    } else {
+        log_error("Failed to parse query");
+        goto out_with_delete_ystate;
+    }
+    ret = 0;
+ out_with_delete_ystate:
+    yypstate_delete(ystate);
+ out_with_destroy_scanner:
+    yylex_destroy(scanner);
+ out:
+    return ret;
+}
+
+int append(const char *cnd){
+    log_debug(">>> append: %s", cnd);
+    return evr_ok;
 }

@@ -16,30 +16,29 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-%{
+#ifndef __attr_query_ast_h__
+#define __attr_query_ast_h__
+
 #include "config.h"
 
-#include <string.h>
+#include <time.h>
+#include <sqlite3.h>
 
-#include "attr-query-parser.h"
-%}
+struct evr_attr_query_ctx {
+    time_t t;
+};
 
-/*
- * See https://github.com/mwberry/yacc-examples/blob/master/push/push.lex#L6
- * for reasoning about reentrant and bison-bridge.
- */
-%option reentrant
-%option bison-bridge
+struct evr_attr_query_node {
+    int (*append_cnd)(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(const char *cnd));
+    int (*bind)(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column);
+    int (*free_data)(void *data);
+    void *data;
+};
 
-%option noyywrap
-%option noinput
-%option nounput
+struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value);
 
-%%
+struct evr_attr_query_node *evr_attr_query_bool_and(struct evr_attr_query_node *l, struct evr_attr_query_node *r);
 
-"&&"	{ return BOOL_AND; }
-[a-zA-Z][a-zA-Z0-9_-]*	{ yylval->string = strdup(yytext); return STRING; }
-"="	{ return EQ; }
-[ \t]*	{ }
+void evr_free_attr_query_node(struct evr_attr_query_node *node);
 
-%%
+#endif

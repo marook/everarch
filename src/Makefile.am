@@ -1,4 +1,4 @@
-AM_CFLAGS = -std=c11 -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
+AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
 BUILT_SOURCES = attr-query-parser.h
 AM_YFLAGS = -d
 
@@ -38,8 +38,11 @@ attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 attr_query_test_SOURCES = \
 	attr-query-lexer.l \
 	attr-query-parser.y \
+	attr-query-sql.c \
 	attr-query-test.c \
 	logger.c
+attr_query_test_LDADD = $(EVERARCH_LIBS)
+attr_query_test_LFLAGS = --header-file=attr-query-lexer.h
 
 basics_test_SOURCES = \
 	assert.c \

@@ -75,16 +75,28 @@ struct evr_buf_pos {
         (bp)->pos = (bp)->buf;                  \
     } while(0)
 
+#define evr_inc_buf_pos(bp, size)               \
+    do {                                        \
+        (bp)->pos += size;                      \
+    } while(0)
+
+#define evr_map_struct(bp, struct_ptr)                  \
+    do {                                                \
+        size_t size = sizeof(typeof(*struct_ptr));      \
+        struct_ptr = (typeof(struct_ptr))(bp)->pos;     \
+        evr_inc_buf_pos(bp, size);                      \
+    } while(0)
+
 #define evr_pull_as(bp, val, type)              \
     do {                                        \
         *(val) = *(type*)((bp)->pos);           \
-        (bp)->pos += sizeof(type);              \
+        evr_inc_buf_pos(bp, sizeof(type));      \
     } while(0)
 
 #define evr_pull_n(bp, val, size)               \
     do {                                        \
         memcpy(val, (bp)->pos, size);           \
-        (bp)->pos += size;                      \
+        evr_inc_buf_pos(bp, size);              \
     } while(0)
 
 #define evr_pull_map(bp, val, type, map)        \
@@ -96,13 +108,13 @@ struct evr_buf_pos {
 #define evr_push_as(bp, val, type)              \
     do {                                        \
         *(type*)((bp)->pos) = *val;             \
-        (bp)->pos += sizeof(type);              \
+        evr_inc_buf_pos(bp, sizeof(type));      \
     } while (0)
 
 #define evr_push_n(bp, val, size)               \
     do {                                        \
         memcpy((bp)->pos, val, size);           \
-        (bp)->pos += size;                      \
+        evr_inc_buf_pos(bp, size);              \
     } while (0)
 
 #define evr_push_concat(bp, s)                  \

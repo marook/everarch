@@ -16,29 +16,65 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-%{
-#include "logger.h"
+/*
+ * The attr query language implements a boolean grammar for filtering
+ * claims using their attributes.
+ *
+ * Each of the following lines are valid query examples:
+ * tag=todo
+ * mime-type=image/jpeg && tag=todo
+ */
 
-int yylex (void);
-void yyerror (char const *e){
+%{
+#include "config.h"
+
+#include "logger.h"
+#include "attr-query-sql.h"
+
+// This appears to be a bug. This typedef breaks a dependency cycle between the headers.
+// See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
+typedef void * yyscan_t;
+
+void yyerror(struct evr_attr_query_node **root, char const *e){
   // TODO transport errors towards request or something
   log_error("parser error: %s", e);
 }
+
 %}
 
-// TODO %define api.value.type {struct evr_query_node}
+%define api.push-pull push
+%define api.pure full
+
+%parse-param {struct evr_attr_query_node **root}
+
+%union {
+  struct evr_attr_query_node *node;
+  char *string;
+}
+
+%{
+int yylex(YYSTYPE *yylval_param);
+%}
 
 %token attr_key
-%token bool_and
-%token str
+%token BOOL_AND
+%token EQ
+%token <string> STRING
+
+%type <node> conditions;
+%type <node> condition;
 
 %%
 
-query: condition;
+query: conditions { *root = $1; };
+
+conditions:
+  condition
+| conditions BOOL_AND condition { $$ = evr_attr_query_bool_and($1, $3); }
+;
 
 condition:
-  condition bool_and condition
-| attr_key '=' str
-  ;
+  STRING EQ STRING { $$ = evr_attr_query_eq_cnd($1, $3); }
+;
 
 %%
