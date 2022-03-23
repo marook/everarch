@@ -90,7 +90,7 @@ int dynamic_array_remove(struct dynamic_array *da, size_t offset, size_t size){
     return evr_ok;
 }
 
-struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, char* data, size_t data_size){
+struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, const char* data, size_t data_size){
     size_t new_size_used = da->size_used + data_size;
     if(new_size_used > da->size_allocated){
         da = grow_dynamic_array_at_least(da, new_size_used);

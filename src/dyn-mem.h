@@ -68,7 +68,7 @@ void rtrim_dynamic_array(struct dynamic_array *da, int (*istrimmed)(int c));
 
 int dynamic_array_remove(struct dynamic_array *da, size_t offset, size_t size);
 
-struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, char* data, size_t data_size);
+struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, const char* data, size_t data_size);
 
 /**
  * evr_chunk_size is the size of one chunk in bytes.

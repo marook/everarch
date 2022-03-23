@@ -24,6 +24,9 @@ attr_index_db_test_SOURCES = \
 	attr-index-db.c \
 	attr-index-db-configuration.c \
 	attr-index-db-test.c \
+	attr-query-lexer.l \
+	attr-query-parser.y \
+	attr-query-sql.c \
 	configuration-testutil.c \
 	configurations.c \
 	db.c \
@@ -34,6 +37,7 @@ attr_index_db_test_SOURCES = \
 	keys.c \
 	logger.c
 attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 attr_query_test_SOURCES = \
 	attr-query-lexer.l \

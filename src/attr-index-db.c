@@ -21,10 +21,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dyn-mem.h"
 #include "basics.h"
 #include "logger.h"
 #include "errors.h"
 #include "db.h"
+#include "attr-query-parser.h"
+#include "attr-query-lexer.h"
+#include "attr-query-sql.h"
 
 int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, time_t valid_until);
 int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, time_t t);
@@ -624,4 +628,118 @@ int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_a
     ret = evr_ok;
  out:
     return ret;
+}
+
+struct evr_attr_query_node *evr_attr_parse_query(const char *query);
+
+struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit);
+
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, time_t t, size_t offset, size_t limit, evr_claim_visitor visit){
+    int ret = evr_error;
+    struct evr_attr_query_node *root = evr_attr_parse_query(query);
+    if(!root){
+        log_error("Failed to parse attr query: %s", query);
+        goto out;
+    }
+    struct evr_attr_query_ctx ctx;
+    ctx.t = t;
+    struct dynamic_array *sql = evr_attr_build_sql_query(root, &ctx, offset, limit);
+    if(!sql){
+        goto out_with_free_root;
+    }
+    sqlite3_stmt *query_stmt;
+    if(evr_prepare_stmt(db->db, sql->data, &query_stmt) != evr_ok){
+        goto out_with_free_sql;
+    }
+    int column = 1;
+    if(root->bind(&ctx, root, query_stmt, &column) != evr_ok){
+        goto out_with_finalize_query_stmt;
+    }
+    while(1){
+        int step_res = evr_step_stmt(db->db, query_stmt);
+        if(step_res == SQLITE_DONE){
+            break;
+        }
+        if(step_res != SQLITE_ROW){
+            goto out_with_finalize_query_stmt;
+        }
+        int ref_col_size = sqlite3_column_bytes(query_stmt, 0);
+        if(ref_col_size != evr_claim_ref_size){
+            goto out_with_finalize_query_stmt;
+        }
+        const evr_claim_ref *ref = sqlite3_column_blob(query_stmt, 0);
+        if(visit(*ref) != evr_ok){
+            goto out_with_finalize_query_stmt;
+        }
+    }
+    ret = evr_ok;
+    out_with_finalize_query_stmt:
+    if(sqlite3_finalize(query_stmt) != SQLITE_OK){
+        evr_panic("Failed to finalize claim query statement");
+        ret = evr_error;
+    }
+ out_with_free_sql:
+    free(sql);
+ out_with_free_root:
+    evr_free_attr_query_node(root);
+ out:
+    return ret;
+}
+
+struct evr_attr_query_node *evr_attr_parse_query(const char *query){
+    struct evr_attr_query_node *ret = NULL;
+    yyscan_t scanner;
+    if(yylex_init(&scanner)){
+        goto out;
+    }
+    if(!yy_scan_string(query, scanner)){
+        goto out_with_destroy_scanner;
+    }
+    yypstate *ystate = yypstate_new();
+    if(!ystate){
+        goto out_with_destroy_scanner;
+    }
+    int status;
+    YYSTYPE pushed_value;
+    do {
+        status = yypush_parse(ystate, yylex(&pushed_value, scanner), &pushed_value, &ret);
+    } while(status == YYPUSH_MORE);
+    yypstate_delete(ystate);
+ out_with_destroy_scanner:
+    yylex_destroy(scanner);
+ out:
+    return ret;
+}
+
+int evr_attr_build_sql_append(struct evr_attr_query_ctx *ctx, const char *cnd){
+    int ret = evr_error;
+    struct dynamic_array **buf = ctx->more;
+    size_t cnd_len = strlen(cnd);
+    *buf = write_n_dynamic_array(*buf, cnd, cnd_len);
+    if(!*buf){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit){
+    struct dynamic_array *ret = alloc_dynamic_array(4 * 1024);
+    if(!ret){
+        goto out;
+    }
+    ctx->more = &ret;
+    const char prefix[] = "select ref from claim where ";
+    ret = write_n_dynamic_array(ret, prefix, strlen(prefix));
+    if(root->append_cnd(ctx, root, evr_attr_build_sql_append) != evr_ok){
+        goto out_with_free_ret;
+    }
+    // TODO append limit X offset X
+    ret = write_n_dynamic_array(ret, "", 1);
+ out:
+    return ret;
+ out_with_free_ret:
+    free(ret);
+    return NULL;
 }

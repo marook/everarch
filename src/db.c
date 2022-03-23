@@ -22,7 +22,7 @@
 #include "errors.h"
 
 int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
-    log_debug("Prepare sqlite stamenent: %s", sql);
+    log_debug("Prepare sqlite statement: %s", sql);
     if(sqlite3_prepare_v2(db, sql, -1, stmt, NULL) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db);
         log_error("Failed to prepare statement '%s': %s", sql, sqlite_error_msg);

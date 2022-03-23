@@ -22,12 +22,7 @@
 #include "logger.h"
 #include "errors.h"
 
-// This appears to be a bug. This typedef breaks a dependency cycle
-// between the headers.
-// See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
-typedef void * yyscan_t;
-
-int append(const char *cnd);
+int append(struct evr_attr_query_ctx *ctx, const char *cnd);
 
 int main(){
     int ret = 1;
@@ -67,7 +62,7 @@ int main(){
     return ret;
 }
 
-int append(const char *cnd){
+int append(struct evr_attr_query_ctx *ctx, const char *cnd){
     log_debug(">>> append: %s", cnd);
     return evr_ok;
 }

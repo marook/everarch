@@ -31,9 +31,15 @@
 int found_tag_a = 0;
 int found_tag_b = 0;
 
+int found_claim_0 = 0;
+
 void reset_visit_attrs();
 int visit_attrs(const evr_claim_ref ref, const char *key, const char *value);
+int visit_claims(const evr_claim_ref ref);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
+void reset_visit_claims();
+int visit_claims(const evr_claim_ref ref);
+void assert_claims(int expected_found_claim_0);
 void assert_tag_eq(int actual, int expected, char *name);
 
 void test_open_new_attr_index_db_twice(){
@@ -80,8 +86,13 @@ void test_open_new_attr_index_db_twice(){
                 for(size_t rai = 0; rai < merge_attrs_len; ++rai){
                     size_t aai = attr_merge_permutations[pi][rai];
                     time_t t = merge_attrs_t[aai];
-                    struct evr_attr *attr = &merge_attrs[aai];
-                    assert_ok(evr_merge_attr_index_attr(db, t, ref, attr, 1));
+                    struct evr_attr_claim claim;
+                    claim.ref_type = evr_ref_type_blob;
+                    memcpy(claim.ref, ref, evr_blob_ref_size);
+                    claim.claim_index = 0;
+                    claim.attr_len = 1;
+                    claim.attr = &merge_attrs[aai];
+                    assert_ok(evr_merge_attr_index_claim(db, t, &claim));
                 }
             }
             log_info("Assert t=0");
@@ -116,6 +127,18 @@ void test_open_new_attr_index_db_twice(){
             reset_visit_attrs();
             assert_ok(evr_get_ref_attrs(db, 25, other_ref, visit_attrs));
             assert_attrs(0, 0);
+            log_info("Assert evr_attr_query_claims tag=A t=0");
+            reset_visit_claims();
+            assert_ok(evr_attr_query_claims(db, "tag=A", 0, 0, 100, visit_claims));
+            assert_claims(0);
+            log_info("Assert evr_attr_query_claims tag=A t=25");
+            reset_visit_claims();
+            assert_ok(evr_attr_query_claims(db, "tag=A", 25, 0, 100, visit_claims));
+            assert_claims(1);
+            log_info("Assert evr_attr_query_claims tag=X t=25");
+            reset_visit_claims();
+            assert_ok(evr_attr_query_claims(db, "tag=X", 25, 0, 100, visit_claims));
+            assert_claims(0);
             assert_ok(evr_free_glacier_index_db(db));
         }
         evr_free_attr_index_db_configuration(cfg);
@@ -146,6 +169,23 @@ int visit_attrs(const evr_claim_ref ref, const char *key, const char *value){
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b){
     assert_int_eq_msg(found_tag_a, expected_found_tag_a, "Expected found_a to be %d but was %d\n", expected_found_tag_a, found_tag_a);
     assert_int_eq_msg(found_tag_b, expected_found_tag_b, "Expected found_b to be %d but was %d\n", expected_found_tag_b, found_tag_b);
+}
+
+void reset_visit_claims(){
+    found_claim_0 = 0;
+}
+
+int visit_claims(const evr_claim_ref ref){
+    evr_claim_ref_str ref_str;
+    evr_fmt_claim_ref(ref_str, ref);
+    if(strcmp(ref_str, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000") == 0){
+        found_claim_0 = 1;
+    }
+    return evr_ok;
+}
+
+void assert_claims(int expected_found_claim_0){
+    assert_int_eq_msg(found_claim_0, expected_found_claim_0, "Expected to have found claim 0");
 }
 
 void test_add_two_attr_claims_for_same_target(){
