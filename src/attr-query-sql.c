@@ -124,13 +124,13 @@ int evr_append_bool_and(struct evr_attr_query_ctx *ctx, struct evr_attr_query_no
     if(append(ctx, "(") != evr_ok){
         goto out;
     }
-    if(data->l->append_cnd(data->l->data, data->l, append) != evr_ok){
+    if(data->l->append_cnd(ctx, data->l, append) != evr_ok){
         goto out;
     }
     if(append(ctx, ") and (") != evr_ok){
         goto out;
     }
-    if(data->r->append_cnd(data->r->data, data->r, append) != evr_ok){
+    if(data->r->append_cnd(ctx, data->r, append) != evr_ok){
         goto out;
     }
     if(append(ctx, ")") != evr_ok){

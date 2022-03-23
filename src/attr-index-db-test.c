@@ -139,6 +139,14 @@ void test_open_new_attr_index_db_twice(){
             reset_visit_claims();
             assert_ok(evr_attr_query_claims(db, "tag=X", 25, 0, 100, visit_claims));
             assert_claims(0);
+            log_info("Assert evr_attr_query_claims tag=A && tag=B t=25");
+            reset_visit_claims();
+            assert_ok(evr_attr_query_claims(db, "tag=A && tag=B", 25, 0, 100, visit_claims));
+            assert_claims(1);
+            log_info("Assert evr_attr_query_claims tag=A && tag=B t=15");
+            reset_visit_claims();
+            assert_ok(evr_attr_query_claims(db, "tag=A && tag=B", 15, 0, 100, visit_claims));
+            assert_claims(0);
             assert_ok(evr_free_glacier_index_db(db));
         }
         evr_free_attr_index_db_configuration(cfg);
