@@ -14,6 +14,11 @@ there should be at least these response modes:
 * introduce evr-attr-cli cmd with index query feature
 command line client which sends querries to a evr-attr-index and lists
 found blobs.
+* implement offset and limit in attr queries
+tag=todo offset=0 limit=100
+* implement t in attr queries
+tag=todo t=12345
+tag=todo t=1970-01-01T00:00:07Z
 * add ref key to attr query language to match ref
 introduce ref as keyword to match the ref of a claim. later "ref" (in
 double quotes) should mean the attribute with the key ref.
