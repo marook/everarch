@@ -4,7 +4,6 @@ AM_YFLAGS = -d
 
 bin_PROGRAMS = \
 	attr-index-db-test \
-	attr-query-test \
 	basics-test \
 	claims-test \
 	concurrent-glacier-test \
@@ -38,15 +37,6 @@ attr_index_db_test_SOURCES = \
 	logger.c
 attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
-
-attr_query_test_SOURCES = \
-	attr-query-lexer.l \
-	attr-query-parser.y \
-	attr-query-sql.c \
-	attr-query-test.c \
-	logger.c
-attr_query_test_LDADD = $(EVERARCH_LIBS)
-attr_query_test_LFLAGS = --header-file=attr-query-lexer.h
 
 basics_test_SOURCES = \
 	assert.c \
