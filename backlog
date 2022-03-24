@@ -83,11 +83,6 @@ once for every blob and without any checksum.
 there should be either a checksum for the two fields or it should be
 stored redundant. this should reduce the risk of breaking a whole
 bucket if one blob in it has a bit error.
-* move glacier storage client functions into glacier-client.[hc]
-right now the evr-glacier-cli.c contains functions for handling blob
-put and blob get commands. code should be centralized in
-glacier-client.[ch] in order to be reused in other future clients like
-the file upload service.
 * add setup hints to README
 ** gpg signing key
 hint the user that the default gpg signing key is used for signing
@@ -103,6 +98,11 @@ because of the evr_chunk_set_max_chunks limitation.
 
 struct dynamic_array should be renamed to hint the random access
 usage. maybe rabuf instead of dynamic_array and llbuf for chunk_set.
+* use writev instead of buf copying
+writev can write mutliple buffers in one system call. this may reduce
+the amout of memory being copied before a write call. there are
+probably some places in glacier.c and the networking code which can
+benefit from writev.
 * replace own queues with lib io_uring
 inter thread communitcation queues have been implemented in struct
 evr_work_watch_ctx and struct evr_persister_ctx.
