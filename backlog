@@ -1,53 +1,3 @@
-* define query language and result format for evr-attr-index server
-expression examples:
-
-#+BEGIN_SRC
-tag=peng color=blue size<=12 is_image(mime_type) -key -key2=peng
--tag=nsfw
-(tag=todo || tag=backlog) tag=howto
-#+END_SRC
-
-implement an ast and parser for the query language.
-
-define a format for results the query can find.
-** TODO how can we search for a single blob
-something like "ref:sha3-224-…" but without the issue that "ref:"
-would shadow a ref attribute defined in a claim.
-** DONE how can we defined what kind of results we want?
-maybe only a limited set of attributes is required? maybe some
-aggregation functions should be invoked?
-
--> a minimalistic query will always just return refs of matching
-   claims. it will probably make sense to specify a set of attribute
-   keys which should also be responded.
-** DONE how can we map the query to select statements?
-#+BEGIN_SRC sql
-;; tag=peng
-select cref from claim where
-  cref in (select cref from attr where key = ? and val_str = ?)
-;; [(txt, 'tag'), (txt, 'peng')]
-
-;; tag=a && tag=b
-select cref from claim where
-  (
-       cref in (select cref from attr where key = ? and val_str = ?)
-   and cref in (select cref from attr where key = ? and val_str = ?)
-  )
-;; [(txt, 'tag'), (txt, 'a'), (txt, 'tag'), (txt, 'b')]
-#+END_SRC
-
-[[https://lloydrochester.com/post/flex-bison/json-parse-ast/][Parse JSON into an Abstract Syntax Tree using Flex/Bison]] shows how to
-parse a JSON ast with bison.
-
-#+BEGIN_SRC c
-union evr_attr_query_param {
-  // TODO
-}
-
-struct evr_attr_query_node {
-  char *cond;
-}
-#+END_SRC
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
 
@@ -55,10 +5,43 @@ then build a sqlite index db based on index claim. watch a glacier for
 claims and populate the sqlite db until the batch ends.
 
 the recent sqlite db should be provided to consumers.
+* how do we report claims found in attr query?
+there should be at least these response modes:
+** report only ref
+** report ref and some attributes specified by key
+** report ref and all attributes
 * evr-attr-index should listen on a socket for querries
 * introduce evr-attr-cli cmd with index query feature
 command line client which sends querries to a evr-attr-index and lists
 found blobs.
+* add ref key to attr query language to match ref
+introduce ref as keyword to match the ref of a claim. later "ref" (in
+double quotes) should mean the attribute with the key ref.
+* add boolean or operator to attr query language
+#+BEGIN_SRC
+(tag=todo || tag=backlog) && tag=howto
+#+END_SRC
+* add braces to attr query language
+#+BEGIN_SRC
+(tag=todo || tag=backlog) && tag=howto
+#+END_SRC
+* add not operator to attr query language
+#+BEGIN_SRC
+!tag=nsfw
+#+END_SRC
+* allow attr query args in quotes
+#+BEGIN_SRC
+'the key'='the value'
+"the key"="the value"
+#+END_SRC
+* add match functions to attr query language
+#+BEGIN_SRC
+tag=todo && is_image(mime_type)
+#+END_SRC
+* make boolean and operator '&&' optional in attr query language
+#+BEGIN_SRC
+(tag=todo || tag=backlog) tag=howto
+#+END_SRC
 * introduce content sourced attritutes
 attr specs should contain declarations for content sourced
 attributes. content sourced attributes are scripts which are executed
