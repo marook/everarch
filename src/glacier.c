@@ -198,31 +198,41 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
     if(sqlite3_bind_int64(ctx->list_blobs_stmt, 1, last_modified_after) != SQLITE_OK){
         goto out;
     }
-    int step_ret = sqlite3_step(ctx->list_blobs_stmt);
+    int has_found_key = 0;
+    evr_blob_ref found_key;
+    int flags;
+    unsigned long long last_modified;
     while(1){
+        int step_ret = sqlite3_step(ctx->list_blobs_stmt);
         if(step_ret == SQLITE_DONE){
+            if(has_found_key){
+                if(visit(vctx, found_key, flags, last_modified, 1) != evr_ok){
+                    goto out;
+                }
+            }
             break;
         }
         if(step_ret != SQLITE_ROW){
             goto out;
         }
-        int flags = sqlite3_column_int(ctx->list_blobs_stmt, 1);
-        if((flags & flags_filter) != flags_filter){
-            step_ret = sqlite3_step(ctx->list_blobs_stmt);
+        int new_flags = sqlite3_column_int(ctx->list_blobs_stmt, 1);
+        if((new_flags & flags_filter) != flags_filter){
             continue;
+        }
+        if(has_found_key){
+            if(visit(vctx, found_key, flags, last_modified, 0) != evr_ok){
+                goto out;
+            }
         }
         int key_col_size = sqlite3_column_bytes(ctx->list_blobs_stmt, 0);
         if(key_col_size != evr_blob_ref_size){
             goto out;
         }
-        evr_blob_ref key;
+        has_found_key = 1;
+        flags = new_flags;
         const void *sqkey = sqlite3_column_blob(ctx->list_blobs_stmt, 0);
-        memcpy(key, sqkey, evr_blob_ref_size);
-        unsigned long long last_modified = sqlite3_column_int64(ctx->list_blobs_stmt, 2);
-        step_ret = sqlite3_step(ctx->list_blobs_stmt);
-        if(visit(vctx, key, flags, last_modified, step_ret == SQLITE_DONE) != evr_ok){
-            goto out;
-        }
+        memcpy(found_key, sqkey, evr_blob_ref_size);
+        last_modified = sqlite3_column_int64(ctx->list_blobs_stmt, 2);
     }
     ret = evr_ok;
  out:

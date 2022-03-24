@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-24T00:00:00Z"
+    >
+  <attr>
+    <a op="+" k="tag" v="todo"/>
+    <a op="=" k="title" v="test claim"/>
+  </attr>
+</claim-set>

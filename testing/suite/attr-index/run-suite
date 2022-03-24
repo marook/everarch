@@ -16,11 +16,11 @@ stop(){
         echo "storage/lock still existing after storage quit" >&2
         exit 1
     fi
-    rm -rf 'storage'
+    rm -rf 'storage' 'attr-index'
 }
 
-rm -rf 'storage'
-mkdir 'storage'
+rm -rf 'storage' 'attr-index'
+mkdir 'storage' 'attr-index'
 
 evr-glacier-storage &
 spid=$!
@@ -39,11 +39,14 @@ evr-glacier-cli -f 3 sign-put <<EOF
     >
   <attr-spec>
     <attr-def k="tag" type="str"/>
+    <attr-def k="title" type="str"/>
     <stylesheet blob="${basic_xslt_ref}"/>
   </attr-spec>
 </claim-set>
 EOF
-# TODO produce "old stylesheet" and attr-spec
+
+echo "Uploading test claim…"
+evr-glacier-cli -f 1 sign-put < attr-claim.xml
 
 echo "Starting evr-attr-index…"
 evr-attr-index &
@@ -51,3 +54,5 @@ ipid=$!
 
 # TODO build up index
 sleep 1
+
+echo "Stopping…"

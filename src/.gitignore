@@ -2,3 +2,4 @@
 /attr-query-lexer.h
 /attr-query-parser.h
 /attr-query-parser.c
+/evr_attr_index-attr-query-lexer.c

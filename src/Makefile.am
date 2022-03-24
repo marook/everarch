@@ -71,7 +71,14 @@ dyn_mem_test_SOURCES = \
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
 evr_attr_index_SOURCES = \
+	attr-index-db.c \
+	attr-index-db-configuration.c \
+	attr-query-lexer.l \
+	attr-query-parser.y \
+	attr-query-sql.c \
 	claims.c \
+	configurations.c \
+	db.c \
 	dyn-mem.c \
 	evr-attr-index.c \
 	evr-glacier-client.c \
@@ -81,7 +88,8 @@ evr_attr_index_SOURCES = \
 	logger.c \
 	server.c \
 	signatures.c
-evr_attr_index_LDADD = $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS)
+evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
+evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_glacier_cli_SOURCES = \
 	claims.c \

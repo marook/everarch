@@ -103,7 +103,7 @@ int main(){
     };
     if(evr_load_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*), merge_evr_glacier_storage_configuration_file, expand_evr_glacier_storage_configuration) != evr_ok){
         log_error("Failed to load configuration");
-        goto out;
+        goto out_with_free_configuration;
     }
     if(evr_quick_check_glacier(config) != evr_ok){
         log_error("Glacier quick check failed");

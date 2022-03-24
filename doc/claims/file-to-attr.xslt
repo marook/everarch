@@ -17,11 +17,13 @@
     xmlns:dc="http://purl.org/dc/terms/"
     >
   <xsl:output encoding="UTF-8"/>
+
   <xsl:template match="/evr:claim-set">
     <evr:claim-set dc:created="{@dc:created}">
       <xsl:apply-templates/>
     </evr:claim-set>
   </xsl:template>
+
   <xsl:template match="evr:file">
     <evr:attr claim="{count(preceding-sibling::*)}">
       <evr:a op="=" k="title" v="{@dc:title}"/>

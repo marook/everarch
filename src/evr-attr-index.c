@@ -23,6 +23,7 @@
 #include <stdatomic.h>
 #include <unistd.h>
 #include <threads.h>
+#include <libxslt/transform.h>
 
 #include "basics.h"
 #include "claims.h"
@@ -31,10 +32,15 @@
 #include "evr-glacier-client.h"
 #include "signatures.h"
 #include "server.h"
+#include "attr-index-db-configuration.h"
+#include "attr-index-db.h"
+#include "configurations.h"
 
 sig_atomic_t running = 1;
 mtx_t stop_lock;
 cnd_t stop_signal;
+
+struct evr_attr_index_db_configuration *cfg;
 
 struct evr_attr_spec_handover_ctx {
     mtx_t lock;
@@ -52,16 +58,23 @@ struct evr_attr_spec_handover_ctx {
 };
 
 void handle_sigterm(int signum);
+struct evr_attr_index_db_configuration *evr_load_attr_index_db_cfg();
 int evr_init_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
 int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
 int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
+int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, int *c);
 int evr_attr_index_tcp_server();
 
 int main(){
     int ret = evr_error;
-    if(mtx_init(&stop_lock, mtx_plain) != thrd_success){
+    cfg = evr_load_attr_index_db_cfg();
+    if(!cfg){
         goto out;
+    }
+    if(mtx_init(&stop_lock, mtx_plain) != thrd_success){
+        goto out_with_free_cfg;
     }
     if(cnd_init(&stop_signal) != thrd_success){
         goto out_with_free_stop_lock;
@@ -137,12 +150,31 @@ int main(){
         ret = evr_error;
     }
  out_with_cleanup_xml_parser:
+    xsltCleanupGlobals();
     xmlCleanupParser();
     cnd_destroy(&stop_signal);
  out_with_free_stop_lock:
     mtx_destroy(&stop_lock);
+ out_with_free_cfg:
+    evr_free_attr_index_db_configuration(cfg);
  out:
     return ret;
+}
+
+struct evr_attr_index_db_configuration *evr_load_attr_index_db_cfg(){
+    struct evr_attr_index_db_configuration *cfg = evr_create_attr_index_db_configuration();
+    const char *config_paths[] = {
+        "~/.config/everarch/attr-index.json",
+        "attr-index.json",
+    };
+    if(evr_load_configurations(cfg, config_paths, sizeof(config_paths) / sizeof(char*), evr_merge_attr_index_db_configuration, evr_expand_attr_index_db_configuration) != evr_ok){
+        log_error("Failed to load configuration");
+        goto out_with_free_cfg;
+    }
+    return cfg;
+ out_with_free_cfg:
+    evr_free_attr_index_db_configuration(cfg);
+    return NULL;
 }
 
 void handle_sigterm(int signum){
@@ -406,22 +438,210 @@ int evr_build_index_worker(void *arg){
             evr_panic("Failed to unlock attr-spec handover lock");
             goto out;
         }
-#ifdef EVR_LOG_DEBUG
+#ifdef EVR_LOG_INFO
         {
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, claim_key);
-            log_debug("Start building attr index for %s", fmt_key);
+            log_info("Start building attr index for %s", fmt_key);
         }
 #endif
-        // TODO
-        log_debug(">>> got an index to build");
+        if(evr_bootstrap_db(claim_key, claim) != evr_ok){
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, claim_key);
+            log_error("Failed building attr index for %s", fmt_key);
+            goto out;
+        }
+#ifdef EVR_LOG_INFO
+        {
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, claim_key);
+            log_info("Finished building attr index for %s", fmt_key);
+        }
+#endif
+        // TODO handover
+        log_debug(">>> should handover ready made db to current index");
         free(claim);
         xmlFree(stylesheet);
         continue;
     out_of_running_loop:
         break;
     }
+ out:
     log_debug("Ended build index worker with result %d", ret);
+    return ret;
+}
+
+int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
+    int ret = evr_error;
+    int cw = evr_connect_to_storage();
+    if(cw < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out;
+    }
+    evr_blob_ref_str claim_key_str;
+    evr_fmt_blob_ref(claim_key_str, claim_key);
+    // TODO delete former db if it exists
+    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, claim_key_str);
+    if(!db){
+        goto out_with_close_cw;
+    }
+    if(evr_setup_attr_index_db(db, spec) != evr_ok){
+        goto out_with_free_db;
+    }
+    if(evr_prepare_attr_index_db(db) != evr_ok){
+        goto out_with_free_db;
+    }
+    xmlDocPtr style_doc = evr_fetch_xml(cw, spec->stylesheet_blob_ref);
+    if(!style_doc){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, spec->stylesheet_blob_ref);
+        log_error("Failed to fetch attr spec's stylesheet with ref %s", ref_str);
+        goto out_with_free_db;
+    }
+    xsltStylesheetPtr style = xsltParseStylesheetDoc(style_doc);
+    if(!style){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, spec->stylesheet_blob_ref);
+        log_error("Failed to parse XSLT stylesheet from blob with ref %s", ref_str);
+        // style_doc is freed by xsltFreeStylesheet(style) on
+        // successful style parsing.
+        xmlFreeDoc(style_doc);
+        goto out_with_free_db;
+    }
+    struct evr_blob_filter filter;
+    filter.flags_filter = evr_blob_flag_claim;
+    filter.last_modified_after = 0;
+    if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
+        goto out_with_free_style;
+    }
+    struct evr_watch_blobs_body wbody;
+    fd_set active_fd_set;
+    FD_ZERO(&active_fd_set);
+    FD_SET(cw, &active_fd_set);
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    int cs = -1;
+    while(running){
+        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, &timeout);
+        if(sret < 0){
+            goto out_with_close_cs;
+        }
+        if(!running){
+            ret = evr_ok;
+            goto out_with_close_cs;
+        }
+        if(sret == 0){
+            continue;
+        }
+        if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
+            goto out_with_close_cs;
+        }
+        if(evr_index_claim_set(db, style, wbody.key, &cs) != evr_ok){
+            goto out_with_close_cs;
+        }
+        if((wbody.flags & evr_watch_flag_eob) == evr_watch_flag_eob){
+            break;
+        }
+    }
+    ret = evr_ok;
+ out_with_close_cs:
+    if(cs >= 0){
+        close(cs);
+    }
+ out_with_free_style:
+    xsltFreeStylesheet(style);
+ out_with_free_db:
+    if(evr_free_glacier_index_db(db) != evr_ok){
+        ret = evr_error;
+    }
+ out_with_close_cw:
+    close(cw);
+ out:
+    return ret;
+}
+
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, int *c){
+    int ret = evr_error;
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_debug("Indexing claim set %s", ref_str);
+    }
+#endif
+    if(*c == -1){
+        *c = evr_connect_to_storage();
+        if(*c < 0){
+            log_error("Failed to connect to evr-glacier-storage server");
+            goto out;
+        }
+    }
+    xmlDocPtr raw_claim_set_doc = evr_fetch_signed_xml(*c, claim_set_ref);
+    if(!raw_claim_set_doc){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("Claim set not fetchable for blob key %s", ref_str);
+        goto out;
+    }
+    const char *xslt_params[] = {
+        NULL
+    };
+    xmlDocPtr claim_set_doc = xsltApplyStylesheet(stylesheet, raw_claim_set_doc, xslt_params);
+    xmlFreeDoc(raw_claim_set_doc);
+    if(!claim_set_doc){
+        goto out;
+    }
+    xmlNode *cs_node = evr_get_root_claim_set(claim_set_doc);
+    if(!cs_node){
+#ifdef EVR_LOG_INFO
+        {
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_info("Transformed claim set blob %s does not contain claim-set element", ref_str);
+        }
+#endif
+        ret = evr_ok;
+        goto out_with_free_claim_set_doc;
+    }
+    time_t created;
+    if(evr_parse_created(&created, cs_node) != evr_ok){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("Failed to parse created date from transformed claim-set for blob ref %s", ref_str);
+        goto out_with_free_claim_set_doc;
+    }
+    xmlNode *c_node = evr_first_claim(cs_node);
+    struct evr_attr_claim *attr;
+    while(c_node){
+        c_node = evr_find_next_element(c_node, "attr");
+        if(!c_node){
+            break;
+        }
+        attr = evr_parse_attr_claim(c_node);
+        if(!attr){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s", ref_str);
+            goto out_with_free_claim_set_doc;
+        }
+        if(attr->ref_type == evr_ref_type_self){
+            memcpy(attr->ref, claim_set_ref, evr_blob_ref_size);
+            attr->ref_type = evr_ref_type_blob;
+        }
+        int merge_res = evr_merge_attr_index_claim(db, created, attr);
+        free(attr);
+        if(merge_res != evr_ok){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Failed to merge attr claim from transformed claim-set for blob with ref %s into attr index", ref_str);
+            goto out_with_free_claim_set_doc;
+        }
+        c_node = c_node->next;
+    }
+    ret = evr_ok;
+ out_with_free_claim_set_doc:
+    xmlFreeDoc(claim_set_doc);
  out:
     return ret;
 }
