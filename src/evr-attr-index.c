@@ -58,10 +58,18 @@ struct evr_attr_spec_handover_ctx {
     xmlDocPtr stylesheet;
 };
 
+struct evr_index_handover_ctx {
+    struct evr_handover_ctx handover;
+
+    evr_blob_ref index_ref;
+};
+
 void handle_sigterm(int signum);
 struct evr_attr_index_db_configuration *evr_load_attr_index_db_cfg();
-int evr_init_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
+#define evr_init_attr_spec_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
 int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
+#define evr_init_index_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
+#define evr_free_index_handover_ctx(ctx) evr_free_handover_ctx(&(ctx)->handover)
 
 int evr_init_handover_ctx(struct evr_handover_ctx *ctx);
 int evr_free_handover_ctx(struct evr_handover_ctx *ctx);
@@ -102,16 +110,24 @@ int main(){
     if(evr_init_attr_spec_handover_ctx(&attr_spec_handover_ctx) != evr_ok){
         goto out_with_cleanup_xml_parser;
     }
-    thrd_t watch_index_claims_thrd;
-    if(thrd_create(&watch_index_claims_thrd, evr_watch_index_claims_worker, &attr_spec_handover_ctx) != thrd_success){
+    struct evr_index_handover_ctx index_handover_ctx;
+    if(evr_init_index_handover_ctx(&index_handover_ctx) != evr_ok){
         goto out_with_free_attr_spec_handover_ctx;
     }
+    thrd_t watch_index_claims_thrd;
+    if(thrd_create(&watch_index_claims_thrd, evr_watch_index_claims_worker, &attr_spec_handover_ctx) != thrd_success){
+        goto out_with_free_index_handover_ctx;
+    }
     thrd_t build_index_thrd;
-    if(thrd_create(&build_index_thrd, evr_build_index_worker, &attr_spec_handover_ctx) != thrd_success){
+    void *build_index_thrd_ctx[] = {
+        &attr_spec_handover_ctx,
+        &index_handover_ctx,
+    };
+    if(thrd_create(&build_index_thrd, evr_build_index_worker, &build_index_thrd_ctx) != thrd_success){
         goto out_with_join_watch_index_claims_thrd;
     }
     thrd_t tcp_server_thrd;
-    if(thrd_create(&tcp_server_thrd, evr_attr_index_tcp_server, NULL) != thrd_success){
+    if(thrd_create(&tcp_server_thrd, evr_attr_index_tcp_server, &index_handover_ctx) != thrd_success){
         goto out_with_join_build_index_thrd;
     }
     if(mtx_lock(&stop_lock) != thrd_success){
@@ -126,6 +142,9 @@ int main(){
     }
     if(mtx_unlock(&stop_lock) != thrd_success){
         evr_panic("Failed to unlock stop lock");
+        goto out_with_join_watch_index_claims_thrd;
+    }
+    if(evr_stop_handover(&index_handover_ctx.handover) != evr_ok){
         goto out_with_join_watch_index_claims_thrd;
     }
     if(evr_stop_handover(&attr_spec_handover_ctx.handover) != evr_ok){
@@ -147,6 +166,11 @@ int main(){
         ret = evr_error;
     }
     if(thrd_res != evr_ok){
+        ret = evr_error;
+    }
+ out_with_free_index_handover_ctx:
+    if(evr_free_index_handover_ctx(&index_handover_ctx) != evr_ok){
+        evr_panic("Failed to free index handover context");
         ret = evr_error;
     }
  out_with_free_attr_spec_handover_ctx:
@@ -199,17 +223,6 @@ void handle_sigterm(int signum){
         evr_panic("Failed to unlock stop lock");
         return;
     }
-}
-
-int evr_init_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx){
-    int ret = evr_error;
-    if(evr_init_handover_ctx(&ctx->handover) != evr_ok){
-        goto out;
-    }
-    ctx->claim = NULL;
-    ret = evr_ok;
- out:
-    return ret;
 }
 
 int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx){
@@ -504,21 +517,23 @@ int evr_watch_index_claims_worker(void *arg){
 
 int evr_build_index_worker(void *arg){
     int ret = evr_error;
-    struct evr_attr_spec_handover_ctx *ctx = arg;
+    void **evr_build_index_worker_ctx = arg;
+    struct evr_attr_spec_handover_ctx *sctx = evr_build_index_worker_ctx[0];
+    struct evr_index_handover_ctx *ictx = evr_build_index_worker_ctx[1];
     log_debug("Started build index worker");
     while(running){
-        if(evr_wait_for_handover_occupied(&ctx->handover) != evr_ok){
+        if(evr_wait_for_handover_occupied(&sctx->handover) != evr_ok){
             goto out;
         }
         if(!running){
             break;
         }
-        struct evr_attr_spec_claim *claim = ctx->claim;
+        struct evr_attr_spec_claim *claim = sctx->claim;
         evr_blob_ref claim_key;
-        memcpy(claim_key, ctx->claim_key, evr_blob_ref_size);
-        // TODO time_t created = ctx->created;;
-        xmlDocPtr stylesheet = ctx->stylesheet;
-        if(evr_empty_handover(&ctx->handover) != evr_ok){
+        memcpy(claim_key, sctx->claim_key, evr_blob_ref_size);
+        // TODO time_t created = sctx->created;;
+        xmlDocPtr stylesheet = sctx->stylesheet;
+        if(evr_empty_handover(&sctx->handover) != evr_ok){
             goto out;
         }
 #ifdef EVR_LOG_INFO
@@ -541,11 +556,27 @@ int evr_build_index_worker(void *arg){
             log_info("Finished building attr index for %s", fmt_key);
         }
 #endif
-        // TODO handover
-        log_debug(">>> should handover ready made db to current index");
         free(claim);
         xmlFree(stylesheet);
+        if(evr_wait_for_handover_available(&ictx->handover) != evr_ok){
+            goto out;
+        }
+        if(!running){
+            break;
+        }
+#ifdef EVR_LOG_DEBUG
+        {
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, claim_key);
+            log_info("Handover attr index for %s", fmt_key);
+        }
+#endif
+        memcpy(ictx->index_ref, claim_key, evr_blob_ref_size);
+        if(evr_occupy_handover(&ictx->handover) != evr_ok){
+            goto out;
+        }
     }
+    ret = evr_ok;
  out:
     log_debug("Ended build index worker with result %d", ret);
     return ret;
