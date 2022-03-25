@@ -22,6 +22,7 @@
 #include "config.h"
 
 #include <sqlite3.h>
+#include <libxslt/documents.h>
 
 #include "attr-index-db-configuration.h"
 #include "claims.h"
@@ -51,6 +52,8 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  * evr_attr_index_db for merge calls.
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
+
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc);
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim);
 

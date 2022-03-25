@@ -20,6 +20,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <libxslt/transform.h>
 
 #include "dyn-mem.h"
 #include "basics.h"
@@ -152,6 +153,76 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     return ret;
  out_with_free_error:
     sqlite3_free(error);
+    return ret;
+}
+
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc){
+    int ret = evr_error;
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_debug("Indexing claim set %s", ref_str);
+    }
+#endif
+    const char *xslt_params[] = {
+        NULL
+    };
+    xmlDocPtr claim_set_doc = xsltApplyStylesheet(style, raw_claim_set_doc, xslt_params);
+    if(!claim_set_doc){
+        goto out;
+    }
+    xmlNode *cs_node = evr_get_root_claim_set(claim_set_doc);
+    if(!cs_node){
+#ifdef EVR_LOG_INFO
+        {
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_info("Transformed claim set blob %s does not contain claim-set element", ref_str);
+        }
+#endif
+        ret = evr_ok;
+        goto out_with_free_claim_set_doc;
+    }
+    time_t created;
+    if(evr_parse_created(&created, cs_node) != evr_ok){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("Failed to parse created date from transformed claim-set for blob ref %s", ref_str);
+        goto out_with_free_claim_set_doc;
+    }
+    xmlNode *c_node = evr_first_claim(cs_node);
+    struct evr_attr_claim *attr;
+    while(c_node){
+        c_node = evr_find_next_element(c_node, "attr");
+        if(!c_node){
+            break;
+        }
+        attr = evr_parse_attr_claim(c_node);
+        if(!attr){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s", ref_str);
+            goto out_with_free_claim_set_doc;
+        }
+        if(attr->ref_type == evr_ref_type_self){
+            memcpy(attr->ref, claim_set_ref, evr_blob_ref_size);
+            attr->ref_type = evr_ref_type_blob;
+        }
+        int merge_res = evr_merge_attr_index_claim(db, created, attr);
+        free(attr);
+        if(merge_res != evr_ok){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Failed to merge attr claim from transformed claim-set for blob with ref %s into attr index", ref_str);
+            goto out_with_free_claim_set_doc;
+        }
+        c_node = c_node->next;
+    }
+    ret = evr_ok;
+ out_with_free_claim_set_doc:
+    xmlFreeDoc(claim_set_doc);
+ out:
     return ret;
 }
 

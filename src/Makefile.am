@@ -26,6 +26,7 @@ attr_index_db_test_SOURCES = \
 	attr-query-lexer.l \
 	attr-query-parser.y \
 	attr-query-sql.c \
+	claims.c \
 	configuration-testutil.c \
 	configurations.c \
 	db.c \
@@ -35,7 +36,7 @@ attr_index_db_test_SOURCES = \
 	glacier-storage-configuration.c \
 	keys.c \
 	logger.c
-attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 basics_test_SOURCES = \

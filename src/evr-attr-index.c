@@ -23,7 +23,7 @@
 #include <stdatomic.h>
 #include <unistd.h>
 #include <threads.h>
-#include <libxslt/transform.h>
+#include <libxslt/xslt.h>
 
 #include "basics.h"
 #include "claims.h"
@@ -561,7 +561,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     return ret;
 }
 
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, int *c){
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, int *c){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {
@@ -577,71 +577,19 @@ int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr styleshe
             goto out;
         }
     }
-    xmlDocPtr raw_claim_set_doc = evr_fetch_signed_xml(*c, claim_set_ref);
-    if(!raw_claim_set_doc){
+    xmlDocPtr claim_set = evr_fetch_signed_xml(*c, claim_set_ref);
+    if(!claim_set){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
         log_error("Claim set not fetchable for blob key %s", ref_str);
         goto out;
     }
-    const char *xslt_params[] = {
-        NULL
-    };
-    xmlDocPtr claim_set_doc = xsltApplyStylesheet(stylesheet, raw_claim_set_doc, xslt_params);
-    xmlFreeDoc(raw_claim_set_doc);
-    if(!claim_set_doc){
-        goto out;
-    }
-    xmlNode *cs_node = evr_get_root_claim_set(claim_set_doc);
-    if(!cs_node){
-#ifdef EVR_LOG_INFO
-        {
-            evr_blob_ref_str ref_str;
-            evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_info("Transformed claim set blob %s does not contain claim-set element", ref_str);
-        }
-#endif
-        ret = evr_ok;
-        goto out_with_free_claim_set_doc;
-    }
-    time_t created;
-    if(evr_parse_created(&created, cs_node) != evr_ok){
-        evr_blob_ref_str ref_str;
-        evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("Failed to parse created date from transformed claim-set for blob ref %s", ref_str);
-        goto out_with_free_claim_set_doc;
-    }
-    xmlNode *c_node = evr_first_claim(cs_node);
-    struct evr_attr_claim *attr;
-    while(c_node){
-        c_node = evr_find_next_element(c_node, "attr");
-        if(!c_node){
-            break;
-        }
-        attr = evr_parse_attr_claim(c_node);
-        if(!attr){
-            evr_blob_ref_str ref_str;
-            evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s", ref_str);
-            goto out_with_free_claim_set_doc;
-        }
-        if(attr->ref_type == evr_ref_type_self){
-            memcpy(attr->ref, claim_set_ref, evr_blob_ref_size);
-            attr->ref_type = evr_ref_type_blob;
-        }
-        int merge_res = evr_merge_attr_index_claim(db, created, attr);
-        free(attr);
-        if(merge_res != evr_ok){
-            evr_blob_ref_str ref_str;
-            evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_error("Failed to merge attr claim from transformed claim-set for blob with ref %s into attr index", ref_str);
-            goto out_with_free_claim_set_doc;
-        }
-        c_node = c_node->next;
+    if(evr_merge_attr_index_claim_set(db, style, claim_set_ref, claim_set) != evr_ok){
+        goto out_with_free_claim_set;
     }
     ret = evr_ok;
- out_with_free_claim_set_doc:
-    xmlFreeDoc(claim_set_doc);
+ out_with_free_claim_set:
+    xmlFreeDoc(claim_set);
  out:
     return ret;
 }
