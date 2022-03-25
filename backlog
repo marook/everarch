@@ -1,3 +1,4 @@
+* evr_setup_attr_index_db should not fail if db is already setup
 * extract code from evr_bootstrap_db(…) so it can be hooked in later
 evr_bootstrap_db right now creates a attr index db from scratch. there
 is a part in evr_bootstrap_db which starts watching for claim sets
