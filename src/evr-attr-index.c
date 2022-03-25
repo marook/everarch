@@ -100,6 +100,10 @@ int main(){
     if(thrd_create(&build_index_thrd, evr_build_index_worker, &attr_spec_handover_ctx) != thrd_success){
         goto out_with_join_watch_index_claims_thrd;
     }
+    thrd_t tcp_server_thrd;
+    if(thrd_create(&tcp_server_thrd, evr_attr_index_tcp_server, NULL) != thrd_success){
+        goto out_with_join_build_index_thrd;
+    }
     if(mtx_lock(&stop_lock) != thrd_success){
         evr_panic("Failed to lock stop lock");
         goto out_with_join_watch_index_claims_thrd;
@@ -122,13 +126,9 @@ int main(){
         evr_panic("Failed to signal on_empty_spec on termination");
         goto out_with_join_watch_index_claims_thrd;
     }
-    // TODO
-    /*if(evr_attr_index_tcp_server() != evr_ok){
-        goto out_with_join_build_index_thrd;
-        }*/
     ret = evr_ok;
     int thrd_res;
-    // TODO out_with_join_build_index_thrd:
+ out_with_join_build_index_thrd:
     if(thrd_join(build_index_thrd, &thrd_res) != thrd_success){
         evr_panic("Failed to join build index thread");
         ret = evr_error;
@@ -614,13 +614,19 @@ int evr_attr_index_tcp_server(){
     fd_set active_fd_set;
     FD_ZERO(&active_fd_set);
     FD_SET(s, &active_fd_set);
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
     while(running){
-        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL);
-        if(sret == -1){
-            // select returns -1 on sigint.
+        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, &timeout);
+        if(sret < 0){
             goto out_with_close_s;
-        } else if(sret < 0){
-            goto out_with_close_s;
+        }
+        if(!running){
+            break;
+        }
+        if(sret == 0){
+            continue;
         }
         // TODO check active_fd_set and accept connection
     }
