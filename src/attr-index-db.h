@@ -29,6 +29,8 @@
 
 struct evr_attr_index_db {
     sqlite3 *db;
+    sqlite3_stmt *find_state;
+    sqlite3_stmt *update_state;
     sqlite3_stmt *find_attr_type_for_key;
     sqlite3_stmt *find_past_attr_siblings;
     sqlite3_stmt *find_future_attr_siblings;
@@ -40,7 +42,23 @@ struct evr_attr_index_db {
 
 struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name);
 
-int evr_free_glacier_index_db(struct evr_attr_index_db *db);
+int evr_free_attr_index_db(struct evr_attr_index_db *db);
+
+/**
+ * evr_state_key_last_indexed_claim_ts is the last modified timestamp
+ * of the last merged claim set's blob.
+ */
+#define evr_state_key_last_indexed_claim_ts 1
+
+/**
+ * evr_state_key_recent indicates if the watch which fills this db has
+ * reached end of batch.
+ */
+#define evr_state_key_recent 2
+
+int evr_attr_index_get_state(struct evr_attr_index_db *db, int key, sqlite3_int64 *value);
+
+int evr_attr_index_set_state(struct evr_attr_index_db *db, int key, sqlite3_int64 value);
 
 /**
  * evr_setup_attr_index_db sets up an opened but empty attr-index db.
@@ -53,7 +71,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc);
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim);
 

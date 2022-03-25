@@ -64,7 +64,7 @@ int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
 int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, int *c);
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, int *c);
 int evr_attr_index_tcp_server();
 
 int main(){
@@ -508,9 +508,14 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         xmlFreeDoc(style_doc);
         goto out_with_free_db;
     }
+    sqlite3_int64 last_indexed_claim_ts;
+    if(evr_attr_index_get_state(db, evr_state_key_last_indexed_claim_ts, &last_indexed_claim_ts) != evr_ok){
+        goto out_with_free_style;
+    }
     struct evr_blob_filter filter;
     filter.flags_filter = evr_blob_flag_claim;
-    filter.last_modified_after = 0;
+    const time_t overlap = 10 * 60; // seconds
+    filter.last_modified_after = last_indexed_claim_ts <= overlap ? 0 : last_indexed_claim_ts - overlap;
     if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
         goto out_with_free_style;
     }
@@ -537,7 +542,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
             goto out_with_close_cs;
         }
-        if(evr_index_claim_set(db, style, wbody.key, &cs) != evr_ok){
+        if(evr_index_claim_set(db, style, wbody.key, wbody.last_modified, &cs) != evr_ok){
             goto out_with_close_cs;
         }
         if((wbody.flags & evr_watch_flag_eob) == evr_watch_flag_eob){
@@ -552,7 +557,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
  out_with_free_style:
     xsltFreeStylesheet(style);
  out_with_free_db:
-    if(evr_free_glacier_index_db(db) != evr_ok){
+    if(evr_free_attr_index_db(db) != evr_ok){
         ret = evr_error;
     }
  out_with_close_cw:
@@ -561,7 +566,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     return ret;
 }
 
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, int *c){
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, int *c){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {
@@ -584,7 +589,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, e
         log_error("Claim set not fetchable for blob key %s", ref_str);
         goto out;
     }
-    if(evr_merge_attr_index_claim_set(db, style, claim_set_ref, claim_set) != evr_ok){
+    if(evr_merge_attr_index_claim_set(db, style, claim_set_ref, claim_set_last_modified, claim_set) != evr_ok){
         goto out_with_free_claim_set;
     }
     ret = evr_ok;

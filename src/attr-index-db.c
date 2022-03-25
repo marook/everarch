@@ -42,6 +42,8 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_config
         return NULL;
     }
     db->db = NULL;
+    db->find_state = NULL;
+    db->update_state = NULL;
     db->find_attr_type_for_key = NULL;
     db->find_past_attr_siblings = NULL;
     db->find_future_attr_siblings = NULL;
@@ -84,7 +86,7 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_config
         }                                               \
     } while(0)
 
-int evr_free_glacier_index_db(struct evr_attr_index_db *db){
+int evr_free_attr_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
     evr_finalize_stmt(find_ref_attrs);
     evr_finalize_stmt(update_attr_valid_until);
@@ -93,6 +95,8 @@ int evr_free_glacier_index_db(struct evr_attr_index_db *db){
     evr_finalize_stmt(find_future_attr_siblings);
     evr_finalize_stmt(find_past_attr_siblings);
     evr_finalize_stmt(find_attr_type_for_key);
+    evr_finalize_stmt(update_state);
+    evr_finalize_stmt(find_state);
     if(sqlite3_close(db->db) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db->db);
         log_error("Could not close attr-index database: %s", sqlite_error_msg);
@@ -104,12 +108,53 @@ int evr_free_glacier_index_db(struct evr_attr_index_db *db){
     return ret;
 }
 
+int evr_attr_index_get_state(struct evr_attr_index_db *db, int key, sqlite3_int64 *value){
+    int ret = evr_error;
+    if(sqlite3_bind_int(db->find_state, 1, key) != SQLITE_OK){
+        goto out_with_reset_find_state;
+    }
+    if(evr_step_stmt(db->db, db->find_state) != SQLITE_ROW){
+        goto out_with_reset_find_state;
+    }
+    *value = sqlite3_column_int64(db->find_state, 0);
+    ret = evr_ok;
+ out_with_reset_find_state:
+    if(sqlite3_reset(db->find_state) != SQLITE_OK){
+        evr_panic("Failed to reset find state statement");
+        ret = evr_error;
+    }
+    return ret;
+}
+
+int evr_attr_index_set_state(struct evr_attr_index_db *db, int key, sqlite3_int64 value){
+    int ret = evr_error;
+    if(sqlite3_bind_int64(db->update_state, 1, value) != SQLITE_OK){
+        goto out_with_reset_update_state;
+    }
+    if(sqlite3_bind_int(db->update_state, 2, key) != SQLITE_OK){
+        goto out_with_reset_update_state;
+    }
+    if(evr_step_stmt(db->db, db->update_state) != SQLITE_DONE){
+        goto out_with_reset_update_state;
+    }
+    ret = evr_ok;
+ out_with_reset_update_state:
+    if(sqlite3_reset(db->update_state) != SQLITE_OK){
+        evr_panic("Failed to reset find state statement");
+        ret = evr_error;
+    }
+    return ret;
+}
+
 int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec){
     int ret = evr_error;
     const char *sql[] = {
         "create table attr_def (key text primary key not null, type integer not null)",
         "create table attr (ref blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
         "create table claim (ref blob primary key not null)",
+        "create table state (key integer primary key, value integer not null)",
+        "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
+        "insert into state (key, value) values (" to_string(evr_state_key_recent) ", 0)",
         NULL
     };
     char *error;
@@ -156,7 +201,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     return ret;
 }
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc){
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {
@@ -218,6 +263,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
             goto out_with_free_claim_set_doc;
         }
         c_node = c_node->next;
+    }
+    if(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, claim_set_last_modified) != evr_ok){
+        goto out_with_free_claim_set_doc;
     }
     ret = evr_ok;
  out_with_free_claim_set_doc:
@@ -305,6 +353,12 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_claim_
 
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
+    if(evr_prepare_stmt(db->db, "select value from state where key = ?", &db->find_state) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "update state set value = ? where key = ?", &db->update_state) != evr_ok){
+        goto out;
+    }
     if(evr_prepare_stmt(db->db, "select type from attr_def where key = ?", &db->find_attr_type_for_key) != evr_ok){
         goto out;
     }

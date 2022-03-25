@@ -26,6 +26,9 @@
 
 #define ceil_div(dividend, divisor) ((dividend + (divisor - 1)) / divisor)
 
+#define stringify(n) #n
+#define to_string(n) stringify(n)
+
 #define evr_glacier_storage_port 2361
 #define evr_glacier_attr_index_port 2362
 

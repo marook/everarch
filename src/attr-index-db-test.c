@@ -40,7 +40,7 @@ void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void reset_visit_claims();
 int visit_claims(const evr_claim_ref ref);
 void assert_claims(int expected_found_claim_0);
-void assert_tag_eq(int actual, int expected, char *name);
+struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg);
 
 void test_open_new_attr_index_db_twice(){
     const time_t merge_attrs_t[merge_attrs_len] = {
@@ -147,7 +147,7 @@ void test_open_new_attr_index_db_twice(){
             reset_visit_claims();
             assert_ok(evr_attr_query_claims(db, "tag=A && tag=B", 15, 0, 100, visit_claims));
             assert_claims(0);
-            assert_ok(evr_free_glacier_index_db(db));
+            assert_ok(evr_free_attr_index_db(db));
         }
         evr_free_attr_index_db_configuration(cfg);
     }
@@ -196,14 +196,20 @@ void assert_claims(int expected_found_claim_0){
     assert_int_eq_msg(found_claim_0, expected_found_claim_0, "Expected to have found claim 0");
 }
 
-void test_add_two_attr_claims_for_same_target(){
-    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg){
     struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, "ye-db");
+    assert_not_null(db);
     struct evr_attr_spec_claim spec;
     spec.attr_def_len = 0;
     spec.attr_def = NULL;
     assert_ok_msg(evr_setup_attr_index_db(db, &spec), "evr_setup_attr_index_db failed\n");
     assert_ok_msg(evr_prepare_attr_index_db(db), "evr_prepare_attr_index_db failed\n");
+    return db;
+}
+
+void test_add_two_attr_claims_for_same_target(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg);
     struct evr_attr_claim c;
     c.ref_type = evr_ref_type_blob;
     assert_ok(evr_parse_blob_ref(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000"));
@@ -214,12 +220,27 @@ void test_add_two_attr_claims_for_same_target(){
         log_info("Claim merge #%d", i+1);
         assert_ok(evr_merge_attr_index_claim(db, 10, &c));
     }
-    assert_ok(evr_free_glacier_index_db(db));
+    assert_ok(evr_free_attr_index_db(db));
+    evr_free_attr_index_db_configuration(cfg);
+}
+
+void test_get_set_state(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg);
+    sqlite3_int64 value = -1;
+    assert_ok(evr_attr_index_get_state(db, evr_state_key_last_indexed_claim_ts, &value));
+    assert_int_eq_msg(value, 0, "Expected initial last_indexed_claim_ts to be 0 but was %lu\n", value);
+    assert_ok(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, 42));
+    value = -1;
+    assert_ok(evr_attr_index_get_state(db, evr_state_key_last_indexed_claim_ts, &value));
+    assert_int_eq_msg(value, 42, "Expected last_indexed_claim_ts to be 42 but was %lu\n", value);
+    assert_ok(evr_free_attr_index_db(db));
     evr_free_attr_index_db_configuration(cfg);
 }
 
 int main(){
     run_test(test_open_new_attr_index_db_twice);
     run_test(test_add_two_attr_claims_for_same_target);
+    run_test(test_get_set_state);
     return 0;
 }
