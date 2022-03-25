@@ -1,3 +1,5 @@
+* attr index db should store last modified of most recent merged claim
+in order to be able to pick it up again on a later execution.
 * add index populate thread to evr-attr-index
 should wait for index claims from index claim watch thread.
 
