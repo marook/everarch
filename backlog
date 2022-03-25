@@ -1,6 +1,3 @@
-* avoid indexing claim sets twice
-store ref of indexed claim sets and make sure there are none before
-merging the claim set into the attr index.
 * extract code from evr_bootstrap_db(…) so it can be hooked in later
 evr_bootstrap_db right now creates a attr index db from scratch. there
 is a part in evr_bootstrap_db which starts watching for claim sets

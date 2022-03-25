@@ -36,6 +36,7 @@ struct evr_attr_index_db {
     sqlite3_stmt *find_future_attr_siblings;
     sqlite3_stmt *insert_attr;
     sqlite3_stmt *insert_claim;
+    sqlite3_stmt *insert_claim_set;
     sqlite3_stmt *update_attr_valid_until;
     sqlite3_stmt *find_ref_attrs;
 };

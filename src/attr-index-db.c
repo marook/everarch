@@ -49,6 +49,7 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_config
     db->find_future_attr_siblings = NULL;
     db->insert_attr = NULL;
     db->insert_claim = NULL;
+    db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
     db->find_ref_attrs = NULL;
     const char ext[] = ".db"; 
@@ -90,6 +91,7 @@ int evr_free_attr_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
     evr_finalize_stmt(find_ref_attrs);
     evr_finalize_stmt(update_attr_valid_until);
+    evr_finalize_stmt(insert_claim_set);
     evr_finalize_stmt(insert_claim);
     evr_finalize_stmt(insert_attr);
     evr_finalize_stmt(find_future_attr_siblings);
@@ -107,6 +109,8 @@ int evr_free_attr_index_db(struct evr_attr_index_db *db){
  out:
     return ret;
 }
+
+#undef evr_finalize_stmt
 
 int evr_attr_index_get_state(struct evr_attr_index_db *db, int key, sqlite3_int64 *value){
     int ret = evr_error;
@@ -155,6 +159,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
         "insert into state (key, value) values (" to_string(evr_state_key_recent) ", 0)",
+        "create table claim_set (ref blob primary key not null)",
         NULL
     };
     char *error;
@@ -203,6 +208,27 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
 
 int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
     int ret = evr_error;
+    if(sqlite3_bind_blob(db->insert_claim_set, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto out_with_reset_insert_claim_set;
+    }
+    // sqlite3_step is called here instead of evr_step_stmt because we
+    // don't want evr_step_stmt to report SQLITE_CONSTRAINT result as
+    // an error.
+    int step_res = sqlite3_step(db->insert_claim_set);
+    if(step_res == SQLITE_CONSTRAINT){
+        // SQLITE_CONSTRAINT is ok because it most likely tells us
+        // that the same row already exists.
+        {
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_debug("Claim set %s already indexed", ref_str);
+        }
+        ret = evr_ok;
+        goto out_with_reset_insert_claim_set;
+    }
+    if(step_res != SQLITE_DONE){
+        goto out_with_reset_insert_claim_set;
+    }
 #ifdef EVR_LOG_DEBUG
     {
         evr_blob_ref_str ref_str;
@@ -215,7 +241,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
     };
     xmlDocPtr claim_set_doc = xsltApplyStylesheet(style, raw_claim_set_doc, xslt_params);
     if(!claim_set_doc){
-        goto out;
+        goto out_with_reset_insert_claim_set;
     }
     xmlNode *cs_node = evr_get_root_claim_set(claim_set_doc);
     if(!cs_node){
@@ -270,7 +296,13 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
     ret = evr_ok;
  out_with_free_claim_set_doc:
     xmlFreeDoc(claim_set_doc);
- out:
+    int reset_res;
+ out_with_reset_insert_claim_set:
+    reset_res = sqlite3_reset(db->insert_claim_set);
+    if(reset_res != SQLITE_OK && reset_res != SQLITE_CONSTRAINT){
+        evr_panic("Failed to reset insert_claim_set statement");
+        ret = evr_error;
+    }
     return ret;
 }
 
@@ -372,6 +404,9 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "insert into claim (ref) values (?)", &db->insert_claim) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "insert into claim_set (ref) values (?)", &db->insert_claim_set) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "update attr set valid_until = ? where rowid = ?", &db->update_attr_valid_until) != evr_ok){
