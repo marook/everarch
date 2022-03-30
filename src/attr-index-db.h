@@ -52,10 +52,12 @@ int evr_free_attr_index_db(struct evr_attr_index_db *db);
 #define evr_state_key_last_indexed_claim_ts 1
 
 /**
- * evr_state_key_recent indicates if the watch which fills this db has
- * reached end of batch.
+ * evr_state_key_stage indicates at which readiness phase the db is.
  */
-#define evr_state_key_recent 2
+#define evr_state_key_stage 2
+
+#define evr_attr_index_stage_initial 0
+#define evr_attr_index_stage_built   1
 
 int evr_attr_index_get_state(struct evr_attr_index_db *db, int key, sqlite3_int64 *value);
 

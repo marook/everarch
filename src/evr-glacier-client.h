@@ -35,6 +35,7 @@
 #include "config.h"
 
 #include <libxml/tree.h>
+#include <libxslt/xsltInternals.h>
 
 #include "glacier-cmd.h"
 
@@ -43,6 +44,8 @@ int evr_connect_to_storage();
 xmlDocPtr evr_fetch_xml(int fd, evr_blob_ref key);
 
 xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_ref key);
+
+xsltStylesheetPtr evr_fetch_stylesheet(int fd, evr_blob_ref ref);
 
 int evr_req_cmd_get_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp);
 

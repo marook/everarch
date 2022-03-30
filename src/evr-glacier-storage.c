@@ -151,10 +151,10 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
     }
     log_info("Listening on localhost:%d", evr_glacier_storage_port);
     fd_set active_fd_set;
-    FD_ZERO(&active_fd_set);
-    FD_SET(s, &active_fd_set);
     struct sockaddr_in client_addr;
     while(running){
+        FD_ZERO(&active_fd_set);
+        FD_SET(s, &active_fd_set);
         int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL);
         if(sret == -1){
             // select returns -1 on sigint.

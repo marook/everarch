@@ -102,7 +102,7 @@ evr_glacier_cli_SOURCES = \
 	keys.c \
 	logger.c \
 	signatures.c
-evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS)
+evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	concurrent-glacier.c \

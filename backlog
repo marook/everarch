@@ -1,16 +1,4 @@
 * evr_setup_attr_index_db should not fail if db is already setup
-* extract code from evr_bootstrap_db(…) so it can be hooked in later
-evr_bootstrap_db right now creates a attr index db from scratch. there
-is a part in evr_bootstrap_db which starts watching for claim sets
-after the bootstrap. this part should be centralized into a function
-which can also be used later when the index is live.
-* add index populate thread to evr-attr-index
-should wait for index claims from index claim watch thread.
-
-then build a sqlite index db based on index claim. watch a glacier for
-claims and populate the sqlite db until the batch ends.
-
-the recent sqlite db should be provided to consumers.
 * how do we report claims found in attr query?
 there should be at least these response modes:
 ** report only ref

@@ -158,7 +158,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table claim (ref blob primary key not null)",
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
-        "insert into state (key, value) values (" to_string(evr_state_key_recent) ", 0)",
+        "insert into state (key, value) values (" to_string(evr_state_key_stage) ", " to_string(evr_attr_index_stage_initial) ")",
         "create table claim_set (ref blob primary key not null)",
         NULL
     };

@@ -40,6 +40,12 @@ sig_atomic_t running = 1;
 mtx_t stop_lock;
 cnd_t stop_signal;
 
+/**
+ * watch_overlap defines the overlap of claim watches in seconds.
+ */
+#define watch_overlap (10 * 60)
+#define apply_watch_overlap(t) (t <= watch_overlap ? 0 : t - watch_overlap)
+
 struct evr_attr_index_db_configuration *cfg;
 
 struct evr_handover_ctx {
@@ -55,7 +61,6 @@ struct evr_attr_spec_handover_ctx {
     struct evr_attr_spec_claim *claim;
     evr_blob_ref claim_key;
     time_t created;
-    xmlDocPtr stylesheet;
 };
 
 struct evr_index_handover_ctx {
@@ -76,11 +81,13 @@ int evr_free_handover_ctx(struct evr_handover_ctx *ctx);
 int evr_stop_handover(struct evr_handover_ctx *ctx);
 int evr_wait_for_handover_available(struct evr_handover_ctx *ctx);
 int evr_wait_for_handover_occupied(struct evr_handover_ctx *ctx);
+int evr_lock_handover(struct evr_handover_ctx *ctx);
 int evr_occupy_handover(struct evr_handover_ctx *ctx);
 int evr_empty_handover(struct evr_handover_ctx *ctx);
 
 int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
+int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
 int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, int *c);
 int evr_attr_index_tcp_server();
@@ -126,9 +133,13 @@ int main(){
     if(thrd_create(&build_index_thrd, evr_build_index_worker, &build_index_thrd_ctx) != thrd_success){
         goto out_with_join_watch_index_claims_thrd;
     }
+    thrd_t index_sync_thrd;
+    if(thrd_create(&index_sync_thrd, evr_index_sync_worker, &index_handover_ctx) != thrd_success){
+        goto out_with_join_build_index_thrd;
+    }
     thrd_t tcp_server_thrd;
     if(thrd_create(&tcp_server_thrd, evr_attr_index_tcp_server, &index_handover_ctx) != thrd_success){
-        goto out_with_join_build_index_thrd;
+        goto out_with_join_index_sync_thrd;
     }
     if(mtx_lock(&stop_lock) != thrd_success){
         evr_panic("Failed to lock stop lock");
@@ -152,6 +163,14 @@ int main(){
     }
     ret = evr_ok;
     int thrd_res;
+ out_with_join_index_sync_thrd:
+    if(thrd_join(index_sync_thrd, &thrd_res) != thrd_success){
+        evr_panic("Failed to join index sync thread");
+        ret = evr_error;
+    }
+    if(thrd_res != evr_ok){
+        ret = evr_error;
+    }
  out_with_join_build_index_thrd:
     if(thrd_join(build_index_thrd, &thrd_res) != thrd_success){
         evr_panic("Failed to join build index thread");
@@ -229,7 +248,6 @@ int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx){
     int ret = evr_error;
     if(ctx->claim){
         free(ctx->claim);
-        xmlFree(ctx->stylesheet);
     }
     if(evr_free_handover_ctx(&ctx->handover) != evr_ok){
         goto out;
@@ -271,11 +289,11 @@ int evr_free_handover_ctx(struct evr_handover_ctx *ctx){
 int evr_stop_handover(struct evr_handover_ctx *ctx){
     int ret = evr_error;
     if(cnd_signal(&ctx->on_push_spec) != thrd_success){
-        evr_panic("Failed to signal on_push_spec on termination");
+        evr_panic("Failed to signal on_push on termination");
         goto out;
     }
     if(cnd_signal(&ctx->on_empty_spec) != thrd_success){
-        evr_panic("Failed to signal on_empty_spec on termination");
+        evr_panic("Failed to signal on_empty on termination");
         goto out;
     }
     ret = evr_ok;
@@ -285,20 +303,20 @@ int evr_stop_handover(struct evr_handover_ctx *ctx){
 
 int evr_wait_for_handover_available(struct evr_handover_ctx *ctx){
     int ret = evr_error;
-    if(mtx_lock(&ctx->lock) != thrd_success){
-        evr_panic("Failed to lock attr-spec handover lock");
+    if(evr_lock_handover(ctx) != evr_ok){
+        evr_panic("Failed to lock handover lock");
         goto out;
     }
     while(ctx->occupied){
         if(!running){
             if(mtx_unlock(&ctx->lock) != thrd_success){
-                evr_panic("Failed to unlock attr-spec handover lock");
+                evr_panic("Failed to unlock handover lock");
                 goto out;
             }
             break;
         }
         if(cnd_wait(&ctx->on_empty_spec, &ctx->lock) != thrd_success){
-            evr_panic("Failed to wait for empty spec signal");
+            evr_panic("Failed to wait for empty handover signal");
             goto out;
         }
     }
@@ -309,7 +327,7 @@ int evr_wait_for_handover_available(struct evr_handover_ctx *ctx){
 
 int evr_wait_for_handover_occupied(struct evr_handover_ctx *ctx){
     int ret = evr_error;
-    if(mtx_lock(&ctx->lock) != thrd_success){
+    if(evr_lock_handover(ctx) != evr_ok){
         evr_panic("Failed to lock handover lock");
         goto out;
     }
@@ -325,6 +343,16 @@ int evr_wait_for_handover_occupied(struct evr_handover_ctx *ctx){
             evr_panic("Failed to wait for handover push");
             goto out;
         }
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+int evr_lock_handover(struct evr_handover_ctx *ctx){
+    int ret = evr_error;
+    if(mtx_lock(&ctx->lock) != thrd_success){
+        goto out;
     }
     ret = evr_ok;
  out:
@@ -388,13 +416,13 @@ int evr_watch_index_claims_worker(void *arg){
     int cs = -1;
     log_debug("Watching index claims");
     fd_set active_fd_set;
-    FD_ZERO(&active_fd_set);
-    FD_SET(cw, &active_fd_set);
     struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
     while(running){
-        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, &timeout);
+        FD_ZERO(&active_fd_set);
+        FD_SET(cw, &active_fd_set);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+        int sret = select(cw + 1, &active_fd_set, NULL, NULL, &timeout);
         if(sret < 0){
             goto out_with_close_cw;
         }
@@ -433,7 +461,7 @@ int evr_watch_index_claims_worker(void *arg){
         if(!cs_node){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
-            log_error("Index claim does not contain claim-set for blob key %s", fmt_key);
+            log_error("Index claim does not contain claim-set element for blob key %s", fmt_key);
             goto out_with_free_claim_doc;
         }
         time_t created;
@@ -461,17 +489,10 @@ int evr_watch_index_claims_worker(void *arg){
         if((body.flags & evr_watch_flag_eob) == 0 || !latest_spec){
             continue;
         }
-        xmlDocPtr xslt_doc = evr_fetch_xml(cs, latest_spec->stylesheet_blob_ref);
-        if(!xslt_doc){
-            evr_blob_ref_str fmt_key;
-            evr_fmt_blob_ref(fmt_key, body.key);
-            log_error("Failed to fetch stylesheet for attr-spec with blob key %s", fmt_key);
-            goto out_with_free_latest_spec;
-        }
         close(cs);
         cs = -1;
         if(evr_wait_for_handover_available(&ctx->handover) != evr_ok){
-            goto out_with_free_xslt_doc;
+            goto out_with_free_latest_spec;
         }
         if(!running){
             break;
@@ -487,15 +508,11 @@ int evr_watch_index_claims_worker(void *arg){
         ctx->claim = latest_spec;
         memcpy(ctx->claim_key, latest_spec_key, evr_blob_ref_size);
         ctx->created = latest_spec_created;
-        ctx->stylesheet = xslt_doc;
         if(evr_occupy_handover(&ctx->handover) != evr_ok){
-            goto out_with_free_xslt_doc;
+            goto out_with_free_latest_spec;
         }
         latest_spec = NULL;
         continue;
-    out_with_free_xslt_doc:
-        xmlFree(xslt_doc);
-        goto out_with_free_latest_spec;
     out_with_free_claim_doc:
         xmlFree(claim_doc);
         goto out_with_free_latest_spec;
@@ -532,7 +549,6 @@ int evr_build_index_worker(void *arg){
         evr_blob_ref claim_key;
         memcpy(claim_key, sctx->claim_key, evr_blob_ref_size);
         // TODO time_t created = sctx->created;;
-        xmlDocPtr stylesheet = sctx->stylesheet;
         if(evr_empty_handover(&sctx->handover) != evr_ok){
             goto out;
         }
@@ -557,7 +573,6 @@ int evr_build_index_worker(void *arg){
         }
 #endif
         free(claim);
-        xmlFree(stylesheet);
         if(evr_wait_for_handover_available(&ictx->handover) != evr_ok){
             goto out;
         }
@@ -568,7 +583,7 @@ int evr_build_index_worker(void *arg){
         {
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, claim_key);
-            log_info("Handover attr index for %s", fmt_key);
+            log_debug("Handover attr index for %s", fmt_key);
         }
 #endif
         memcpy(ictx->index_ref, claim_key, evr_blob_ref_size);
@@ -584,17 +599,11 @@ int evr_build_index_worker(void *arg){
 
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     int ret = evr_error;
-    int cw = evr_connect_to_storage();
-    if(cw < 0){
-        log_error("Failed to connect to evr-glacier-storage server");
-        goto out;
-    }
     evr_blob_ref_str claim_key_str;
     evr_fmt_blob_ref(claim_key_str, claim_key);
-    // TODO delete former db if it exists
     struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, claim_key_str);
     if(!db){
-        goto out_with_close_cw;
+        goto out;
     }
     if(evr_setup_attr_index_db(db, spec) != evr_ok){
         goto out_with_free_db;
@@ -602,22 +611,22 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     if(evr_prepare_attr_index_db(db) != evr_ok){
         goto out_with_free_db;
     }
-    xmlDocPtr style_doc = evr_fetch_xml(cw, spec->stylesheet_blob_ref);
-    if(!style_doc){
-        evr_blob_ref_str ref_str;
-        evr_fmt_blob_ref(ref_str, spec->stylesheet_blob_ref);
-        log_error("Failed to fetch attr spec's stylesheet with ref %s", ref_str);
+    sqlite3_int64 stage;
+    if(evr_attr_index_get_state(db, evr_state_key_stage, &stage) != evr_ok){
         goto out_with_free_db;
     }
-    xsltStylesheetPtr style = xsltParseStylesheetDoc(style_doc);
-    if(!style){
-        evr_blob_ref_str ref_str;
-        evr_fmt_blob_ref(ref_str, spec->stylesheet_blob_ref);
-        log_error("Failed to parse XSLT stylesheet from blob with ref %s", ref_str);
-        // style_doc is freed by xsltFreeStylesheet(style) on
-        // successful style parsing.
-        xmlFreeDoc(style_doc);
+    if(stage >= evr_attr_index_stage_built){
+        ret = evr_ok;
         goto out_with_free_db;
+    }
+    int cw = evr_connect_to_storage();
+    if(cw < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out_with_free_db;
+    }
+    xsltStylesheetPtr style = evr_fetch_stylesheet(cw, spec->stylesheet_blob_ref);
+    if(!style){
+        goto out_with_close_cw;
     }
     sqlite3_int64 last_indexed_claim_ts;
     if(evr_attr_index_get_state(db, evr_state_key_last_indexed_claim_ts, &last_indexed_claim_ts) != evr_ok){
@@ -625,21 +634,20 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     }
     struct evr_blob_filter filter;
     filter.flags_filter = evr_blob_flag_claim;
-    const time_t overlap = 10 * 60; // seconds
-    filter.last_modified_after = last_indexed_claim_ts <= overlap ? 0 : last_indexed_claim_ts - overlap;
+    filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
     if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
         goto out_with_free_style;
     }
     struct evr_watch_blobs_body wbody;
     fd_set active_fd_set;
-    FD_ZERO(&active_fd_set);
-    FD_SET(cw, &active_fd_set);
-    struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
     int cs = -1;
+    struct timeval timeout;
     while(running){
-        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, &timeout);
+        FD_ZERO(&active_fd_set);
+        FD_SET(cw, &active_fd_set);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+        int sret = select(cw + 1, &active_fd_set, NULL, NULL, &timeout);
         if(sret < 0){
             goto out_with_close_cs;
         }
@@ -660,6 +668,9 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
             break;
         }
     }
+    if(evr_attr_index_set_state(db, evr_state_key_stage, evr_attr_index_stage_built) != evr_ok){
+        goto out_with_close_cs;
+    }
     ret = evr_ok;
  out_with_close_cs:
     if(cs >= 0){
@@ -667,12 +678,12 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     }
  out_with_free_style:
     xsltFreeStylesheet(style);
+ out_with_close_cw:
+    close(cw);
  out_with_free_db:
     if(evr_free_attr_index_db(db) != evr_ok){
         ret = evr_error;
     }
- out_with_close_cw:
-    close(cw);
  out:
     return ret;
 }
@@ -710,6 +721,164 @@ int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, e
     return ret;
 }
 
+int evr_index_sync_worker(void *arg){
+    int ret = evr_error;
+    struct evr_index_handover_ctx *ctx = arg;
+    log_debug("Started index sync worker");
+    if(evr_wait_for_handover_occupied(&ctx->handover) != evr_ok){
+        goto out;
+    }
+    evr_blob_ref index_ref;
+    memcpy(index_ref, ctx->index_ref, evr_blob_ref_size);
+    if(evr_empty_handover(&ctx->handover) != evr_ok){
+        goto out;
+    }
+    int cg = -1; // connection get
+    int cw = -1; // connection watch
+    struct evr_attr_index_db *db = NULL;
+    fd_set active_fd_set;
+    struct timeval timeout;
+    struct evr_watch_blobs_body wbody;
+    xsltStylesheetPtr style = NULL;
+    while(running){
+        if(evr_lock_handover(&ctx->handover) != evr_ok){
+            goto out_with_free;
+        }
+        if(ctx->handover.occupied){
+            if(cw != -1){
+#ifdef EVR_LOG_DEBUG
+                evr_blob_ref_str index_ref_str;
+                evr_fmt_blob_ref(index_ref_str, index_ref);
+                log_debug("Index sync worker stop index %s", index_ref_str);
+#endif
+                close(cw);
+                cw = -1;
+            }
+            memcpy(index_ref, ctx->index_ref, evr_blob_ref_size);
+            if(evr_empty_handover(&ctx->handover) != evr_ok){
+                goto out_with_free;
+            }
+        } else {
+            if(mtx_unlock(&ctx->handover.lock) != thrd_success){
+                evr_panic("Failed to unlock evr_index_handover_ctx");
+                goto out_with_free;
+            }
+        }
+        if(cw == -1){
+            if(style){
+                xsltFreeStylesheet(style);
+                style = NULL;
+            }
+            if(db){
+                if(evr_free_attr_index_db(db) != evr_ok){
+                    log_error("Failed to close stopped index db");
+                    goto out;
+                }
+                db = NULL;
+            }
+            // after this point the former index should be cleaned up
+            // with all it's dependant variables
+            evr_blob_ref_str index_ref_str;
+            evr_fmt_blob_ref(index_ref_str, index_ref);
+            log_info("Index sync worker switches to index %s", index_ref_str);
+            db = evr_open_attr_index_db(cfg, index_ref_str);
+            if(!db){
+                goto out_with_free;
+            }
+            cw = evr_connect_to_storage();
+            if(cw < 0){
+                log_error("Failed to connect to evr-glacier-storage server");
+                goto out_with_free;
+            }
+            if(evr_prepare_attr_index_db(db) != evr_ok){
+                goto out_with_free;
+            }
+            xmlDocPtr cs_doc = evr_fetch_signed_xml(cw, index_ref);
+            if(!cs_doc){
+                evr_blob_ref_str fmt_key;
+                evr_fmt_blob_ref(fmt_key, index_ref);
+                log_error("Index claim not fetchable for blob key %s", fmt_key);
+                goto out_with_free;
+            }
+            xmlNode *cs_node = evr_get_root_claim_set(cs_doc);
+            if(!cs_node){
+                goto out_with_free_cs_doc;
+            }
+            xmlNode *c_node = evr_find_next_element(evr_first_claim(cs_node), "attr-spec");
+            if(!c_node){
+                goto out_with_free_cs_doc;
+            }
+            struct evr_attr_spec_claim *spec = evr_parse_attr_spec_claim(c_node);
+            xmlFree(cs_doc);
+            if(!spec){
+                goto out_with_free;
+            }
+            style = evr_fetch_stylesheet(cw, spec->stylesheet_blob_ref);
+            free(spec);
+            if(!style){
+                goto out_with_free;
+            }
+            sqlite3_int64 last_indexed_claim_ts;
+            if(evr_attr_index_get_state(db, evr_state_key_last_indexed_claim_ts, &last_indexed_claim_ts) != evr_ok){
+                goto out_with_free;
+            }
+            struct evr_blob_filter filter;
+            filter.flags_filter = evr_blob_flag_claim;
+            filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
+            if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
+                goto out_with_free;
+            }
+            goto end_init_style;
+        out_with_free_cs_doc:
+            xmlFree(cs_doc);
+            goto out_with_free;
+        end_init_style:
+            log_debug("Index sync worker switch done");
+            do{} while(0);
+        }
+        FD_ZERO(&active_fd_set);
+        FD_SET(cw, &active_fd_set);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+        int sret = select(cw + 1, &active_fd_set, NULL, NULL, &timeout);
+        if(sret < 0){
+            goto out_with_free;
+        }
+        if(!running){
+            break;
+        }
+        if(sret == 0){
+            // TODO close cg after n timeouts in a row and set to -1
+            continue;
+        }
+        if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
+            goto out_with_free;
+        }
+        if(evr_index_claim_set(db, style, wbody.key, wbody.last_modified, &cg) != evr_ok){
+            goto out_with_free;
+        }
+    }
+    ret = evr_ok;
+ out_with_free:
+    if(cg >= 0){
+        close(cg);
+    }
+    if(cw >= 0){
+        close(cw);
+    }
+    if(style){
+        xsltFreeStylesheet(style);
+    }
+    if(db){
+        if(evr_free_attr_index_db(db) != evr_ok){
+            ret = evr_error;
+        }
+    }
+ out:
+    log_debug("Ended index sync worker with result %d", ret);
+    return ret;
+}
+
 int evr_attr_index_tcp_server(){
     int ret = evr_error;
     int s = evr_make_tcp_socket(evr_glacier_attr_index_port);
@@ -723,13 +892,13 @@ int evr_attr_index_tcp_server(){
     }
     log_info("Listening on localhost:%d", evr_glacier_attr_index_port);
     fd_set active_fd_set;
-    FD_ZERO(&active_fd_set);
-    FD_SET(s, &active_fd_set);
     struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
     while(running){
-        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, &timeout);
+        FD_ZERO(&active_fd_set);
+        FD_SET(s, &active_fd_set);
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+        int sret = select(s + 1, &active_fd_set, NULL, NULL, &timeout);
         if(sret < 0){
             goto out_with_close_s;
         }
