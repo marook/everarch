@@ -47,3 +47,12 @@ test_file_put_pop "hello"
 # produce a 32mb file
 dd if=/dev/random bs=4096 count=8192 of=files/big.txt
 test_file_put_pop "big"
+
+# it should use custom title if -t arg present
+ref=`evr-glacier-cli post-file -t 'my file name' 'files/hello.txt'`
+claim=`evr-glacier-cli get ${ref}`
+if [[ "${claim}" != *"my file name"* ]]
+then
+    echo "Claim should have used title 'my file name': ${claim}" >&2
+    exit 1
+fi

@@ -58,6 +58,7 @@ static struct argp_option options[] = {
     {"flags", 'f', "F", 0, "Use the given flags when put a blob to evr-glacier-storage."},
     {"flags-filter", 'f', "F", 0, "Only watch blobs which have set at least the given flag bits."},
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
+    {"title", 't', "T", 0, "Title of the created claim. Might be used together with post-file."},
     {0}
 };
 
@@ -74,6 +75,7 @@ struct cli_arguments {
     char *key;
     char *file;
     int flags;
+    char *title;
     unsigned long long last_modified_after;
 };
 
@@ -100,6 +102,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
         }
         break;
     }
+    case 't':
+        cli_args->title = strdup(arg);
+        break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
         default:
@@ -166,7 +171,7 @@ int evr_cli_put(int flags);
 int evr_cli_sign_put(int flags);
 int evr_cli_get_file(char *fmt_key);
 int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
-int evr_cli_post_file(char *file);
+int evr_cli_post_file(char *file, char *title);
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after);
 int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob);
 
@@ -177,27 +182,39 @@ int main(int argc, char **argv){
     cli_args.key = NULL;
     cli_args.file = NULL;
     cli_args.flags = 0;
+    cli_args.title = NULL;
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
     cli_args.last_modified_after = LLONG_MAX;
     argp_parse(&argp, argc, argv, 0, 0, &cli_args);
+    int ret;
     switch(cli_args.cmd){
     default:
-        return 1;
+        ret = 1;
+        break;
     case cli_cmd_get:
-        return evr_cli_get(cli_args.key);
+        ret = evr_cli_get(cli_args.key);
+        break;
     case cli_cmd_put:
-        return evr_cli_put(cli_args.flags);
+        ret = evr_cli_put(cli_args.flags);
+        break;
     case cli_cmd_sign_put:
-        return evr_cli_sign_put(cli_args.flags);
+        ret = evr_cli_sign_put(cli_args.flags);
+        break;
     case cli_cmd_get_file:
-        return evr_cli_get_file(cli_args.key);
+        ret = evr_cli_get_file(cli_args.key);
+        break;
     case cli_cmd_post_file:
-        return evr_cli_post_file(cli_args.file);
+        ret = evr_cli_post_file(cli_args.file, cli_args.title);
+        break;
     case cli_cmd_watch_blobs:
-        return evr_cli_watch_blobs(cli_args.flags, cli_args.last_modified_after);
+        ret = evr_cli_watch_blobs(cli_args.flags, cli_args.last_modified_after);
+        break;
     }
-    return 0;
+    if(cli_args.title){
+        free(cli_args.title);
+    }
+    return ret;
 }
 
 int evr_cli_get(char *fmt_key){
@@ -436,7 +453,7 @@ int evr_cli_get_file(char *fmt_key){
     return ret;
 }
 
-int evr_cli_post_file(char *file){
+int evr_cli_post_file(char *file, char *title){
     int ret = evr_error;
     evr_init_signatures();
     int f = open(file, O_RDONLY);
@@ -459,7 +476,7 @@ int evr_cli_post_file(char *file){
     struct evr_file_claim fc;
     // warning to future me: at the following expression we modify the
     // content of file
-    fc.title = basename(file);
+    fc.title = title ? title : basename(file);
     fc.slices_len = ctx.slices->size_used / sizeof(struct evr_file_slice);
     fc.slices = (struct evr_file_slice*)ctx.slices->data;
     log_debug("Uploaded %d file segments", fc.slices_len);
