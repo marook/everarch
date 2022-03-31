@@ -56,3 +56,12 @@ then
     echo "Claim should have used title 'my file name': ${claim}" >&2
     exit 1
 fi
+
+# it should read from stdin if file argument is missing
+ref=`echo 'piped content' | evr-glacier-cli post-file`
+content=`evr-glacier-cli get-file ${ref}`
+if [[ 'piped content' != "${content}" ]]
+then
+    echo "Expected 'piped content' but got: ${content}" >&2
+    exit 1
+fi

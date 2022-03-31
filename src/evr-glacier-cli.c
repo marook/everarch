@@ -49,7 +49,7 @@ static char doc[] =
     "The put command retrieves a blob via stdin and sends it to the evr-glacier-storage.\n\n"
     "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
-    "The post-file command expects one file name argument for upload to the evr-glacier-storage.\n\n"
+    "The post-file command expects one optional file name argument for upload to the evr-glacier-storage. File will be read from stdin if no file name argument is given.\n\n"
     "The watch command prints modified blob keys.";
 
 static char args_doc[] = "CMD";
@@ -147,7 +147,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             return ARGP_ERR_UNKNOWN;
         case cli_cmd_get:
         case cli_cmd_get_file:
-        case cli_cmd_post_file:
             if (state->arg_num < 2) {
                 // not enough arguments
                 argp_usage (state);
@@ -156,6 +155,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             break;
         case cli_cmd_put:
         case cli_cmd_sign_put:
+        case cli_cmd_post_file:
         case cli_cmd_watch_blobs:
             break;
         }
@@ -456,9 +456,12 @@ int evr_cli_get_file(char *fmt_key){
 int evr_cli_post_file(char *file, char *title){
     int ret = evr_error;
     evr_init_signatures();
-    int f = open(file, O_RDONLY);
-    if(f < 0){
-        goto out;
+    int f = STDIN_FILENO;
+    if(file){
+        f = open(file, O_RDONLY);
+        if(f < 0){
+            goto out;
+        }
     }
     struct post_file_ctx ctx;
     ctx.c = evr_connect_to_storage();
@@ -474,9 +477,14 @@ int evr_cli_post_file(char *file, char *title){
         goto out_with_free_slice_keys;
     }
     struct evr_file_claim fc;
-    // warning to future me: at the following expression we modify the
-    // content of file
-    fc.title = title ? title : basename(file);
+    fc.title = NULL;
+    if(title){
+        fc.title = title;
+    } else if (file){
+        // warning to future me: at the following expression we modify the
+        // content of file
+        fc.title = basename(file);
+    }
     fc.slices_len = ctx.slices->size_used / sizeof(struct evr_file_slice);
     fc.slices = (struct evr_file_slice*)ctx.slices->data;
     log_debug("Uploaded %d file segments", fc.slices_len);
@@ -529,7 +537,7 @@ int evr_cli_post_file(char *file, char *title){
         ret = evr_error;
     }
  out_with_close_f:
-    if(close(f)){
+    if(f != STDIN_FILENO && close(f)){
         ret = evr_error;
     }
  out:
