@@ -117,7 +117,7 @@ int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto end_with_find_reset;
     }
-    int step_result = sqlite3_step(ctx->find_blob_stmt);
+    int step_result = evr_step_stmt(ctx->db, ctx->find_blob_stmt);
     if(step_result == SQLITE_DONE){
         ret = evr_not_found;
         goto end_with_find_reset;
@@ -140,7 +140,7 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto end_with_find_reset;
     }
-    int step_result = sqlite3_step(ctx->find_blob_stmt);
+    int step_result = evr_step_stmt(ctx->db, ctx->find_blob_stmt);
     if(step_result == SQLITE_DONE){
         ret = evr_not_found;
         if(status(arg, 0, 0, 0) != evr_ok){
@@ -203,7 +203,7 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
     int flags;
     unsigned long long last_modified;
     while(1){
-        int step_ret = sqlite3_step(ctx->list_blobs_stmt);
+        int step_ret = evr_step_stmt(ctx->db, ctx->list_blobs_stmt);
         if(step_ret == SQLITE_DONE){
             if(has_found_key){
                 if(visit(vctx, found_key, flags, last_modified, 1) != evr_ok){
@@ -461,16 +461,29 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
 }
 
 int evr_open_index_db(struct evr_glacier_storage_configuration *config, int sqliteFlags, sqlite3 **db){
+    int ret = evr_error;
     size_t glacier_file_path_max_size = strlen(config->bucket_dir_path) + 10;
     char *glacier_file_path = alloca(glacier_file_path_max_size);
     build_glacier_file_path(glacier_file_path, glacier_file_path_max_size, config->bucket_dir_path, glacier_dir_index_db_path);
-    int result = sqlite3_open_v2(glacier_file_path, db, sqliteFlags | SQLITE_OPEN_NOMUTEX, NULL);
+    sqlite3 *_db;
+    int result = sqlite3_open_v2(glacier_file_path, &_db, sqliteFlags | SQLITE_OPEN_NOMUTEX, NULL);
     if(result != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(*db);
         log_error("glacier storage could not open %s sqlite database: %s", glacier_file_path, sqlite_error_msg);
-        return 1;
+        goto out;
     }
-    return 0;
+    if(sqlite3_busy_timeout(_db, evr_sqlite3_busy_timeout) != SQLITE_OK){
+        goto out_with_close_db;
+    }
+    *db = _db;
+    ret = evr_ok;
+ out:
+    return ret;
+ out_with_close_db:
+    if(sqlite3_close(_db) != SQLITE_OK){
+        ret = evr_error;
+    }
+    return ret;
 }
 
 int evr_close_index_db(struct evr_glacier_storage_configuration *config, sqlite3 *db){
@@ -598,7 +611,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     if(sqlite3_bind_int64(ctx->insert_blob_stmt, 6, t64) != SQLITE_OK){
         goto fail_with_insert_reset;
     }
-    if(sqlite3_step(ctx->insert_blob_stmt) != SQLITE_DONE){
+    if(evr_step_stmt(ctx->db, ctx->insert_blob_stmt) != SQLITE_DONE){
         const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
         log_error("glacier storage %s failed to store blob index: %s", ctx->config->bucket_dir_path, sqlite_error_msg);
         goto fail_with_insert_reset;

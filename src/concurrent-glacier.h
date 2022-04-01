@@ -16,6 +16,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * concurrent-glacier.h provides functions for concurrent access to the
+ * glacier API.
+ *
+ * The implementation relies upon the fact that the sqlite3 db is
+ * configured to use multi threading BEFORE calling any function from
+ * concurrent-glacier.h:
+ *
+ * if(sqlite3_config(SQLITE_CONFIG_MULTITHREAD) != SQLITE_OK){
+ *   // handle error
+ * }
+ */
+
 #ifndef __evr_concurrent_glacier_h__
 #define __evr_concurrent_glacier_h__
 

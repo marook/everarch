@@ -111,6 +111,12 @@ int main(){
         sigaction(SIGINT, &action, NULL);
         signal(SIGPIPE, SIG_IGN);
     }
+    if(sqlite3_config(SQLITE_CONFIG_MULTITHREAD) != SQLITE_OK){
+        // read https://sqlite.org/threadsafe.html if you run into
+        // this error
+        log_error("Failed to configure multi-threaded mode for sqlite3");
+        goto out_with_free_stop_lock;
+    }
     evr_init_signatures();
     xmlInitParser();
     struct evr_attr_spec_handover_ctx attr_spec_handover_ctx;

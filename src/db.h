@@ -23,6 +23,15 @@
 
 #include <sqlite3.h>
 
+/**
+ * evr_sqlite3_busy_timeout defines the amount of milliseconds which
+ * evr sqlite3 databases should wait for sqlite locks until they give
+ * up.
+ *
+ * For more details see https://sqlite.org/c3ref/busy_timeout.html
+ */
+#define evr_sqlite3_busy_timeout 1000
+
 int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt);
 
 int evr_step_stmt(sqlite3 *db, sqlite3_stmt *stmt);

@@ -16,6 +16,19 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * attr-index-db.h provides functions for creating, filling and
+ * querrying the attributes index.
+ *
+ * The implementation relies upon the fact that the sqlite3 db is
+ * configured to use multi threading BEFORE calling any function from
+ * attr-index-db.h:
+ *
+ * if(sqlite3_config(SQLITE_CONFIG_MULTITHREAD) != SQLITE_OK){
+ *   // handle error
+ * }
+ */
+
 #ifndef __attr_index_db_h__
 #define __attr_index_db_h__
 

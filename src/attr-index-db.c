@@ -73,7 +73,14 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_config
         log_error("Could not open %s sqlite database for attr-index: %s", db_path, sqlite_error_msg);
         goto out_with_free_db;
     }
+    if(sqlite3_busy_timeout(db->db, evr_sqlite3_busy_timeout) != SQLITE_OK){
+        goto out_with_close_db;
+    }
     return db;
+ out_with_close_db:
+    if(sqlite3_close(db->db) != SQLITE_OK){
+        evr_panic("Failed to close attr-index sqlite db");
+    }
  out_with_free_db:
     free(db);
     return NULL;

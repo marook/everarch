@@ -105,6 +105,12 @@ int main(){
         log_error("Failed to load configuration");
         goto out_with_free_configuration;
     }
+    if(sqlite3_config(SQLITE_CONFIG_MULTITHREAD) != SQLITE_OK){
+        // read https://sqlite.org/threadsafe.html if you run into
+        // this error
+        log_error("Failed to configure multi-threaded mode for sqlite3");
+        goto out_with_free_configuration;
+    }
     if(evr_quick_check_glacier(config) != evr_ok){
         log_error("Glacier quick check failed");
         goto out_with_free_configuration;
@@ -425,6 +431,7 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
             goto out;
         }
     } else {
+        log_error("evr_glacier_stat_blob failed with error code %d", stat_ret);
         goto out;
     }
     ret = evr_ok;
