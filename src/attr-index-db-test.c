@@ -87,8 +87,8 @@ void test_open_new_attr_index_db_twice(){
                     size_t aai = attr_merge_permutations[pi][rai];
                     time_t t = merge_attrs_t[aai];
                     struct evr_attr_claim claim;
-                    claim.ref_type = evr_ref_type_blob;
-                    memcpy(claim.ref, ref, evr_blob_ref_size);
+                    claim.ref_type = evr_ref_type_claim;
+                    evr_build_claim_ref(claim.ref, ref, 0);
                     claim.claim_index = 0;
                     claim.attr_len = 1;
                     claim.attr = &merge_attrs[aai];
@@ -211,8 +211,8 @@ void test_add_two_attr_claims_for_same_target(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg);
     struct evr_attr_claim c;
-    c.ref_type = evr_ref_type_blob;
-    assert_ok(evr_parse_blob_ref(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000"));
+    c.ref_type = evr_ref_type_claim;
+    assert_ok(evr_parse_claim_ref(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0001"));
     c.claim_index = 1;
     c.attr_len = 0;
     c.attr = NULL;

@@ -373,10 +373,10 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     struct evr_attr_claim *c = NULL;
     int ref_type;
     char *fmt_ref = (char*)xmlGetProp(claim_node, BAD_CAST "ref");
-    evr_blob_ref ref;
+    evr_claim_ref ref;
     if(fmt_ref){
-        ref_type = evr_ref_type_blob;
-        int parse_ref_ret = evr_parse_blob_ref(ref, fmt_ref);
+        ref_type = evr_ref_type_claim;
+        int parse_ref_ret = evr_parse_claim_ref(ref, fmt_ref);
         xmlFree(fmt_ref);
         if(parse_ref_ret != evr_ok){
             goto out;
@@ -432,8 +432,8 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     c = (struct evr_attr_claim *)buf;
     c->ref_type = ref_type;
     buf = (char *)&((struct evr_attr_claim*)buf)[1];
-    if(ref_type == evr_ref_type_blob){
-        memcpy(c->ref, ref, evr_blob_ref_size);
+    if(ref_type == evr_ref_type_claim){
+        memcpy(c->ref, ref, evr_claim_ref_size);
     }
     c->claim_index = claim_index;
     c->attr_len = attr_count;

@@ -284,8 +284,8 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
             goto out_with_free_claim_set_doc;
         }
         if(attr->ref_type == evr_ref_type_self){
-            memcpy(attr->ref, claim_set_ref, evr_blob_ref_size);
-            attr->ref_type = evr_ref_type_blob;
+            evr_build_claim_ref(attr->ref, claim_set_ref, attr->claim_index);
+            attr->ref_type = evr_ref_type_claim;
         }
         int merge_res = evr_merge_attr_index_claim(db, created, attr);
         free(attr);
@@ -315,8 +315,8 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim){
     int ret = evr_error;
-    if(claim->ref_type != evr_ref_type_blob){
-        log_error("Only attr claims with blob ref can be merged into attr-index");
+    if(claim->ref_type != evr_ref_type_claim){
+        log_error("Only attr claims with claim ref can be merged into attr-index");
         goto out;
     }
     if(evr_merge_attr_index_attr(db, t, claim->ref, claim->attr, claim->attr_len) != evr_ok){

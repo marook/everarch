@@ -88,12 +88,17 @@ struct evr_attr {
     char *value;
 };
 
-#define evr_ref_type_self 0x01
-#define evr_ref_type_blob 0x02
+#define evr_ref_type_self  0x01
+#define evr_ref_type_claim 0x02
 
 struct evr_attr_claim {
     int ref_type;
-    evr_blob_ref ref;
+
+    /**
+     * ref is only filled if ref_type is evr_ref_type_claim.
+     */
+    evr_claim_ref ref;
+
     size_t claim_index;
     size_t attr_len;
     struct evr_attr *attr;
