@@ -1,3 +1,4 @@
+* evr-glacier-cli post-file should return cref instead of bref
 * evr_setup_attr_index_db should not fail if db is already setup
 * how do we report claims found in attr query?
 there should be at least these response modes:
@@ -65,6 +66,18 @@ once for every blob and without any checksum.
 there should be either a checksum for the two fields or it should be
 stored redundant. this should reduce the risk of breaking a whole
 bucket if one blob in it has a bit error.
+* gracefully handle sqlite database is locked in evr-glacier-storage
+sqlite's step function will exit with SQLITE_LOCKED if a table is
+locked for more than 1sec (configured right now).
+
+a SQLITE_LOCKED error should be indicated as 'resource temporary not
+available' to the client.
+* gracefully handle sqlite database is locked in evr-attr-index
+sqlite's step function will exit with SQLITE_LOCKED if a table is
+locked for more than 1sec (configured right now).
+
+a SQLITE_LOCKED error should be indicated as 'resource temporary not
+available' to the client.
 * add setup hints to README
 ** gpg signing key
 hint the user that the default gpg signing key is used for signing
