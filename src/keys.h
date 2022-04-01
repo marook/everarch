@@ -77,6 +77,8 @@ int evr_calc_blob_ref(evr_blob_ref key, size_t size, char **chunks);
 
 void evr_build_claim_ref(evr_claim_ref cref, evr_blob_ref bref, int claim);
 
+void evr_split_claim_ref(evr_blob_ref bref, int *claim, evr_claim_ref cref);
+
 void evr_fmt_claim_ref(char *dest, const evr_claim_ref cref);
 
 int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref);

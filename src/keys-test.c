@@ -62,6 +62,13 @@ void test_build_fmt_claim_ref(){
     evr_claim_ref_str cref_str;
     evr_fmt_claim_ref(cref_str, cref);
     assert_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+    evr_blob_ref sbref;
+    int claim;
+    evr_split_claim_ref(sbref, &claim, cref);
+    evr_blob_ref_str fmt_sbref;
+    evr_fmt_blob_ref(fmt_sbref, sbref);
+    assert_str_eq(fmt_sbref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
+    assert_int_eq(claim, 65000);
     evr_build_claim_ref(cref, bref, 0);
     evr_fmt_claim_ref(cref_str, cref);
     assert_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-0000");

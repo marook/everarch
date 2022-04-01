@@ -1,4 +1,3 @@
-* evr-glacier-cli post-file should return cref instead of bref
 * evr_setup_attr_index_db should not fail if db is already setup
 * how do we report claims found in attr query?
 there should be at least these response modes:

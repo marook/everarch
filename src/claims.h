@@ -142,6 +142,8 @@ xmlNode *evr_first_claim(xmlNode *claim_set);
 
 xmlNode *evr_next_claim(xmlNode *claim_node);
 
+xmlNode *evr_nth_claim(xmlNode *claim_set, int n);
+
 int evr_is_evr_element(xmlNode *n, char *name);
 
 struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node);

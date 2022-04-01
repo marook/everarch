@@ -366,12 +366,12 @@ struct post_file_ctx {
 
 int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0);
 
-int evr_cli_get_file(char *fmt_key){
+int evr_cli_get_file(char *fmt_cref){
     int ret = evr_error;
     evr_init_signatures();
     xmlInitParser();
-    evr_blob_ref key;
-    if(evr_parse_blob_ref(key, fmt_key) != evr_ok){
+    evr_claim_ref cref;
+    if(evr_parse_claim_ref(cref, fmt_cref) != evr_ok){
         goto out;
     }
     int c = evr_connect_to_storage();
@@ -379,11 +379,12 @@ int evr_cli_get_file(char *fmt_key){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
-    xmlDocPtr doc = evr_fetch_signed_xml(c, key);
+    evr_blob_ref bref;
+    int claim;
+    evr_split_claim_ref(bref, &claim, cref);
+    xmlDocPtr doc = evr_fetch_signed_xml(c, bref);
     if(!doc){
-        evr_blob_ref_str fmt_key;
-        evr_fmt_blob_ref(fmt_key, key);
-        log_error("No validly signed XML found for key %s", fmt_key);
+        log_error("No validly signed XML found for ref %s", fmt_cref);
         goto out;
     }
     xmlNode *cs = evr_get_root_claim_set(doc);
@@ -391,16 +392,14 @@ int evr_cli_get_file(char *fmt_key){
         log_error("No claim set found in blob");
         goto out_with_free_doc;
     }
-    xmlNode *fc = evr_first_claim(cs);
-    while(1){
-        if(!fc){
-            log_error("No file claim found in claim set");
-            goto out_with_free_doc;
-        }
-        if(evr_is_evr_element(fc, "file")){
-            break;
-        }
-        fc = evr_next_claim(fc);
+    xmlNode *fc = evr_nth_claim(cs, claim);
+    if(!fc){
+        log_error("There is no claim with index %d in claim-set with ref %s", claim, fmt_cref);
+        goto out_with_free_doc;
+    }
+    if(!evr_is_evr_element(fc, "file")){
+        log_error("The claim with index %d in claim-set with ref %s is not a file claim", claim, fmt_cref);
+        goto out_with_free_doc;
     }
     xmlNode *fbody = evr_find_next_element(fc->children, "body");
     if(!fbody){
@@ -408,23 +407,23 @@ int evr_cli_get_file(char *fmt_key){
         goto out_with_free_doc;
     }
     xmlNode *slice = evr_find_next_element(fbody->children, "slice");
-    evr_blob_ref ref;
+    evr_blob_ref sref;
     struct evr_resp_header resp;
     char buf[1];
     while(1){
         if(!slice){
             break;
         }
-        char *fmt_ref = (char*)xmlGetProp(slice, BAD_CAST "ref");
-        if(!fmt_ref){
+        char *fmt_sref = (char*)xmlGetProp(slice, BAD_CAST "ref");
+        if(!fmt_sref){
             goto out_with_free_doc;
         }
-        int pkret = evr_parse_blob_ref(ref, fmt_ref);
-        xmlFree(fmt_ref);
+        int pkret = evr_parse_blob_ref(sref, fmt_sref);
+        xmlFree(fmt_sref);
         if(pkret != evr_ok){
             goto out_with_free_doc;
         }
-        if(evr_write_cmd_get_blob(c, ref) != evr_ok){
+        if(evr_write_cmd_get_blob(c, sref) != evr_ok){
             goto out_with_free_doc;
         }
         if(evr_read_resp_header(c, &resp) != evr_ok){
@@ -432,8 +431,8 @@ int evr_cli_get_file(char *fmt_key){
         }
         if(resp.status_code != evr_status_code_ok){
             evr_blob_ref_str fmt_key;
-            evr_fmt_blob_ref(fmt_key, ref);
-            log_error("Failed to fetch file slice blob with key %s. Response status code was 0x%02x.", fmt_key, resp.status_code);
+            evr_fmt_blob_ref(fmt_key, sref);
+            log_error("Failed to fetch file slice blob with ref %s. Response status code was 0x%02x.", fmt_key, resp.status_code);
             goto out_with_free_doc;
         }
         // read flags but don't use them
@@ -516,9 +515,11 @@ int evr_cli_post_file(char *file, char *title){
     if(evr_stat_and_put(ctx.c, key, evr_blob_flag_claim, &sc_blob) != evr_ok){
         goto out_with_free_sc;
     }
-    evr_blob_ref_str fmt_key;
-    evr_fmt_blob_ref(fmt_key, key);
-    printf("%s\n", fmt_key);
+    evr_claim_ref cref;
+    evr_build_claim_ref(cref, key, 0);
+    evr_claim_ref_str fmt_cref;
+    evr_fmt_claim_ref(fmt_cref, cref);
+    printf("%s\n", fmt_cref);
     ret = evr_ok;
  out_with_free_sc:
     if(sc){

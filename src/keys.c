@@ -97,6 +97,13 @@ void evr_build_claim_ref(evr_claim_ref cref, evr_blob_ref bref, int claim){
     evr_push_map(&bp, &claim, uint16_t, htobe16);
 }
 
+void evr_split_claim_ref(evr_blob_ref bref, int *claim, evr_claim_ref cref){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, (char*)cref);
+    evr_pull_n(&bp, bref, evr_blob_ref_size);
+    evr_pull_map(&bp, claim, uint16_t, be16toh);
+}
+
 void evr_fmt_claim_ref(char *dest, const evr_claim_ref cref){
     evr_fmt_blob_ref(dest, cref);
     int claim = be16toh(*(uint16_t*)&cref[evr_blob_ref_size]);

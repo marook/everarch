@@ -176,6 +176,14 @@ xmlNode *evr_next_claim(xmlNode *claim_node){
     return evr_find_next_element(claim_node->next, NULL);
 }
 
+xmlNode *evr_nth_claim(xmlNode *claim_set, int n){
+    xmlNode *node = evr_first_claim(claim_set);
+    for(int i = 1; node && i < n; ++i){
+        node = evr_next_claim(node);
+    }
+    return node;
+}
+
 int evr_is_evr_element(xmlNode *n, char *name){
     int ret = 0;
     if(!n || !n->name || !n->ns || n->type != XML_ELEMENT_NODE){
