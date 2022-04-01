@@ -1,3 +1,6 @@
+* add milliseconds precision to claim-set created timestamp
+adding milliseconds precision also involves updating the last modified
+timestamps in the glacier db, the cli etc.
 * evr_setup_attr_index_db should not fail if db is already setup
 * how do we report claims found in attr query?
 there should be at least these response modes:
