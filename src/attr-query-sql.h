@@ -24,13 +24,15 @@
 #include <time.h>
 #include <sqlite3.h>
 
+#include "basics.h"
+
 // This appears to be a bug. This typedef breaks a dependency cycle
 // between the headers.
 // See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
 typedef void * yyscan_t;
 
 struct evr_attr_query_ctx {
-    time_t t;
+    evr_time t;
     void *more;
 };
 

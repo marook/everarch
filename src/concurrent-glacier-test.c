@@ -46,7 +46,7 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
     return evr_ok;
 }
 
-int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, unsigned long long *last_modified){
+int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, evr_time *last_modified){
     assert_not_null_msg(ctx, "evr_glacier_write_ctx must not be null");
     assert_not_null_msg(blob, "blob must not be null");
     assert_not_null_msg(last_modified, "last_modified was not supplied");

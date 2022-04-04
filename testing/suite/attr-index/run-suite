@@ -35,7 +35,7 @@ evr-glacier-cli -f 3 sign-put <<EOF
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
     xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="2022-03-01T00:00:00Z"
+    dc:created="2022-03-01T00:00:00.000000Z"
     >
   <attr-spec>
     <attr-def k="tag" type="str"/>

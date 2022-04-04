@@ -6,7 +6,7 @@
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
     xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="1970-01-01T00:00:07Z"
+    dc:created="1970-01-01T00:00:07.000000Z"
     >
   <file dc:title="test.txt">
     <body>

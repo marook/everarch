@@ -188,9 +188,9 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     return ret;
 }
 
-int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, unsigned long long last_modified, int last_blob), int flags_filter, unsigned long long last_modified_after, void *vctx){
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob), int flags_filter, evr_time last_modified_after, void *vctx){
     int ret = evr_error;
-    if(last_modified_after > (unsigned long long)LLONG_MAX){
+    if(last_modified_after > LLONG_MAX){
         // sqlite3 api only provides bind for signed int64. so we must
         // make sure that value does not overflow.
         goto out;
@@ -201,7 +201,7 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
     int has_found_key = 0;
     evr_blob_ref found_key;
     int flags;
-    unsigned long long last_modified;
+    evr_time last_modified;
     while(1){
         int step_ret = evr_step_stmt(ctx->db, ctx->list_blobs_stmt);
         if(step_ret == SQLITE_DONE){
@@ -523,12 +523,10 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
     memcpy(p, path_suffix, path_suffix_len+1);
 }
 
-int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, unsigned long long *last_modified) {
+int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, evr_time *last_modified) {
     int ret = evr_error;
-    time_t t;
-    time(&t);
-    uint64_t t64 = (uint64_t)t;
-    *last_modified = t64;
+    evr_now(last_modified);
+    uint64_t t64 = (uint64_t)*last_modified;
     size_t blob_size_size = 4;
     size_t header_disk_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + blob_size_size;
     size_t disk_size = header_disk_size + blob->size;

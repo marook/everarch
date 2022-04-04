@@ -2,7 +2,7 @@
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
     xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="2022-03-24T00:00:00Z"
+    dc:created="2022-03-24T00:00:00.000000Z"
     >
   <attr>
     <a op="+" k="tag" v="todo"/>

@@ -35,6 +35,7 @@
 #include <time.h>
 #include <libxml/xmlwriter.h>
 
+#include "basics.h"
 #include "keys.h"
 
 struct evr_claim_set {
@@ -104,7 +105,7 @@ struct evr_attr_claim {
     struct evr_attr *attr;
 };
 
-int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created);
+int evr_init_claim_set(struct evr_claim_set *cs, const evr_time *created);
 
 int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim *claim);
 
@@ -122,7 +123,7 @@ int evr_free_claim_set(struct evr_claim_set *cs);
  * xmlInitParser(); // just once at startup
  * …
  * doc = evr_parse_claim_set(…)
- * time_t created;
+ * evr_time created;
  * evr_parse_created(&created, xmlDocGetRootElement(doc));
  * for(cn = evr_first_claim(); cn; cn = evr_next_claim(cn)){
  *   …
@@ -141,7 +142,7 @@ xmlDocPtr evr_parse_claim_set(const char *buf, size_t buf_size);
 
 xmlNode *evr_get_root_claim_set(xmlDocPtr doc);
 
-int evr_parse_created(time_t *t, xmlNode *node);
+int evr_parse_created(evr_time *t, xmlNode *node);
 
 xmlNode *evr_first_claim(xmlNode *claim_set);
 

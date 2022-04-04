@@ -49,7 +49,7 @@ lwpid=$!
 pwpid=$!
 
 now=`date +%s`
-future=`expr 1000 + ${now}`
+future=`expr 60000 + ${now} '*' 1000`
 ( evr-glacier-cli watch --last-modified-after "${future}" > future-watch.actual.log ) &
 fwpid=$!
 

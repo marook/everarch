@@ -23,7 +23,7 @@
 #include "test.h"
 #include "keys.h"
 
-time_t t0 = 0;
+evr_time t0 = 0;
 
 void assert_file_claim(const struct evr_file_claim *claim, const char *expected_file_document);
 
@@ -37,7 +37,7 @@ void test_empty_claim(){
     struct evr_claim_set cs;
     assert_ok(evr_init_claim_set(&cs, &t0));
     assert_ok(evr_finalize_claim_set(&cs));
-    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\"/>\n");
+    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\"/>\n");
     assert_ok(evr_free_claim_set(&cs));
 }
 
@@ -113,18 +113,18 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
 void test_parse_file_claim_claim_set(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<file dc:title=\"test.txt\"><body><slice ref=\"sha3-224-12300000000000000000000000000000000000000000000000000321\" size=\"1\"/></body></file>"
         "<file xmlns=\"https://evr.ma300k.de/something-which-will-never-ever-exist\"></file>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
     assert_not_null(doc);
-    time_t created;
+    evr_time created;
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert_not_null(csn);
     assert_ok(evr_parse_created(&created, csn));
-    assert_equal(created, 7);
+    assert_equal(created, 7000);
     int file_claims_found = 0;
     int unknown_claims_found = 0;
     for(xmlNode *cn = evr_first_claim(csn); cn; cn = evr_next_claim(cn)){
@@ -151,7 +151,7 @@ void test_parse_file_claim_claim_set(){
 void test_parse_attr_claim_with_claim_ref(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<attr ref=\"sha3-224-32100000000000000000000000000000000000000000000000000123-0000\">"
         "<a op=\"=\" k=\"title\" v=\"test.txt\"/>"
         "<a op=\"+\" k=\"add\" v=\"spice\"/>"
@@ -189,7 +189,7 @@ void test_parse_attr_claim_with_claim_ref(){
 void test_parse_attr_claim_with_self_ref(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<attr></attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
@@ -211,7 +211,7 @@ void test_parse_attr_claim_with_self_ref(){
 void test_parse_attr_claim_with_claim_index(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<attr claim=\"1024\"></attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
@@ -233,7 +233,7 @@ void test_parse_attr_claim_with_claim_index(){
 void test_parse_two_attr_claims(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<attr></attr>"
         "<attr></attr>"
         "</claim-set>\n";
@@ -263,7 +263,7 @@ void test_parse_two_attr_claims(){
 void test_parse_attr_spec_claim(){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<claim-set dc:created=\"1970-01-01T00:00:07Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<attr-spec>"
         "<attr-def k=\"tag\" type=\"str\"/>"
         "<attr-def k=\"body-size\" type=\"int\"/>"

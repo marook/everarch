@@ -60,7 +60,7 @@ struct evr_attr_spec_handover_ctx {
 
     struct evr_attr_spec_claim *claim;
     evr_blob_ref claim_key;
-    time_t created;
+    evr_time created;
 };
 
 struct evr_index_handover_ctx {
@@ -89,7 +89,7 @@ int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
 int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, int *c);
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c);
 int evr_attr_index_tcp_server();
 
 int main(){
@@ -416,7 +416,7 @@ int evr_watch_index_claims_worker(void *arg){
     struct evr_watch_blobs_body body;
     struct evr_attr_spec_claim *latest_spec = NULL;
     evr_blob_ref latest_spec_key;
-    time_t latest_spec_created = 0;
+    evr_time latest_spec_created = 0;
     // cs is the connection used for finding the most recent
     // attr-spec claim
     int cs = -1;
@@ -470,7 +470,7 @@ int evr_watch_index_claims_worker(void *arg){
             log_error("Index claim does not contain claim-set element for blob key %s", fmt_key);
             goto out_with_free_claim_doc;
         }
-        time_t created;
+        evr_time created;
         if(evr_parse_created(&created, cs_node) != evr_ok){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
@@ -554,7 +554,7 @@ int evr_build_index_worker(void *arg){
         struct evr_attr_spec_claim *claim = sctx->claim;
         evr_blob_ref claim_key;
         memcpy(claim_key, sctx->claim_key, evr_blob_ref_size);
-        // TODO time_t created = sctx->created;;
+        // TODO evr_time created = sctx->created;
         if(evr_empty_handover(&sctx->handover) != evr_ok){
             goto out;
         }
@@ -694,7 +694,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     return ret;
 }
 
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, int *c){
+int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {

@@ -487,8 +487,8 @@ int evr_cli_post_file(char *file, char *title){
     fc.slices_len = ctx.slices->size_used / sizeof(struct evr_file_slice);
     fc.slices = (struct evr_file_slice*)ctx.slices->data;
     log_debug("Uploaded %d file segments", fc.slices_len);
-    time_t t;
-    time(&t);
+    evr_time t;
+    evr_now(&t);
     struct evr_claim_set cs;
     if(evr_init_claim_set(&cs, &t) != evr_ok){
         goto out_with_free_slice_keys;

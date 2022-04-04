@@ -83,7 +83,7 @@ void test_evr_glacier_write_smal_blob(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
-        unsigned long long last_modified;
+        evr_time last_modified;
         assert_zero(evr_glacier_append_blob(write_ctx, wb, &last_modified));
         assert_equal(write_ctx->current_bucket_index, 1);
         assert_equal(write_ctx->current_bucket_pos, 56);
@@ -106,7 +106,7 @@ void test_evr_glacier_write_smal_blob(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
-        unsigned long long last_modified;
+        evr_time last_modified;
         assert_zero(evr_glacier_append_blob(write_ctx, wb, &last_modified));
         assert_equal(write_ctx->current_bucket_index, 1);
         assert_equal(write_ctx->current_bucket_pos, 100);
@@ -192,7 +192,7 @@ void test_evr_glacier_write_big_blob(){
         assert_not_null(wb->chunks[1]);
         memset(wb->chunks[1], 0x44, chunk_1_len);
         wb->size = evr_chunk_size + chunk_1_len;
-        unsigned long long last_modified;
+        evr_time last_modified;
         assert_ok(evr_glacier_append_blob(ctx, wb, &last_modified));
         free(wb->chunks[0]);
         free(wb->chunks[1]);

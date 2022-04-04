@@ -31,10 +31,10 @@
 #include "attr-query-lexer.h"
 #include "attr-query-sql.h"
 
-int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, time_t valid_until);
-int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, time_t t);
+int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, evr_time valid_until);
+int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, evr_time t);
 int evr_get_attr_type_for_key(struct evr_attr_index_db *db, int *attr_type, char *key);
-int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, time_t valid_from, int is_valid_until, time_t valid_until, int trunc);
+int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, evr_time valid_from, int is_valid_until, evr_time valid_until, int trunc);
 
 struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name){
     struct evr_attr_index_db *db = malloc(sizeof(struct evr_attr_index_db));
@@ -213,7 +213,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     return ret;
 }
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
     int ret = evr_error;
     if(sqlite3_bind_blob(db->insert_claim_set, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out_with_reset_insert_claim_set;
@@ -262,7 +262,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
         ret = evr_ok;
         goto out_with_free_claim_set_doc;
     }
-    time_t created;
+    evr_time created;
     if(evr_parse_created(&created, cs_node) != evr_ok){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
@@ -313,7 +313,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
     return ret;
 }
 
-int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim){
+int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct evr_attr_claim *claim){
     int ret = evr_error;
     if(claim->ref_type != evr_ref_type_claim){
         log_error("Only attr claims with claim ref can be merged into attr-index");
@@ -348,13 +348,13 @@ int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct ev
     return ret;
 }
 
-int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, char *key, char* value);
+int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, char *key, char* value);
 
-int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, char *key, char* value);
+int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, char *key, char* value);
 
-int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, char *key, char* value);
+int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, char *key, char* value);
 
-int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len){
+int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len){
     int ret = evr_error;
     struct evr_attr *end = &attr[attr_len];
     for(struct evr_attr *a = attr; a != end; ++a){
@@ -427,7 +427,7 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     return ret;
 }
 
-int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, char *key, char* value){
+int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, char *key, char* value){
     int ret = evr_error;
     int attr_type;
     if(evr_get_attr_type_for_key(db, &attr_type, key) != evr_ok){
@@ -471,7 +471,7 @@ int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, time_t t, ev
             break;
         }
     }
-    time_t valid_until = 0;
+    evr_time valid_until = 0;
     if(is_valid_until){
         valid_until = sqlite3_column_int64(db->find_future_attr_siblings, 1);
     }
@@ -493,7 +493,7 @@ int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, time_t t, ev
     return ret;
 }
 
-int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, char *key, char* value){
+int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, char *key, char* value){
     int ret = evr_error;
     int attr_type;
     if(evr_get_attr_type_for_key(db, &attr_type, key) != evr_ok){
@@ -546,7 +546,7 @@ int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, time_t t, evr_cl
             }
         }
     }
-    time_t valid_until = 0;
+    evr_time valid_until = 0;
     if(is_valid_until){
         valid_until = sqlite3_column_int64(db->find_future_attr_siblings, 1);
     }
@@ -568,7 +568,7 @@ int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, time_t t, evr_cl
     return ret;
 }
 
-int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, char *key, char* value){
+int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, char *key, char* value){
     int ret = evr_error;
     if(evr_attr_index_bind_find_siblings(db->find_past_attr_siblings, ref, key, t) != evr_ok){
         goto out_with_reset_find_past_attr_siblings;
@@ -605,7 +605,7 @@ int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, time_t t, evr_cla
         is_valid_until = 1;
         break;
     }
-    time_t valid_until = 0;
+    evr_time valid_until = 0;
     if(is_valid_until){
         valid_until = sqlite3_column_int64(db->find_future_attr_siblings, 1);
     }
@@ -626,7 +626,7 @@ int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, time_t t, evr_cla
     return ret;
 }
 
-int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, time_t valid_until){
+int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, evr_time valid_until){
     int ret = evr_error;
     if(sqlite3_bind_int64(update_stmt, 1, (sqlite3_int64)valid_until) != SQLITE_OK){
         goto out_with_reset_update_stmt;
@@ -646,7 +646,7 @@ int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, in
     return ret;
 }
 
-int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, time_t t){
+int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, evr_time t){
     int ret = evr_error;
     if(sqlite3_bind_blob(find_stmt, 1, ref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out;
@@ -688,7 +688,7 @@ int evr_get_attr_type_for_key(struct evr_attr_index_db *db, int *attr_type, char
     return ret;
 }
 
-int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, time_t valid_from, int is_valid_until, time_t valid_until, int trunc){
+int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, evr_time valid_from, int is_valid_until, evr_time valid_until, int trunc){
     int ret = evr_error;
     int attr_type;
     if(evr_get_attr_type_for_key(db, &attr_type, key) != evr_ok){
@@ -754,7 +754,7 @@ int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, 
     return ret;
 }
 
-int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, evr_attr_visitor visit){
+int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, evr_attr_visitor visit){
     int ret = evr_error;
     if(sqlite3_bind_blob(db->find_ref_attrs, 1, ref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out_with_reset_find_ref_attrs;
@@ -801,7 +801,7 @@ struct evr_attr_query_node *evr_attr_parse_query(const char *query);
 
 struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, time_t t, size_t offset, size_t limit, evr_claim_visitor visit){
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, evr_claim_visitor visit){
     int ret = evr_error;
     struct evr_attr_query_node *root = evr_attr_parse_query(query);
     if(!root){

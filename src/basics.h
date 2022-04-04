@@ -21,13 +21,20 @@
 
 #include "config.h"
 
+#include <stdint.h>
+#include <time.h>
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) < (b) ? (b) : (a))
 
 #define ceil_div(dividend, divisor) ((dividend + (divisor - 1)) / divisor)
 
-#define stringify(n) #n
-#define to_string(n) stringify(n)
+/*
+ * in order to convert the numeric value of a define into a string
+ * call to_string(n). _stringify(n) is just a helper function.
+ */
+#define _stringify(n) #n
+#define to_string(n) _stringify(n)
 
 #define evr_glacier_storage_port 2361
 #define evr_glacier_attr_index_port 2362
@@ -152,6 +159,37 @@ struct evr_buf_pos {
             *s = '\0';                                                  \
         }                                                               \
         log_debug("struct evr_buf_pos %p with len %lu dump: %s", bp, (bp)->pos - (bp)->buf, dump); \
+    } while(0)
+
+/**
+ * evr_time is the everarch time representation.
+ *
+ * You can assume the following:
+ * - bigger values are later in time
+ * - comparision operators =, < and > work
+ */
+typedef uint64_t evr_time;
+
+void evr_now(evr_time *t);
+
+#define evr_time_from_timespec(t, ts)                           \
+    do {                                                                \
+        *(t) = ((evr_time)(ts)->tv_sec) * 1000 + (ts)->tv_nsec / 1000000; \
+    } while(0)
+
+/**
+ * evr_max_time_iso8601_size is the maximum size of an ISO 8601
+ * formatted string in bytes including \0 termination.
+ */
+#define evr_max_time_iso8601_size 30
+
+int evr_time_from_iso8601(evr_time *t, const char *s);
+
+void evr_time_to_iso8601(char *s, size_t sn, const evr_time *t);
+
+#define evr_time_add_ms(t, ms)                  \
+    do {                                        \
+        *(t) += ms;                             \
     } while(0)
 
 #endif

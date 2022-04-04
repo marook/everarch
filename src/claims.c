@@ -27,7 +27,7 @@ const char *evr_iso_8601_timestamp = "%FT%TZ";
 const char *evr_claims_ns = "https://evr.ma300k.de/claims/";
 const char *evr_dc_ns = "http://purl.org/dc/terms/";
 
-int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created){
+int evr_init_claim_set(struct evr_claim_set *cs, const evr_time *created){
     cs->out = xmlBufferCreate();
     if(cs->out == NULL){
         goto out;
@@ -49,9 +49,7 @@ int evr_init_claim_set(struct evr_claim_set *cs, const time_t *created){
         goto out_with_free_writer;
     }
     char buf[30];
-    struct tm t;
-    gmtime_r(created, &t);
-    strftime(buf, sizeof(buf), evr_iso_8601_timestamp, &t);
+    evr_time_to_iso8601(buf, sizeof(buf), created);
     if(xmlTextWriterWriteAttributeNS(cs->writer, BAD_CAST "dc", BAD_CAST "created", BAD_CAST evr_dc_ns, BAD_CAST buf) < 0){
         goto out_with_free_writer;
     }
@@ -149,18 +147,15 @@ xmlNode *evr_get_root_claim_set(xmlDocPtr doc){
     return cs;
 }
 
-int evr_parse_created(time_t *t, xmlNode *node){
+int evr_parse_created(evr_time *t, xmlNode *node){
     int ret = evr_error;
     char *s = (char*)xmlGetNsProp(node, BAD_CAST "created", BAD_CAST evr_dc_ns);
     if(!s){
         goto out;
     }
-    char *end = &s[strlen(s)];
-    struct tm tm;
-    if(strptime(s, evr_iso_8601_timestamp, &tm) != end){
+    if(evr_time_from_iso8601(t, s) != evr_ok){
         goto out_with_free_s;
     }
-    *t = timegm(&tm);
     ret = evr_ok;
  out_with_free_s:
     xmlFree(s);

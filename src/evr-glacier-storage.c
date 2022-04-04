@@ -51,7 +51,7 @@ struct evr_connection{
 
 struct evr_modified_blob {
     evr_blob_ref key;
-    unsigned long long last_modified;
+    evr_time last_modified;
     int flags;
 };
 
@@ -72,9 +72,9 @@ int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
 int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
-int evr_handle_blob_list(void *ctx, const evr_blob_ref key, int flags, unsigned long long last_modified, int last_blob);
+int evr_handle_blob_list(void *ctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob);
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx);
-void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, unsigned long long last_modified);
+void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, evr_time last_modified);
 int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx);
 int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
@@ -602,7 +602,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     return ret;
 }
 
-int evr_handle_blob_list(void *ctx0, const evr_blob_ref key, int flags, unsigned long long last_modified, int last_blob){
+int evr_handle_blob_list(void *ctx0, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob){
     int ret = evr_error;
     struct evr_list_blobs_ctx *ctx = ctx0;
     if(ctx->blobs_used == evr_list_blobs_blobs_len){
@@ -643,7 +643,7 @@ int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx){
     return ret;
 }
 
-void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, unsigned long long last_modified){
+void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, evr_time last_modified){
     struct evr_work_watch_ctx *wctx = ctx;
     if((wctx->filter->flags_filter & flags) != wctx->filter->flags_filter){
         return;

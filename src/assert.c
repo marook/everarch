@@ -54,11 +54,24 @@ void assert_zero(int i){
 }
 
 void assert_ok(int result){
-    assert_equal_msg(result, evr_ok, "Expected result to be evr_ok but was 0x%02x\n", result);
+    assert_ok_msg(result, "Expected result to be evr_ok but was 0x%02x\n", result);
 }
 
 void assert_ok_msg(int result, const char *format, ...){
     if(result != evr_ok){
+        va_list args;
+        va_start(args, format);
+        vfail(format, args);
+        va_end(args);
+    }
+}
+
+void assert_err(int result){
+    assert_err_msg(result, "Expected result to be error but was evr_ok");
+}
+
+void assert_err_msg(int result, const char *format, ...){
+    if(result == evr_ok){
         va_list args;
         va_start(args, format);
         vfail(format, args);
@@ -79,15 +92,15 @@ void assert_equal_msg(int actual, int expected, const char *format, ...){
     }
 }
 
-void assert_greater_equal(int actual, int min){
+void assert_greater_equal(long actual, long min){
     if(actual < min){
-        fail("Expected %d to be >= %d\n", actual, min);
+        fail("Expected %l to be >= %l\n", actual, min);
     }
 }
 
-void assert_greater_then(int actual, int min){
+void assert_greater_then(long actual, long min){
     if(actual <= min){
-        fail("Expected %d to be > %d\n", actual, min);
+        fail("Expected %l to be > %l\n", actual, min);
     }
 }
 

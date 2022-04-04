@@ -37,6 +37,7 @@
 #include <endian.h>
 
 #include "keys.h"
+#include "basics.h"
 
 /**
  * evr_cmd_type_get_blob asks for a blob with a certain key.
@@ -140,16 +141,15 @@ struct evr_blob_filter {
     int flags_filter;
 
     /**
-     * last_modified_after is the unix epoch timestamp in seconds
-     * after which a blob must have been modified in order to be
-     * passed by the filter.
+     * last_modified_after is the timestamp after which a blob must
+     * have been modified in order to be passed by the filter.
      *
      * Future last_modified_after values will not report any
      * modifications already persisted into the glacier storage. But
      * live modifications on blobs will be reported even if they lie
      * behind last_modified_after.
      */
-    unsigned long long last_modified_after;
+    evr_time last_modified_after;
 };
 
 #define evr_blob_filter_n_size (sizeof(uint8_t) + sizeof(uint64_t))

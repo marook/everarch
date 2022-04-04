@@ -43,7 +43,7 @@ void assert_claims(int expected_found_claim_0);
 struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg);
 
 void test_open_new_attr_index_db_twice(){
-    const time_t merge_attrs_t[merge_attrs_len] = {
+    const evr_time merge_attrs_t[merge_attrs_len] = {
         10,
         20,
         30,
@@ -85,7 +85,7 @@ void test_open_new_attr_index_db_twice(){
             if(round == 0){
                 for(size_t rai = 0; rai < merge_attrs_len; ++rai){
                     size_t aai = attr_merge_permutations[pi][rai];
-                    time_t t = merge_attrs_t[aai];
+                    evr_time t = merge_attrs_t[aai];
                     struct evr_attr_claim claim;
                     claim.ref_type = evr_ref_type_claim;
                     evr_build_claim_ref(claim.ref, ref, 0);

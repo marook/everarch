@@ -87,17 +87,17 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, time_t claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
 
-int evr_merge_attr_index_claim(struct evr_attr_index_db *db, time_t t, struct evr_attr_claim *claim);
+int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct evr_attr_claim *claim);
 
-int evr_merge_attr_index_attr(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
+int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
 
 typedef int (*evr_attr_visitor)(const evr_claim_ref ref, const char *key, const char *value);
 
 typedef int (*evr_claim_visitor)(const evr_claim_ref ref);
 
-int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref, evr_attr_visitor visit);
+int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, evr_attr_visitor visit);
 
 /**
  * evr_visit_attr_query visits statements which select attribute ref,
@@ -105,6 +105,6 @@ int evr_get_ref_attrs(struct evr_attr_index_db *db, time_t t, evr_claim_ref ref,
  */
 int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, time_t t, size_t offset, size_t limit, evr_claim_visitor visit);
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, evr_claim_visitor visit);
 
 #endif

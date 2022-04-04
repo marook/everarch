@@ -26,6 +26,7 @@ attr_index_db_test_SOURCES = \
 	attr-query-lexer.l \
 	attr-query-parser.y \
 	attr-query-sql.c \
+	basics.c \
 	claims.c \
 	configuration-testutil.c \
 	configurations.c \
@@ -42,10 +43,12 @@ attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 basics_test_SOURCES = \
 	assert.c \
 	basics.c \
-	basics-test.c
+	basics-test.c \
+	logger.c
 
 claims_test_SOURCES = \
 	assert.c \
+	basics.c \
 	claims.c \
 	claims-test.c \
 	keys.c \
@@ -77,6 +80,7 @@ evr_attr_index_SOURCES = \
 	attr-query-lexer.l \
 	attr-query-parser.y \
 	attr-query-sql.c \
+	basics.c \
 	claims.c \
 	configurations.c \
 	db.c \
@@ -93,6 +97,7 @@ evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_glacier_cli_SOURCES = \
+	basics.c \
 	claims.c \
 	dyn-mem.c \
 	evr-glacier-cli.c \
@@ -105,6 +110,7 @@ evr_glacier_cli_SOURCES = \
 evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
 
 evr_glacier_storage_SOURCES = \
+	basics.c \
 	concurrent-glacier.c \
 	configurations.c \
 	db.c \
@@ -137,6 +143,7 @@ glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 glacier_test_SOURCES = \
 	assert.c \
 	attr-index-db-configuration.c \
+	basics.c \
 	configuration-testutil.c \
 	configurations.c \
 	db.c \
