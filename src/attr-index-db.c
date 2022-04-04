@@ -157,8 +157,17 @@ int evr_attr_index_set_state(struct evr_attr_index_db *db, int key, sqlite3_int6
     return ret;
 }
 
+#define attr_index_db_version 1
+
 int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec){
     int ret = evr_error;
+    int db_setup = 0;
+    char *error = NULL;
+    if(sqlite3_exec(db->db, "select 1 from v" to_string(attr_index_db_version) "", NULL, NULL, NULL) == SQLITE_OK){
+        db_setup = 1;
+        log_debug("attr-index db already setup");
+        goto prepare;
+    }
     const char *sql[] = {
         "create table attr_def (key text primary key not null, type integer not null)",
         "create table attr (ref blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
@@ -169,7 +178,6 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table claim_set (ref blob primary key not null)",
         NULL
     };
-    char *error;
     for(size_t i = 0; ; ++i){
         const char *s = sql[i];
         if(!s){
@@ -181,23 +189,30 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         }
     }
     sqlite3_stmt *insert_attr_def;
+ prepare:
     if(sqlite3_prepare_v2(db->db, "insert into attr_def (key, type) values (?, ?)", -1, &insert_attr_def, NULL) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db->db);
         log_error("Failed to prepare insert attr_def statement: %s", sqlite_error_msg);
         goto out;
     }
-    struct evr_attr_def *attr_def_end = &spec->attr_def[spec->attr_def_len];
-    for(struct evr_attr_def *ad = spec->attr_def; ad != attr_def_end; ++ad){
-        if(sqlite3_bind_text(insert_attr_def, 1, ad->key, -1, NULL) != SQLITE_OK){
-            goto out_with_free_insert_attr_def;
+    if(!db_setup){
+        struct evr_attr_def *attr_def_end = &spec->attr_def[spec->attr_def_len];
+        for(struct evr_attr_def *ad = spec->attr_def; ad != attr_def_end; ++ad){
+            if(sqlite3_bind_text(insert_attr_def, 1, ad->key, -1, NULL) != SQLITE_OK){
+                goto out_with_free_insert_attr_def;
+            }
+            if(sqlite3_bind_int(insert_attr_def, 2, ad->type) != SQLITE_OK){
+                goto out_with_free_insert_attr_def;
+            }
+            if(sqlite3_step(insert_attr_def) != SQLITE_DONE){
+                goto out_with_free_insert_attr_def;
+            }
+            if(sqlite3_reset(insert_attr_def) != SQLITE_OK){
+                goto out_with_free_insert_attr_def;
+            }
         }
-        if(sqlite3_bind_int(insert_attr_def, 2, ad->type) != SQLITE_OK){
-            goto out_with_free_insert_attr_def;
-        }
-        if(sqlite3_step(insert_attr_def) != SQLITE_DONE){
-            goto out_with_free_insert_attr_def;
-        }
-        if(sqlite3_reset(insert_attr_def) != SQLITE_OK){
+        if(sqlite3_exec(db->db, "create table v" to_string(attr_index_db_version) " (x integer)", NULL, NULL, &error) != SQLITE_OK){
+            log_error("Failed to mark attr index db as prepared: %s", error);
             goto out_with_free_insert_attr_def;
         }
     }
@@ -206,10 +221,11 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     if(sqlite3_finalize(insert_attr_def) != SQLITE_OK){
         ret = evr_error;
     }
- out:
-    return ret;
  out_with_free_error:
-    sqlite3_free(error);
+    if(error){
+        sqlite3_free(error);
+    }
+ out:
     return ret;
 }
 

@@ -238,9 +238,19 @@ void test_get_set_state(){
     evr_free_attr_index_db_configuration(cfg);
 }
 
+void test_setup_attr_index_db_twice(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg);
+    assert_ok(evr_free_attr_index_db(db));
+    db = create_prepared_attr_index_db(cfg);
+    assert_ok(evr_free_attr_index_db(db));
+    evr_free_attr_index_db_configuration(cfg);
+}
+
 int main(){
     run_test(test_open_new_attr_index_db_twice);
     run_test(test_add_two_attr_claims_for_same_target);
     run_test(test_get_set_state);
+    run_test(test_setup_attr_index_db_twice);
     return 0;
 }
