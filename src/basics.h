@@ -129,8 +129,9 @@ struct evr_buf_pos {
 
 #define evr_push_concat(bp, s)                  \
     do {                                        \
-        size_t len = strlen(s);                 \
-        evr_push_n(bp, s, len);                 \
+        const char *_s = s;                     \
+        size_t len = strlen(_s);                \
+        evr_push_n(bp, _s, len);                \
     } while(0)
 
 #define evr_push_eos(bp)                        \

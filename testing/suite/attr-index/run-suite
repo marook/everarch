@@ -46,13 +46,35 @@ evr-glacier-cli -f 3 sign-put <<EOF
 EOF
 
 echo "Uploading test claim…"
-evr-glacier-cli -f 1 sign-put < attr-claim.xml
+test_ref=`evr-glacier-cli -f 1 sign-put < attr-claim.xml`
 
 echo "Starting evr-attr-index…"
 evr-attr-index &
 ipid=$!
 
-# TODO build up index
 sleep 1
+
+echo "Running test queryies…"
+
+results=`nc localhost 2362 <<EOF
+s tag=no-such-tag-exists
+exit
+EOF`
+if [[ "${results}" != "OK" ]]
+then
+    echo "Unexpected result from tag=no-such-tag-exists query: ${results}" >&2
+    exit 1
+fi
+
+results=`nc localhost 2362 <<EOF
+s tag=todo
+exit
+EOF`
+if [[ "${results}" != "OK
+${test_ref}-0000" ]]
+then
+    echo "Unexpected result from tag=todo query: ${results}" >&2
+    exit 1
+fi
 
 echo "Stopping…"

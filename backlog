@@ -1,12 +1,8 @@
-* how do we report claims found in attr query?
+* report further claim attributes for found refs
 there should be at least these response modes:
 ** report only ref
 ** report ref and some attributes specified by key
 ** report ref and all attributes
-* evr-attr-index should listen on a socket for querries
-* introduce evr-attr-cli cmd with index query feature
-command line client which sends querries to a evr-attr-index and lists
-found blobs.
 * implement offset and limit in attr queries
 tag=todo offset=0 limit=100
 * implement t in attr queries

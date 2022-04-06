@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <threads.h>
 #include <libxslt/xslt.h>
+#include <arpa/inet.h>
 
 #include "basics.h"
 #include "claims.h"
@@ -35,10 +36,15 @@
 #include "attr-index-db-configuration.h"
 #include "attr-index-db.h"
 #include "configurations.h"
+#include "files.h"
 
 sig_atomic_t running = 1;
 mtx_t stop_lock;
 cnd_t stop_signal;
+
+struct evr_connection {
+    int socket;
+};
 
 /**
  * watch_overlap defines the overlap of claim watches in seconds.
@@ -69,12 +75,26 @@ struct evr_index_handover_ctx {
     evr_blob_ref index_ref;
 };
 
+struct evr_current_index_ctx {
+    struct evr_handover_ctx handover;
+    evr_blob_ref index_ref;
+};
+
+struct evr_current_index_ctx current_index_ctx;
+
+struct evr_search_ctx {
+    struct evr_connection *con;
+    int parse_res;
+};
+
 void handle_sigterm(int signum);
 struct evr_attr_index_db_configuration *evr_load_attr_index_db_cfg();
 #define evr_init_attr_spec_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
 int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
 #define evr_init_index_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
 #define evr_free_index_handover_ctx(ctx) evr_free_handover_ctx(&(ctx)->handover)
+#define evr_init_current_index_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
+#define evr_free_current_index_ctx(ctx) evr_free_handover_ctx(&(ctx)->handover)
 
 int evr_init_handover_ctx(struct evr_handover_ctx *ctx);
 int evr_free_handover_ctx(struct evr_handover_ctx *ctx);
@@ -82,6 +102,7 @@ int evr_stop_handover(struct evr_handover_ctx *ctx);
 int evr_wait_for_handover_available(struct evr_handover_ctx *ctx);
 int evr_wait_for_handover_occupied(struct evr_handover_ctx *ctx);
 int evr_lock_handover(struct evr_handover_ctx *ctx);
+int evr_unlock_handover(struct evr_handover_ctx *ctx);
 int evr_occupy_handover(struct evr_handover_ctx *ctx);
 int evr_empty_handover(struct evr_handover_ctx *ctx);
 
@@ -91,6 +112,13 @@ int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
 int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c);
 int evr_attr_index_tcp_server();
+int evr_connection_worker(void *ctx);
+int evr_work_cmd(struct evr_connection *ctx, char *line);
+int evr_work_search_cmd(struct evr_connection *ctx, char *query);
+int evr_respond_search_status(void *context, int parse_res);
+int evr_respond_search_result(void *context, const evr_claim_ref ref);
+int evr_respond_help(struct evr_connection *ctx);
+int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
 
 int main(){
     int ret = evr_error;
@@ -104,6 +132,9 @@ int main(){
     if(cnd_init(&stop_signal) != thrd_success){
         goto out_with_free_stop_lock;
     }
+    if(evr_init_current_index_ctx(&current_index_ctx) != evr_ok){
+        goto out_with_free_stop_signal;
+    }
     {
         struct sigaction action;
         memset(&action, 0, sizeof(action));
@@ -115,7 +146,7 @@ int main(){
         // read https://sqlite.org/threadsafe.html if you run into
         // this error
         log_error("Failed to configure multi-threaded mode for sqlite3");
-        goto out_with_free_stop_lock;
+        goto out_with_free_current_index;
     }
     evr_init_signatures();
     xmlInitParser();
@@ -167,6 +198,9 @@ int main(){
     if(evr_stop_handover(&attr_spec_handover_ctx.handover) != evr_ok){
         goto out_with_join_watch_index_claims_thrd;
     }
+    if(evr_stop_handover(&current_index_ctx.handover) != evr_ok){
+        goto out_with_join_watch_index_claims_thrd;
+    }
     ret = evr_ok;
     int thrd_res;
  out_with_join_index_sync_thrd:
@@ -206,6 +240,9 @@ int main(){
  out_with_cleanup_xml_parser:
     xsltCleanupGlobals();
     xmlCleanupParser();
+ out_with_free_current_index:
+    evr_free_current_index_ctx(&current_index_ctx);
+ out_with_free_stop_signal:
     cnd_destroy(&stop_signal);
  out_with_free_stop_lock:
     mtx_destroy(&stop_lock);
@@ -365,6 +402,17 @@ int evr_lock_handover(struct evr_handover_ctx *ctx){
     return ret;
 }
 
+int evr_unlock_handover(struct evr_handover_ctx *ctx){
+    int ret = evr_error;
+    if(mtx_unlock(&ctx->lock) != thrd_success){
+        evr_panic("Failed to unlock handover");
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
 int evr_occupy_handover(struct evr_handover_ctx *ctx){
     int ret = evr_error;
     ctx->occupied = 1;
@@ -372,8 +420,7 @@ int evr_occupy_handover(struct evr_handover_ctx *ctx){
         evr_panic("Failed to signal spec pushed on occupy");
         goto out;
     }
-    if(mtx_unlock(&ctx->lock) != thrd_success){
-        evr_panic("Failed to unlock handover lock on occupy");
+    if(evr_unlock_handover(ctx) != evr_ok){
         goto out;
     }
     ret = evr_ok;
@@ -388,8 +435,7 @@ int evr_empty_handover(struct evr_handover_ctx *ctx){
         evr_panic("Failed to signal handover empty");
         goto out;
     }
-    if(mtx_unlock(&ctx->lock) != thrd_success){
-        evr_panic("Failed to unlock handover lock on empty");
+    if(evr_unlock_handover(ctx) != evr_ok){
         goto out;
     }
     ret = evr_ok;
@@ -787,6 +833,14 @@ int evr_index_sync_worker(void *arg){
             evr_blob_ref_str index_ref_str;
             evr_fmt_blob_ref(index_ref_str, index_ref);
             log_info("Index sync worker switches to index %s", index_ref_str);
+            if(evr_lock_handover(&current_index_ctx.handover) != evr_ok){
+                goto out_with_free;
+            }
+            memcpy(current_index_ctx.index_ref, index_ref, evr_blob_ref_size);
+            if(evr_occupy_handover(&current_index_ctx.handover) != evr_ok){
+                evr_panic("Failed to occupy current index handover");
+                goto out_with_free;
+            }
             db = evr_open_attr_index_db(cfg, index_ref_str);
             if(!db){
                 goto out_with_free;
@@ -899,6 +953,7 @@ int evr_attr_index_tcp_server(){
     log_info("Listening on localhost:%d", evr_glacier_attr_index_port);
     fd_set active_fd_set;
     struct timeval timeout;
+    struct sockaddr_in client_addr;
     while(running){
         FD_ZERO(&active_fd_set);
         FD_SET(s, &active_fd_set);
@@ -914,11 +969,214 @@ int evr_attr_index_tcp_server(){
         if(sret == 0){
             continue;
         }
-        // TODO check active_fd_set and accept connection
+        for(int i = 0; i < FD_SETSIZE; ++i){
+            if(FD_ISSET(i, &active_fd_set)){
+                if(i == s){
+                    socklen_t size = sizeof(client_addr);
+                    int c = accept(s, (struct sockaddr*)&client_addr, &size);
+                    if(c < 0){
+                        goto out_with_close_s;
+                    }
+                    log_debug("Connection from %s:%d accepted (will be worker %d)", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), c);
+                    struct evr_connection *ctx = malloc(sizeof(struct evr_connection));
+                    if(!ctx){
+                        goto out_with_close_c;
+                    }
+                    ctx->socket = c;
+                    thrd_t t;
+                    if(thrd_create(&t, evr_connection_worker, ctx) != thrd_success){
+                        goto out_with_free_ctx;
+                    }
+                    if(thrd_detach(t) != thrd_success){
+                        evr_panic("Failed to detach connection worker thread for worker %d", c);
+                        goto out_with_close_s;
+                    }
+                    goto loop;
+                out_with_free_ctx:
+                    free(ctx);
+                out_with_close_c:
+                    close(c);
+                    log_error("Failed to startup connection from %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+                loop:
+                    continue;
+                }
+            }
+        }
     }
     ret = evr_ok;
  out_with_close_s:
     close(s);
  out:
     return ret;
+}
+
+int evr_connection_worker(void *context) {
+    int ret = evr_error;
+    struct evr_connection ctx = *(struct evr_connection*)context;
+    free(context);
+    log_debug("Started connection worker %d", ctx.socket);
+    char query_str[8*1024];
+    char *query_scanned = query_str;
+    char *query_end = &query_str[sizeof(query_str)];
+    while(running){
+        size_t max_read = query_end - query_scanned;
+        if(max_read == 0){
+            log_debug("Connection worker %d retrieved too big query", ctx.socket);
+            goto out_with_close_socket;
+        }
+        ssize_t bytes_read = read(ctx.socket, query_scanned, max_read);
+        if(bytes_read == 0){
+            ret = evr_ok;
+            goto out_with_close_socket;
+        }
+        if(bytes_read < 0){
+            goto out_with_close_socket;
+        }
+        char *read_end = &query_scanned[bytes_read];
+        while(query_scanned != read_end){
+            if(*query_scanned != '\n'){
+                ++query_scanned;
+                continue;
+            }
+            *query_scanned = '\0';
+            int cmd_res = evr_work_cmd(&ctx, query_str);
+            if(cmd_res == evr_end){
+                ret = evr_ok;
+                goto out_with_close_socket;
+            }
+            if(cmd_res != evr_ok){
+                goto out_with_close_socket;
+            }
+            size_t l = read_end - (query_scanned + 1);
+            if(l > 0){
+                memmove(query_str, query_scanned + 1, l);
+            }
+            read_end -= (query_scanned + 1) - query_str;
+            query_scanned = query_str;
+        }
+    }
+ out_with_close_socket:
+    close(ctx.socket);
+    log_debug("Ended connection worker %d with result %d", ctx.socket, ret);
+    return ret;
+}
+
+int evr_work_cmd(struct evr_connection *ctx, char *line){
+    log_debug("Connection worker %d retrieved cmd: %s", ctx->socket, line);
+    char *cmd = line;
+    char *args = index(line, ' ');
+    if(args){
+        *args = '\0';
+        ++args;
+    }
+    if(strcmp(cmd, "s") == 0){
+        return evr_work_search_cmd(ctx, args);
+    }
+    if(strcmp(cmd, "exit") == 0){
+        return evr_end;
+    }
+    if(strcmp(cmd, "?") == 0 || strcmp(cmd, "help") == 0){
+        return evr_respond_help(ctx);
+    }
+    return evr_respond_status(ctx, 0, "No such command.");
+}
+
+int evr_work_search_cmd(struct evr_connection *ctx, char *query){
+    int ret = evr_error;
+    log_debug("Connection worker %d retrieved query: %s", ctx->socket, query);
+    if(evr_wait_for_handover_occupied(&current_index_ctx.handover) != evr_ok){
+        goto out;
+    }
+    evr_blob_ref index_ref;
+    memcpy(index_ref, current_index_ctx.index_ref, evr_blob_ref_size);
+    if(evr_unlock_handover(&current_index_ctx.handover) != evr_ok){
+        evr_panic("Failed to unlock current index handover");
+        goto out;
+    }
+    if(!running){
+        goto out;
+    }
+    evr_blob_ref_str index_ref_str;
+    evr_fmt_blob_ref(index_ref_str, index_ref);
+    log_debug("Connection worker %d is using index %s for query", ctx->socket, index_ref_str);
+    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, index_ref_str);
+    if(!db){
+        goto out;
+    }
+    evr_time t;
+    evr_now(&t);
+    struct evr_search_ctx sctx;
+    sctx.con = ctx;
+    if(evr_attr_query_claims(db, query, t, 0, 100, evr_respond_search_status, evr_respond_search_result, &sctx) != evr_ok){
+        goto out_with_free_db;
+    }
+    if(sctx.parse_res == evr_ok){
+        if(write_n(ctx->socket, "\n", 1) != evr_ok){
+            goto out_with_free_db;
+        }
+    }
+    ret = evr_ok;
+ out_with_free_db:
+    if(evr_free_attr_index_db(db) != evr_ok){
+        ret = evr_error;
+    }
+ out:
+    return ret;
+}
+
+int evr_respond_search_status(void *context, int parse_res){
+    struct evr_search_ctx *ctx = context;
+    ctx->parse_res = parse_res;
+    if(parse_res != evr_ok){
+        return evr_respond_status(ctx->con, 0, "Syntax error in query.");
+    }
+    return evr_respond_status(ctx->con, 1, NULL);
+}
+
+int evr_respond_search_result(void *context, const evr_claim_ref ref){
+    int ret = evr_error;
+    struct evr_search_ctx *ctx = context;
+    char buf[evr_claim_ref_str_size];
+    evr_fmt_claim_ref(buf, ref);
+    buf[evr_claim_ref_str_size - 1] = '\n';
+    if(write_n(ctx->con->socket, buf, sizeof(buf)) != evr_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+int evr_respond_help(struct evr_connection *ctx){
+    int ret = evr_error;
+    if(evr_respond_status(ctx, 1, NULL) != evr_ok){
+        goto out;
+    }
+    const char help[] = PACKAGE_STRING "\n"
+        "These commands are defined.\n"
+        "exit - closes the conneciton\n"
+        "help - shows this help message\n"
+        "s QUERY - searches for claims matching the given query.\n"
+        "\n"
+        ;
+    if(write_n(ctx->socket, help, sizeof(help)) != evr_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+int evr_respond_status(struct evr_connection *ctx, int ok, char *msg){
+    size_t msg_len = msg ? 1 + strlen(msg) : 0;
+    char buf[5 + msg_len + 1];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_push_concat(&bp, ok ? "OK" : "ERROR");
+    if(msg){
+        evr_push_concat(&bp, " ");
+        evr_push_concat(&bp, msg);
+    }
+    evr_push_concat(&bp, "\n");
+    return write_n(ctx->socket, buf, bp.pos - bp.buf);
 }

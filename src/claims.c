@@ -393,7 +393,9 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
         claim_index = 0;
         xmlNode *sibling = claim_node->prev;
         while(sibling){
-            ++claim_index;
+            if(sibling->type == XML_ELEMENT_NODE){
+                ++claim_index;
+            }
             sibling = sibling->prev;
         }
     }

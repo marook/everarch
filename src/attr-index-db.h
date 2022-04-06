@@ -95,7 +95,7 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
 
 typedef int (*evr_attr_visitor)(const evr_claim_ref ref, const char *key, const char *value);
 
-typedef int (*evr_claim_visitor)(const evr_claim_ref ref);
+typedef int (*evr_claim_visitor)(void *ctx, const evr_claim_ref ref);
 
 int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, evr_attr_visitor visit);
 
@@ -105,6 +105,6 @@ int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref re
  */
 int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, evr_claim_visitor visit);
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res), evr_claim_visitor visit, void *ctx);
 
 #endif

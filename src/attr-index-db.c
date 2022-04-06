@@ -817,12 +817,19 @@ struct evr_attr_query_node *evr_attr_parse_query(const char *query);
 
 struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, evr_claim_visitor visit){
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res), evr_claim_visitor visit, void *visit_ctx){
     int ret = evr_error;
     struct evr_attr_query_node *root = evr_attr_parse_query(query);
     if(!root){
         log_error("Failed to parse attr query: %s", query);
+        if(status(visit_ctx, evr_error) != evr_ok){
+            goto out;
+        }
+        ret = evr_ok;
         goto out;
+    }
+    if(status(visit_ctx, evr_ok) != evr_ok){
+        goto out_with_free_root;
     }
     struct evr_attr_query_ctx ctx;
     ctx.t = t;
@@ -851,7 +858,7 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_t
             goto out_with_finalize_query_stmt;
         }
         const evr_claim_ref *ref = sqlite3_column_blob(query_stmt, 0);
-        if(visit(*ref) != evr_ok){
+        if(visit(visit_ctx, *ref) != evr_ok){
             goto out_with_finalize_query_stmt;
         }
     }
