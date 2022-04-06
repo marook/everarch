@@ -38,7 +38,7 @@
 %%
 
 "&&"	{ return BOOL_AND; }
-[a-zA-Z][a-zA-Z0-9_-]*	{ yylval->string = strdup(yytext); return STRING; }
+[a-zA-Z0-9][a-zA-Z0-9_-]*	{ yylval->string = strdup(yytext); return STRING; }
 "="	{ return EQ; }
 [ \t]*	{ }
 
