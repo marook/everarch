@@ -145,15 +145,15 @@ void handle_sigterm(int signum){
 }
 
 int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config){
+    int ret = evr_error;
     int s = evr_make_tcp_socket(evr_glacier_storage_port);
     if(s < 0){
         log_error("Failed to create socket");
-        return evr_error;
+        goto out;
     }
     if(listen(s, 7) < 0){
         log_error("Failed to listen on localhost:%d", evr_glacier_storage_port);
-        // TODO don't we have to close s here?
-        return evr_error;
+        goto out_with_close_s;
     }
     log_info("Listening on localhost:%d", evr_glacier_storage_port);
     fd_set active_fd_set;
@@ -164,11 +164,10 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
         int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL);
         if(sret == -1){
             // select returns -1 on sigint.
-            // TODO don't we have to close s here?
-            return evr_end;
+            ret = evr_end;
+            goto out_with_close_s;
         } else if(sret < 0){
-            // TODO don't we have to close s here?
-            return evr_error;
+            goto out_with_close_s;
         }
         for(int i = 0; i < FD_SETSIZE; ++i){
             if(FD_ISSET(i, &active_fd_set)){
@@ -177,8 +176,7 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
                     socklen_t size = sizeof(client_addr);
                     int c = accept(s, (struct sockaddr*)&client_addr, &size);
                     if(c < 0){
-                        // TODO don't we have to close s here?
-                        return evr_error;
+                        goto out_with_close_s;
                     }
                     log_debug("Connection from %s:%d accepted (will be worker %d)", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), c);
                     struct evr_connection *context = malloc(sizeof(struct evr_connection));
@@ -191,7 +189,8 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
                         goto thread_create_fail;
                     }
                     if(thrd_detach(t) != thrd_success){
-                        goto thread_create_fail;
+                        evr_panic("Failed to detach connection worker thread");
+                        goto out_with_close_s;
                     }
                     goto end;
                 thread_create_fail:
@@ -205,8 +204,11 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *confi
             }
         }
     }
-    // TODO don't we have to close s here?
-    return evr_ok;
+    ret = evr_ok;
+ out_with_close_s:
+    close(s);
+ out:
+    return ret;
 }
 
 int evr_connection_worker(void *context){
