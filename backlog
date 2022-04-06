@@ -3,11 +3,15 @@ there should be at least these response modes:
 ** report only ref
 ** report ref and some attributes specified by key
 ** report ref and all attributes
-* implement offset and limit in attr queries
-tag=todo offset=0 limit=100
+* add lisp output mode to evr-attr-index search results
+* add emacs integration with evr-search-claim function
+function evr-search-claim should search for claims with a given
+expression.
 * implement t in attr queries
 tag=todo t=12345
 tag=todo t=1970-01-01T00:00:07Z
+* implement offset and limit in attr queries
+tag=todo offset=0 limit=100
 * add ref key to attr query language to match ref
 introduce ref as keyword to match the ref of a claim. later "ref" (in
 double quotes) should mean the attribute with the key ref.
