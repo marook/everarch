@@ -79,7 +79,7 @@ int merge_evr_glacier_storage_configuration_file(void *cfg, const char *config_p
     replace_string(config->key_path, evr_get_object_string_property(json, "key_path"), out_with_free_json);
     replace_string(config->cert_root_path, evr_get_object_string_property(json, "cert_root_path"), out_with_free_json);
     // TODO replace max_bucket_size
-    replace_string(config->bucket_dir_path, evr_get_object_string_property(json, "bucket_dir_path"), out_with_free_json);
+    replace_string(config->bucket_dir_path, evr_get_object_string_property(json, "bucket_dir"), out_with_free_json);
     ret = evr_ok;
  out_with_free_json:
     cJSON_Delete(json);
