@@ -1,8 +1,42 @@
+* add setup hints to README
+** gpg signing key
+hint the user that the default gpg signing key is used for signing
+claims. don't lose it and be aware of etc.
+** config file locations
+indicate where config files should be placed and how they should look
+* add type attribute to stylesheet and rename to transformation
+add a type attribute so in the future we can support differen
+transformation declaration languages. maybe one day we want to allow
+multiple chained transformations of which one is a python script?
+
+#+BEGIN_SRC xml
+<attr-spec>
+  <!-- transformation was called stylesheet in the past -->
+  <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+</attr-spec>
+#+END_SRC
 * report further claim attributes for found refs
 there should be at least these response modes:
 ** report only ref
 ** report ref and some attributes specified by key
 ** report ref and all attributes
+* introduce content sourced attritutes
+attr specs should contain declarations for content sourced
+attributes. content sourced attributes are scripts which are executed
+with every claim and can produce an attr claim as output.
+
+the attr spec for content based attributes might look like this:
+
+#+BEGIN_SRC xml
+<attr-spec>
+  <attr-def k="tag" type="str"/>
+  <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+  <attr-factory type="bin" blob="sha3-224-00000000000000000000000000000000000000000000000000000001"/>
+</attr-spec>
+#+END_SRC
+
+the attr-factory must point to an executable. for example an elf
+binary, shell or python script.
 * add lisp output mode to evr-attr-index search results
 * add emacs integration with evr-search-claim function
 function evr-search-claim should search for claims with a given
@@ -27,11 +61,32 @@ double quotes) should mean the attribute with the key ref.
 #+BEGIN_SRC
 !tag=nsfw
 #+END_SRC
-* allow attr query args in quotes
-#+BEGIN_SRC
-'the key'='the value'
-"the key"="the value"
-#+END_SRC
+* make evr-glacier-storage port configurable
+* make evr-attr-index port configurable
+* store flags and blob size redundant in buckets
+right now flags and blob size in the evr-glacier-storage are storend
+once for every blob and without any checksum.
+
+there should be either a checksum for the two fields or it should be
+stored redundant. this should reduce the risk of breaking a whole
+bucket if one blob in it has a bit error.
+* migrate tcp sockets to quic
+in order to get faster connection building and encryption.
+* add authentication
+think of some kind of authentication for the network sockets and
+implement it.
+* make accepted gpg keys for verfification configurable
+right now the blob signature verification accepts all valid gpg
+keys. we only want to accept certain gpg keys which are probably our
+own.
+
+also the gpg public keys should be stored in the storage as
+blobs. that way they should never be lost. the configuration should
+reference the gpg keys sha3-224 hashes.
+* ---- v0.1 boundary ----
+everything above will be part of the first release of everarch. first
+release means i will personally use it in production as mirror of my
+perkeep stuff.
 * add match functions to attr query language
 #+BEGIN_SRC
 tag=todo && is_image(mime_type)
@@ -40,30 +95,6 @@ tag=todo && is_image(mime_type)
 #+BEGIN_SRC
 (tag=todo || tag=backlog) tag=howto
 #+END_SRC
-* introduce content sourced attritutes
-attr specs should contain declarations for content sourced
-attributes. content sourced attributes are scripts which are executed
-with every claim and can produce an attr claim as output.
-
-the attr spec for content based attributes might look like this:
-
-#+BEGIN_SRC xml
-<attr-spec>
-  <attr-def k="tag" type="str"/>
-  <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
-  <attr-factory blob="sha3-224-00000000000000000000000000000000000000000000000000000001"/>
-</attr-spec>
-#+END_SRC
-
-the attr-factory must point to an executable. for example an elf
-binary, shell or python script.
-* store flags and blob size redundant in buckets
-right now flags and blob size in the evr-glacier-storage are storend
-once for every blob and without any checksum.
-
-there should be either a checksum for the two fields or it should be
-stored redundant. this should reduce the risk of breaking a whole
-bucket if one blob in it has a bit error.
 * gracefully handle sqlite database is locked in evr-glacier-storage
 sqlite's step function will exit with SQLITE_LOCKED if a table is
 locked for more than 1sec (configured right now).
@@ -76,12 +107,6 @@ locked for more than 1sec (configured right now).
 
 a SQLITE_LOCKED error should be indicated as 'resource temporary not
 available' to the client.
-* add setup hints to README
-** gpg signing key
-hint the user that the default gpg signing key is used for signing
-claims. don't lose it and be aware of etc.
-** config file locations
-indicate where config files should be placed and how they should look
 * replace struct chunk_set with linked list
 dny-mem.h should provide one growable random access data structure and
 one growable linked list data structure.
@@ -91,12 +116,24 @@ because of the evr_chunk_set_max_chunks limitation.
 
 struct dynamic_array should be renamed to hint the random access
 usage. maybe rabuf instead of dynamic_array and llbuf for chunk_set.
+
+linked list chunk sizes maybe should be aligned with RLIMIT_FSIZE. see
+[[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
+regarding to it. also the chunk size should not grow over 1MB.
+
+there should also be a function for writing linked lists to a file
+descriptor using writev.
 * use writev instead of buf copying
 writev can write mutliple buffers in one system call. this may reduce
 the amout of memory being copied before a write call. there are
 probably some places in glacier.c and the networking code which can
 benefit from writev.
-* replace own queues with lib io_uring
+* allow attr query args in quotes
+#+BEGIN_SRC
+'the key'='the value'
+"the key"="the value"
+#+END_SRC
+* analyze and maybe replace own queues with lib io_uring
 inter thread communitcation queues have been implemented in struct
 evr_work_watch_ctx and struct evr_persister_ctx.
 
@@ -105,14 +142,6 @@ own queues to lib io_uring. mentioned by pitrp.
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
-* add option for flags to evr-glacier-cli put command
-right now flags=0 is always sent when putting a blob to the storage.
-
-the put flags should be specifyable using command line arguments in
-the evr-glacier-cli tool.
-* align chunk size with RLIMIT_FSIZE
-see [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
-regarding to it. also the chunk size should not grow over 1MB.
 * create bucket directory if not existing :bdircre:
 * repair out of sync bucket end pointer and file end offset :beprep:
 the whole bucket should be scanned with validation of each key and
