@@ -3,7 +3,7 @@ there should be at least these response modes:
 ** report only ref
 ** report ref and some attributes specified by key
 ** report ref and all attributes
-* introduce content sourced attritutes
+* introduce content sourced attributes
 attr specs should contain declarations for content sourced
 attributes. content sourced attributes are scripts which are executed
 with every claim and can produce an attr claim as output.
@@ -20,6 +20,7 @@ the attr spec for content based attributes might look like this:
 
 the attr-factory must point to an executable. for example an elf
 binary, shell or python script.
+* report attr query syntax errors via error response
 * add lisp output mode to evr-attr-index search results
 * add emacs integration with evr-search-claim function
 function evr-search-claim should search for claims with a given
