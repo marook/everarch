@@ -13,11 +13,32 @@
       <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="1"/>
     </body>
   </file>
+
+  <!-- the following claim should show that file claims from other
+       namespaces are possible but have their own meaning -->
   <file xmlns="https://evr.ma300k.de/something-which-will-never-ever-exist"></file>
+
   <file dc:title="second file.txt">
     <body>
       <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="99"/>
       <slice ref="sha3-224-12300000000000000000000000000000000000000000000000000321" size="1"/>
     </body>
   </file>
+
+  <!-- the following attr claim references the second claim inside
+       this claim-set which is the file claim above and sets some
+       indexable attributes for this file -->
+  <attr
+      xmlns="https://evr.ma300k.de/claims/"
+      claim="2"
+      >
+    <!-- adds the value v to the set of values for k -->
+    <a op="+" k="tag" v="todo"/>
+    <!-- empties the set of values for k -->
+    <a op="-" k="someKey"/>
+    <!-- removes the value v from the set of values for k -->
+    <a op="-" k="someKey" v="someVal"/>
+    <!-- replaces the set of values for k with v -->
+    <a op="=" k="replacedKey" v="replacedVal"/>
+  </attr>
 </claim-set>

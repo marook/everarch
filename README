@@ -1,8 +1,86 @@
 everarch - the hopefully ever lasting archive
 
-1) Build
-2) Tests
-3) License
+1) Introduction
+2) Build
+3) Configuration
+4) Usage
+5) Tests
+6) License
+7) Contact
+
+
+------------------------------------------------------------------------
+Introduction
+
+everarch is a collection of applications to store your data. The goals
+of everarch are:
+
+- store your tiny and GB sized files and provide an index
+- make backups complete and fast
+- store your data in a format which you still can read in 20 years in
+  _future scripting language_
+- store your data in a way that allows you to easily adopt new data
+  structures without the need to migrate the existing data
+- detect corrupt or externally modified data and restore it with a
+  partial backup
+
+What everarch is not:
+
+- a database which handles inserts every few milliseconds over a long
+  amount of time very well
+
+everarch is right now in a pre alpha state. It's not intended to be
+used for your production data yet. Check out the backlog file to see
+what we are heading for in the v0.1 release.
+
+The core everarch applications are the evr-glacier-storage server, the
+evr-attr-index server and a command line interface evr-glacier-cli.
+
+        ________
+       / bucket \
+       | files  |
+       \________/
+
+           ^
+           | reads / writes
+
+  -----------------------    watches   ------------------
+  | evr-glacier-storage |  <---------  | evr-attr-index |
+  -----------------------              ------------------
+
+           ^                                   ^
+           | get / put                         | search index
+
+  -----------------------               -----------------
+  |   evr-glacier-cli   |               |    netcat     |
+  -----------------------               -----------------
+
+
+The evr-glacier-storage server stores claims and blob data in the
+bucket files. Claims are actually also stored as blobs but have some
+additional attributes. Claims are PGP signed XML documents which
+contain claim-set root elements. An example claim-set is located in
+doc/claims/claim-set-file.xml.
+
+A claim-set contains claims. everarch comes with a limited set of
+supported claims. These include a attr claim which can set or remove
+attributes from another claim. Also a file claim is supported which
+defines blobs which make up the pieces of a bigger file.
+
+You should be able to easily add your own self defined claims. In
+order to make them indexable you must provide an XSLT stylesheet which
+converts your claim into attr claims. doc/claims/file-to-attr.xslt
+contains a stylesheet which converts a file claim for example into
+attr claims.
+
+attr claims are the only claims which can be indexed by the
+evr-attr-index server.
+
+The stylesheet is referenced by a attr-spec claim. An example
+attr-spec claim is located in doc/claims/attr-spec.xml. The
+evr-attr-index server searches for attr-spec claims and will
+automatically start indexing the evr-glacier-storage in the way
+defined in the attr-spec.
 
 
 ------------------------------------------------------------------------
@@ -22,14 +100,103 @@ $ make
 
 
 ------------------------------------------------------------------------
+Configuration
+
+everarch stores it's configuration files in ~/.config/everarch. Most
+of the configuration file properties are subject to change. The
+following shows some minimalistic configurations:
+
+The evr-glacier-storage configuration file is called
+glacier-storage.json and may contain something like this:
+
+{
+    "bucket_dir": "path/to/my/storage"
+}
+
+The evr-attr-index configuration file is called attr-index.json and
+may contain something like this:
+
+{
+    "state_dir": "path/to/attr-index"
+}
+
+Make sure you have a GPG key pair. It will be used for signing claims.
+
+
+------------------------------------------------------------------------
+Usage
+
+The following assumes you have built and configured the
+application. The following commands should be executable from the
+everarch source directory in which this README is also located.
+
+First should start the evr-glacier-storage server and keep it running:
+
+$ ./src/evr-glacier-storage
+
+Upload your attr-spec stylesheet:
+
+$ ./src/evr-glacier-storage put < doc/claims/file-to-attr.xslt
+
+The stylesheet put will output a stylesheet reference which looks for
+example like
+sha3-224-00000000000000000000000000000000000000000000000000000000.
+
+This reference must be used in the following attr-spec claim:
+
+$ evr-glacier-cli -f 3 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:00:00.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="title" type="str"/>
+    <attr-def k="size" type="int"/>
+    <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+  </attr-spec>
+</claim-set>
+EOF
+
+Now you can start the evr-attr-index server and keep it running:
+
+$ ./src/evr-attr-index
+
+It should find your attr-spec and start indexing your otherwise empty
+evr-glacier-storage.
+
+In order to test the server you can now post a file into the storage:
+
+$ ./src/evr-glacier-cli post-file README
+
+The evr-attr-index server should index the created file claim.
+
+You can query the index using netcat:
+
+$ nc localhost 2362
+s title=README
+
+The 's' command searches for query expressions. It prints the found
+claim references.
+
+You can also type help to see your options.
+
+
+------------------------------------------------------------------------
 Tests
 
-Build the application and then exectute the following to run the whole
+Build the application and then execute the following to run the whole
 test suite:
 
 $ ./test.sh
 
 Test execution relies on valgrind ( https://www.valgrind.org ).
+
+Right now network ports are not configurable. That means the
+integration tests will use the same port as a live instance. So you
+have to stop your live instance before you execute the tests. Making
+ports configurable is a task in the backlog.
 
 The following steps should be performed when adding new tests. We
 assume a test for x.h/x.c should be added.
@@ -45,10 +212,18 @@ License
 
 See COPYING for details about everarch files copying conditions.
 
-There are a few files which got a differen license. See their header
+There are a few files which got a different license. See their header
 comments for more details. These files include at least:
 
 src/rollsum.h
 src/rollsum.c
 
-My sincere thank you goes out to the original authors.
+My sincere thank you goes out to the original authors Martin Pool and
+Donovan Baarda.
+
+
+------------------------------------------------------------------------
+Contact
+
+For questions about everarch you can contact me via email at Markus
+Peröbner <markus.peroebner@gmail.com>.
