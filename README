@@ -154,7 +154,7 @@ $ evr-glacier-cli -f 3 sign-put <<EOF
   <attr-spec>
     <attr-def k="title" type="str"/>
     <attr-def k="size" type="int"/>
-    <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+    <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
   </attr-spec>
 </claim-set>
 EOF

@@ -40,7 +40,7 @@ evr-glacier-cli -f 3 sign-put <<EOF
   <attr-spec>
     <attr-def k="tag" type="str"/>
     <attr-def k="title" type="str"/>
-    <stylesheet blob="${basic_xslt_ref}"/>
+    <transformation type="xslt" blob="${basic_xslt_ref}"/>
   </attr-spec>
 </claim-set>
 EOF

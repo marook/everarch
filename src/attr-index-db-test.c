@@ -78,7 +78,7 @@ void test_open_new_attr_index_db_twice(){
                 struct evr_attr_spec_claim spec;
                 spec.attr_def_len = 2;
                 spec.attr_def = attr_def;
-                memset(spec.stylesheet_blob_ref, 0, evr_blob_ref_size);
+                memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
                 assert_ok_msg(evr_setup_attr_index_db(db, &spec), "evr_setup_attr_index_db failed\n");
             }
             assert_ok_msg(evr_prepare_attr_index_db(db), "evr_prepare_attr_index_db failed\n");

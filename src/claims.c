@@ -215,16 +215,27 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
         xmlFree(key);
         attr_def_node = attr_def_node->next;
     }
-    xmlNode *stylesheet_node = evr_find_next_element(claim_node->children, "stylesheet");
-    if(!stylesheet_node){
-        log_error("Missing stylesheet element in attr-spec claim");
+    xmlNode *transformation_node = evr_find_next_element(claim_node->children, "transformation");
+    if(!transformation_node){
+        log_error("Missing transformation element in attr-spec claim");
         goto out;
     }
-    char *fmt_stylesheet_ref = (char*)xmlGetProp(stylesheet_node, BAD_CAST "blob");
-    evr_blob_ref stylesheet_ref;
-    int parse_stylesheet_ref_result = evr_parse_blob_ref(stylesheet_ref, fmt_stylesheet_ref);
-    xmlFree(fmt_stylesheet_ref);
-    if(parse_stylesheet_ref_result != evr_ok){
+    char *transformation_type = (char*)xmlGetProp(transformation_node, BAD_CAST "type");
+    if(!transformation_type){
+        log_error("Missing transformation type on transformation element.");
+        goto out;
+    }
+    if(strcmp(transformation_type, "xslt") != 0){
+        log_error("Unsupported transformation type %s found on transformation element", transformation_type);
+        xmlFree(transformation_type);
+        goto out;
+    }
+    xmlFree(transformation_type);
+    char *fmt_transformation_ref = (char*)xmlGetProp(transformation_node, BAD_CAST "blob");
+    evr_blob_ref transformation_ref;
+    int parse_transformation_ref_result = evr_parse_blob_ref(transformation_ref, fmt_transformation_ref);
+    xmlFree(fmt_transformation_ref);
+    if(parse_transformation_ref_result != evr_ok){
         goto out;
     }
     struct evr_buf_pos bp;
@@ -237,7 +248,7 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     c->attr_def_len = attr_def_count;
     c->attr_def = (struct evr_attr_def*)bp.pos;
     bp.pos += attr_def_count * sizeof(struct evr_attr_def);
-    memcpy(c->stylesheet_blob_ref, stylesheet_ref, evr_blob_ref_size);
+    memcpy(c->transformation_blob_ref, transformation_ref, evr_blob_ref_size);
     struct evr_attr_def *next_attr_def = c->attr_def;
     attr_def_node = claim_node->children;
     while(1){

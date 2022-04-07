@@ -1,14 +1,3 @@
-* add type attribute to stylesheet and rename to transformation
-add a type attribute so in the future we can support differen
-transformation declaration languages. maybe one day we want to allow
-multiple chained transformations of which one is a python script?
-
-#+BEGIN_SRC xml
-<attr-spec>
-  <!-- transformation was called stylesheet in the past -->
-  <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
-</attr-spec>
-#+END_SRC
 * report further claim attributes for found refs
 there should be at least these response modes:
 ** report only ref
@@ -24,7 +13,7 @@ the attr spec for content based attributes might look like this:
 #+BEGIN_SRC xml
 <attr-spec>
   <attr-def k="tag" type="str"/>
-  <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+  <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
   <attr-factory type="bin" blob="sha3-224-00000000000000000000000000000000000000000000000000000001"/>
 </attr-spec>
 #+END_SRC
@@ -122,6 +111,21 @@ writev can write mutliple buffers in one system call. this may reduce
 the amout of memory being copied before a write call. there are
 probably some places in glacier.c and the networking code which can
 benefit from writev.
+* introduce scripted transformations
+attr specs should also support scripts which perform the claim
+transformations instead of just xslt stylesheets.
+
+a new transformation could look like this:
+
+#+BEGIN_SRC xml
+<attr-spec>
+  <attr-def k="tag" type="str"/>
+  <transformation type="bin" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+</attr-spec>
+#+END_SRC
+
+the transformation would point to an executable elf binary, shell or
+python script.
 * allow attr query args in quotes
 #+BEGIN_SRC
 'the key'='the value'

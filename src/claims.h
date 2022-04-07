@@ -76,7 +76,7 @@ struct evr_attr_def {
 struct evr_attr_spec_claim {
     size_t attr_def_len;
     struct evr_attr_def *attr_def;
-    evr_blob_ref stylesheet_blob_ref;
+    evr_blob_ref transformation_blob_ref;
 };
 
 #define evr_attr_op_replace 0x01

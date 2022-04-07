@@ -15,6 +15,6 @@
   <attr-spec>
     <attr-def k="tag" type="str"/>
     <attr-def k="body-size" type="int"/>
-    <stylesheet blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+    <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
   </attr-spec>
 </claim-set>

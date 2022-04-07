@@ -267,7 +267,7 @@ void test_parse_attr_spec_claim(){
         "<attr-spec>"
         "<attr-def k=\"tag\" type=\"str\"/>"
         "<attr-def k=\"body-size\" type=\"int\"/>"
-        "<stylesheet blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
+        "<transformation type=\"xslt\" blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
         "</attr-spec>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
@@ -286,10 +286,30 @@ void test_parse_attr_spec_claim(){
     struct evr_attr_def *size_def = &c->attr_def[1];
     assert_str_eq(size_def->key, "body-size");
     assert_int_eq(size_def->type, evr_type_int);
-    evr_blob_ref_str fmt_stylesheet_blob_ref;
-    evr_fmt_blob_ref(fmt_stylesheet_blob_ref, c->stylesheet_blob_ref);
-    assert_str_eq(fmt_stylesheet_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
+    evr_blob_ref_str fmt_transformation_blob_ref;
+    evr_fmt_blob_ref(fmt_transformation_blob_ref, c->transformation_blob_ref);
+    assert_str_eq(fmt_transformation_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
     free(c);
+    xmlFreeDoc(doc);
+}
+
+void test_parse_attr_spec_claim_error_unknown_transformation_type(){
+    const char *buf =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<attr-spec>"
+        "<transformation type=\"windows-exe-lol\" blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
+        "</attr-spec>"
+        "</claim-set>\n";
+    size_t buf_size = strlen(buf);
+    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    assert_not_null(doc);
+    xmlNode *csn = evr_get_root_claim_set(doc);
+    assert_not_null(csn);
+    xmlNode *cn = evr_first_claim(csn);
+    assert_not_null(cn);
+    struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
+    assert_null(c);
     xmlFreeDoc(doc);
 }
 
@@ -306,6 +326,7 @@ int main(){
     run_test(test_parse_attr_claim_with_claim_index);
     run_test(test_parse_two_attr_claims);
     run_test(test_parse_attr_spec_claim);
+    run_test(test_parse_attr_spec_claim_error_unknown_transformation_type);
     xmlCleanupParser();
     return 0;
 }

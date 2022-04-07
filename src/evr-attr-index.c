@@ -676,7 +676,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_db;
     }
-    xsltStylesheetPtr style = evr_fetch_stylesheet(cw, spec->stylesheet_blob_ref);
+    xsltStylesheetPtr style = evr_fetch_stylesheet(cw, spec->transformation_blob_ref);
     if(!style){
         goto out_with_close_cw;
     }
@@ -873,7 +873,7 @@ int evr_index_sync_worker(void *arg){
             if(!spec){
                 goto out_with_free;
             }
-            style = evr_fetch_stylesheet(cw, spec->stylesheet_blob_ref);
+            style = evr_fetch_stylesheet(cw, spec->transformation_blob_ref);
             free(spec);
             if(!style){
                 goto out_with_free;
