@@ -100,6 +100,9 @@ because of the evr_chunk_set_max_chunks limitation.
 struct dynamic_array should be renamed to hint the random access
 usage. maybe rabuf instead of dynamic_array and llbuf for chunk_set.
 
+pitrp also suggests to copy the XARRAY or X_ARRAY implementation from
+the linux kernel.
+
 linked list chunk sizes maybe should be aligned with RLIMIT_FSIZE. see
 [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
 regarding to it. also the chunk size should not grow over 1MB.
@@ -131,6 +134,8 @@ python script.
 'the key'='the value'
 "the key"="the value"
 #+END_SRC
+* get rid of double _ in defines
+as they are not intended for userspace. mentioned by pitrp.
 * analyze and maybe replace own queues with lib io_uring
 inter thread communitcation queues have been implemented in struct
 evr_work_watch_ctx and struct evr_persister_ctx.
