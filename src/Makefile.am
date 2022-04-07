@@ -1,5 +1,5 @@
 AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
-BUILT_SOURCES = attr-query-parser.h
+BUILT_SOURCES = attr-query-parser.h attr_index_db_test-attr-query-lexer.c evr_attr_index-attr-query-lexer.c
 AM_YFLAGS = -d
 
 bin_PROGRAMS = \
