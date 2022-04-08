@@ -178,3 +178,30 @@ void evr_free_attr_query_node(struct evr_attr_query_node *node){
     node->free_data(node->data);
     free(node);
 }
+
+struct evr_attr_selector *evr_build_attr_selector(int type){
+    struct evr_attr_selector *ret = malloc(sizeof(*ret));
+    if(!ret){
+        goto out;
+    }
+    ret->type = type;
+ out:
+    return ret;
+}
+
+struct evr_attr_query *evr_build_attr_query(struct evr_attr_selector *selector, struct evr_attr_query_node *root){
+    struct evr_attr_query *ret = malloc(sizeof(*ret));
+    if(!ret){
+        goto out;
+    }
+    ret->selector = selector;
+    ret->root = root;
+ out:
+    return ret;
+}
+
+void evr_free_attr_query(struct evr_attr_query *query){
+    evr_free_attr_selector(query->selector);
+    evr_free_attr_query_node(query->root);
+    free(query);
+}

@@ -116,7 +116,7 @@ int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
 int evr_work_search_cmd(struct evr_connection *ctx, char *query);
 int evr_respond_search_status(void *context, int parse_res);
-int evr_respond_search_result(void *context, const evr_claim_ref ref);
+int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 int evr_respond_help(struct evr_connection *ctx);
 int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
 
@@ -1133,13 +1133,33 @@ int evr_respond_search_status(void *context, int parse_res){
     return evr_respond_status(ctx->con, 1, NULL);
 }
 
-int evr_respond_search_result(void *context, const evr_claim_ref ref){
+int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
     int ret = evr_error;
+    size_t attrs_size = 0;
+    if(attrs){
+        struct evr_attr_tuple *end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
+            attrs_size += 1 + strlen(a->key) + 1 + strlen(a->value) + 1;
+        }
+    }
     struct evr_search_ctx *ctx = context;
-    char buf[evr_claim_ref_str_size];
-    evr_fmt_claim_ref(buf, ref);
-    buf[evr_claim_ref_str_size - 1] = '\n';
-    if(write_n(ctx->con->socket, buf, sizeof(buf)) != evr_ok){
+    char buf[evr_claim_ref_str_size + attrs_size];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_fmt_claim_ref(bp.pos, ref);
+    evr_inc_buf_pos(&bp, evr_claim_ref_str_size - 1);
+    evr_push_concat(&bp, "\n");
+    if(attrs){
+        struct evr_attr_tuple *end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
+            evr_push_concat(&bp, "\t");
+            evr_push_concat(&bp, a->key);
+            evr_push_concat(&bp, "=");
+            evr_push_concat(&bp, a->value);
+            evr_push_concat(&bp, "\n");
+        }
+    }
+    if(write_n(ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
         goto out;
     }
     ret = evr_ok;

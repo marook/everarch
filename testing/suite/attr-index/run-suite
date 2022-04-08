@@ -77,4 +77,16 @@ then
     exit 1
 fi
 
+results=`nc localhost 2362 <<EOF
+s select * where tag=todo
+exit
+EOF`
+if [[ "${results}" != "OK
+${test_ref}-0000
+	tag=todo
+	title=test claim" ]]
+then
+    echo "Unexpected result from select * where tag=todo query: ${results}" >&2
+    exit 1
+fi
 echo "Stopping…"

@@ -174,14 +174,14 @@ void test_parse_attr_claim_with_claim_ref(){
     assert_int_eq(c->claim_index, 0);
     assert_int_eq(c->attr_len, 3);
     assert_int_eq(c->attr[0].op, evr_attr_op_replace);
-    assert_str_eq(c->attr[0].key, "title");
-    assert_str_eq(c->attr[0].value, "test.txt");
+    assert_str_eq(c->attr[0].attr.key, "title");
+    assert_str_eq(c->attr[0].attr.value, "test.txt");
     assert_int_eq(c->attr[1].op, evr_attr_op_add);
-    assert_str_eq(c->attr[1].key, "add");
-    assert_str_eq(c->attr[1].value, "spice");
+    assert_str_eq(c->attr[1].attr.key, "add");
+    assert_str_eq(c->attr[1].attr.value, "spice");
     assert_int_eq(c->attr[2].op, evr_attr_op_rm);
-    assert_str_eq(c->attr[2].key, "rm");
-    assert_null(c->attr[2].value);
+    assert_str_eq(c->attr[2].attr.key, "rm");
+    assert_null(c->attr[2].attr.value);
     free(c);
     xmlFreeDoc(doc);
 }

@@ -481,16 +481,16 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
         char *value = (char*)xmlGetProp(attr, BAD_CAST "v");
         next_attr->op = op;
         size_t key_size = strlen(key) + 1;
-        next_attr->key = buf;
-        memcpy(next_attr->key, key, key_size);
+        next_attr->attr.key = buf;
+        memcpy(next_attr->attr.key, key, key_size);
         buf += key_size;
         if(value){
-            next_attr->value = buf;
+            next_attr->attr.value = buf;
             size_t value_size = strlen(value) + 1;
-            memcpy(next_attr->value, value, value_size);
+            memcpy(next_attr->attr.value, value, value_size);
             buf += value_size;
         } else {
-            next_attr->value = NULL;
+            next_attr->attr.value = NULL;
         }
         xmlFree(value);
         xmlFree(key);

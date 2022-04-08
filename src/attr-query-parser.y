@@ -35,7 +35,7 @@
 // See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
 typedef void * yyscan_t;
 
-void yyerror(struct evr_attr_query_node **root, char const *e){
+void yyerror(struct evr_attr_query **root, char const *e){
   // TODO transport errors towards request or something
   log_error("parser error: %s", e);
 }
@@ -45,9 +45,11 @@ void yyerror(struct evr_attr_query_node **root, char const *e){
 %define api.push-pull push
 %define api.pure full
 
-%parse-param {struct evr_attr_query_node **root}
+%parse-param {struct evr_attr_query **query}
 
 %union {
+  struct evr_attr_query *query;
+  struct evr_attr_selector *selector;
   struct evr_attr_query_node *node;
   char *string;
 }
@@ -60,13 +62,27 @@ int yylex(YYSTYPE *yylval_param);
 %token BOOL_AND
 %token EQ
 %token <string> STRING
+%token SELECT
+%token WHERE
+%token WILDCARD
 
+%type <query> query;
+%type <selector> attr_selector;
 %type <node> conditions;
 %type <node> condition;
 
 %%
 
-query: conditions { *root = $1; };
+line: query { *query = $1; }
+
+query:
+  conditions { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1); }
+| SELECT attr_selector WHERE conditions { $$ = evr_build_attr_query($2, $4); }
+;
+
+attr_selector:
+  WILDCARD { $$ = evr_build_attr_selector(evr_attr_selector_all); }
+;
 
 conditions:
   condition

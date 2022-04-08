@@ -41,6 +41,7 @@
 #include "claims.h"
 
 struct evr_attr_index_db {
+    char *db_path;
     sqlite3 *db;
     sqlite3_stmt *find_state;
     sqlite3_stmt *update_state;
@@ -55,6 +56,8 @@ struct evr_attr_index_db {
 };
 
 struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name);
+
+struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *db);
 
 int evr_free_attr_index_db(struct evr_attr_index_db *db);
 
@@ -93,17 +96,24 @@ int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct 
 
 int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
 
-typedef int (*evr_attr_visitor)(const evr_claim_ref ref, const char *key, const char *value);
+typedef int (*evr_attr_visitor)(void *ctx, const evr_claim_ref ref, const char *key, const char *value);
 
-typedef int (*evr_claim_visitor)(void *ctx, const evr_claim_ref ref);
+/**
+ * evr_claim_visitor is a callback for visiting claims.
+ *
+ * attrs may be NULL in the case that no attributes are provided at
+ * all. Otherwise attrs_len specifies how many attributes are
+ * provided.
+ */
+typedef int (*evr_claim_visitor)(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 
-int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, evr_attr_visitor visit);
+int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, const evr_claim_ref ref, evr_attr_visitor visit, void *ctx);
 
 /**
  * evr_visit_attr_query visits statements which select attribute ref,
  * key and value.
  */
-int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit);
+int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit, void *ctx);
 
 int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res), evr_claim_visitor visit, void *ctx);
 

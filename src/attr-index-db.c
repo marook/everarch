@@ -31,16 +31,48 @@
 #include "attr-query-lexer.h"
 #include "attr-query-sql.h"
 
+struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db);
 int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, evr_time valid_until);
 int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, evr_time t);
 int evr_get_attr_type_for_key(struct evr_attr_index_db *db, int *attr_type, char *key);
 int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, evr_time valid_from, int is_valid_until, evr_time valid_until, int trunc);
 
 struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name){
-    struct evr_attr_index_db *db = malloc(sizeof(struct evr_attr_index_db));
+    const char ext[] = ".db"; 
+    size_t state_dir_path_len = strlen(cfg->state_dir_path);
+    size_t name_len = strlen(name);
+    size_t ext_len = strlen(ext);
+    size_t db_path_size = state_dir_path_len + 1 + name_len + ext_len + 1;
+    struct evr_attr_index_db *db = malloc(sizeof(struct evr_attr_index_db) + db_path_size);
     if(!db){
         return NULL;
     }
+    db->db_path = (char*)&db[1];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, db->db_path);
+    evr_push_n(&bp, cfg->state_dir_path, state_dir_path_len);
+    const char slash = '/';
+    if(state_dir_path_len > 0 && cfg->state_dir_path[state_dir_path_len - 1] != slash){
+        evr_push_as(&bp, &slash, char);
+    }
+    evr_push_n(&bp, name, name_len);
+    evr_push_n(&bp, ext, ext_len);
+    evr_push_eos(&bp);
+    return evr_init_attr_index_db(db);
+}
+
+struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *odb){
+    size_t db_path_size = strlen(odb->db_path) + 1;
+    struct evr_attr_index_db *fdb = malloc(sizeof(struct evr_attr_index_db) + db_path_size);
+    if(!fdb){
+        return NULL;
+    }
+    fdb->db_path = (char*)&fdb[1];
+    memcpy(fdb->db_path, odb->db_path, db_path_size);
+    return evr_init_attr_index_db(fdb);
+}
+
+struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->db = NULL;
     db->find_state = NULL;
     db->update_state = NULL;
@@ -52,25 +84,10 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_config
     db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
     db->find_ref_attrs = NULL;
-    const char ext[] = ".db"; 
-    size_t state_dir_path_len = strlen(cfg->state_dir_path);
-    size_t name_len = strlen(name);
-    size_t ext_len = strlen(ext);
-    char db_path[state_dir_path_len + 1 + name_len + ext_len + 1];
-    struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, db_path);
-    evr_push_n(&bp, cfg->state_dir_path, state_dir_path_len);
-    const char slash = '/';
-    if(state_dir_path_len > 0 && cfg->state_dir_path[state_dir_path_len - 1] != slash){
-        evr_push_as(&bp, &slash, char);
-    }
-    evr_push_n(&bp, name, name_len);
-    evr_push_n(&bp, ext, ext_len);
-    evr_push_eos(&bp);
     int db_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX;
-    if(sqlite3_open_v2(db_path, &db->db, db_flags, NULL) != SQLITE_OK){
+    if(sqlite3_open_v2(db->db_path, &db->db, db_flags, NULL) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db->db);
-        log_error("Could not open %s sqlite database for attr-index: %s", db_path, sqlite_error_msg);
+        log_error("Could not open %s sqlite database for attr-index: %s", db->db_path, sqlite_error_msg);
         goto out_with_free_db;
     }
     if(sqlite3_busy_timeout(db->db, evr_sqlite3_busy_timeout) != SQLITE_OK){
@@ -376,8 +393,8 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
     for(struct evr_attr *a = attr; a != end; ++a){
 #ifdef EVR_LOG_DEBUG
         do {
-            char *value = a->value ? a->value : "null";
-            log_debug("Merging attr op=0x%02x, k=%s, v=%s", a->op, a->key, value);
+            char *value = a->attr.value ? a->attr.value : "null";
+            log_debug("Merging attr op=0x%02x, k=%s, v=%s", a->op, a->attr.key, value);
         } while(0);
 #endif
         switch(a->op){
@@ -385,17 +402,17 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
             log_error("Requested to merge attr with unknown op 0x%02x", a->op);
             goto out;
         case evr_attr_op_replace:
-            if(evr_merge_attr_index_attr_replace(db, t, ref, a->key, a->value) != evr_ok){
+            if(evr_merge_attr_index_attr_replace(db, t, ref, a->attr.key, a->attr.value) != evr_ok){
                 goto out;
             }
             break;
         case evr_attr_op_add:
-            if(evr_merge_attr_index_attr_add(db, t, ref, a->key, a->value) != evr_ok){
+            if(evr_merge_attr_index_attr_add(db, t, ref, a->attr.key, a->attr.value) != evr_ok){
                 goto out;
             }
             break;
         case evr_attr_op_rm:
-            if(evr_merge_attr_index_attr_rm(db, t, ref, a->key, a->value) != evr_ok){
+            if(evr_merge_attr_index_attr_rm(db, t, ref, a->attr.key, a->attr.value) != evr_ok){
                 goto out;
             }
             break;
@@ -770,7 +787,7 @@ int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, 
     return ret;
 }
 
-int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, evr_attr_visitor visit){
+int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, const evr_claim_ref ref, evr_attr_visitor visit, void *ctx){
     int ret = evr_error;
     if(sqlite3_bind_blob(db->find_ref_attrs, 1, ref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out_with_reset_find_ref_attrs;
@@ -778,7 +795,7 @@ int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref re
     if(sqlite3_bind_int64(db->find_ref_attrs, 2, (sqlite3_int64)t) != SQLITE_OK){
         goto out_with_reset_find_ref_attrs;
     }
-    ret = evr_visit_attr_query(db, db->find_ref_attrs, visit);
+    ret = evr_visit_attr_query(db, db->find_ref_attrs, visit, ctx);
  out_with_reset_find_ref_attrs:
     if(sqlite3_reset(db->find_ref_attrs) != SQLITE_OK){
         evr_panic("Failed to reset find_ref_attrs statement");
@@ -787,7 +804,7 @@ int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, evr_claim_ref re
     return ret;
 }
 
-int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit){
+int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit, void *ctx){
     int ret = evr_error;
     while(1){
         int step_res = evr_step_stmt(db->db, stmt);
@@ -804,7 +821,7 @@ int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_a
         const evr_claim_ref *ref = sqlite3_column_blob(stmt, 0);
         const char *key = (const char*)sqlite3_column_text(stmt, 1);
         const char *value = (const char*)sqlite3_column_text(stmt, 2);
-        if(visit(*ref, key, value) != evr_ok){
+        if(visit(ctx, *ref, key, value) != evr_ok){
             goto out;
         }
     }
@@ -813,15 +830,26 @@ int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_a
     return ret;
 }
 
-struct evr_attr_query_node *evr_attr_parse_query(const char *query);
+struct evr_attr_query *evr_attr_parse_query(const char *query);
 
 struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res), evr_claim_visitor visit, void *visit_ctx){
+#define evr_collect_selected_attrs_attrs_size (2000 * sizeof(struct evr_attr_tuple))
+#define evr_collect_selected_attrs_data_size (2000 * 2 * 32)
+
+struct evr_collect_selected_attrs_ctx {
+    struct evr_attr_index_db *db;
+    struct evr_buf_pos attrs;
+    struct evr_buf_pos data;
+};
+
+int evr_collect_selected_attrs(struct evr_collect_selected_attrs_ctx *ctx, struct evr_attr_index_db *db, struct evr_attr_selector *selector, evr_time t, const evr_claim_ref ref);
+
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res), evr_claim_visitor visit, void *visit_ctx){
     int ret = evr_error;
-    struct evr_attr_query_node *root = evr_attr_parse_query(query);
-    if(!root){
-        log_error("Failed to parse attr query: %s", query);
+    struct evr_attr_query *query = evr_attr_parse_query(query_str);
+    if(!query){
+        log_error("Failed to parse attr query: %s", query_str);
         if(status(visit_ctx, evr_error) != evr_ok){
             goto out;
         }
@@ -829,55 +857,78 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_t
         goto out;
     }
     if(status(visit_ctx, evr_ok) != evr_ok){
-        goto out_with_free_root;
+        goto out_with_free_query;
     }
     struct evr_attr_query_ctx ctx;
     ctx.t = t;
-    struct dynamic_array *sql = evr_attr_build_sql_query(root, &ctx, offset, limit);
+    struct dynamic_array *sql = evr_attr_build_sql_query(query->root, &ctx, offset, limit);
     if(!sql){
-        goto out_with_free_root;
+        goto out_with_free_query;
     }
     sqlite3_stmt *query_stmt;
     if(evr_prepare_stmt(db->db, sql->data, &query_stmt) != evr_ok){
         goto out_with_free_sql;
     }
     int column = 1;
-    if(root->bind(&ctx, root, query_stmt, &column) != evr_ok){
+    if(query->root->bind(&ctx, query->root, query_stmt, &column) != evr_ok){
         goto out_with_finalize_query_stmt;
     }
+    struct evr_collect_selected_attrs_ctx attr_ctx;
+    attr_ctx.db = NULL;
+    attr_ctx.attrs.buf = NULL;
+    attr_ctx.data.buf = NULL;
     while(1){
         int step_res = evr_step_stmt(db->db, query_stmt);
         if(step_res == SQLITE_DONE){
             break;
         }
         if(step_res != SQLITE_ROW){
-            goto out_with_finalize_query_stmt;
+            goto out_with_free_attrs;
         }
         int ref_col_size = sqlite3_column_bytes(query_stmt, 0);
         if(ref_col_size != evr_claim_ref_size){
-            goto out_with_finalize_query_stmt;
+            goto out_with_free_attrs;
         }
         const evr_claim_ref *ref = sqlite3_column_blob(query_stmt, 0);
-        if(visit(visit_ctx, *ref) != evr_ok){
-            goto out_with_finalize_query_stmt;
+        evr_reset_buf_pos(&attr_ctx.attrs);
+        evr_reset_buf_pos(&attr_ctx.data);
+        if(evr_collect_selected_attrs(&attr_ctx, db, query->selector, t, *ref) != evr_ok){
+            goto out_with_free_attrs;
+        }
+        size_t attrs_len = (attr_ctx.attrs.pos - attr_ctx.attrs.buf) / sizeof(struct evr_attr_tuple);
+        if(visit(visit_ctx, *ref, (struct evr_attr_tuple*)attr_ctx.attrs.buf, attrs_len) != evr_ok){
+            goto out_with_free_attrs;
         }
     }
     ret = evr_ok;
-    out_with_finalize_query_stmt:
+ out_with_free_attrs:
+    if(attr_ctx.data.buf){
+        free(attr_ctx.data.buf);
+    }
+    if(attr_ctx.attrs.buf){
+        free(attr_ctx.attrs.buf);
+    }
+    if(attr_ctx.db){
+        if(evr_free_attr_index_db(attr_ctx.db) != evr_ok){
+            evr_panic("Failed to free attr index db used for fetching attributes");
+            ret = evr_error;
+        }
+    }
+ out_with_finalize_query_stmt:
     if(sqlite3_finalize(query_stmt) != SQLITE_OK){
         evr_panic("Failed to finalize claim query statement");
         ret = evr_error;
     }
  out_with_free_sql:
     free(sql);
- out_with_free_root:
-    evr_free_attr_query_node(root);
+ out_with_free_query:
+    evr_free_attr_query(query);
  out:
     return ret;
 }
 
-struct evr_attr_query_node *evr_attr_parse_query(const char *query){
-    struct evr_attr_query_node *ret = NULL;
+struct evr_attr_query *evr_attr_parse_query(const char *query){
+    struct evr_attr_query *ret = NULL;
     yyscan_t scanner;
     if(yylex_init(&scanner)){
         goto out;
@@ -932,4 +983,61 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
  out_with_free_ret:
     free(ret);
     return NULL;
+}
+
+int evr_collect_selected_attrs_visitor(void *context, const evr_claim_ref ref, const char *key, const char *value);
+
+int evr_collect_selected_attrs(struct evr_collect_selected_attrs_ctx *ctx, struct evr_attr_index_db *db, struct evr_attr_selector *selector, evr_time t, const evr_claim_ref ref){
+    switch(selector->type){
+    default:
+        log_error("Unknown selector type %d", selector->type);
+        return evr_error;
+    case evr_attr_selector_none:
+        return evr_ok;
+    case evr_attr_selector_all: {
+        if(!ctx->db){
+            ctx->db = evr_fork_attr_index_db(db);
+            if(!ctx->db){
+                return evr_error;
+            }
+            if(evr_prepare_attr_index_db(ctx->db) != evr_ok){
+                return evr_error;
+            }
+        }
+        return evr_get_ref_attrs(ctx->db, t, ref, evr_collect_selected_attrs_visitor, ctx);
+    }
+    }
+}
+
+int evr_collect_selected_attrs_visitor(void *context, const evr_claim_ref ref, const char *key, const char *value){
+    int ret = evr_error;
+    struct evr_collect_selected_attrs_ctx *ctx = context;
+    if(!ctx->attrs.buf){
+        evr_malloc_buf_pos(&ctx->attrs, evr_collect_selected_attrs_attrs_size);
+        evr_malloc_buf_pos(&ctx->data, evr_collect_selected_attrs_data_size);
+        if(!ctx->attrs.buf || !ctx->data.buf){
+            goto out;
+        }
+    }
+    char *attrs_end = &ctx->attrs.buf[evr_collect_selected_attrs_attrs_size];
+    if(ctx->attrs.pos + sizeof(struct evr_attr_tuple) > attrs_end){
+        log_error("evr_collect_selected_attrs_ctx attr buffer size exceeded");
+        goto out;
+    }
+    char *data_end = &ctx->data.buf[evr_collect_selected_attrs_data_size];
+    size_t key_size = strlen(key) + 1;
+    size_t value_size = strlen(value) + 1;
+    if(ctx->data.pos + key_size + value_size > data_end){
+        log_error("evr_collect_selected_attrs_ctx data buffer size exceeded");
+        goto out;
+    }
+    struct evr_attr_tuple *attr = (struct evr_attr_tuple*)ctx->attrs.pos;
+    evr_inc_buf_pos(&ctx->attrs, sizeof(struct evr_attr_tuple));
+    attr->key = ctx->data.pos;
+    evr_push_n(&ctx->data, key, key_size);
+    attr->value = ctx->data.pos;
+    evr_push_n(&ctx->data, value, value_size);
+    ret = evr_ok;
+ out:
+    return ret;
 }

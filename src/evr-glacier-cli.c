@@ -484,7 +484,7 @@ int evr_cli_post_file(char *file, char *title){
         // content of file
         fc.title = basename(file);
     }
-    fc.slices_len = ctx.slices->size_used / sizeof(struct evr_file_slice);
+    fc.slices_len = dynamic_array_len(ctx.slices, sizeof(struct evr_file_slice));
     fc.slices = (struct evr_file_slice*)ctx.slices->data;
     log_debug("Uploaded %d file segments", fc.slices_len);
     evr_time t;

@@ -1,8 +1,3 @@
-* report further claim attributes for found refs
-there should be at least these response modes:
-** report only ref
-** report ref and some attributes specified by key
-** report ref and all attributes
 * introduce content sourced attributes
 attr specs should contain declarations for content sourced
 attributes. content sourced attributes are scripts which are executed
@@ -75,6 +70,8 @@ perkeep stuff.
 #+BEGIN_SRC
 tag=todo && is_image(mime_type)
 #+END_SRC
+* report ref and some attributes specified by key in attr querries
+the query might be something like: select title where tag=todo
 * make boolean and operator '&&' optional in attr query language
 #+BEGIN_SRC
 (tag=todo || tag=backlog) tag=howto

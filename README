@@ -175,7 +175,7 @@ The evr-attr-index server should index the created file claim.
 You can query the index using netcat:
 
 $ nc localhost 2362
-s title=README
+s select * where title=README
 
 The 's' command searches for query expressions. It prints the found
 claim references.

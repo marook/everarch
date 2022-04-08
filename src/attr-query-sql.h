@@ -26,12 +26,13 @@
 
 #include "basics.h"
 
-// This appears to be a bug. This typedef breaks a dependency cycle
-// between the headers.
-// See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
+// This appears to be a bug bison/flex. This typedef breaks a
+// dependency cycle between the headers. See
+// https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
 typedef void * yyscan_t;
 
 struct evr_attr_query_ctx {
+    // TODO selected attributes
     evr_time t;
     void *more;
 };
@@ -48,5 +49,28 @@ struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value);
 struct evr_attr_query_node *evr_attr_query_bool_and(struct evr_attr_query_node *l, struct evr_attr_query_node *r);
 
 void evr_free_attr_query_node(struct evr_attr_query_node *node);
+
+#define evr_attr_selector_none 0x01
+#define evr_attr_selector_all  0x02
+
+struct evr_attr_selector {
+    /**
+     * type must be one of evr_attr_selector_*.
+     */
+    int type;
+};
+
+struct evr_attr_selector *evr_build_attr_selector(int type);
+
+#define evr_free_attr_selector(s) free(s)
+
+struct evr_attr_query {
+    struct evr_attr_selector *selector;
+    struct evr_attr_query_node *root;
+};
+
+struct evr_attr_query *evr_build_attr_query(struct evr_attr_selector *selector, struct evr_attr_query_node *root);
+
+void evr_free_attr_query(struct evr_attr_query *query);
 
 #endif

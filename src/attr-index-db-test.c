@@ -34,11 +34,11 @@ int found_tag_b = 0;
 int found_claim_0 = 0;
 
 void reset_visit_attrs();
-int visit_attrs(const evr_claim_ref ref, const char *key, const char *value);
+int visit_attrs(void *ctx, const evr_claim_ref ref, const char *key, const char *value);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void reset_visit_claims();
 int claims_status_ok(void *ctx, int parse_res);
-int visit_claims(void *ctx, const evr_claim_ref ref);
+int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 void assert_claims(int expected_found_claim_0);
 struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg);
 
@@ -49,9 +49,9 @@ void test_open_new_attr_index_db_twice(){
         30,
     };
     struct evr_attr merge_attrs[merge_attrs_len] = {
-        { evr_attr_op_replace, "tag", "A" },
-        { evr_attr_op_add, "tag", "B" },
-        { evr_attr_op_rm, "tag", NULL },
+        { evr_attr_op_replace, { "tag", "A" } },
+        { evr_attr_op_add, { "tag", "B" } },
+        { evr_attr_op_rm, { "tag", NULL } },
     };
     const int attr_merge_permutations[permutations][merge_attrs_len] = {
         { 0, 1, 2 },
@@ -97,35 +97,35 @@ void test_open_new_attr_index_db_twice(){
             }
             log_info("Assert t=0");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 0, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 0, ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert t=10");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 10, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 10, ref, visit_attrs, NULL));
             assert_attrs(1, 0);
             log_info("Assert t=15");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 15, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 15, ref, visit_attrs, NULL));
             assert_attrs(1, 0);
             log_info("Assert t=20");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 20, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 20, ref, visit_attrs, NULL));
             assert_attrs(1, 1);
             log_info("Assert t=25");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 25, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 25, ref, visit_attrs, NULL));
             assert_attrs(1, 1);
             log_info("Assert t=30");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 30, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 30, ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert t=35");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 35, ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 35, ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert not existing ref");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 25, other_ref, visit_attrs));
+            assert_ok(evr_get_ref_attrs(db, 25, other_ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert evr_attr_query_claims tag=A t=0");
             reset_visit_claims();
@@ -158,7 +158,8 @@ void reset_visit_attrs(){
     found_tag_b = 0;
 }
 
-int visit_attrs(const evr_claim_ref ref, const char *key, const char *value){
+int visit_attrs(void *ctx, const evr_claim_ref ref, const char *key, const char *value){
+    assert_null(ctx);
     evr_claim_ref_str fmt_ref;
     evr_fmt_claim_ref(fmt_ref, ref);
     assert_str_eq(fmt_ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000");
@@ -188,13 +189,15 @@ int claims_status_ok(void *ctx, int parse_res){
     return evr_ok;
 }
 
-int visit_claims(void *ctx, const evr_claim_ref ref){
+int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
+    assert_null(ctx);
     evr_claim_ref_str ref_str;
     evr_fmt_claim_ref(ref_str, ref);
     if(strcmp(ref_str, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000") == 0){
         found_claim_0 = 1;
     }
-    assert_null(ctx);
+    assert_null(attrs);
+    assert_int_eq(attrs_len, 0);
     return evr_ok;
 }
 
