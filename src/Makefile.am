@@ -16,7 +16,8 @@ bin_PROGRAMS = \
 	glacier-test \
 	keys-test \
 	rollsum-test \
-	signatures-test
+	signatures-test \
+	subprocess-test
 
 attr_index_db_test_SOURCES = \
 	assert.c \
@@ -36,7 +37,8 @@ attr_index_db_test_SOURCES = \
 	glacier.c \
 	glacier-storage-configuration.c \
 	keys.c \
-	logger.c
+	logger.c \
+	subprocess.c
 attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
@@ -92,7 +94,8 @@ evr_attr_index_SOURCES = \
 	keys.c \
 	logger.c \
 	server.c \
-	signatures.c
+	signatures.c \
+	subprocess.c
 evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
@@ -175,3 +178,11 @@ signatures_test_SOURCES = \
 	signatures.c \
 	signatures-test.c
 signatures_test_LDADD = $(GPGME_LIBS)
+
+subprocess_test_SOURCES = \
+	assert.c \
+	dyn-mem.c \
+	files.c \
+	logger.c \
+	subprocess.c \
+	subprocess-test.c

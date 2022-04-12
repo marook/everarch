@@ -215,6 +215,16 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
         xmlFree(key);
         attr_def_node = attr_def_node->next;
     }
+    size_t attr_factories_len = 0;
+    xmlNode *attr_factory_node = claim_node->children;
+    while(1){
+        attr_factory_node = evr_find_next_element(attr_factory_node, "attr-factory");
+        if(!attr_factory_node){
+            break;
+        }
+        ++attr_factories_len;
+        attr_factory_node = attr_factory_node->next;
+    }
     xmlNode *transformation_node = evr_find_next_element(claim_node->children, "transformation");
     if(!transformation_node){
         log_error("Missing transformation element in attr-spec claim");
@@ -239,7 +249,7 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
         goto out;
     }
     struct evr_buf_pos bp;
-    evr_malloc_buf_pos(&bp, sizeof(struct evr_attr_spec_claim) + attr_def_count * sizeof(struct evr_attr_def) + attr_def_str_size_sum);
+    evr_malloc_buf_pos(&bp, sizeof(struct evr_attr_spec_claim) + attr_def_count * sizeof(struct evr_attr_def) + attr_def_str_size_sum + attr_factories_len * evr_blob_ref_size);
     if(!bp.buf){
         goto out;
     }
@@ -284,6 +294,40 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
         next_attr_def->type = type;
         ++next_attr_def;
         attr_def_node = attr_def_node->next;
+    }
+    evr_blob_ref *attr_factories = (evr_blob_ref*)bp.pos;
+    c->attr_factories_len = attr_factories_len;
+    c->attr_factories = attr_factories;
+    attr_factory_node = claim_node->children;
+    while(1){
+        attr_factory_node = evr_find_next_element(attr_factory_node, "attr-factory");
+        if(!attr_factory_node){
+            break;
+        }
+        char *type_str = (char*)xmlGetProp(attr_factory_node, BAD_CAST "type");
+        if(!type_str){
+            log_error("Missing type attribute in attr-factory element");
+            goto fail_with_free_c;
+        }
+        if(strcmp(type_str, "executable") != 0){
+            log_error("Unknown type attribute found in attr-factory with value: %s", type_str);
+            xmlFree(type_str);
+            goto fail_with_free_c;
+        }
+        xmlFree(type_str);
+        char *ref_str = (char*)xmlGetProp(attr_factory_node, BAD_CAST "blob");
+        if(!ref_str){
+            log_error("Missing blob attribute in attr-factory element");
+            goto fail_with_free_c;
+        }
+        if(evr_parse_blob_ref(*attr_factories, ref_str) != evr_ok){
+            log_error("Unable to parse blob attribute in attr-factory with value: %s", ref_str);
+            xmlFree(ref_str);
+            goto fail_with_free_c;
+        }
+        xmlFree(ref_str);
+        ++attr_factories;
+        attr_factory_node = attr_factory_node->next;
     }
  out:
     return c;

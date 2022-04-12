@@ -267,6 +267,7 @@ void test_parse_attr_spec_claim(){
         "<attr-spec>"
         "<attr-def k=\"tag\" type=\"str\"/>"
         "<attr-def k=\"body-size\" type=\"int\"/>"
+        "<attr-factory type=\"executable\" blob=\"sha3-224-99900000000000000000000000000000000000000000000000000000\"/>"
         "<transformation type=\"xslt\" blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
         "</attr-spec>"
         "</claim-set>\n";
@@ -289,6 +290,10 @@ void test_parse_attr_spec_claim(){
     evr_blob_ref_str fmt_transformation_blob_ref;
     evr_fmt_blob_ref(fmt_transformation_blob_ref, c->transformation_blob_ref);
     assert_str_eq(fmt_transformation_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
+    assert_int_eq(c->attr_factories_len, 1);
+    evr_blob_ref_str attr_factory_ref_str;
+    evr_fmt_blob_ref(attr_factory_ref_str, *c->attr_factories);
+    assert_str_eq(attr_factory_ref_str, "sha3-224-99900000000000000000000000000000000000000000000000000000");
     free(c);
     xmlFreeDoc(doc);
 }
@@ -299,6 +304,27 @@ void test_parse_attr_spec_claim_error_unknown_transformation_type(){
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
         "<attr-spec>"
         "<transformation type=\"windows-exe-lol\" blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
+        "</attr-spec>"
+        "</claim-set>\n";
+    size_t buf_size = strlen(buf);
+    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    assert_not_null(doc);
+    xmlNode *csn = evr_get_root_claim_set(doc);
+    assert_not_null(csn);
+    xmlNode *cn = evr_first_claim(csn);
+    assert_not_null(cn);
+    struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
+    assert_null(c);
+    xmlFreeDoc(doc);
+}
+
+void test_parse_attr_spec_claim_error_unknown_attr_factory_type(){
+    const char *buf =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<attr-spec>"
+        "<transformation type=\"xslt\" blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
+        "<attr-factory type=\"exe\" blob=\"sha3-224-99900000000000000000000000000000000000000000000000000000\"/>"
         "</attr-spec>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
@@ -327,6 +353,7 @@ int main(){
     run_test(test_parse_two_attr_claims);
     run_test(test_parse_attr_spec_claim);
     run_test(test_parse_attr_spec_claim_error_unknown_transformation_type);
+    run_test(test_parse_attr_spec_claim_error_unknown_attr_factory_type);
     xmlCleanupParser();
     return 0;
 }

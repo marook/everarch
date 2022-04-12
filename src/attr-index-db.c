@@ -21,6 +21,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libxslt/transform.h>
+#include <threads.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 #include "dyn-mem.h"
 #include "basics.h"
@@ -30,6 +33,8 @@
 #include "attr-query-parser.h"
 #include "attr-query-lexer.h"
 #include "attr-query-sql.h"
+#include "subprocess.h"
+#include "files.h"
 
 struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db);
 int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, evr_time valid_until);
@@ -37,38 +42,51 @@ int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref
 int evr_get_attr_type_for_key(struct evr_attr_index_db *db, int *attr_type, char *key);
 int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, evr_time valid_from, int is_valid_until, evr_time valid_until, int trunc);
 
-struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name){
-    const char ext[] = ".db"; 
+struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx){
+    const char slash = '/';
+    size_t slash_len = 1;
     size_t state_dir_path_len = strlen(cfg->state_dir_path);
     size_t name_len = strlen(name);
-    size_t ext_len = strlen(ext);
-    size_t db_path_size = state_dir_path_len + 1 + name_len + ext_len + 1;
-    struct evr_attr_index_db *db = malloc(sizeof(struct evr_attr_index_db) + db_path_size);
+    size_t dir_size = state_dir_path_len + slash_len + name_len + slash_len + 1;
+    struct evr_attr_index_db *db = malloc(sizeof(struct evr_attr_index_db) + dir_size);
     if(!db){
         return NULL;
     }
-    db->db_path = (char*)&db[1];
+    db->dir = (char*)&db[1];
     struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, db->db_path);
+    evr_init_buf_pos(&bp, db->dir);
     evr_push_n(&bp, cfg->state_dir_path, state_dir_path_len);
-    const char slash = '/';
     if(state_dir_path_len > 0 && cfg->state_dir_path[state_dir_path_len - 1] != slash){
         evr_push_as(&bp, &slash, char);
     }
     evr_push_n(&bp, name, name_len);
-    evr_push_n(&bp, ext, ext_len);
+    evr_push_as(&bp, &slash, char);
     evr_push_eos(&bp);
+    if(mkdir(db->dir, 0755)){
+        // there is a chance that the dir already exists an hopefully
+        // is not a file. if it is a file the sqlite open later will
+        // fail.
+        if(errno != EEXIST){
+            log_error("Failed to create attr-index-db directory %s", db->dir);
+            free(db);
+            return NULL;
+        }
+    }
+    db->blob_file_writer = blob_file_writer;
+    db->blob_file_writer_ctx = blob_file_writer_ctx;
     return evr_init_attr_index_db(db);
 }
 
 struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *odb){
-    size_t db_path_size = strlen(odb->db_path) + 1;
-    struct evr_attr_index_db *fdb = malloc(sizeof(struct evr_attr_index_db) + db_path_size);
+    size_t dir_size = strlen(odb->dir) + 1;
+    struct evr_attr_index_db *fdb = malloc(sizeof(struct evr_attr_index_db) + dir_size);
     if(!fdb){
         return NULL;
     }
-    fdb->db_path = (char*)&fdb[1];
-    memcpy(fdb->db_path, odb->db_path, db_path_size);
+    fdb->dir = (char*)&fdb[1];
+    memcpy(fdb->dir, odb->dir, dir_size);
+    fdb->blob_file_writer = odb->blob_file_writer;
+    fdb->blob_file_writer_ctx = odb->blob_file_writer_ctx;
     return evr_init_attr_index_db(fdb);
 }
 
@@ -84,10 +102,15 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
     db->find_ref_attrs = NULL;
+    size_t dir_len = strlen(db->dir);
+    const char filename[] = "index.db";
+    char db_path[dir_len + sizeof(filename)];
+    memcpy(db_path, db->dir, dir_len);
+    memcpy(&db_path[dir_len], filename, sizeof(filename));
     int db_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX;
-    if(sqlite3_open_v2(db->db_path, &db->db, db_flags, NULL) != SQLITE_OK){
+    if(sqlite3_open_v2(db_path, &db->db, db_flags, NULL) != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(db->db);
-        log_error("Could not open %s sqlite database for attr-index: %s", db->db_path, sqlite_error_msg);
+        log_error("Could not open %s sqlite database for attr-index: %s", db->dir, sqlite_error_msg);
         goto out_with_free_db;
     }
     if(sqlite3_busy_timeout(db->db, evr_sqlite3_busy_timeout) != SQLITE_OK){
@@ -246,7 +269,9 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     return ret;
 }
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
+int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_claim_set_doc, struct evr_attr_spec_claim *spec, evr_blob_ref claim_set_ref);
+
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
     int ret = evr_error;
     if(sqlite3_bind_blob(db->insert_claim_set, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out_with_reset_insert_claim_set;
@@ -276,6 +301,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
         log_debug("Indexing claim set %s", ref_str);
     }
 #endif
+    if(evr_append_attr_factory_claims(db, raw_claim_set_doc, spec, claim_set_ref) != evr_ok){
+        goto out_with_reset_insert_claim_set;
+    }
     const char *xslt_params[] = {
         NULL
     };
@@ -344,6 +372,230 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetP
         ret = evr_error;
     }
     return ret;
+}
+
+struct evr_append_attr_factory_claims_worker_ctx {
+    struct evr_attr_index_db *db;
+    char *claim_set;
+    size_t claim_set_len;
+    evr_blob_ref claim_set_ref;
+    evr_blob_ref attr_factory;
+    int res;
+    xmlDocPtr built_doc;
+};
+
+int evr_append_attr_factory_claims_worker(void *context);
+
+int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name);
+
+int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_claim_set_doc, struct evr_attr_spec_claim *spec, evr_blob_ref claim_set_ref){
+    int ret = evr_ok; // BIG OTHER WAY ROUND WARNING!
+    thrd_t thrds[spec->attr_factories_len];
+    thrd_t *t = thrds;
+    struct evr_append_attr_factory_claims_worker_ctx ctxs[spec->attr_factories_len];
+    struct evr_append_attr_factory_claims_worker_ctx *c = ctxs;
+    evr_blob_ref *af_end = &spec->attr_factories[spec->attr_factories_len];
+    char *raw_claim_set = NULL;
+    int raw_claim_set_size;
+    xmlDocDumpMemoryEnc(raw_claim_set_doc, (xmlChar**)&raw_claim_set, &raw_claim_set_size, "UTF-8");
+    if(!raw_claim_set){
+        log_error("Failed to format raw claim-set doc");
+        goto out;
+    }
+    for(evr_blob_ref *af = spec->attr_factories; af != af_end; ++af){
+        c->db = db;
+        c->claim_set = raw_claim_set;
+        c->claim_set_len = raw_claim_set_size;
+        memcpy(c->claim_set_ref, claim_set_ref, evr_blob_ref_size);
+        memcpy(c->attr_factory, af, evr_blob_ref_size);
+        c->res = evr_error;
+        if(thrd_create(t, evr_append_attr_factory_claims_worker, c) != thrd_success){
+            ret = evr_error;
+            goto out_with_join_threads;
+        }
+        ++t;
+        ++c;
+    }
+ out_with_join_threads:
+    for(--t; t >= thrds; --t){
+        if(thrd_join(*t, NULL) != thrd_success){
+            evr_panic("Failed to join attr factory thread");
+            ret = evr_error;
+            goto out;
+        }
+    }
+    xmlFree(raw_claim_set);
+    struct evr_append_attr_factory_claims_worker_ctx *c_end = &ctxs[spec->attr_factories_len];
+    if(ret == evr_ok){
+        for(c = ctxs; c != c_end; ++c){
+            if(c->res != evr_ok){
+                evr_blob_ref_str claim_set_ref_str;
+                evr_fmt_blob_ref(claim_set_ref_str, c->claim_set_ref);
+                evr_blob_ref_str attr_factory_str;
+                evr_fmt_blob_ref(attr_factory_str, c->attr_factory);
+                log_error("attr-factory %s failed with claim set %s", attr_factory_str, claim_set_ref_str);
+                continue;
+            }
+            if(evr_merge_claim_set_docs(raw_claim_set_doc, c->built_doc, "original", "dynamic") != evr_ok){
+                evr_blob_ref_str claim_set_ref_str;
+                evr_fmt_blob_ref(claim_set_ref_str, c->claim_set_ref);
+                evr_blob_ref_str attr_factory_str;
+                evr_fmt_blob_ref(attr_factory_str, c->attr_factory);
+                log_error("Failed to merged attr-factory %s's dynamic claim-set for original claim-set %s", attr_factory_str, claim_set_ref_str);
+                ret = evr_error;
+                goto out_with_free_built_docs;
+            }
+        }
+    }
+ out_with_free_built_docs:
+    for(c = ctxs; c != c_end; ++c){
+        if(c->built_doc){
+            xmlFreeDoc(c->built_doc);
+        }
+    }
+ out:
+    return ret;
+}
+
+int evr_ensure_attr_factory_exe_ready(struct evr_attr_index_db *db, evr_blob_ref attr_factory, char *exe_path);
+
+int evr_append_attr_factory_claims_worker(void *context){
+    struct evr_append_attr_factory_claims_worker_ctx *ctx = context;
+    size_t dir_len = strlen(ctx->db->dir);
+    char exe_path[dir_len + evr_blob_ref_str_size];
+    memcpy(exe_path, ctx->db->dir, dir_len);
+    evr_fmt_blob_ref(&exe_path[dir_len], ctx->attr_factory);
+    if(evr_ensure_attr_factory_exe_ready(ctx->db, ctx->attr_factory, exe_path) != evr_ok){
+        goto out;
+    }
+    evr_blob_ref_str claim_set_ref_str;
+    evr_fmt_blob_ref(claim_set_ref_str, ctx->claim_set_ref);
+    char *argv[] = {
+        exe_path,
+        claim_set_ref_str,
+        NULL
+    };
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_blob_ref_str attr_factory_str;
+        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
+        log_debug("Spawn attr-factory %s for claim-set %s", attr_factory_str, claim_set_ref_str);
+    }
+#endif
+    struct evr_subprocess sp;
+    if(evr_spawn(&sp, argv) != evr_ok){
+        goto out;
+    }
+    int write_res = write_n(sp.stdin, ctx->claim_set, ctx->claim_set_len);
+    if(write_res != evr_ok && write_res != evr_end){
+        goto out_with_join_sp;
+    }
+    struct dynamic_array *buf = alloc_dynamic_array(32 * 1024);
+    if(!buf){
+        goto out_with_join_sp;
+    }
+    int read_res = read_fd(&buf, sp.stdout, evr_max_blob_data_size);
+    if(read_res != evr_ok && read_res != evr_end){
+        if(buf){
+            free(buf);
+        }
+        goto out_with_join_sp;
+    }
+    if(!buf){
+        goto out_with_join_sp;
+    }
+    ctx->built_doc = evr_parse_claim_set(buf->data, buf->size_used);
+    if(!ctx->built_doc){
+        evr_blob_ref_str attr_factory_str;
+        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
+        char eos = '\0';
+        buf = write_n_dynamic_array(buf, &eos, sizeof(eos));
+        if(buf){
+            log_error("Output from attr-factory %s for claim-set %s not parseable. Output claim set was: %s", attr_factory_str, claim_set_ref_str, buf->data);
+            free(buf);
+        } else {
+            log_error("Output from attr-factory %s for claim-set %s not parseable.", attr_factory_str, claim_set_ref_str);
+        }
+        goto out_with_join_sp;
+    }
+    free(buf);
+ out_with_join_sp:
+    if(waitpid(sp.pid, &ctx->res, WUNTRACED) < 0){
+        evr_blob_ref_str attr_factory_str;
+        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
+        evr_panic("Failed to wait for attr-factory %s subprocess", attr_factory_str);
+        goto out;
+    }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_blob_ref_str attr_factory_str;
+        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
+        log_debug("Joined attr-factory %s for claim-set %s with exit code %d", attr_factory_str, claim_set_ref_str, ctx->res);
+    }
+#endif
+ out:
+    return evr_ok;
+}
+
+int evr_ensure_attr_factory_exe_ready(struct evr_attr_index_db *db, evr_blob_ref attr_factory, char *exe_path){
+    struct stat st;
+    if(stat(exe_path, &st) != 0){
+        if(errno != ENOENT){
+            log_error("Failed to stat attr-factory executable %s", exe_path);
+            return evr_error;
+        }
+#ifdef EVR_LOG_DEBUG
+        {
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, attr_factory);
+            log_debug("Caching attr-factory %s's executable", ref_str);
+        }
+#endif
+        if(db->blob_file_writer(db->blob_file_writer_ctx, exe_path, 0755, attr_factory) != evr_ok){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, attr_factory);
+            log_error("Failed to fetch executable for attr-factory %s", ref_str);
+            return evr_error;
+        }
+    }
+    return evr_ok;
+}
+
+int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name){
+    xmlNode *dcs = evr_get_root_claim_set(dest);
+    if(!dcs){
+        log_error("No claim-set found in %s document", dest_name);
+        return evr_error;
+    }
+    xmlNode *d_last_claim = xmlGetLastChild(dcs);
+    xmlNode *scs = evr_get_root_claim_set(src);
+    if(!scs){
+        log_error("No claim-set found in %s document", src_name);
+        return evr_error;
+    }
+    xmlNode *sc = evr_first_claim(scs);
+    while(sc){
+        sc = evr_find_next_element(sc, NULL);
+        if(!sc){
+            break;
+        }
+        if(xmlDOMWrapAdoptNode(NULL, src, sc, dest, dcs, 0)){
+            return evr_error;
+        }
+        if(d_last_claim){
+            d_last_claim = xmlAddNextSibling(d_last_claim, sc);
+            if(!d_last_claim){
+                return evr_error;
+            }
+        } else {
+            d_last_claim = xmlAddChild(dcs, sc);
+            if(!d_last_claim){
+                return evr_error;
+            }
+        }
+        sc = sc->next;
+    }
+    return evr_ok;
 }
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct evr_attr_claim *claim){

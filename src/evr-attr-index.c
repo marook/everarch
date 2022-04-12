@@ -25,6 +25,7 @@
 #include <threads.h>
 #include <libxslt/xslt.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 #include "basics.h"
 #include "claims.h"
@@ -110,7 +111,7 @@ int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
 int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c);
+int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c);
 int evr_attr_index_tcp_server();
 int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
@@ -119,6 +120,7 @@ int evr_respond_search_status(void *context, int parse_res);
 int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 int evr_respond_help(struct evr_connection *ctx);
 int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
+int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
 
 int main(){
     int ret = evr_error;
@@ -653,7 +655,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     int ret = evr_error;
     evr_blob_ref_str claim_key_str;
     evr_fmt_blob_ref(claim_key_str, claim_key);
-    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, claim_key_str);
+    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, claim_key_str, evr_write_blob_to_file, NULL);
     if(!db){
         goto out;
     }
@@ -713,7 +715,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
             goto out_with_close_cs;
         }
-        if(evr_index_claim_set(db, style, wbody.key, wbody.last_modified, &cs) != evr_ok){
+        if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cs) != evr_ok){
             goto out_with_close_cs;
         }
         if((wbody.flags & evr_watch_flag_eob) == evr_watch_flag_eob){
@@ -740,7 +742,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     return ret;
 }
 
-int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c){
+int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {
@@ -763,7 +765,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, e
         log_error("Claim set not fetchable for blob key %s", ref_str);
         goto out;
     }
-    if(evr_merge_attr_index_claim_set(db, style, claim_set_ref, claim_set_last_modified, claim_set) != evr_ok){
+    if(evr_merge_attr_index_claim_set(db, spec, style, claim_set_ref, claim_set_last_modified, claim_set) != evr_ok){
         goto out_with_free_claim_set;
     }
     ret = evr_ok;
@@ -791,6 +793,7 @@ int evr_index_sync_worker(void *arg){
     fd_set active_fd_set;
     struct timeval timeout;
     struct evr_watch_blobs_body wbody;
+    struct evr_attr_spec_claim *spec = NULL;
     xsltStylesheetPtr style = NULL;
     while(running){
         if(evr_lock_handover(&ctx->handover) != evr_ok){
@@ -821,6 +824,10 @@ int evr_index_sync_worker(void *arg){
                 xsltFreeStylesheet(style);
                 style = NULL;
             }
+            if(spec){
+                free(spec);
+                spec = NULL;
+            }
             if(db){
                 if(evr_free_attr_index_db(db) != evr_ok){
                     log_error("Failed to close stopped index db");
@@ -841,7 +848,7 @@ int evr_index_sync_worker(void *arg){
                 evr_panic("Failed to occupy current index handover");
                 goto out_with_free;
             }
-            db = evr_open_attr_index_db(cfg, index_ref_str);
+            db = evr_open_attr_index_db(cfg, index_ref_str, evr_write_blob_to_file, NULL);
             if(!db){
                 goto out_with_free;
             }
@@ -874,7 +881,6 @@ int evr_index_sync_worker(void *arg){
                 goto out_with_free;
             }
             style = evr_fetch_stylesheet(cw, spec->transformation_blob_ref);
-            free(spec);
             if(!style){
                 goto out_with_free;
             }
@@ -914,7 +920,7 @@ int evr_index_sync_worker(void *arg){
         if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
             goto out_with_free;
         }
-        if(evr_index_claim_set(db, style, wbody.key, wbody.last_modified, &cg) != evr_ok){
+        if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cg) != evr_ok){
             goto out_with_free;
         }
     }
@@ -928,6 +934,9 @@ int evr_index_sync_worker(void *arg){
     }
     if(style){
         xsltFreeStylesheet(style);
+    }
+    if(spec){
+        free(spec);
     }
     if(db){
         if(evr_free_attr_index_db(db) != evr_ok){
@@ -1099,7 +1108,7 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     evr_blob_ref_str index_ref_str;
     evr_fmt_blob_ref(index_ref_str, index_ref);
     log_debug("Connection worker %d is using index %s for query", ctx->socket, index_ref_str);
-    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, index_ref_str);
+    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, index_ref_str, evr_write_blob_to_file, NULL);
     if(!db){
         goto out;
     }
@@ -1199,4 +1208,51 @@ int evr_respond_status(struct evr_connection *ctx, int ok, char *msg){
     }
     evr_push_concat(&bp, "\n");
     return write_n(ctx->socket, buf, bp.pos - bp.buf);
+}
+
+int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref){
+    int ret = evr_error;
+    int f = creat(path, mode);
+    if(f < 0){
+        goto out;
+    }
+    int c = evr_connect_to_storage();
+    if(c < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out_with_close_f;
+    }
+    struct evr_resp_header resp;
+    if(evr_req_cmd_get_blob(c, ref, &resp) != evr_ok){
+        goto out_with_close_c;
+        return evr_error;
+    }
+    if(resp.status_code != evr_status_code_ok){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, ref);
+        log_error("Failed to read blob %s from server. Responded status code was 0x%02x", resp.status_code);
+        goto out;
+    }
+    if(resp.body_size > evr_max_blob_data_size){
+        log_error("Server indicated huge blob size of %ul bytes", resp.body_size);
+        goto out_with_close_c;
+    }
+    // ignore one byte containing the flags
+    char buf[1];
+    if(read_n(c, buf, sizeof(buf)) != evr_ok){
+        goto out_with_close_c;
+    }
+    if(pipe_n(f, c, resp.body_size - sizeof(buf)) != evr_ok){
+        goto out_with_close_c;
+    }
+    ret = evr_ok;
+ out_with_close_c:
+    if(close(c)){
+        ret = evr_error;
+    }
+ out_with_close_f:
+    if(close(f)){
+        ret = evr_error;
+    }
+ out:
+    return ret;
 }

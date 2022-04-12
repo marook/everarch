@@ -40,8 +40,14 @@
 #include "attr-index-db-configuration.h"
 #include "claims.h"
 
+typedef int (*evr_blob_file_writer)(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
+
 struct evr_attr_index_db {
-    char *db_path;
+    /**
+     * dir is the path to the index's root directory. Always ends with
+     * a slash.
+     */
+    char *dir;
     sqlite3 *db;
     sqlite3_stmt *find_state;
     sqlite3_stmt *update_state;
@@ -53,9 +59,11 @@ struct evr_attr_index_db {
     sqlite3_stmt *insert_claim_set;
     sqlite3_stmt *update_attr_valid_until;
     sqlite3_stmt *find_ref_attrs;
+    evr_blob_file_writer blob_file_writer;
+    void *blob_file_writer_ctx;
 };
 
-struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name);
+struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx);
 
 struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *db);
 
@@ -90,7 +98,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct evr_attr_claim *claim);
 

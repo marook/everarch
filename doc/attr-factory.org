@@ -1,0 +1,48 @@
+* attr-factory
+attr-factory is a element within attr-spec claims. It describes
+applications which generate attrs claims from indexed claims. This can
+be used for example to detect mime types of file claims.
+
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="1970-01-01T00:00:07.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <attr-def k="body-size" type="int"/>
+    <attr-factory
+        type="executable"
+        blob="sha3-224-99900000000000000000000000000000000000000000000000000000"
+        />
+    <transformation
+        type="xslt"
+        blob="sha3-224-32100000000000000000000000000000000000000000000000000123"
+        />
+  </attr-spec>
+</claim-set>
+#+END_SRC
+
+The blob referenced by the attr-factory element must contain an
+executable file. This may be for example an ELF binary or shell
+script.
+
+The script is called with one argument which is the indexed claim
+set's blob ref. The original claim set is piped to the script's stdin.
+
+The executable must terminate with an exit code 0 and produce a XML
+document on stdout which contains the dynamic claim set as root
+element. The dynamic claim set's claims are appended to the original
+claim set before any transformations are applied. The order in which
+attr elements are appended is undefined.
+
+There are several constrains which apply to the dynamic claim set:
+- the default XML namespace must be https://evr.ma300k.de/claims/
+- all further namespaces must be defined on the claim elements itself
+
+An exit code unequal to 0 indicates the script failed and the output
+must not be taken into account by the evr-attr-index.
+
+The execution order of multiple attr factories is undefined.
