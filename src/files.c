@@ -32,7 +32,7 @@
 int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
     int result = evr_error;
     int f = open(path, O_RDONLY);
-    if(!f){
+    if(f < 0){
         goto open_fail;
     }
     int read_res = read_fd(buffer, f, max_size);
