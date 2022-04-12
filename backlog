@@ -15,6 +15,7 @@ the attr spec for content based attributes might look like this:
 
 the attr-factory must point to an executable. for example an elf
 binary, shell or python script.
+* rename attr claims's 'claim' attribute to 'index-ref'
 * report attr query syntax errors via error response
 * add lisp output mode to evr-attr-index search results
 * add emacs integration with evr-search-claim function
