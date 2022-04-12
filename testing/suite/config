@@ -1,3 +1,6 @@
+# enable core dumps
+ulimit -c unlimited
+
 PATH="../../../src:${PATH}"
 
 wait_for_glacier_storage(){
