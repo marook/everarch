@@ -1,3 +1,5 @@
+* fix unclosed subprocess stdin/stdout/stderr descriptors
+in evr_append_attr_factory_claims_worker()
 * rename attr claims's 'claim' attribute to 'index-ref'
 * report attr query syntax errors via error response
 * add lisp output mode to evr-attr-index search results

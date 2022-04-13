@@ -158,6 +158,12 @@ xmlNode *evr_nth_claim(xmlNode *claim_set, int n);
 
 int evr_is_evr_element(xmlNode *n, char *name);
 
+/**
+ * evr_add_claim_ref_attrs makes sure every claim within the doc has a
+ * ref attribute. Existing ref attributes are kept as they are.
+ */
+int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref);
+
 struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node);
 
 /**

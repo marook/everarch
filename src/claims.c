@@ -195,6 +195,43 @@ int evr_is_evr_element(xmlNode *n, char *name){
     return ret;
 }
 
+int evr_parse_claim_index_attr(size_t *claim_index, xmlNode *claim);
+
+int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
+    xmlNode *cs = evr_get_root_claim_set(doc);
+    if(!cs){
+        return evr_ok;
+    }
+    size_t ci = 0;
+    xmlNode *c = evr_first_claim(cs);
+    size_t claim_index;
+    while(c){
+        c = evr_find_next_element(c, NULL);
+        if(!c){
+            break;
+        }
+        xmlAttrPtr ref_attr = xmlHasProp(c, BAD_CAST "ref");
+        if(!ref_attr){
+            int claim_index_res = evr_parse_claim_index_attr(&claim_index, c);
+            if(claim_index_res == evr_not_found){
+                claim_index = ci;
+            } else if(claim_index_res != evr_ok){
+                return evr_error;
+            }
+            evr_claim_ref cref;
+            evr_build_claim_ref(cref, doc_ref, claim_index);
+            evr_claim_ref_str cref_str;
+            evr_fmt_claim_ref(cref_str, cref);
+            if(!xmlSetProp(c, BAD_CAST "ref", BAD_CAST cref_str)){
+                return evr_error;
+            }
+        }
+        c = c->next;
+        ++ci;
+    }
+    return evr_ok;
+}
+
 struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     struct evr_attr_spec_claim *c = NULL;
     size_t attr_def_count = 0;
@@ -434,17 +471,9 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     } else {
         ref_type = evr_ref_type_self;
     }
-    char *fmt_claim_index = (char*)xmlGetProp(claim_node, BAD_CAST "claim");
     size_t claim_index;
-    if(fmt_claim_index){
-        int scan_res = sscanf(fmt_claim_index, "%lu", &claim_index);
-        if(scan_res != 1){
-            log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_claim_index);
-            xmlFree(fmt_claim_index);
-            goto out;
-        }
-        xmlFree(fmt_claim_index);
-    } else {
+    int claim_index_res = evr_parse_claim_index_attr(&claim_index, claim_node);
+    if(claim_index_res == evr_not_found){
         claim_index = 0;
         xmlNode *sibling = claim_node->prev;
         while(sibling){
@@ -453,6 +482,8 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
             }
             sibling = sibling->prev;
         }
+    } else if(claim_index_res != evr_ok){
+        goto out;
     }
     size_t attr_count = 0;
     size_t attr_str_size_sum = 0;
@@ -546,6 +577,23 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
  fail_with_free_c:
     free(c);
     return NULL;
+}
+
+int evr_parse_claim_index_attr(size_t *claim_index, xmlNode *claim){
+    char *fmt_claim_index = (char*)xmlGetProp(claim, BAD_CAST "claim");
+    if(!fmt_claim_index){
+        return evr_not_found;
+    }
+    int ret = evr_error;
+    int scan_res = sscanf(fmt_claim_index, "%lu", claim_index);
+    if(scan_res != 1){
+        log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_claim_index);
+        goto out_with_free_fmt_claim_index;
+    }
+    ret = evr_ok;
+ out_with_free_fmt_claim_index:
+    xmlFree(fmt_claim_index);
+    return ret;
 }
 
 xmlNode *evr_find_next_element(xmlNode *n, char *name_filter){

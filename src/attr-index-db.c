@@ -301,6 +301,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         log_debug("Indexing claim set %s", ref_str);
     }
 #endif
+    if(evr_add_claim_ref_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
+        goto out_with_reset_insert_claim_set;
+    }
     if(evr_append_attr_factory_claims(db, raw_claim_set_doc, spec, claim_set_ref) != evr_ok){
         goto out_with_reset_insert_claim_set;
     }
@@ -490,6 +493,9 @@ int evr_append_attr_factory_claims_worker(void *context){
     if(write_res != evr_ok && write_res != evr_end){
         goto out_with_join_sp;
     }
+    if(close(sp.stdin)){
+        goto out_with_join_sp;
+    }
     struct dynamic_array *buf = alloc_dynamic_array(32 * 1024);
     if(!buf){
         goto out_with_join_sp;
@@ -512,9 +518,22 @@ int evr_append_attr_factory_claims_worker(void *context){
         buf = write_n_dynamic_array(buf, &eos, sizeof(eos));
         if(buf){
             log_error("Output from attr-factory %s for claim-set %s not parseable. Output claim set was: %s", attr_factory_str, claim_set_ref_str, buf->data);
-            free(buf);
+            buf->size_used = 0;
         } else {
             log_error("Output from attr-factory %s for claim-set %s not parseable.", attr_factory_str, claim_set_ref_str);
+            buf = alloc_dynamic_array(32 * 1024);
+        }
+        int err_read_res = read_fd(&buf, sp.stderr, evr_max_blob_data_size);
+        if(err_read_res != evr_ok && err_read_res != evr_end){
+            if(buf){
+                free(buf);
+            }
+            goto out_with_join_sp;
+        }
+        buf = write_n_dynamic_array(buf, &eos, sizeof(eos));
+        if(buf){
+            log_error("Stderr output from attr-factory %s for claim-set %s was: %s", attr_factory_str, claim_set_ref_str, buf->data);
+            free(buf);
         }
         goto out_with_join_sp;
     }
@@ -526,6 +545,7 @@ int evr_append_attr_factory_claims_worker(void *context){
         evr_panic("Failed to wait for attr-factory %s subprocess", attr_factory_str);
         goto out;
     }
+    // TODO close sp.stdin, sp.stdout, sp.stderr
 #ifdef EVR_LOG_DEBUG
     {
         evr_blob_ref_str attr_factory_str;
