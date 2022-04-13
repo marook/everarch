@@ -47,7 +47,7 @@ void test_read_fd_partial_file(){
 void test_read_empty_json_with_big_buffer(){
     struct dynamic_array *buffer = alloc_dynamic_array(1024);
     assert_not_null(buffer);
-    assert_zero(read_file_str(&buffer, "etc/configuration/empty.json", 1024));
+    assert_zero(read_file_str(&buffer, "../etc/configuration/empty.json", 1024));
     assert_str_eq((char*)buffer->data, "{}\n");
     assert_size_eq(buffer->size_used, 4);
     free(buffer);
@@ -56,14 +56,14 @@ void test_read_empty_json_with_big_buffer(){
 void test_read_empty_json_with_small_buffer(){
     struct dynamic_array *buffer = alloc_dynamic_array(1);
     assert_not_null(buffer);
-    assert_zero(read_file_str(&buffer, "etc/configuration/empty.json", 1024));
+    assert_zero(read_file_str(&buffer, "../etc/configuration/empty.json", 1024));
     assert_str_eq((char*)buffer->data, "{}\n");
     assert_size_eq(buffer->size_used, 4);
     free(buffer);
 }
 
 void test_read_into_chunks_with_small_file(){
-    int f = open("etc/configuration/empty.json", O_RDONLY);
+    int f = open("../etc/configuration/empty.json", O_RDONLY);
     assert_truthy(f);
     struct chunk_set *cs = read_into_chunks(f, 2);
     close(f);
@@ -76,7 +76,7 @@ void test_read_into_chunks_with_small_file(){
 }
 
 void test_append_into_chunk_set_with_small_file(){
-    int f = open("etc/configuration/empty.json", O_RDONLY);
+    int f = open("../etc/configuration/empty.json", O_RDONLY);
     assert_truthy(f);
     struct chunk_set *cs = evr_allocate_chunk_set(0);
     assert_not_null(cs);
@@ -114,7 +114,7 @@ void test_rollsum_split_tiny_file(){
     slice_counter = 0;
     small_slices_counter = 0;
     slice_size_sum = 0;
-    int f = open("etc/configuration/empty.json", O_RDONLY);
+    int f = open("../etc/configuration/empty.json", O_RDONLY);
     assert_equal(evr_rollsum_split(f, 10, visit_slice, NULL), evr_end);
     close(f);
     assert_greater_then(2, small_slices_counter);

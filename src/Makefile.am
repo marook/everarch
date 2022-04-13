@@ -3,14 +3,30 @@ BUILT_SOURCES = attr-query-parser.h attr_index_db_test-attr-query-lexer.c evr_at
 AM_YFLAGS = -d
 
 bin_PROGRAMS = \
+	evr-attr-index \
+	evr-glacier-cli \
+	evr-glacier-storage
+
+check_PROGRAMS = \
 	attr-index-db-test \
 	basics-test \
 	claims-test \
 	concurrent-glacier-test \
 	dyn-mem-test \
-	evr-attr-index \
-	evr-glacier-cli \
-	evr-glacier-storage \
+	files-test \
+	glacier-cmd-test \
+	glacier-test \
+	keys-test \
+	rollsum-test \
+	signatures-test \
+	subprocess-test
+
+TESTS = \
+	attr-index-db-test \
+	basics-test \
+	claims-test \
+	concurrent-glacier-test \
+	dyn-mem-test \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
