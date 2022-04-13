@@ -1,5 +1,8 @@
 * fix unclosed subprocess stdin/stdout/stderr descriptors
 in evr_append_attr_factory_claims_worker()
+* pass PATH to attr-factory process
+so that the evr-glacier-cli for example can be found in attr-factory
+scripts.
 * rename attr claims's 'claim' attribute to 'index-ref'
 * report attr query syntax errors via error response
 * add lisp output mode to evr-attr-index search results
