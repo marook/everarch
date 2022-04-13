@@ -875,7 +875,7 @@ int evr_index_sync_worker(void *arg){
             if(!c_node){
                 goto out_with_free_cs_doc;
             }
-            struct evr_attr_spec_claim *spec = evr_parse_attr_spec_claim(c_node);
+            spec = evr_parse_attr_spec_claim(c_node);
             xmlFree(cs_doc);
             if(!spec){
                 goto out_with_free;
