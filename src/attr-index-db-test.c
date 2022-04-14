@@ -96,7 +96,7 @@ void test_open_new_attr_index_db_twice(){
                     struct evr_attr_claim claim;
                     claim.ref_type = evr_ref_type_claim;
                     evr_build_claim_ref(claim.ref, ref, 0);
-                    claim.claim_index = 0;
+                    claim.index_ref = 0;
                     claim.attr_len = 1;
                     claim.attr = &merge_attrs[aai];
                     assert_ok(evr_merge_attr_index_claim(db, t, &claim));
@@ -265,7 +265,7 @@ void test_add_two_attr_claims_for_same_target(){
     struct evr_attr_claim c;
     c.ref_type = evr_ref_type_claim;
     assert_ok(evr_parse_claim_ref(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0001"));
-    c.claim_index = 1;
+    c.index_ref = 1;
     c.attr_len = 0;
     c.attr = NULL;
     for(int i = 0; i < 2; ++i){

@@ -125,11 +125,11 @@ int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref){
         goto out;
     }
     s += evr_claim_ref_str_separator_len;
-    int claim_index;
-    if(sscanf(s, "%04x", &claim_index) != 1){
+    int index_ref;
+    if(sscanf(s, "%04x", &index_ref) != 1){
         goto out;
     }
-    *(uint16_t*)&cref[evr_blob_ref_size] = htobe16(claim_index);
+    *(uint16_t*)&cref[evr_blob_ref_size] = htobe16(index_ref);
     ret = evr_ok;
  out:
     return ret;

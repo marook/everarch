@@ -106,7 +106,7 @@ struct evr_attr_claim {
      */
     evr_claim_ref ref;
 
-    size_t claim_index;
+    size_t index_ref;
     size_t attr_len;
     struct evr_attr *attr;
 };

@@ -25,7 +25,7 @@
   </xsl:template>
 
   <xsl:template match="evr:file">
-    <evr:attr claim="{count(preceding-sibling::*)}">
+    <evr:attr index-ref="{count(preceding-sibling::*)}">
       <evr:a op="=" k="title" v="{@dc:title}"/>
       <evr:a op="=" k="size" v="{sum(evr:body/evr:slice/@size)}"/>
     </evr:attr>

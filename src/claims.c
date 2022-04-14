@@ -195,7 +195,7 @@ int evr_is_evr_element(xmlNode *n, char *name){
     return ret;
 }
 
-int evr_parse_claim_index_attr(size_t *claim_index, xmlNode *claim);
+int evr_parse_claim_index_ref_attr(size_t *index_ref, xmlNode *claim);
 
 int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
     xmlNode *cs = evr_get_root_claim_set(doc);
@@ -204,7 +204,7 @@ int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
     }
     size_t ci = 0;
     xmlNode *c = evr_first_claim(cs);
-    size_t claim_index;
+    size_t index_ref;
     while(c){
         c = evr_find_next_element(c, NULL);
         if(!c){
@@ -212,14 +212,14 @@ int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
         }
         xmlAttrPtr ref_attr = xmlHasProp(c, BAD_CAST "ref");
         if(!ref_attr){
-            int claim_index_res = evr_parse_claim_index_attr(&claim_index, c);
-            if(claim_index_res == evr_not_found){
-                claim_index = ci;
-            } else if(claim_index_res != evr_ok){
+            int index_ref_res = evr_parse_claim_index_ref_attr(&index_ref, c);
+            if(index_ref_res == evr_not_found){
+                index_ref = ci;
+            } else if(index_ref_res != evr_ok){
                 return evr_error;
             }
             evr_claim_ref cref;
-            evr_build_claim_ref(cref, doc_ref, claim_index);
+            evr_build_claim_ref(cref, doc_ref, index_ref);
             evr_claim_ref_str cref_str;
             evr_fmt_claim_ref(cref_str, cref);
             if(!xmlSetProp(c, BAD_CAST "ref", BAD_CAST cref_str)){
@@ -471,18 +471,18 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     } else {
         ref_type = evr_ref_type_self;
     }
-    size_t claim_index;
-    int claim_index_res = evr_parse_claim_index_attr(&claim_index, claim_node);
-    if(claim_index_res == evr_not_found){
-        claim_index = 0;
+    size_t index_ref;
+    int index_ref_res = evr_parse_claim_index_ref_attr(&index_ref, claim_node);
+    if(index_ref_res == evr_not_found){
+        index_ref = 0;
         xmlNode *sibling = claim_node->prev;
         while(sibling){
             if(sibling->type == XML_ELEMENT_NODE){
-                ++claim_index;
+                ++index_ref;
             }
             sibling = sibling->prev;
         }
-    } else if(claim_index_res != evr_ok){
+    } else if(index_ref_res != evr_ok){
         goto out;
     }
     size_t attr_count = 0;
@@ -518,7 +518,7 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     if(ref_type == evr_ref_type_claim){
         memcpy(c->ref, ref, evr_claim_ref_size);
     }
-    c->claim_index = claim_index;
+    c->index_ref = index_ref;
     c->attr_len = attr_count;
     c->attr = (struct evr_attr *)buf;
     buf = (char *)&((struct evr_attr*)buf)[attr_count];
@@ -579,20 +579,20 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     return NULL;
 }
 
-int evr_parse_claim_index_attr(size_t *claim_index, xmlNode *claim){
-    char *fmt_claim_index = (char*)xmlGetProp(claim, BAD_CAST "claim");
-    if(!fmt_claim_index){
+int evr_parse_claim_index_ref_attr(size_t *index_ref, xmlNode *claim){
+    char *fmt_index_ref = (char*)xmlGetProp(claim, BAD_CAST "index-ref");
+    if(!fmt_index_ref){
         return evr_not_found;
     }
     int ret = evr_error;
-    int scan_res = sscanf(fmt_claim_index, "%lu", claim_index);
+    int scan_res = sscanf(fmt_index_ref, "%lu", index_ref);
     if(scan_res != 1){
-        log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_claim_index);
-        goto out_with_free_fmt_claim_index;
+        log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_index_ref);
+        goto out_with_free_fmt_index_ref;
     }
     ret = evr_ok;
- out_with_free_fmt_claim_index:
-    xmlFree(fmt_claim_index);
+ out_with_free_fmt_index_ref:
+    xmlFree(fmt_index_ref);
     return ret;
 }
 

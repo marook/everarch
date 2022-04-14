@@ -348,7 +348,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             goto out_with_free_claim_set_doc;
         }
         if(attr->ref_type == evr_ref_type_self){
-            evr_build_claim_ref(attr->ref, claim_set_ref, attr->claim_index);
+            evr_build_claim_ref(attr->ref, claim_set_ref, attr->index_ref);
             attr->ref_type = evr_ref_type_claim;
         }
         int merge_res = evr_merge_attr_index_claim(db, created, attr);
@@ -634,7 +634,7 @@ int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct 
         goto out;
     }
     evr_claim_ref cref;
-    evr_build_claim_ref(cref, claim->ref, claim->claim_index);
+    evr_build_claim_ref(cref, claim->ref, claim->index_ref);
     if(sqlite3_bind_blob(db->insert_claim, 1, cref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out_with_reset_insert_claim;
     }
