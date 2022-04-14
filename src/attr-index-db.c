@@ -491,24 +491,26 @@ int evr_append_attr_factory_claims_worker(void *context){
     }
     int write_res = write_n(sp.stdin, ctx->claim_set, ctx->claim_set_len);
     if(write_res != evr_ok && write_res != evr_end){
-        goto out_with_join_sp;
+        goto out_with_close_sp;
     }
     if(close(sp.stdin)){
-        goto out_with_join_sp;
+        goto out_with_close_sp;
     }
+    const int closed_fd = -1;
+    sp.stdin = closed_fd;
     struct dynamic_array *buf = alloc_dynamic_array(32 * 1024);
     if(!buf){
-        goto out_with_join_sp;
+        goto out_with_close_sp;
     }
     int read_res = read_fd(&buf, sp.stdout, evr_max_blob_data_size);
     if(read_res != evr_ok && read_res != evr_end){
         if(buf){
             free(buf);
         }
-        goto out_with_join_sp;
+        goto out_with_close_sp;
     }
     if(!buf){
-        goto out_with_join_sp;
+        goto out_with_close_sp;
     }
     ctx->built_doc = evr_parse_claim_set(buf->data, buf->size_used);
     if(!ctx->built_doc){
@@ -528,24 +530,28 @@ int evr_append_attr_factory_claims_worker(void *context){
             if(buf){
                 free(buf);
             }
-            goto out_with_join_sp;
+            goto out_with_close_sp;
         }
         buf = write_n_dynamic_array(buf, &eos, sizeof(eos));
         if(buf){
             log_error("Stderr output from attr-factory %s for claim-set %s was: %s", attr_factory_str, claim_set_ref_str, buf->data);
             free(buf);
         }
-        goto out_with_join_sp;
+        goto out_with_close_sp;
     }
     free(buf);
- out_with_join_sp:
+ out_with_close_sp:
+    if(sp.stdin != closed_fd){
+        close(sp.stdin);
+    }
+    close(sp.stdout);
+    close(sp.stderr);
     if(waitpid(sp.pid, &ctx->res, WUNTRACED) < 0){
         evr_blob_ref_str attr_factory_str;
         evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
         evr_panic("Failed to wait for attr-factory %s subprocess", attr_factory_str);
         goto out;
     }
-    // TODO close sp.stdin, sp.stdout, sp.stderr
 #ifdef EVR_LOG_DEBUG
     {
         evr_blob_ref_str attr_factory_str;

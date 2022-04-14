@@ -1,5 +1,3 @@
-* fix unclosed subprocess stdin/stdout/stderr descriptors
-in evr_append_attr_factory_claims_worker()
 * pass PATH to attr-factory process
 so that the evr-glacier-cli for example can be found in attr-factory
 scripts.
