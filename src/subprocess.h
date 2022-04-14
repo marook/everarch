@@ -23,7 +23,8 @@
 #ifndef subprocess_h
 #define subprocess_h
 
-// #include <unistd.h>
+#include "config.h"
+
 #include <sys/types.h>
 
 struct evr_subprocess {
@@ -42,5 +43,7 @@ struct evr_subprocess {
  * Returns evr_ok on success.
  */
 int evr_spawn(struct evr_subprocess *p, char *argv[]);
+
+char *evr_env_path();
 
 #endif

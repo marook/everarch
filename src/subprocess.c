@@ -19,11 +19,12 @@
 #include "subprocess.h"
 
 #include <unistd.h>
+#include <string.h>
 
 #include "errors.h"
 #include "logger.h"
 
-#define replace_fd(oldfd, newfd)                     \
+#define replace_fd(oldfd, newfd)                \
     do {                                        \
         if(dup2(oldfd, newfd) < 0) {            \
             goto panic;                         \
@@ -48,6 +49,7 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
     if(pipe(child_err)){
         goto panic;
     }
+    char *path = evr_env_path();
     pid_t pid = fork();
     if(pid < 0){
         goto panic;
@@ -70,7 +72,10 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
         replace_fd(child_in[0], 0);
         replace_fd(child_out[1], 1);
         replace_fd(child_err[1], 2);
-        char* envp[] = { NULL };
+        char* envp[] = {
+            path,
+            NULL
+        };
         if(execve(argv[0], argv, envp)){
             evr_panic("Failed to execute %s", argv[0]);
             goto out;
@@ -99,3 +104,16 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
 }
 
 #undef replace_fd
+
+char *evr_env_path(){
+    char *path = NULL;
+    char *path_prefix = "PATH=";
+    size_t path_len = strlen(path_prefix);
+    for(char **e = environ; *e; ++e){
+        if(strncmp(*e, path_prefix, path_len) != 0){
+            continue;
+        }
+        path = *e;
+    }
+    return path;
+}

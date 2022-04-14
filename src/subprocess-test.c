@@ -27,6 +27,7 @@
 #include "subprocess.h"
 #include "errors.h"
 #include "files.h"
+#include "logger.h"
 
 void test_cat_subprocess(){
     struct evr_subprocess sp;
@@ -66,8 +67,34 @@ void test_false_subprocess(){
     assert_truthy(status);
 }
 
+void test_pass_path_to_subprocess(){
+    struct evr_subprocess sp;
+    char *argv[] = {
+        "/bin/sh",
+        "-c",
+        "echo PATH=$PATH",
+        NULL
+    };
+    char *my_path = evr_env_path();
+    // if the following assert breaks you have to extend this test to
+    // support not existing PATH environment variables
+    assert_not_null(my_path);
+    assert_ok(evr_spawn(&sp, argv));
+    assert_zero(close(sp.stdin));
+    char sp_path[4096];
+    ssize_t bytes_read = read(sp.stdout, sp_path, sizeof(sp_path));
+    sp_path[min(bytes_read, sizeof(sp_path)) - 1] = '\0';
+    assert_zero(strncmp(my_path, sp_path, sizeof(sp_path) - 1));
+    assert_zero(close(sp.stdout));
+    assert_zero(close(sp.stderr));
+    int status;
+    assert_greater_equal(waitpid(sp.pid, &status, WUNTRACED), 0);
+    assert_zero(status);
+}
+
 int main(){
     run_test(test_cat_subprocess);
     run_test(test_false_subprocess);
+    run_test(test_pass_path_to_subprocess);
     return 0;
 }
