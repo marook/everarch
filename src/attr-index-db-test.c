@@ -299,6 +299,26 @@ void test_setup_attr_index_db_twice(){
     evr_free_attr_index_db_configuration(cfg);
 }
 
+int claims_status_syntax_error_calls;
+
+int claims_status_syntax_error(void *ctx, int parse_res);
+
+void test_query_syntax_error(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
+    claims_status_syntax_error_calls = 0;
+    assert_ok(evr_attr_query_claims(db, "tag=todo && tachjen", 0, 0, 100, claims_status_syntax_error, NULL, NULL));
+    assert_int_eq(claims_status_syntax_error_calls, 1);
+    assert_ok(evr_free_attr_index_db(db));
+    evr_free_attr_index_db_configuration(cfg);
+}
+
+int claims_status_syntax_error(void *ctx, int parse_res){
+    ++claims_status_syntax_error_calls;
+    assert_int_eq(parse_res, evr_error);
+    return evr_ok;
+}
+
 xsltStylesheetPtr create_attr_mapping_stylesheet();
 xmlDocPtr create_xml_doc(char *content);
 
@@ -358,6 +378,7 @@ int main(){
     run_test(test_add_two_attr_claims_for_same_target);
     run_test(test_get_set_state);
     run_test(test_setup_attr_index_db_twice);
+    run_test(test_query_syntax_error);
     run_test(test_attr_factories);
     return 0;
 }

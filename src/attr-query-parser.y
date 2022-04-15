@@ -62,14 +62,18 @@ int yylex(YYSTYPE *yylval_param);
 %token BOOL_AND
 %token EQ
 %token <string> STRING
+%destructor { free($$); } <string>;
 %token SELECT
 %token WHERE
 %token WILDCARD
 
 %type <query> query;
+%destructor { evr_free_attr_query($$); } <query>;
 %type <selector> attr_selector;
+%destructor { evr_free_attr_selector($$); } <selector>;
 %type <node> conditions;
 %type <node> condition;
+%destructor { evr_free_attr_query_node($$); } <node>;
 
 %%
 
