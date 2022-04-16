@@ -600,9 +600,9 @@ int evr_build_index_worker(void *arg){
             break;
         }
         struct evr_attr_spec_claim *claim = sctx->claim;
+        sctx->claim = NULL;
         evr_blob_ref claim_key;
         memcpy(claim_key, sctx->claim_key, evr_blob_ref_size);
-        // TODO evr_time created = sctx->created;
         if(evr_empty_handover(&sctx->handover) != evr_ok){
             goto out;
         }
