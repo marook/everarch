@@ -1,4 +1,3 @@
-* report attr query syntax errors via error response
 * add lisp output mode to evr-attr-index search results
 * add emacs integration with evr-search-claim function
 function evr-search-claim should search for claims with a given

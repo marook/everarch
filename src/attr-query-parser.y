@@ -28,6 +28,8 @@
 %{
 #include "config.h"
 
+#include <string.h>
+
 #include "logger.h"
 #include "attr-query-sql.h"
 
@@ -35,17 +37,17 @@
 // See https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
 typedef void * yyscan_t;
 
-void yyerror(struct evr_attr_query **root, char const *e){
-  // TODO transport errors towards request or something
-  log_error("parser error: %s", e);
+void yyerror(struct evr_attr_query_result *res, char const *e){
+  res->error = strdup(e);
 }
 
 %}
 
 %define api.push-pull push
 %define api.pure full
+%define parse.error detailed
 
-%parse-param {struct evr_attr_query **query}
+%parse-param {struct evr_attr_query_result *res}
 
 %union {
   struct evr_attr_query *query;
@@ -77,7 +79,7 @@ int yylex(YYSTYPE *yylval_param);
 
 %%
 
-line: query { *query = $1; }
+line: query { res->query = $1; }
 
 query:
   conditions { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1); }

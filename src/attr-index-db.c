@@ -30,9 +30,9 @@
 #include "logger.h"
 #include "errors.h"
 #include "db.h"
+#include "attr-query-sql.h"
 #include "attr-query-parser.h"
 #include "attr-query-lexer.h"
-#include "attr-query-sql.h"
 #include "subprocess.h"
 #include "files.h"
 
@@ -1108,7 +1108,7 @@ int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_a
     return ret;
 }
 
-struct evr_attr_query *evr_attr_parse_query(const char *query);
+struct evr_attr_query *evr_attr_parse_query(const char *query, char **query_error);
 
 struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit);
 
@@ -1123,18 +1123,23 @@ struct evr_collect_selected_attrs_ctx {
 
 int evr_collect_selected_attrs(struct evr_collect_selected_attrs_ctx *ctx, struct evr_attr_index_db *db, struct evr_attr_selector *selector, evr_time t, const evr_claim_ref ref);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res), evr_claim_visitor visit, void *visit_ctx){
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *visit_ctx){
     int ret = evr_error;
-    struct evr_attr_query *query = evr_attr_parse_query(query_str);
+    char *query_error = NULL;
+    struct evr_attr_query *query = evr_attr_parse_query(query_str, &query_error);
     if(!query){
-        log_error("Failed to parse attr query: %s", query_str);
-        if(status(visit_ctx, evr_error) != evr_ok){
+        log_debug("Failed to parse attr query '%s' because of: %s", query_str, query_error);
+        int status_res = status(visit_ctx, evr_error, query_error);
+        if(query_error){
+            free(query_error);
+        }
+        if(status_res != evr_ok){
             goto out;
         }
         ret = evr_ok;
         goto out;
     }
-    if(status(visit_ctx, evr_ok) != evr_ok){
+    if(status(visit_ctx, evr_ok, NULL) != evr_ok){
         goto out_with_free_query;
     }
     struct evr_attr_query_ctx ctx;
@@ -1205,7 +1210,7 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
     return ret;
 }
 
-struct evr_attr_query *evr_attr_parse_query(const char *query){
+struct evr_attr_query *evr_attr_parse_query(const char *query, char **query_error){
     struct evr_attr_query *ret = NULL;
     yyscan_t scanner;
     if(yylex_init(&scanner)){
@@ -1218,12 +1223,23 @@ struct evr_attr_query *evr_attr_parse_query(const char *query){
     if(!ystate){
         goto out_with_destroy_scanner;
     }
+    struct evr_attr_query_result result;
+    result.query = NULL;
+    result.error = NULL;
     int status;
     YYSTYPE pushed_value;
     do {
-        status = yypush_parse(ystate, yylex(&pushed_value, scanner), &pushed_value, &ret);
+        status = yypush_parse(ystate, yylex(&pushed_value, scanner), &pushed_value, &result);
     } while(status == YYPUSH_MORE);
     yypstate_delete(ystate);
+    if(result.error){
+        if(query_error){
+            *query_error = result.error;
+        } else {
+            free(result.error);
+        }
+    }
+    ret = result.query;
  out_with_destroy_scanner:
     yylex_destroy(scanner);
  out:

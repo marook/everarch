@@ -73,4 +73,9 @@ struct evr_attr_query *evr_build_attr_query(struct evr_attr_selector *selector, 
 
 void evr_free_attr_query(struct evr_attr_query *query);
 
+struct evr_attr_query_result {
+    struct evr_attr_query *query;
+    char *error;
+};
+
 #endif

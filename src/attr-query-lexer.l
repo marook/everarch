@@ -21,6 +21,7 @@
 
 #include <string.h>
 
+#include "attr-query-sql.h"
 #include "attr-query-parser.h"
 %}
 

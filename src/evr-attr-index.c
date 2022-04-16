@@ -116,10 +116,11 @@ int evr_attr_index_tcp_server();
 int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
 int evr_work_search_cmd(struct evr_connection *ctx, char *query);
-int evr_respond_search_status(void *context, int parse_res);
+int evr_respond_search_status(void *context, int parse_res, char *parse_errer);
 int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 int evr_respond_help(struct evr_connection *ctx);
 int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
+int evr_respond_message_end(struct evr_connection *ctx);
 int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
 
 int main(){
@@ -1087,7 +1088,10 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
     if(strcmp(cmd, "?") == 0 || strcmp(cmd, "help") == 0){
         return evr_respond_help(ctx);
     }
-    return evr_respond_status(ctx, 0, "No such command.");
+    if(evr_respond_status(ctx, 0, "No such command.") != evr_ok){
+        return evr_error;
+    }
+    return evr_respond_message_end(ctx);
 }
 
 int evr_work_search_cmd(struct evr_connection *ctx, char *query){
@@ -1119,10 +1123,8 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     if(evr_attr_query_claims(db, query, t, 0, 100, evr_respond_search_status, evr_respond_search_result, &sctx) != evr_ok){
         goto out_with_free_db;
     }
-    if(sctx.parse_res == evr_ok){
-        if(write_n(ctx->socket, "\n", 1) != evr_ok){
-            goto out_with_free_db;
-        }
+    if(evr_respond_message_end(ctx) != evr_ok){
+        goto out_with_free_db;
     }
     ret = evr_ok;
  out_with_free_db:
@@ -1133,11 +1135,11 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     return ret;
 }
 
-int evr_respond_search_status(void *context, int parse_res){
+int evr_respond_search_status(void *context, int parse_res, char *parse_error){
     struct evr_search_ctx *ctx = context;
     ctx->parse_res = parse_res;
     if(parse_res != evr_ok){
-        return evr_respond_status(ctx->con, 0, "Syntax error in query.");
+        return evr_respond_status(ctx->con, 0, parse_error);
     }
     return evr_respond_status(ctx->con, 1, NULL);
 }
@@ -1186,9 +1188,11 @@ int evr_respond_help(struct evr_connection *ctx){
         "exit - closes the conneciton\n"
         "help - shows this help message\n"
         "s QUERY - searches for claims matching the given query.\n"
-        "\n"
         ;
     if(write_n(ctx->socket, help, sizeof(help)) != evr_ok){
+        goto out;
+    }
+    if(evr_respond_message_end(ctx) != evr_ok){
         goto out;
     }
     ret = evr_ok;
@@ -1198,7 +1202,7 @@ int evr_respond_help(struct evr_connection *ctx){
 
 int evr_respond_status(struct evr_connection *ctx, int ok, char *msg){
     size_t msg_len = msg ? 1 + strlen(msg) : 0;
-    char buf[5 + msg_len + 1];
+    char buf[5 + msg_len + 1 + 1];
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, buf);
     evr_push_concat(&bp, ok ? "OK" : "ERROR");
@@ -1208,6 +1212,10 @@ int evr_respond_status(struct evr_connection *ctx, int ok, char *msg){
     }
     evr_push_concat(&bp, "\n");
     return write_n(ctx->socket, buf, bp.pos - bp.buf);
+}
+
+int evr_respond_message_end(struct evr_connection *ctx){
+    return write_n(ctx->socket, "\n", 1);
 }
 
 int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref){

@@ -42,7 +42,7 @@ void reset_visit_attrs();
 int visit_attrs(void *ctx, const evr_claim_ref ref, const char *key, const char *value);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void reset_visit_claims();
-int claims_status_ok(void *ctx, int parse_res);
+int claims_status_ok(void *ctx, int parse_res, char *parse_error);
 int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 void assert_claims(int expected_found_claim_0);
 struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg, struct evr_attr_spec_claim *custom_spec, evr_blob_file_writer custom_writer);
@@ -223,8 +223,9 @@ void reset_visit_claims(){
     found_claim_0 = 0;
 }
 
-int claims_status_ok(void *ctx, int parse_res){
+int claims_status_ok(void *ctx, int parse_res, char *parse_error){
     assert_ok(parse_res);
+    assert_null(parse_error);
     return evr_ok;
 }
 
@@ -301,7 +302,7 @@ void test_setup_attr_index_db_twice(){
 
 int claims_status_syntax_error_calls;
 
-int claims_status_syntax_error(void *ctx, int parse_res);
+int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error);
 
 void test_query_syntax_error(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
@@ -313,9 +314,10 @@ void test_query_syntax_error(){
     evr_free_attr_index_db_configuration(cfg);
 }
 
-int claims_status_syntax_error(void *ctx, int parse_res){
+int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     ++claims_status_syntax_error_calls;
     assert_int_eq(parse_res, evr_error);
+    assert_str_eq(parse_error, "syntax error, unexpected end of file, expecting EQ");
     return evr_ok;
 }
 
