@@ -1,7 +1,9 @@
-* add lisp output mode to evr-attr-index search results
 * add emacs integration with evr-search-claim function
 function evr-search-claim should search for claims with a given
 expression.
+* add optional ref argument to evr-glacier-cli post-file
+so an existing file claim can be replaced with a new one.
+* rename evr-glacier-cli to evr
 * implement t in attr queries
 tag=todo t=12345
 tag=todo t=1970-01-01T00:00:07Z
@@ -31,8 +33,9 @@ once for every blob and without any checksum.
 there should be either a checksum for the two fields or it should be
 stored redundant. this should reduce the risk of breaking a whole
 bucket if one blob in it has a bit error.
-* migrate tcp sockets to quic
-in order to get faster connection building and encryption.
+* migrate tcp sockets to tls
+remove the unencrypted tcp ports and only allow tls secured tcp
+connections.
 * add authentication
 think of some kind of authentication for the network sockets and
 implement it.
@@ -70,6 +73,13 @@ locked for more than 1sec (configured right now).
 
 a SQLITE_LOCKED error should be indicated as 'resource temporary not
 available' to the client.
+* add quic support
+in order to get faster connection building and encryption.
+
+the most interesting quic library to use right now would be [[https://github.com/microsoft/msquic][msquic]]
+because it depends just on OpenSSL. OpenSSL with downstream patches
+unfortunately. there are [[https://www.openssl.org/blog/blog/2021/12/03/starting-the-quic-design/][plans by the OpenSSL team]] to add quic
+support.
 * replace struct chunk_set with linked list
 dny-mem.h should provide one growable random access data structure and
 one growable linked list data structure.
