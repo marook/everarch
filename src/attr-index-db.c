@@ -307,6 +307,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     if(evr_append_attr_factory_claims(db, raw_claim_set_doc, spec, claim_set_ref) != evr_ok){
         goto out_with_reset_insert_claim_set;
     }
+    if(evr_add_claim_ref_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
+        goto out_with_reset_insert_claim_set;
+    }
     const char *xslt_params[] = {
         NULL
     };
