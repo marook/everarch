@@ -182,6 +182,9 @@ claim references.
 
 You can also type help to see your options.
 
+If you don't want to leave emacs you could also load emacs/evr.el and
+call evr-attr-index-search.
+
 
 ------------------------------------------------------------------------
 Tests

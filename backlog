@@ -1,9 +1,6 @@
 * search "title=win10.jpg" does not find posted file
 despite there is a attr within the evr-attr-index with the same key
 and same value.
-* add emacs integration with evr-search-claim function
-function evr-search-claim should search for claims with a given
-expression.
 * add optional ref argument to evr-glacier-cli post-file
 so an existing file claim can be replaced with a new one.
 * rename evr-glacier-cli to evr
