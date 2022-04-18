@@ -29,8 +29,8 @@ trap stop EXIT
 wait_for_glacier_storage
 
 echo "Uploading basic attr-spec…"
-basic_xslt_ref=`evr-glacier-cli put < basic.xslt`
-evr-glacier-cli -f 3 sign-put <<EOF
+basic_xslt_ref=`evr put < basic.xslt`
+evr -f 3 sign-put <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
@@ -46,7 +46,7 @@ evr-glacier-cli -f 3 sign-put <<EOF
 EOF
 
 echo "Uploading test claim…"
-test_ref=`evr-glacier-cli -f 1 sign-put < attr-claim.xml`
+test_ref=`evr -f 1 sign-put < attr-claim.xml`
 
 echo "Starting evr-attr-index…"
 evr-attr-index &

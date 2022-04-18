@@ -7,5 +7,5 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PATH="${script_dir}/../src:${PATH}"
 while true
 do
-    dd if=/dev/random bs=1024 count=4 2>/dev/null | evr-glacier-cli put 2> /dev/null
+    dd if=/dev/random bs=1024 count=4 2>/dev/null | evr put 2> /dev/null
 done

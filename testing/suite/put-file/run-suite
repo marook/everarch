@@ -25,10 +25,10 @@ trap stop EXIT
 test_file_put_pop(){
     local base_name="$1"
     echo "Testing put/pop ${base_name}…"
-    ref=`evr-glacier-cli post-file "files/${base_name}.txt"`
-    echo "evr-glacier-cli reported ref ${ref}"
-    echo "evr-glacier-cli get-file ${ref}"
-    evr-glacier-cli get-file "${ref}" > "files/${base_name}.get.txt"
+    ref=`evr post-file "files/${base_name}.txt"`
+    echo "evr reported ref ${ref}"
+    echo "evr get-file ${ref}"
+    evr get-file "${ref}" > "files/${base_name}.get.txt"
     echo "Comparing ${base_name} posted with get file"
     diff "files/${base_name}.txt" "files/${base_name}.get.txt"
     echo "${base_name} file looks good"
@@ -43,8 +43,8 @@ dd if=/dev/random bs=4096 count=8192 of=files/big.txt
 test_file_put_pop "big"
 
 # it should use custom title if -t arg present
-ref=`evr-glacier-cli post-file -t 'my file name' 'files/hello.txt' | sed 's/\(sha3-.*\)-[a-z0-9]\{4\}/\1/'`
-claim=`evr-glacier-cli get ${ref}`
+ref=`evr post-file -t 'my file name' 'files/hello.txt' | sed 's/\(sha3-.*\)-[a-z0-9]\{4\}/\1/'`
+claim=`evr get ${ref}`
 if [[ "${claim}" != *"my file name"* ]]
 then
     echo "Claim should have used title 'my file name': ${claim}" >&2
@@ -52,8 +52,8 @@ then
 fi
 
 # it should read from stdin if file argument is missing
-ref=`echo 'piped content' | evr-glacier-cli post-file`
-content=`evr-glacier-cli get-file ${ref}`
+ref=`echo 'piped content' | evr post-file`
+content=`evr get-file ${ref}`
 if [[ 'piped content' != "${content}" ]]
 then
     echo "Expected 'piped content' but got: ${content}" >&2

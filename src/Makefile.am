@@ -4,7 +4,7 @@ AM_YFLAGS = -d
 
 bin_PROGRAMS = \
 	evr-attr-index \
-	evr-glacier-cli \
+	evr \
 	evr-glacier-storage
 
 check_PROGRAMS = \
@@ -115,18 +115,18 @@ evr_attr_index_SOURCES = \
 evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
-evr_glacier_cli_SOURCES = \
+evr_SOURCES = \
 	basics.c \
 	claims.c \
 	dyn-mem.c \
-	evr-glacier-cli.c \
+	evr-cli.c \
 	evr-glacier-client.c \
 	files.c \
 	glacier-cmd.c \
 	keys.c \
 	logger.c \
 	signatures.c
-evr_glacier_cli_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
+evr_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	basics.c \

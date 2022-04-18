@@ -1,7 +1,17 @@
+# binaries
+/evr-attr-index
+/evr
+/evr-glacier-storage
+
+# generate code
 /attr_index_db_test-attr-query-lexer.c
 /attr-query-lexer.h
 /attr-query-parser.h
 /attr-query-parser.c
 /evr_attr_index-attr-query-lexer.c
+
 *.log
 *.trs
+*.o
+*-test
+

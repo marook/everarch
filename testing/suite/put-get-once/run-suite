@@ -25,35 +25,35 @@ wait_for_glacier_storage
 
 # tests that watch will report blobs modified while the watch was
 # live.
-( evr-glacier-cli watch > early-watch.actual.log ) &
+( evr watch > early-watch.actual.log ) &
 ewpid=$!
 
 sleep 1
 
-ref=`echo "hello world!" | evr-glacier-cli put`
-echo "evr-glacier-cli reported ref ${ref}"
-body=`evr-glacier-cli get ${ref}`
+ref=`echo "hello world!" | evr put`
+echo "evr reported ref ${ref}"
+body=`evr get ${ref}`
 if [[ "hello world!" != "${body}" ]]
 then
     echo "Unexpected get response: ${body}" >&2
     exit 1
 fi
-echo 'another one' | evr-glacier-cli put --flags 1
+echo 'another one' | evr put --flags 1
 
-( evr-glacier-cli watch > late-watch.actual.log ) &
+( evr watch > late-watch.actual.log ) &
 lwpid=$!
 
 # tests that watch will report blobs modified before the watch was
 # initiated.
-( evr-glacier-cli watch --last-modified-after 0 > past-watch.actual.log ) &
+( evr watch --last-modified-after 0 > past-watch.actual.log ) &
 pwpid=$!
 
 now=`date +%s`
 future=`expr 60000 + ${now} '*' 1000`
-( evr-glacier-cli watch --last-modified-after "${future}" > future-watch.actual.log ) &
+( evr watch --last-modified-after "${future}" > future-watch.actual.log ) &
 fwpid=$!
 
-( evr-glacier-cli watch --flags-filter 1 --last-modified-after 0 > claims-watch.actual.log ) &
+( evr watch --flags-filter 1 --last-modified-after 0 > claims-watch.actual.log ) &
 cwpid=$!
 
 sleep 1
