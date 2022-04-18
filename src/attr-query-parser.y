@@ -68,6 +68,8 @@ int yylex(YYSTYPE *yylval_param);
 %token SELECT
 %token WHERE
 %token WILDCARD
+%token END
+%token UNKNOWN
 
 %type <query> query;
 %destructor { evr_free_attr_query($$); } <query>;
@@ -79,7 +81,7 @@ int yylex(YYSTYPE *yylval_param);
 
 %%
 
-line: query { res->query = $1; }
+line: query END { res->query = $1; };
 
 query:
   conditions { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1); }

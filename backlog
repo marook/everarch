@@ -1,6 +1,3 @@
-* search "title=win10.jpg" does not find posted file
-despite there is a attr within the evr-attr-index with the same key
-and same value.
 * add claim-ref type in attr-spec's attr-def
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable

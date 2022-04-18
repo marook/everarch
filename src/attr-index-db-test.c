@@ -322,7 +322,7 @@ void test_query_syntax_error(){
 int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     ++claims_status_syntax_error_calls;
     assert_int_eq(parse_res, evr_error);
-    assert_str_eq(parse_error, "syntax error, unexpected end of file, expecting EQ");
+    assert_str_eq(parse_error, "syntax error, unexpected END, expecting EQ");
     return evr_ok;
 }
 
@@ -383,6 +383,9 @@ void test_attr_attribute_factories(){
         "<a op=\"=\" k=\"my-key\" v=\"ye-value\"/>"
         "<a op=\"=\" k=\"my-static-key\" vf=\"static\" v=\"ye-value\"/>"
         "<a op=\"=\" k=\"my-claim-ref-key\" vf=\"claim-ref\"/>"
+        // the following line tests a query bug which was caused by
+        // the dot in the file name.
+        "<a op=\"=\" k=\"title\" v=\"win10.jpg\"/>"
         "</attr>"
         "</claim-set>";
     xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
@@ -396,6 +399,7 @@ void test_attr_attribute_factories(){
     assert_query_one_result(db, "my-key=ye-value", t, attr_claim_ref);
     assert_query_one_result(db, "my-static-key=ye-value", t, attr_claim_ref);
     assert_query_one_result(db, "my-claim-ref-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000", t, attr_claim_ref);
+    assert_query_one_result(db, "title=win10.jpg", t, attr_claim_ref);
     xmlFreeDoc(raw_claim_set);
     xsltFreeStylesheet(style);
     assert_ok(evr_free_attr_index_db(db));

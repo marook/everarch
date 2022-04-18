@@ -38,14 +38,19 @@
 
 %%
 
-"&&"	{ return BOOL_AND; }
-"="	{ return EQ; }
-"select"	{ return SELECT; }
-"where"		{ return WHERE; }
-"*"	{ return WILDCARD; }
+"&&"	{ return BOOL_AND; };
+"="	{ return EQ; };
+"select"	{ return SELECT; };
+"where"		{ return WHERE; };
+"*"	{ return WILDCARD; };
 
-[a-zA-Z0-9][a-zA-Z0-9_-]*	{ yylval->string = strdup(yytext); return STRING; }
+[a-zA-Z0-9][a-zA-Z0-9_.-]*	{ yylval->string = strdup(yytext); return STRING; };
 
-[ \t]*	{ }
+[ \t]*	{ };
+
+[\n] { return END; };
+<<EOF>> { return END; };
+
+.  { return UNKNOWN; };
 
 %%
