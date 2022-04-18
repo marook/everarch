@@ -1160,6 +1160,9 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
         ret = evr_ok;
         goto out;
     }
+    if(query_error){
+        free(query_error);
+    }
     if(status(visit_ctx, evr_ok, NULL) != evr_ok){
         goto out_with_free_query;
     }
