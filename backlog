@@ -1,7 +1,3 @@
-* add claim-ref type in attr-spec's attr-def
-add a new type which tells the attr-index to expect a reference to a
-claim as value. attr-index should check if the value is parseable
-using evr_parse_claim_ref(…).
 * add optional ref argument to evr-glacier-cli post-file
 so an existing file claim can be replaced with a new one.
 * rename evr-glacier-cli to evr
@@ -48,6 +44,10 @@ own.
 also the gpg public keys should be stored in the storage as
 blobs. that way they should never be lost. the configuration should
 reference the gpg keys sha3-224 hashes.
+* add claim-ref type in attr-spec's attr-def
+add a new type which tells the attr-index to expect a reference to a
+claim as value. attr-index should check if the value is parseable
+using evr_parse_claim_ref(…).
 * ---- v0.1 boundary ----
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
