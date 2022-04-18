@@ -54,6 +54,9 @@ struct evr_file_slice {
 };
 
 struct evr_file_claim {
+    int has_ref;
+    evr_claim_ref ref;
+
     /**
      * title could be the file name. May also be null if the file has
      * no name.

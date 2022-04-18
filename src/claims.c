@@ -66,6 +66,13 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
     if(xmlTextWriterStartElement(cs->writer, BAD_CAST "file") < 0){
         goto out;
     }
+    if(claim->has_ref) {
+        evr_claim_ref_str ref_str;
+        evr_fmt_claim_ref(ref_str, claim->ref);
+        if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "ref", BAD_CAST ref_str) < 0){
+            goto out;
+        }
+    }
     if(claim->title && claim->title[0] != '\0' && xmlTextWriterWriteAttributeNS(cs->writer, BAD_CAST "dc", BAD_CAST "title", NULL, BAD_CAST claim->title) < 0){
         goto out;
     }

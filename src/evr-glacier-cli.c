@@ -59,6 +59,7 @@ static struct argp_option options[] = {
     {"flags-filter", 'f', "F", 0, "Only watch blobs which have set at least the given flag bits."},
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
     {"title", 't', "T", 0, "Title of the created claim. Might be used together with post-file."},
+    {"ref", 'r', "REF", 0, "Makes the created claim reference another original claim."},
     {0}
 };
 
@@ -76,6 +77,8 @@ struct cli_arguments {
     char *file;
     int flags;
     char *title;
+    int has_ref;
+    evr_claim_ref ref;
     unsigned long long last_modified_after;
 };
 
@@ -105,6 +108,14 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
     case 't':
         cli_args->title = strdup(arg);
         break;
+    case 'r': {
+        if(evr_parse_claim_ref(cli_args->ref, arg) != evr_ok){
+            argp_usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        cli_args->has_ref = 1;
+        break;
+    }
     case ARGP_KEY_ARG:
         switch(state->arg_num){
         default:
@@ -171,7 +182,7 @@ int evr_cli_put(int flags);
 int evr_cli_sign_put(int flags);
 int evr_cli_get_file(char *fmt_key);
 int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
-int evr_cli_post_file(char *file, char *title);
+int evr_cli_post_file(char *file, char *title, int has_ref, evr_claim_ref ref);
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after);
 int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob);
 
@@ -183,6 +194,7 @@ int main(int argc, char **argv){
     cli_args.file = NULL;
     cli_args.flags = 0;
     cli_args.title = NULL;
+    cli_args.has_ref = 0;
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
     cli_args.last_modified_after = LLONG_MAX;
@@ -205,7 +217,7 @@ int main(int argc, char **argv){
         ret = evr_cli_get_file(cli_args.key);
         break;
     case cli_cmd_post_file:
-        ret = evr_cli_post_file(cli_args.file, cli_args.title);
+        ret = evr_cli_post_file(cli_args.file, cli_args.title, cli_args.has_ref, cli_args.ref);
         break;
     case cli_cmd_watch_blobs:
         ret = evr_cli_watch_blobs(cli_args.flags, cli_args.last_modified_after);
@@ -452,7 +464,7 @@ int evr_cli_get_file(char *fmt_cref){
     return ret;
 }
 
-int evr_cli_post_file(char *file, char *title){
+int evr_cli_post_file(char *file, char *title, int has_ref, evr_claim_ref ref){
     int ret = evr_error;
     evr_init_signatures();
     int f = STDIN_FILENO;
@@ -476,6 +488,10 @@ int evr_cli_post_file(char *file, char *title){
         goto out_with_free_slice_keys;
     }
     struct evr_file_claim fc;
+    fc.has_ref = has_ref;
+    if(has_ref){
+        memcpy(fc.ref, ref, evr_claim_ref_size);
+    }
     fc.title = NULL;
     if(title){
         fc.title = title;

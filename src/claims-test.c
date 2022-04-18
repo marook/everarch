@@ -46,6 +46,8 @@ void test_file_claim_with_filename(){
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
     const struct evr_file_claim claim = {
+        0,
+        {},
         "test.txt",
         1,
         &slice,
@@ -58,6 +60,8 @@ void test_file_claim_with_null_filename(){
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
     const struct evr_file_claim claim = {
+        0,
+        {},
         NULL,
         1,
         &slice,
@@ -70,11 +74,27 @@ void test_file_claim_with_empty_filename(){
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
     const struct evr_file_claim claim = {
+        0,
+        {},
         "",
         1,
         &slice,
     };
     assert_file_claim(&claim, "<file><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
+}
+
+void test_file_claim_with_ref(){
+    struct evr_file_slice slice;
+    memset(slice.ref, 0, sizeof(slice.ref));
+    slice.size = 1;
+    const struct evr_file_claim claim = {
+        1,
+        {},
+        NULL,
+        1,
+        &slice,
+    };
+    assert_file_claim(&claim, "<file ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000-0000\"><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
 void assert_file_claim(const struct evr_file_claim *claim, const char *expected_file_document){
@@ -102,10 +122,11 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
         }
         ++src;
         if(*src == '\0'){
+            *dst = '\0';
             break;
         }
     }
-    assert_not_null(strstr(stripped_content, expected_file_document));
+    assert_not_null_msg(strstr(stripped_content, expected_file_document), "Expected\n%s\n to contain\n%s\n", stripped_content, expected_file_document);
     free(stripped_content);
     assert_ok(evr_free_claim_set(&cs));
 }
@@ -354,6 +375,7 @@ int main(){
     run_test(test_file_claim_with_filename);
     run_test(test_file_claim_with_null_filename);
     run_test(test_file_claim_with_empty_filename);
+    run_test(test_file_claim_with_ref);
     run_test(test_parse_file_claim_claim_set);
     run_test(test_parse_attr_claim_with_claim_ref);
     run_test(test_parse_attr_claim_with_self_ref);
