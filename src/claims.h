@@ -85,14 +85,14 @@ struct evr_attr_spec_claim {
 #define evr_attr_op_add 0x02
 #define evr_attr_op_rm 0x03
 
-struct evr_attr_tuple {
-    char *key;
-    char *value;
-};
+#define evr_attr_value_type_static         0x01
+#define evr_attr_value_type_self_claim_ref 0x02
 
 struct evr_attr {
     int op;
-    struct evr_attr_tuple attr;
+    char *key;
+    int value_type;
+    char *value;
 };
 
 #define evr_ref_type_self  0x01

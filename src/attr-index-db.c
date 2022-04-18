@@ -671,11 +671,29 @@ int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, evr_time t, evr_c
 int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len){
     int ret = evr_error;
     struct evr_attr *end = &attr[attr_len];
+    int ref_str_built = 0;
+    evr_claim_ref_str ref_str;
     for(struct evr_attr *a = attr; a != end; ++a){
+        char *value;
+        switch(a->value_type){
+        default:
+            log_error("Unknown attr value type 0x%02x detected.", a->value_type);
+            continue;
+        case evr_attr_value_type_static:
+            value = a->value;
+            break;
+        case evr_attr_value_type_self_claim_ref:
+            if(!ref_str_built){
+                evr_fmt_claim_ref(ref_str, ref);
+                ref_str_built = 1;
+            }
+            value = ref_str;
+            break;
+        }
 #ifdef EVR_LOG_DEBUG
         do {
-            char *value = a->attr.value ? a->attr.value : "null";
-            log_debug("Merging attr op=0x%02x, k=%s, v=%s", a->op, a->attr.key, value);
+            char *value_str = value ? value : "null";
+            log_debug("Merging attr op=0x%02x, k=%s, v=%s", a->op, a->key, value_str);
         } while(0);
 #endif
         switch(a->op){
@@ -683,17 +701,17 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
             log_error("Requested to merge attr with unknown op 0x%02x", a->op);
             goto out;
         case evr_attr_op_replace:
-            if(evr_merge_attr_index_attr_replace(db, t, ref, a->attr.key, a->attr.value) != evr_ok){
+            if(evr_merge_attr_index_attr_replace(db, t, ref, a->key, value) != evr_ok){
                 goto out;
             }
             break;
         case evr_attr_op_add:
-            if(evr_merge_attr_index_attr_add(db, t, ref, a->attr.key, a->attr.value) != evr_ok){
+            if(evr_merge_attr_index_attr_add(db, t, ref, a->key, value) != evr_ok){
                 goto out;
             }
             break;
         case evr_attr_op_rm:
-            if(evr_merge_attr_index_attr_rm(db, t, ref, a->attr.key, a->attr.value) != evr_ok){
+            if(evr_merge_attr_index_attr_rm(db, t, ref, a->key, value) != evr_ok){
                 goto out;
             }
             break;

@@ -20,6 +20,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "assert.h"
 #include "configuration-testutil.h"
@@ -47,6 +48,10 @@ int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attr
 void assert_claims(int expected_found_claim_0);
 struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg, struct evr_attr_spec_claim *custom_spec, evr_blob_file_writer custom_writer);
 
+int asserting_claims_visitor_calls;
+evr_claim_ref asserting_claims_visitor_expected_ref;
+int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
+
 void test_open_new_attr_index_db_twice(){
     const evr_time merge_attrs_t[merge_attrs_len] = {
         10,
@@ -54,9 +59,9 @@ void test_open_new_attr_index_db_twice(){
         30,
     };
     struct evr_attr merge_attrs[merge_attrs_len] = {
-        { evr_attr_op_replace, { "tag", "A" } },
-        { evr_attr_op_add, { "tag", "B" } },
-        { evr_attr_op_rm, { "tag", NULL } },
+        { evr_attr_op_replace, "tag", evr_attr_value_type_static, "A" },
+        { evr_attr_op_add, "tag", evr_attr_value_type_static, "B" },
+        { evr_attr_op_rm, "tag", evr_attr_value_type_static, NULL },
     };
     const int attr_merge_permutations[permutations][merge_attrs_len] = {
         { 0, 1, 2 },
@@ -324,6 +329,8 @@ int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
 xsltStylesheetPtr create_attr_mapping_stylesheet();
 xmlDocPtr create_xml_doc(char *content);
 
+void assert_query_one_result(struct evr_attr_index_db *db, char *query, time_t t, evr_claim_ref expected_ref);
+
 void test_attr_factories(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
     evr_blob_ref attr_factory_ref;
@@ -348,7 +355,47 @@ void test_attr_factories(){
     evr_time t;
     assert_ok(evr_time_from_iso8601(&t, "2022-01-01T00:00:00.000000Z"));
     assert_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, t, raw_claim_set));
-    // TODO assert
+    evr_claim_ref static_claim_ref;
+    evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
+    assert_query_one_result(db, "source=original", t, static_claim_ref);
+    evr_claim_ref factory_claim_ref;
+    evr_build_claim_ref(factory_claim_ref, claim_set_ref, 1);
+    assert_query_one_result(db, "source=factory", t, factory_claim_ref);
+    xmlFreeDoc(raw_claim_set);
+    xsltFreeStylesheet(style);
+    assert_ok(evr_free_attr_index_db(db));
+    evr_free_attr_index_db_configuration(cfg);
+}
+
+void test_attr_attribute_factories(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 0;
+    spec.attr_def = NULL;
+    spec.attr_factories_len = 0;
+    spec.attr_factories = NULL;
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, &spec, never_called_blob_file_writer);
+    xsltStylesheetPtr style = create_attr_mapping_stylesheet();
+    char raw_claim_set_content[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:07.000000Z\">"
+        "<attr>"
+        "<a op=\"=\" k=\"my-key\" v=\"ye-value\"/>"
+        "<a op=\"=\" k=\"my-static-key\" vf=\"static\" v=\"ye-value\"/>"
+        "<a op=\"=\" k=\"my-claim-ref-key\" vf=\"claim-ref\"/>"
+        "</attr>"
+        "</claim-set>";
+    xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
+    evr_blob_ref claim_set_ref;
+    assert_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000"));
+    evr_time t;
+    assert_ok(evr_time_from_iso8601(&t, "2022-01-01T00:00:00.000000Z"));
+    assert_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, t, raw_claim_set));
+    evr_claim_ref attr_claim_ref;
+    evr_build_claim_ref(attr_claim_ref, claim_set_ref, 0);
+    assert_query_one_result(db, "my-key=ye-value", t, attr_claim_ref);
+    assert_query_one_result(db, "my-static-key=ye-value", t, attr_claim_ref);
+    assert_query_one_result(db, "my-claim-ref-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000", t, attr_claim_ref);
     xmlFreeDoc(raw_claim_set);
     xsltFreeStylesheet(style);
     assert_ok(evr_free_attr_index_db(db));
@@ -375,6 +422,26 @@ xmlDocPtr create_xml_doc(char *content){
     return doc;
 }
 
+void assert_query_one_result(struct evr_attr_index_db *db, char *query, time_t t, evr_claim_ref expected_ref){
+    log_info("Asserting query %s has one result", query);
+    asserting_claims_visitor_calls = 0;
+    memcpy(asserting_claims_visitor_expected_ref, expected_ref, evr_claim_ref_size);
+    assert_ok(evr_attr_query_claims(db, query, t, 0, 2, claims_status_ok, asserting_claims_visitor, NULL));
+    assert_int_eq_msg(asserting_claims_visitor_calls, 1, "No claim found but expected one\n");
+}
+
+int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
+    ++asserting_claims_visitor_calls;
+    assert_null(ctx);
+    int ref_cmp = memcmp(ref, asserting_claims_visitor_expected_ref, evr_claim_ref_size);
+    evr_claim_ref_str ref_str, asserting_claims_visitor_expected_ref_str;
+    evr_fmt_claim_ref(ref_str, ref);
+    evr_fmt_claim_ref(asserting_claims_visitor_expected_ref_str, asserting_claims_visitor_expected_ref);
+    assert_int_eq_msg(ref_cmp, 0, "Expected claim ref to be %s but was %s", asserting_claims_visitor_expected_ref_str, ref_str);
+    assert_int_eq(attrs_len, 0);
+    return evr_ok;
+}
+
 int main(){
     run_test(test_open_new_attr_index_db_twice);
     run_test(test_add_two_attr_claims_for_same_target);
@@ -382,5 +449,6 @@ int main(){
     run_test(test_setup_attr_index_db_twice);
     run_test(test_query_syntax_error);
     run_test(test_attr_factories);
+    run_test(test_attr_attribute_factories);
     return 0;
 }

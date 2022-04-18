@@ -547,28 +547,43 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
             goto fail_with_free_c;
         }
         xmlFree(op_str);
+        next_attr->op = op;
         char *key = (char*)xmlGetProp(attr, BAD_CAST "k");
         if(!key){
             // no logging here because the size calculation above
             // already checks the presence of k
             goto fail_with_free_c;
         }
-        char *value = (char*)xmlGetProp(attr, BAD_CAST "v");
-        next_attr->op = op;
+        next_attr->key = buf;
         size_t key_size = strlen(key) + 1;
-        next_attr->attr.key = buf;
-        memcpy(next_attr->attr.key, key, key_size);
+        memcpy(next_attr->key, key, key_size);
         buf += key_size;
-        if(value){
-            next_attr->attr.value = buf;
-            size_t value_size = strlen(value) + 1;
-            memcpy(next_attr->attr.value, value, value_size);
-            buf += value_size;
-        } else {
-            next_attr->attr.value = NULL;
-        }
-        xmlFree(value);
         xmlFree(key);
+        char *value_type = (char*)xmlGetProp(attr, BAD_CAST "vf");
+        if(value_type == NULL || strcmp(value_type, "static") == 0){
+            next_attr->value_type = evr_attr_value_type_static;
+        } else if(strcmp(value_type, "claim-ref") == 0){
+            next_attr->value_type = evr_attr_value_type_self_claim_ref;
+        } else {
+            log_error("Unknown attr value factory type found: %s", value_type);
+            xmlFree(value_type);
+            goto fail_with_free_c;
+        }
+        xmlFree(value_type);
+        if(next_attr->value_type == evr_attr_value_type_static){
+            char *value = (char*)xmlGetProp(attr, BAD_CAST "v");
+            if(value){
+                next_attr->value = buf;
+                size_t value_size = strlen(value) + 1;
+                memcpy(next_attr->value, value, value_size);
+                buf += value_size;
+            } else {
+                next_attr->value = NULL;
+            }
+            xmlFree(value);
+        } else {
+            next_attr->value = NULL;
+        }
         ++next_attr;
         attr = attr->next;
     }

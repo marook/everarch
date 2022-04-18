@@ -106,6 +106,11 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
 
 typedef int (*evr_attr_visitor)(void *ctx, const evr_claim_ref ref, const char *key, const char *value);
 
+struct evr_attr_tuple {
+    char *key;
+    char *value;
+};
+
 /**
  * evr_claim_visitor is a callback for visiting claims.
  *

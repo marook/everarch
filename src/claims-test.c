@@ -156,6 +156,7 @@ void test_parse_attr_claim_with_claim_ref(){
         "<a op=\"=\" k=\"title\" v=\"test.txt\"/>"
         "<a op=\"+\" k=\"add\" v=\"spice\"/>"
         "<a op=\"-\" k=\"rm\"/>"
+        "<a op=\"=\" k=\"my-ref\" vf=\"claim-ref\"/>"
         "</attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
@@ -172,16 +173,23 @@ void test_parse_attr_claim_with_claim_ref(){
     assert_int_eq(c->ref_type, evr_ref_type_claim);
     assert_str_eq(fmt_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123-0000");
     assert_int_eq(c->index_ref, 0);
-    assert_int_eq(c->attr_len, 3);
+    assert_int_eq(c->attr_len, 4);
     assert_int_eq(c->attr[0].op, evr_attr_op_replace);
-    assert_str_eq(c->attr[0].attr.key, "title");
-    assert_str_eq(c->attr[0].attr.value, "test.txt");
+    assert_str_eq(c->attr[0].key, "title");
+    assert_int_eq(c->attr[0].value_type, evr_attr_value_type_static);
+    assert_str_eq(c->attr[0].value, "test.txt");
     assert_int_eq(c->attr[1].op, evr_attr_op_add);
-    assert_str_eq(c->attr[1].attr.key, "add");
-    assert_str_eq(c->attr[1].attr.value, "spice");
+    assert_str_eq(c->attr[1].key, "add");
+    assert_int_eq(c->attr[1].value_type, evr_attr_value_type_static);
+    assert_str_eq(c->attr[1].value, "spice");
     assert_int_eq(c->attr[2].op, evr_attr_op_rm);
-    assert_str_eq(c->attr[2].attr.key, "rm");
-    assert_null(c->attr[2].attr.value);
+    assert_str_eq(c->attr[2].key, "rm");
+    assert_int_eq(c->attr[2].value_type, evr_attr_value_type_static);
+    assert_null(c->attr[2].value);
+    assert_int_eq(c->attr[3].op, evr_attr_op_replace);
+    assert_str_eq(c->attr[3].key, "my-ref");
+    assert_int_eq(c->attr[3].value_type, evr_attr_value_type_self_claim_ref);
+    assert_null(c->attr[3].value);
     free(c);
     xmlFreeDoc(doc);
 }

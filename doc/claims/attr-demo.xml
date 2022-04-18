@@ -12,10 +12,19 @@
     >
   <!-- adds the value v to the set of values for k -->
   <a op="+" k="tag" v="todo"/>
+
   <!-- empties the set of values for k -->
   <a op="-" k="someKey"/>
+
   <!-- removes the value v from the set of values for k -->
   <a op="-" k="someKey" v="someVal"/>
+
   <!-- replaces the set of values for k with v -->
   <a op="=" k="replacedKey" v="replacedVal"/>
+
+  <!-- attributes may also use value factories to determine their
+       values. for example the value factory claim-ref assigns the
+       claim-ref of the parent's attr claim as value to this
+       attribute. -->
+  <a op="=" k="file" vf="claim-ref"/>
 </attr>
