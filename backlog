@@ -1,3 +1,29 @@
+* index the ref attribute of claims in attr-index
+a claim can reference an original claim via it's ref attribute. these
+references should be inexed.
+
+this index should be used to lookup all claims which reference the
+same original claim.
+* store the created attr timestamp for claim-sets in attr-index
+so a temporal order of claims-sets and claims can be created.
+* add a attr-index cmd to lookup all claims for a given claim ref
+* implement contains operator in attr queries
+the contains operator should be the tilde. for example: title~peng.
+* evr-attr-index must collect counts of seen claims
+evr-attr-index must collect the element name and namespace of every
+seen claims from the raw claim sets. the counts should be stored in
+the index db.
+
+there must be a command in the evr-attr-index search interface to
+query the counts.
+
+this feature should make it easier to gain an insight on the indexed
+claims. mostly i want the feature to validate the attr-index works as
+expected.
+
+it also might help finding out which transformations should further be
+added to the transformation xslt.
+* count of seen claims should be queryable via attr-index cmd
 * implement t in attr queries
 tag=todo t=12345
 tag=todo t=1970-01-01T00:00:07Z
