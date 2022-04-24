@@ -215,7 +215,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
         "insert into state (key, value) values (" to_string(evr_state_key_stage) ", " to_string(evr_attr_index_stage_initial) ")",
-        "create table claim_set (ref blob primary key not null)",
+        "create table claim_set (ref blob primary key not null, created integer not null)",
         NULL
     };
     for(size_t i = 0; ; ++i){
@@ -273,7 +273,24 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
 
 int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
     int ret = evr_error;
+    xmlNode *cs_node = evr_get_root_claim_set(raw_claim_set_doc);
+    if(!cs_node){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("No claim-set found in blob with ref %s", ref_str);
+        goto out;
+    }
+    evr_time created;
+    if(evr_parse_created(&created, cs_node) != evr_ok){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("Failed to parse created date from claim-set within blob ref %s", ref_str);
+        goto out;
+    }
     if(sqlite3_bind_blob(db->insert_claim_set, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto out_with_reset_insert_claim_set;
+    }
+    if(sqlite3_bind_int64(db->insert_claim_set, 2, (sqlite3_int64)created) != SQLITE_OK){
         goto out_with_reset_insert_claim_set;
     }
     // sqlite3_step is called here instead of evr_step_stmt because we
@@ -317,7 +334,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     if(!claim_set_doc){
         goto out_with_reset_insert_claim_set;
     }
-    xmlNode *cs_node = evr_get_root_claim_set(claim_set_doc);
+    cs_node = evr_get_root_claim_set(claim_set_doc);
     if(!cs_node){
 #ifdef EVR_LOG_INFO
         {
@@ -327,13 +344,6 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         }
 #endif
         ret = evr_ok;
-        goto out_with_free_claim_set_doc;
-    }
-    evr_time created;
-    if(evr_parse_created(&created, cs_node) != evr_ok){
-        evr_blob_ref_str ref_str;
-        evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("Failed to parse created date from transformed claim-set for blob ref %s", ref_str);
         goto out_with_free_claim_set_doc;
     }
     xmlNode *c_node = evr_first_claim(cs_node);
@@ -377,6 +387,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         evr_panic("Failed to reset insert_claim_set statement");
         ret = evr_error;
     }
+ out:
     return ret;
 }
 
@@ -748,7 +759,7 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "insert into claim (ref, seed) values (?, ?)", &db->insert_claim) != evr_ok){
         goto out;
     }
-    if(evr_prepare_stmt(db->db, "insert into claim_set (ref) values (?)", &db->insert_claim_set) != evr_ok){
+    if(evr_prepare_stmt(db->db, "insert into claim_set (ref, created) values (?, ?)", &db->insert_claim_set) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "update attr set valid_until = ? where rowid = ?", &db->update_attr_valid_until) != evr_ok){

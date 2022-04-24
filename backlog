@@ -1,5 +1,3 @@
-* store the created attr timestamp for claim-sets in attr-index
-so a temporal order of claims-sets and claims can be created.
 * add a attr-index cmd to lookup all claims for a given claim ref
 * apply the name 'seed' to claims which are referenced by a ref attr
 this is probably the case in claims. maybe we should call the ref attr
