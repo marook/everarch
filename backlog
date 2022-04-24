@@ -7,6 +7,14 @@ same original claim.
 * store the created attr timestamp for claim-sets in attr-index
 so a temporal order of claims-sets and claims can be created.
 * add a attr-index cmd to lookup all claims for a given claim ref
+* apply the name 'seed' to claims which are referenced by a ref attr
+this is probably the case in claims. maybe we should call the ref attr
+seed instead? and index-ref should be called index-seed?
+
+the following places should be checked for renamings:
+** README
+** claims.[hc]
+** doc/claims/*.xml
 * implement contains operator in attr queries
 the contains operator should be the tilde. for example: title~peng.
 * evr-attr-index must collect counts of seen claims
