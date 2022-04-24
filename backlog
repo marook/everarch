@@ -1,9 +1,3 @@
-* index the ref attribute of claims in attr-index
-a claim can reference an original claim via it's ref attribute. these
-references should be inexed.
-
-this index should be used to lookup all claims which reference the
-same original claim.
 * store the created attr timestamp for claim-sets in attr-index
 so a temporal order of claims-sets and claims can be created.
 * add a attr-index cmd to lookup all claims for a given claim ref

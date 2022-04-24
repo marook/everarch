@@ -211,7 +211,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     const char *sql[] = {
         "create table attr_def (key text primary key not null, type integer not null)",
         "create table attr (ref blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
-        "create table claim (ref blob primary key not null)",
+        "create table claim (ref blob primary key not null, seed blob not null)",
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
         "insert into state (key, value) values (" to_string(evr_state_key_stage) ", " to_string(evr_attr_index_stage_initial) ")",
@@ -641,6 +641,9 @@ int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct 
     if(sqlite3_bind_blob(db->insert_claim, 1, cref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
         goto out_with_reset_insert_claim;
     }
+    if(sqlite3_bind_blob(db->insert_claim, 2, claim->ref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto out_with_reset_insert_claim;
+    }
     // sqlite3_step is called here instead of evr_step_stmt because we
     // don't want evr_step_stmt to report SQLITE_CONSTRAINT result as
     // an error.
@@ -742,7 +745,7 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "insert into attr (ref, key, val_str, val_int, valid_from, valid_until, trunc) values (?, ?, ?, ?, ?, ?, ?)", &db->insert_attr) != evr_ok){
         goto out;
     }
-    if(evr_prepare_stmt(db->db, "insert into claim (ref) values (?)", &db->insert_claim) != evr_ok){
+    if(evr_prepare_stmt(db->db, "insert into claim (ref, seed) values (?, ?)", &db->insert_claim) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "insert into claim_set (ref) values (?)", &db->insert_claim_set) != evr_ok){
