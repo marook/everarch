@@ -31,6 +31,9 @@ the validity period ends for now never.
 
 the attr-index db should be extended to hold the validity period.
 * a new evr:archive claim should end the validity period of a claim
+* plan backlog tasks for evr-glacier-storage sync
+it should be possible to sync two evr-glacier-storage instances via
+the evr cli.
 * implement contains operator in attr queries
 the contains operator should be the tilde. for example: title~peng.
 * evr-attr-index must collect counts of seen claims
