@@ -6,6 +6,17 @@ the following places should be checked for renamings:
 ** README
 ** claims.[hc]
 ** doc/claims/*.xml
+* give claims a validity period
+right now only claim attributes have a validity period. claims should
+also have one.
+
+the validity period starts with the creation timestamp of the seed
+claim set.
+
+the validity period ends for now never.
+
+the attr-index db should be extended to hold the validity period.
+* a new evr:archive claim should end the validity period of a claim
 * implement contains operator in attr queries
 the contains operator should be the tilde. for example: title~peng.
 * evr-attr-index must collect counts of seen claims
