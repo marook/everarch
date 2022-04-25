@@ -59,6 +59,7 @@ struct evr_attr_index_db {
     sqlite3_stmt *insert_claim_set;
     sqlite3_stmt *update_attr_valid_until;
     sqlite3_stmt *find_ref_attrs;
+    sqlite3_stmt *find_claims_for_seed;
     evr_blob_file_writer blob_file_writer;
     void *blob_file_writer_ctx;
 };
@@ -129,5 +130,7 @@ int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, const evr_claim_
 int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit, void *ctx);
 
 int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *ctx);
+
+int evr_attr_visit_claims_for_seed(struct evr_attr_index_db *db, evr_claim_ref seed_ref, int (*visit)(void *ctx, const evr_claim_ref claim), void *ctx);
 
 #endif

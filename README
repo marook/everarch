@@ -20,7 +20,8 @@ of everarch are:
 - store your data in a format which you still can read in 20 years in
   _future scripting language_
 - store your data in a way that allows you to easily adopt new data
-  structures without the need to migrate the existing data
+  structures without the need to migrate the existing data. 20 years of
+  migration will rot your data away.
 - detect corrupt or externally modified data and restore it with a
   partial backup
 
@@ -81,6 +82,33 @@ attr-spec claim is located in doc/claims/attr-spec.xml. The
 evr-attr-index server searches for attr-spec claims and will
 automatically start indexing the evr-glacier-storage in the way
 defined in the attr-spec.
+
+Claims just like any other data in everarch can't be deleted. So what
+do you do if you like to store your contacts in everarch and also want
+to delete them one day? You need one claim type to define a
+contact. For example:
+
+<contact
+    xmlns="https://whatever.my.domain/is">
+  <name>Heribert Huber</name>
+</contact>
+
+And if you wish another claim for archiving it:
+
+<archive-contact
+    xmlns="https://whatever.my.domain/is"
+    ref="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
+<archive-contact>
+
+The ref attribute on the archive-contact claim points to the contact
+claim which initially created the contact. The ref attribute can also
+be used to update existing claims:
+
+<contact
+    xmlns="https://whatever.my.domain/is"
+    ref="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
+  <name>Heribert Meier</name>
+</contact>
 
 
 ------------------------------------------------------------------------

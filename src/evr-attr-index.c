@@ -118,6 +118,8 @@ int evr_work_cmd(struct evr_connection *ctx, char *line);
 int evr_work_search_cmd(struct evr_connection *ctx, char *query);
 int evr_respond_search_status(void *context, int parse_res, char *parse_errer);
 int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
+int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str);
+int evr_get_current_index_ref(evr_blob_ref index_ref);
 int evr_respond_help(struct evr_connection *ctx);
 int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
 int evr_respond_message_end(struct evr_connection *ctx);
@@ -1082,6 +1084,9 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
     if(strcmp(cmd, "s") == 0){
         return evr_work_search_cmd(ctx, args);
     }
+    if(strcmp(cmd, "c") == 0){
+        return evr_list_claims_for_seed(ctx, args);
+    }
     if(strcmp(cmd, "exit") == 0){
         return evr_end;
     }
@@ -1097,16 +1102,13 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
 int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     int ret = evr_error;
     log_debug("Connection worker %d retrieved query: %s", ctx->socket, query);
-    if(evr_wait_for_handover_occupied(&current_index_ctx.handover) != evr_ok){
-        goto out;
-    }
     evr_blob_ref index_ref;
-    memcpy(index_ref, current_index_ctx.index_ref, evr_blob_ref_size);
-    if(evr_unlock_handover(&current_index_ctx.handover) != evr_ok){
-        evr_panic("Failed to unlock current index handover");
+    int res = evr_get_current_index_ref(index_ref);
+    if(res == evr_end){
+        ret = evr_end;
         goto out;
     }
-    if(!running){
+    if(res != evr_ok){
         goto out;
     }
     evr_blob_ref_str index_ref_str;
@@ -1178,6 +1180,73 @@ int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr
     return ret;
 }
 
+int evr_respond_claims_for_seed_result(void *ctx, const evr_claim_ref claim);
+
+int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str){
+    log_debug("Connection worker %d retrieved list claims for seed %s", ctx->socket, seed_ref_str);
+    int ret = evr_error;
+    evr_claim_ref seed_ref;
+    if(evr_parse_claim_ref(seed_ref, seed_ref_str) != evr_ok){
+        log_error("Failed to parse seed_ref %s", seed_ref_str);
+        goto out;
+    }
+    evr_blob_ref index_ref;
+    int res = evr_get_current_index_ref(index_ref);
+    if(res == evr_end){
+        ret = evr_end;
+        goto out;
+    }
+    if(res != evr_ok){
+        goto out;
+    }
+    evr_blob_ref_str index_ref_str;
+    evr_fmt_blob_ref(index_ref_str, index_ref);
+    log_debug("Connection worker %d is using index %s for list claims for seed", ctx->socket, index_ref_str);
+    struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, index_ref_str, evr_write_blob_to_file, NULL);
+    if(!db){
+        goto out;
+    }
+    if(evr_prepare_attr_index_db(db) != evr_ok){
+        goto out;
+    }
+    if(evr_attr_visit_claims_for_seed(db, seed_ref, evr_respond_claims_for_seed_result, ctx) != evr_ok){
+        goto out_with_free_db;
+    }
+    if(evr_respond_message_end(ctx) != evr_ok){
+        goto out_with_free_db;
+    }
+    ret = evr_ok;
+ out_with_free_db:
+    if(evr_free_attr_index_db(db) != evr_ok){
+        ret = evr_error;
+    }
+ out:
+    return ret;
+}
+
+int evr_respond_claims_for_seed_result(void *context, const evr_claim_ref claim){
+    struct evr_connection *ctx = context;
+    evr_claim_ref_str claim_str;
+    evr_fmt_claim_ref(claim_str, claim);
+    claim_str[evr_claim_ref_str_size - 1] = '\n';
+    return write_n(ctx->socket, claim_str, evr_claim_ref_str_size);
+}
+
+int evr_get_current_index_ref(evr_blob_ref index_ref){
+    if(evr_wait_for_handover_occupied(&current_index_ctx.handover) != evr_ok){
+        return evr_error;
+    }
+    memcpy(index_ref, current_index_ctx.index_ref, evr_blob_ref_size);
+    if(evr_unlock_handover(&current_index_ctx.handover) != evr_ok){
+        evr_panic("Failed to unlock current index handover");
+        return evr_error;
+    }
+    if(!running){
+        return evr_end;
+    }
+    return evr_ok;
+}
+
 int evr_respond_help(struct evr_connection *ctx){
     int ret = evr_error;
     if(evr_respond_status(ctx, 1, NULL) != evr_ok){
@@ -1188,6 +1257,7 @@ int evr_respond_help(struct evr_connection *ctx){
         "exit - closes the conneciton\n"
         "help - shows this help message\n"
         "s QUERY - searches for claims matching the given query.\n"
+        "c REF - lists all claims referencing the given seed claim.\n"
         ;
     if(write_n(ctx->socket, help, sizeof(help)) != evr_ok){
         goto out;

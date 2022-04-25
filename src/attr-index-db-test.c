@@ -187,7 +187,7 @@ int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_bl
         "cat <<EOF\n"
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:07.000000Z\">\n"
-        "<attr claim=\"0\">"
+        "<attr ref=\"sha3-224-c0000000000000000000000000000000000000000000000000000000-0000\">"
         "<a op=\"+\" k=\"source\" v=\"factory\"/>"
         "</attr>"
         "</claim-set>\n"
@@ -331,6 +331,10 @@ xmlDocPtr create_xml_doc(char *content);
 
 void assert_query_one_result(struct evr_attr_index_db *db, char *query, time_t t, evr_claim_ref expected_ref);
 
+int visited_seed_refs = 0;
+
+int visit_claims_for_seed(void *ctx, const evr_claim_ref claim);
+
 void test_attr_factories(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
     evr_blob_ref attr_factory_ref;
@@ -358,13 +362,26 @@ void test_attr_factories(){
     evr_claim_ref static_claim_ref;
     evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
     assert_query_one_result(db, "source=original", t, static_claim_ref);
-    evr_claim_ref factory_claim_ref;
-    evr_build_claim_ref(factory_claim_ref, claim_set_ref, 1);
-    assert_query_one_result(db, "source=factory", t, factory_claim_ref);
+    assert_query_one_result(db, "source=factory", t, static_claim_ref);
     xmlFreeDoc(raw_claim_set);
     xsltFreeStylesheet(style);
+    evr_claim_ref visited_refs[2];
+    assert_ok(evr_attr_visit_claims_for_seed(db, static_claim_ref, visit_claims_for_seed, visited_refs));
+    assert_int_eq_msg(visited_seed_refs, 2, "Expected to visit 2 claims for seed but got %d\n", visited_seed_refs);
+    evr_claim_ref_str claim_ref_str;
+    evr_fmt_claim_ref(claim_ref_str, visited_refs[0]);
+    assert_str_eq(claim_ref_str, "sha3-224-c0000000000000000000000000000000000000000000000000000000-0000");
+    evr_fmt_claim_ref(claim_ref_str, visited_refs[1]);
+    assert_str_eq(claim_ref_str, "sha3-224-c0000000000000000000000000000000000000000000000000000000-0001");
     assert_ok(evr_free_attr_index_db(db));
     evr_free_attr_index_db_configuration(cfg);
+}
+
+int visit_claims_for_seed(void *ctx, const evr_claim_ref claim){
+    evr_claim_ref *visited_refs = ctx;
+    memcpy(visited_refs[visited_seed_refs], claim, evr_claim_ref_size);
+    visited_seed_refs++;
+    return evr_ok;
 }
 
 void test_attr_attribute_factories(){

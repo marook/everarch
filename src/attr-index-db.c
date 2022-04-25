@@ -102,6 +102,7 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
     db->find_ref_attrs = NULL;
+    db->find_claims_for_seed = NULL;
     size_t dir_len = strlen(db->dir);
     const char filename[] = "index.db";
     char db_path[dir_len + sizeof(filename)];
@@ -136,6 +137,7 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
 
 int evr_free_attr_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
+    evr_finalize_stmt(find_claims_for_seed);
     evr_finalize_stmt(find_ref_attrs);
     evr_finalize_stmt(update_attr_valid_until);
     evr_finalize_stmt(insert_claim_set);
@@ -768,6 +770,14 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "select ref, key, val_str from attr where ref = ?1 and valid_from <= ?2 and (valid_until > ?2 or valid_until is null) and val_str not null", &db->find_ref_attrs) != evr_ok){
         goto out;
     }
+    // TODO using a substr to exctract the claim ref's blob ref part
+    // is error prone. we should split up the c.ref column into a
+    // c.ref and c.index column. then we can get rid of the substr
+    // call which makes assumptions about the formatting of a claim
+    // ref.
+    if(evr_prepare_stmt(db->db, "select c.ref from claim c inner join claim_set cs where c.seed = ? and cs.ref = substr(c.ref, 0, " to_string(evr_blob_ref_size + 1)  ") order by cs.created", &db->find_claims_for_seed) != evr_ok){
+        goto out;
+    }
     ret = evr_ok;
  out:
     return ret;
@@ -1371,5 +1381,37 @@ int evr_collect_selected_attrs_visitor(void *context, const evr_claim_ref ref, c
     evr_push_n(&ctx->data, value, value_size);
     ret = evr_ok;
  out:
+    return ret;
+}
+
+int evr_attr_visit_claims_for_seed(struct evr_attr_index_db *db, evr_claim_ref seed_ref, int (*visit)(void *ctx, const evr_claim_ref claim), void *ctx){
+    int ret = evr_error;
+    if(sqlite3_bind_blob(db->find_claims_for_seed, 1, seed_ref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        goto out_with_reset_stmt;
+    }
+    while(1){
+        int step_res = evr_step_stmt(db->db, db->find_claims_for_seed);
+        if(step_res == SQLITE_DONE){
+            break;
+        }
+        if(step_res != SQLITE_ROW){
+            goto out_with_reset_stmt;
+        }
+        int ref_col_size = sqlite3_column_bytes(db->find_claims_for_seed, 0);
+        if(ref_col_size != evr_claim_ref_size){
+            log_error("Claim ref of illegal size %d in claim table", ref_col_size);
+            goto out_with_reset_stmt;
+        }
+        const evr_claim_ref *ref = sqlite3_column_blob(db->find_claims_for_seed, 0);
+        if(visit(ctx, *ref) != evr_ok){
+            goto out_with_reset_stmt;
+        }
+    }
+    ret = evr_ok;
+ out_with_reset_stmt:
+    if(sqlite3_reset(db->find_claims_for_seed) != SQLITE_OK){
+        evr_panic("Failed to reset find_claims_for_seed statement");
+        ret = evr_error;
+    }
     return ret;
 }
