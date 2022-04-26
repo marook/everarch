@@ -97,16 +97,16 @@ And if you wish another claim for archiving it:
 
 <archive-contact
     xmlns="https://whatever.my.domain/is"
-    ref="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
+    seed="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
 <archive-contact>
 
-The ref attribute on the archive-contact claim points to the contact
-claim which initially created the contact. The ref attribute can also
+The seed attribute on the archive-contact claim points to the contact
+claim which initially created the contact. The seed attribute can also
 be used to update existing claims:
 
 <contact
     xmlns="https://whatever.my.domain/is"
-    ref="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
+    seed="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
   <name>Heribert Meier</name>
 </contact>
 

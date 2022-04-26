@@ -1,11 +1,4 @@
-* apply the name 'seed' to claims which are referenced by a ref attr
-this is probably the case in claims. maybe we should call the ref attr
-seed instead? and index-ref should be called index-seed?
-
-the following places should be checked for renamings:
-** README
-** claims.[hc]
-** doc/claims/*.xml
+* make failed assertions in unit tests report source file and line number
 * add get-claim cmd to evr cli
 get-claim should fetch the claim set, validate the signature and print
 the referenced claim to stdout.
@@ -31,6 +24,15 @@ the validity period ends for now never.
 
 the attr-index db should be extended to hold the validity period.
 * a new evr:archive claim should end the validity period of a claim
+* add documentation on how to write attr-specs
+** describe how attr is the central claim
+** describe archive claim
+** describe the seed and index-seed attributes
+seed is provided before attr-factory calls and before each
+transformation.
+
+index-seed must be provided by transformation.
+** describe how seed and index-seed must be handled in transformations
 * plan backlog tasks for evr-glacier-storage sync
 it should be possible to sync two evr-glacier-storage instances via
 the evr cli.

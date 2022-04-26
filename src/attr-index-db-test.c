@@ -40,7 +40,7 @@ int found_claim_0 = 0;
 
 int never_called_blob_file_writer(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
 void reset_visit_attrs();
-int visit_attrs(void *ctx, const evr_claim_ref ref, const char *key, const char *value);
+int visit_attrs(void *ctx, const char *key, const char *value);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
 void reset_visit_claims();
 int claims_status_ok(void *ctx, int parse_res, char *parse_error);
@@ -99,45 +99,45 @@ void test_open_new_attr_index_db_twice(){
                     size_t aai = attr_merge_permutations[pi][rai];
                     evr_time t = merge_attrs_t[aai];
                     struct evr_attr_claim claim;
-                    claim.ref_type = evr_ref_type_claim;
-                    evr_build_claim_ref(claim.ref, ref, 0);
-                    claim.index_ref = 0;
+                    claim.seed_type = evr_seed_type_claim;
+                    evr_build_claim_ref(claim.seed, ref, 0);
+                    claim.index_seed = 0;
                     claim.attr_len = 1;
                     claim.attr = &merge_attrs[aai];
-                    assert_ok(evr_merge_attr_index_claim(db, t, &claim));
+                    assert_ok(evr_merge_attr_index_claim(db, t, claim.seed, &claim));
                 }
             }
             log_info("Assert t=0");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 0, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 0, ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert t=10");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 10, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 10, ref, visit_attrs, NULL));
             assert_attrs(1, 0);
             log_info("Assert t=15");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 15, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 15, ref, visit_attrs, NULL));
             assert_attrs(1, 0);
             log_info("Assert t=20");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 20, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 20, ref, visit_attrs, NULL));
             assert_attrs(1, 1);
             log_info("Assert t=25");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 25, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 25, ref, visit_attrs, NULL));
             assert_attrs(1, 1);
             log_info("Assert t=30");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 30, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 30, ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert t=35");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 35, ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 35, ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert not existing ref");
             reset_visit_attrs();
-            assert_ok(evr_get_ref_attrs(db, 25, other_ref, visit_attrs, NULL));
+            assert_ok(evr_get_seed_attrs(db, 25, other_ref, visit_attrs, NULL));
             assert_attrs(0, 0);
             log_info("Assert evr_attr_query_claims tag=A t=0");
             reset_visit_claims();
@@ -187,7 +187,7 @@ int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_bl
         "cat <<EOF\n"
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:07.000000Z\">\n"
-        "<attr ref=\"sha3-224-c0000000000000000000000000000000000000000000000000000000-0000\">"
+        "<attr seed=\"sha3-224-c0000000000000000000000000000000000000000000000000000000-0000\">"
         "<a op=\"+\" k=\"source\" v=\"factory\"/>"
         "</attr>"
         "</claim-set>\n"
@@ -202,11 +202,8 @@ void reset_visit_attrs(){
     found_tag_b = 0;
 }
 
-int visit_attrs(void *ctx, const evr_claim_ref ref, const char *key, const char *value){
+int visit_attrs(void *ctx, const char *key, const char *value){
     assert_null(ctx);
-    evr_claim_ref_str fmt_ref;
-    evr_fmt_claim_ref(fmt_ref, ref);
-    assert_str_eq(fmt_ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000");
     assert_str_eq(key, "tag");
     assert_not_null(value);
     if(strcmp(value, "A") == 0){
@@ -269,14 +266,14 @@ void test_add_two_attr_claims_for_same_target(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     struct evr_attr_claim c;
-    c.ref_type = evr_ref_type_claim;
-    assert_ok(evr_parse_claim_ref(c.ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0001"));
-    c.index_ref = 1;
+    c.seed_type = evr_seed_type_claim;
+    assert_ok(evr_parse_claim_ref(c.seed, "sha3-224-10000000000000000000000000000000000000000000000000000000-0001"));
+    c.index_seed = 1;
     c.attr_len = 0;
     c.attr = NULL;
     for(int i = 0; i < 2; ++i){
         log_info("Claim merge #%d", i+1);
-        assert_ok(evr_merge_attr_index_claim(db, 10, &c));
+        assert_ok(evr_merge_attr_index_claim(db, 10, c.seed, &c));
     }
     assert_ok(evr_free_attr_index_db(db));
     evr_free_attr_index_db_configuration(cfg);
@@ -458,7 +455,7 @@ int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr
     evr_claim_ref_str ref_str, asserting_claims_visitor_expected_ref_str;
     evr_fmt_claim_ref(ref_str, ref);
     evr_fmt_claim_ref(asserting_claims_visitor_expected_ref_str, asserting_claims_visitor_expected_ref);
-    assert_int_eq_msg(ref_cmp, 0, "Expected claim ref to be %s but was %s", asserting_claims_visitor_expected_ref_str, ref_str);
+    assert_int_eq_msg(ref_cmp, 0, "Expected claim ref to be %s but was %s\n", asserting_claims_visitor_expected_ref_str, ref_str);
     assert_int_eq(attrs_len, 0);
     return evr_ok;
 }

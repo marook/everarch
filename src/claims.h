@@ -54,8 +54,8 @@ struct evr_file_slice {
 };
 
 struct evr_file_claim {
-    int has_ref;
-    evr_claim_ref ref;
+    int has_seed;
+    evr_claim_ref seed;
 
     /**
      * title could be the file name. May also be null if the file has
@@ -98,18 +98,18 @@ struct evr_attr {
     char *value;
 };
 
-#define evr_ref_type_self  0x01
-#define evr_ref_type_claim 0x02
+#define evr_seed_type_self  0x01
+#define evr_seed_type_claim 0x02
 
 struct evr_attr_claim {
-    int ref_type;
+    int seed_type;
 
     /**
-     * ref is only filled if ref_type is evr_ref_type_claim.
+     * seed is only filled if seed_type is evr_seed_type_claim.
      */
-    evr_claim_ref ref;
+    evr_claim_ref seed;
 
-    size_t index_ref;
+    size_t index_seed;
     size_t attr_len;
     struct evr_attr *attr;
 };
@@ -162,10 +162,10 @@ xmlNode *evr_nth_claim(xmlNode *claim_set, int n);
 int evr_is_evr_element(xmlNode *n, char *name);
 
 /**
- * evr_add_claim_ref_attrs makes sure every claim within the doc has a
- * ref attribute. Existing ref attributes are kept as they are.
+ * evr_add_claim_seed_attrs makes sure every claim within the doc has a
+ * seed attribute. Existing seed attributes are kept as they are.
  */
-int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref);
+int evr_add_claim_seed_attrs(xmlDocPtr doc, evr_blob_ref doc_ref);
 
 struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node);
 

@@ -8,7 +8,7 @@
 -->
 <attr
     xmlns="https://evr.ma300k.de/claims/"
-    ref="sha3-224-…"
+    seed="sha3-224-…"
     >
   <!-- adds the value v to the set of values for k -->
   <a op="+" k="tag" v="todo"/>

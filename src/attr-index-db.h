@@ -58,7 +58,7 @@ struct evr_attr_index_db {
     sqlite3_stmt *insert_claim;
     sqlite3_stmt *insert_claim_set;
     sqlite3_stmt *update_attr_valid_until;
-    sqlite3_stmt *find_ref_attrs;
+    sqlite3_stmt *find_seed_attrs;
     sqlite3_stmt *find_claims_for_seed;
     evr_blob_file_writer blob_file_writer;
     void *blob_file_writer_ctx;
@@ -101,16 +101,24 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
 int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
 
-int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, struct evr_attr_claim *claim);
+int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, evr_claim_ref cref, struct evr_attr_claim *claim);
 
 int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
 
-typedef int (*evr_attr_visitor)(void *ctx, const evr_claim_ref ref, const char *key, const char *value);
+typedef int (*evr_attr_visitor)(void *ctx, const char *key, const char *value);
 
 struct evr_attr_tuple {
     char *key;
     char *value;
 };
+
+int evr_get_seed_attrs(struct evr_attr_index_db *db, evr_time t, const evr_claim_ref ref, evr_attr_visitor visit, void *ctx);
+
+/**
+ * evr_visit_attr_query visits statements which select attribute ref,
+ * key and value.
+ */
+int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit, void *ctx);
 
 /**
  * evr_claim_visitor is a callback for visiting claims.
@@ -120,14 +128,6 @@ struct evr_attr_tuple {
  * provided.
  */
 typedef int (*evr_claim_visitor)(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
-
-int evr_get_ref_attrs(struct evr_attr_index_db *db, evr_time t, const evr_claim_ref ref, evr_attr_visitor visit, void *ctx);
-
-/**
- * evr_visit_attr_query visits statements which select attribute ref,
- * key and value.
- */
-int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_attr_visitor visit, void *ctx);
 
 int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *ctx);
 

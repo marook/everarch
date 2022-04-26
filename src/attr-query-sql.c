@@ -56,7 +56,7 @@ struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value){
 }
 
 int evr_append_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)){
-    return append(ctx, "ref in (select ref from attr where key = ? and val_str = ? and valid_from <= ? and (valid_until > ? or valid_until is null) and val_str not null)");
+    return append(ctx, "seed in (select seed from attr where key = ? and val_str = ? and valid_from <= ? and (valid_until > ? or valid_until is null) and val_str not null)");
 }
 
 int evr_bind_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column){

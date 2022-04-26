@@ -30,7 +30,7 @@
        indexable attributes for this file -->
   <attr
       xmlns="https://evr.ma300k.de/claims/"
-      index-ref="2"
+      index-seed="2"
       >
     <!-- adds the value v to the set of values for k -->
     <a op="+" k="tag" v="todo"/>

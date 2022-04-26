@@ -66,10 +66,10 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
     if(xmlTextWriterStartElement(cs->writer, BAD_CAST "file") < 0){
         goto out;
     }
-    if(claim->has_ref) {
-        evr_claim_ref_str ref_str;
-        evr_fmt_claim_ref(ref_str, claim->ref);
-        if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "ref", BAD_CAST ref_str) < 0){
+    if(claim->has_seed) {
+        evr_claim_ref_str seed_str;
+        evr_fmt_claim_ref(seed_str, claim->seed);
+        if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "seed", BAD_CAST seed_str) < 0){
             goto out;
         }
     }
@@ -202,34 +202,34 @@ int evr_is_evr_element(xmlNode *n, char *name){
     return ret;
 }
 
-int evr_parse_claim_index_ref_attr(size_t *index_ref, xmlNode *claim);
+int evr_parse_claim_index_seed_attr(size_t *index_seed, xmlNode *claim);
 
-int evr_add_claim_ref_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
+int evr_add_claim_seed_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
     xmlNode *cs = evr_get_root_claim_set(doc);
     if(!cs){
         return evr_ok;
     }
     size_t ci = 0;
     xmlNode *c = evr_first_claim(cs);
-    size_t index_ref;
+    size_t index_seed;
     while(c){
         c = evr_find_next_element(c, NULL);
         if(!c){
             break;
         }
-        xmlAttrPtr ref_attr = xmlHasProp(c, BAD_CAST "ref");
-        if(!ref_attr){
-            int index_ref_res = evr_parse_claim_index_ref_attr(&index_ref, c);
-            if(index_ref_res == evr_not_found){
-                index_ref = ci;
-            } else if(index_ref_res != evr_ok){
+        xmlAttrPtr seed_attr = xmlHasProp(c, BAD_CAST "seed");
+        if(!seed_attr){
+            int index_seed_res = evr_parse_claim_index_seed_attr(&index_seed, c);
+            if(index_seed_res == evr_not_found){
+                index_seed = ci;
+            } else if(index_seed_res != evr_ok){
                 return evr_error;
             }
-            evr_claim_ref cref;
-            evr_build_claim_ref(cref, doc_ref, index_ref);
-            evr_claim_ref_str cref_str;
-            evr_fmt_claim_ref(cref_str, cref);
-            if(!xmlSetProp(c, BAD_CAST "ref", BAD_CAST cref_str)){
+            evr_claim_ref seed;
+            evr_build_claim_ref(seed, doc_ref, index_seed);
+            evr_claim_ref_str seed_str;
+            evr_fmt_claim_ref(seed_str, seed);
+            if(!xmlSetProp(c, BAD_CAST "seed", BAD_CAST seed_str)){
                 return evr_error;
             }
         }
@@ -465,31 +465,31 @@ size_t evr_count_elements(xmlNode *start, char *name){
 
 struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     struct evr_attr_claim *c = NULL;
-    int ref_type;
-    char *fmt_ref = (char*)xmlGetProp(claim_node, BAD_CAST "ref");
-    evr_claim_ref ref;
-    if(fmt_ref){
-        ref_type = evr_ref_type_claim;
-        int parse_ref_ret = evr_parse_claim_ref(ref, fmt_ref);
-        xmlFree(fmt_ref);
-        if(parse_ref_ret != evr_ok){
+    int seed_type;
+    char *fmt_seed = (char*)xmlGetProp(claim_node, BAD_CAST "seed");
+    evr_claim_ref seed;
+    if(fmt_seed){
+        seed_type = evr_seed_type_claim;
+        int parse_seed_ret = evr_parse_claim_ref(seed, fmt_seed);
+        xmlFree(fmt_seed);
+        if(parse_seed_ret != evr_ok){
             goto out;
         }
     } else {
-        ref_type = evr_ref_type_self;
+        seed_type = evr_seed_type_self;
     }
-    size_t index_ref;
-    int index_ref_res = evr_parse_claim_index_ref_attr(&index_ref, claim_node);
-    if(index_ref_res == evr_not_found){
-        index_ref = 0;
+    size_t index_seed;
+    int index_seed_res = evr_parse_claim_index_seed_attr(&index_seed, claim_node);
+    if(index_seed_res == evr_not_found){
+        index_seed = 0;
         xmlNode *sibling = claim_node->prev;
         while(sibling){
             if(sibling->type == XML_ELEMENT_NODE){
-                ++index_ref;
+                ++index_seed;
             }
             sibling = sibling->prev;
         }
-    } else if(index_ref_res != evr_ok){
+    } else if(index_seed_res != evr_ok){
         goto out;
     }
     size_t attr_count = 0;
@@ -520,12 +520,12 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
         goto out;
     }
     c = (struct evr_attr_claim *)buf;
-    c->ref_type = ref_type;
+    c->seed_type = seed_type;
     buf = (char *)&((struct evr_attr_claim*)buf)[1];
-    if(ref_type == evr_ref_type_claim){
-        memcpy(c->ref, ref, evr_claim_ref_size);
+    if(seed_type == evr_seed_type_claim){
+        memcpy(c->seed, seed, evr_claim_ref_size);
     }
-    c->index_ref = index_ref;
+    c->index_seed = index_seed;
     c->attr_len = attr_count;
     c->attr = (struct evr_attr *)buf;
     buf = (char *)&((struct evr_attr*)buf)[attr_count];
@@ -601,20 +601,20 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     return NULL;
 }
 
-int evr_parse_claim_index_ref_attr(size_t *index_ref, xmlNode *claim){
-    char *fmt_index_ref = (char*)xmlGetProp(claim, BAD_CAST "index-ref");
-    if(!fmt_index_ref){
+int evr_parse_claim_index_seed_attr(size_t *index_seed, xmlNode *claim){
+    char *fmt_index_seed = (char*)xmlGetProp(claim, BAD_CAST "index-seed");
+    if(!fmt_index_seed){
         return evr_not_found;
     }
     int ret = evr_error;
-    int scan_res = sscanf(fmt_index_ref, "%lu", index_ref);
+    int scan_res = sscanf(fmt_index_seed, "%lu", index_seed);
     if(scan_res != 1){
-        log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_index_ref);
-        goto out_with_free_fmt_index_ref;
+        log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_index_seed);
+        goto out_with_free_fmt_index_seed;
     }
     ret = evr_ok;
- out_with_free_fmt_index_ref:
-    xmlFree(fmt_index_ref);
+ out_with_free_fmt_index_seed:
+    xmlFree(fmt_index_seed);
     return ret;
 }
 

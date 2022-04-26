@@ -182,7 +182,7 @@ int evr_cli_put(int flags);
 int evr_cli_sign_put(int flags);
 int evr_cli_get_file(char *fmt_key);
 int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
-int evr_cli_post_file(char *file, char *title, int has_ref, evr_claim_ref ref);
+int evr_cli_post_file(char *file, char *title, int has_seed, evr_claim_ref seed);
 int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after);
 int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob);
 
@@ -464,7 +464,7 @@ int evr_cli_get_file(char *fmt_cref){
     return ret;
 }
 
-int evr_cli_post_file(char *file, char *title, int has_ref, evr_claim_ref ref){
+int evr_cli_post_file(char *file, char *title, int has_seed, evr_claim_ref seed){
     int ret = evr_error;
     evr_init_signatures();
     int f = STDIN_FILENO;
@@ -488,9 +488,9 @@ int evr_cli_post_file(char *file, char *title, int has_ref, evr_claim_ref ref){
         goto out_with_free_slice_keys;
     }
     struct evr_file_claim fc;
-    fc.has_ref = has_ref;
-    if(has_ref){
-        memcpy(fc.ref, ref, evr_claim_ref_size);
+    fc.has_seed = has_seed;
+    if(has_seed){
+        memcpy(fc.seed, seed, evr_claim_ref_size);
     }
     fc.title = NULL;
     if(title){
