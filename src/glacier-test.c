@@ -45,10 +45,10 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
         log_info("Round %d…", i);
         struct evr_glacier_storage_configuration *round_config = clone_config(config);
         struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
-        assert_not_null(ctx);
-        assert_equal(ctx->current_bucket_index, 1);
-        assert_greater_equal(ctx->current_bucket_f, 0);
-        assert_equal(ctx->current_bucket_pos, 4);
+        assert(ctx);
+        assert(ctx->current_bucket_index == 1);
+        assert(ctx->current_bucket_f >= 0);
+        assert(ctx->current_bucket_pos == 4);
         free_glacier_ctx(ctx);
     }
     free_evr_glacier_storage_configuration(config);
@@ -57,20 +57,20 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
 void test_evr_glacier_create_context_twice_fails(){
     struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     struct evr_glacier_write_ctx *ctx1 = evr_create_glacier_write_ctx(config);
-    assert_not_null(ctx1);
+    assert(ctx1);
     struct evr_glacier_write_ctx *ctx2 = evr_create_glacier_write_ctx(config);
-    assert_null(ctx2);
+    assert(ctx2 == NULL);
     free_glacier_ctx(ctx1);
 }
 
 void test_evr_glacier_write_smal_blob(){
     struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     struct evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(config);
-    assert_not_null(write_ctx);
+    assert(write_ctx);
     {
         log_info("Write a blob");
         void *buffer = malloc(256);
-        assert_not_null(buffer);
+        assert(buffer);
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 1, evr_blob_ref_size);
@@ -84,16 +84,16 @@ void test_evr_glacier_write_smal_blob(){
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
         evr_time last_modified;
-        assert_zero(evr_glacier_append_blob(write_ctx, wb, &last_modified));
-        assert_equal(write_ctx->current_bucket_index, 1);
-        assert_equal(write_ctx->current_bucket_pos, 56);
-        assert_greater_then(last_modified, 1644937656);
+        assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &last_modified)));
+        assert(write_ctx->current_bucket_index == 1);
+        assert(write_ctx->current_bucket_pos == 56);
+        assert(last_modified > 1644937656);
         free(buffer);
     }
     {
         log_info("Write another unrelated blob");
         void *buffer = malloc(256);
-        assert_not_null(buffer);
+        assert(buffer);
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 2, evr_blob_ref_size);
@@ -107,27 +107,27 @@ void test_evr_glacier_write_smal_blob(){
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
         evr_time last_modified;
-        assert_zero(evr_glacier_append_blob(write_ctx, wb, &last_modified));
-        assert_equal(write_ctx->current_bucket_index, 1);
-        assert_equal(write_ctx->current_bucket_pos, 100);
-        assert_greater_then(last_modified, 1644937656);
+        assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &last_modified)));
+        assert(write_ctx->current_bucket_index == 1);
+        assert(write_ctx->current_bucket_pos == 100);
+        assert(last_modified > 1644937656);
         free(buffer);
     }
     struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
-    assert_not_null(read_ctx);
+    assert(read_ctx);
     {
         log_info("Read the written blob");
         evr_blob_ref key;
         memset(key, 1, evr_blob_ref_size);
         struct dynamic_array *data_buffer = alloc_dynamic_array(128);
-        assert_not_null(data_buffer);
+        assert(data_buffer);
         status_mock_ret = evr_ok;
         status_mock_expected_exists = 1;
         status_mock_expected_flags = 0;
         status_mock_expected_blob_size = 11;
-        assert_zero(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_dynamic_array, &data_buffer));
-        assert_equal(data_buffer->size_used, 11);
-        assert_zero(memcmp("hello world", data_buffer->data, data_buffer->size_used));
+        assert(is_ok(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_dynamic_array, &data_buffer)));
+        assert(data_buffer->size_used == 11);
+        assert(memcmp("hello world", data_buffer->data, data_buffer->size_used) == 0);
         free(data_buffer);
     }
     {
@@ -138,16 +138,16 @@ void test_evr_glacier_write_smal_blob(){
         status_mock_expected_exists = 0;
         status_mock_expected_flags = 0;
         status_mock_expected_blob_size = 0;
-        assert_equal(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_void, NULL), evr_not_found);
+        assert(evr_glacier_read_blob(read_ctx, key, status_mock, store_into_void, NULL) == evr_not_found);
     }
-    assert_zero(evr_free_glacier_read_ctx(read_ctx));
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
     free_glacier_ctx(write_ctx);
 }
 
 int status_mock(void *arg, int exists, int flags, size_t blob_size){
-    assert_equal(exists, status_mock_expected_exists);
-    assert_equal(flags, status_mock_expected_flags);
-    assert_equal(blob_size, status_mock_expected_blob_size);
+    assert(exists == status_mock_expected_exists);
+    assert(flags == status_mock_expected_flags);
+    assert(blob_size == status_mock_expected_blob_size);
     return status_mock_ret;
 }
 
@@ -172,11 +172,11 @@ int store_into_void(void *arg, const char *data, size_t data_len){
 void test_evr_glacier_write_big_blob(){
     struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
     struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
-    assert_not_null(ctx);
+    assert(ctx);
     {
         log_info("Write a blob");
         void *buffer = malloc(256);
-        assert_not_null(buffer);
+        assert(buffer);
         void *p = buffer;
         struct evr_writing_blob *wb = (struct evr_writing_blob*)p;
         memset(wb->key, 1, evr_blob_ref_size);
@@ -185,26 +185,26 @@ void test_evr_glacier_write_big_blob(){
         wb->chunks = (char**)p;
         p = (void*)(wb->chunks + 2);
         wb->chunks[0] = malloc(evr_chunk_size);
-        assert_not_null(wb->chunks[0]);
+        assert(wb->chunks[0]);
         memset(wb->chunks[0], 0x33, evr_chunk_size);
         size_t chunk_1_len = evr_chunk_size / 2;
         wb->chunks[1] = malloc(chunk_1_len);
-        assert_not_null(wb->chunks[1]);
+        assert(wb->chunks[1]);
         memset(wb->chunks[1], 0x44, chunk_1_len);
         wb->size = evr_chunk_size + chunk_1_len;
         evr_time last_modified;
-        assert_ok(evr_glacier_append_blob(ctx, wb, &last_modified));
+        assert(is_ok(evr_glacier_append_blob(ctx, wb, &last_modified)));
         free(wb->chunks[0]);
         free(wb->chunks[1]);
         free(buffer);
     }
-    assert_equal(ctx->current_bucket_index, 1);
+    assert(ctx->current_bucket_index == 1);
     free_glacier_ctx(ctx);
 }
 
 struct evr_glacier_storage_configuration* clone_config(struct evr_glacier_storage_configuration *config){
     struct evr_glacier_storage_configuration *clone = (struct evr_glacier_storage_configuration*)malloc(sizeof(struct evr_glacier_storage_configuration));
-    assert_not_null(clone);
+    assert(clone);
     clone->cert_path = clone_string(config->cert_path);
     clone->key_path = clone_string(config->key_path);
     clone->cert_root_path = clone_string(config->cert_root_path);
@@ -219,7 +219,7 @@ char* clone_string(const char* s){
     }
     size_t s_len = strlen(s);
     char *c = (char*)malloc(s_len + 1);
-    assert_not_null(c);
+    assert(c);
     memcpy(c, s, s_len + 1);
     return c;
 }
@@ -227,7 +227,7 @@ char* clone_string(const char* s){
 void free_glacier_ctx(struct evr_glacier_write_ctx *ctx){
     // TODO delete buckets dir
     struct evr_glacier_storage_configuration *config = ctx->config;
-    assert_zero(evr_free_glacier_write_ctx(ctx));
+    assert(is_ok(evr_free_glacier_write_ctx(ctx)));
     free_evr_glacier_storage_configuration(config);
 }
 

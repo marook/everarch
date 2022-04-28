@@ -47,11 +47,11 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
 }
 
 int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, evr_time *last_modified){
-    assert_not_null_msg(ctx, "evr_glacier_write_ctx must not be null");
-    assert_not_null_msg(blob, "blob must not be null");
-    assert_not_null_msg(last_modified, "last_modified was not supplied");
+    assert(ctx);
+    assert(blob);
+    assert(last_modified);
     if(append_blob_delay){
-        assert_equal(thrd_sleep(append_blob_delay, NULL), 0);
+        assert(thrd_sleep(append_blob_delay, NULL) == 0);
     }
     *last_modified = 123;
     return evr_glacier_append_blob_result;
@@ -60,11 +60,11 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
 struct evr_glacier_storage_configuration *test_config;
 
 void evr_temp_persister_start(){
-    assert_ok(evr_persister_start(test_config));
+    assert(is_ok(evr_persister_start(test_config)));
 }
 
 void evr_temp_persister_stop(){
-    assert_ok(evr_persister_stop());
+    assert(is_ok(evr_persister_stop()));
 }
 
 void test_queue_one_blob_success(){
@@ -73,12 +73,12 @@ void test_queue_one_blob_success(){
     evr_temp_persister_start();
     struct evr_writing_blob blob;
     struct evr_persister_task task;
-    assert_ok(evr_persister_init_task(&task, &blob));
-    assert_ok(evr_persister_queue_task(&task));
-    assert_ok(evr_persister_wait_for_task(&task));
-    assert_ok(task.result);
-    assert_equal(task.last_modified, 123);
-    assert_ok(evr_persister_destroy_task(&task));
+    assert(is_ok(evr_persister_init_task(&task, &blob)));
+    assert(is_ok(evr_persister_queue_task(&task)));
+    assert(is_ok(evr_persister_wait_for_task(&task)));
+    assert(is_ok(task.result));
+    assert(task.last_modified == 123);
+    assert(is_ok(evr_persister_destroy_task(&task)));
     evr_temp_persister_stop();
 }
 
@@ -88,11 +88,11 @@ void test_queue_one_blob_write_error(){
     evr_temp_persister_start();
     struct evr_writing_blob blob;
     struct evr_persister_task task;
-    assert_ok(evr_persister_init_task(&task, &blob));
-    assert_ok(evr_persister_queue_task(&task));
-    assert_ok(evr_persister_wait_for_task(&task));
-    assert_equal(task.result, evr_error);
-    assert_ok(evr_persister_destroy_task(&task));
+    assert(is_ok(evr_persister_init_task(&task, &blob)));
+    assert(is_ok(evr_persister_queue_task(&task)));
+    assert(is_ok(evr_persister_wait_for_task(&task)));
+    assert(is_err(task.result));
+    assert(is_ok(evr_persister_destroy_task(&task)));
     evr_temp_persister_stop();
 }
 
@@ -123,12 +123,12 @@ void test_queue_many_blobs_slow_queue(){
 void queue_and_process_many_blobs(struct timespec *queue_delay){
     evr_temp_persister_start();
     struct evr_writing_blob *blobs = malloc(sizeof(struct evr_writing_blob) * many_blobs_count);
-    assert_not_null(blobs);
+    assert(blobs);
     struct evr_persister_task *tasks = malloc(sizeof(struct evr_persister_task) * many_blobs_count);
-    assert_not_null(tasks);
+    assert(tasks);
     log_info("Initializing tasks...");
     for(int i = 0; i < many_blobs_count; i++){
-        assert_ok(evr_persister_init_task(&tasks[i], &blobs[i]));
+        assert(is_ok(evr_persister_init_task(&tasks[i], &blobs[i])));
     }
     log_info("Queueing tasks...");
     for(int i = 0; i < many_blobs_count;){
@@ -136,28 +136,28 @@ void queue_and_process_many_blobs(struct timespec *queue_delay){
         if(result == evr_temporary_occupied){
             continue;
         }
-        assert_ok(result);
+        assert(is_ok(result));
         i++;
         if(queue_delay){
-            assert_equal(thrd_sleep(queue_delay, NULL), 0);
+            assert(thrd_sleep(queue_delay, NULL) == 0);
         }
     }
     log_info("Waiting for tasks...");
     for(int i = many_blobs_count - 1; i >= 0; i--){
         struct evr_persister_task *task = &tasks[i];
-        assert_ok(evr_persister_wait_for_task(task));
-        assert_equal(task->result, evr_ok);
+        assert(is_ok(evr_persister_wait_for_task(task)));
+        assert(is_ok(task->result));
     }
     log_info("Destroying tasks...");
     for(int i = 0; i < many_blobs_count; i++){
-        assert_ok(evr_persister_destroy_task(&tasks[i]));
+        assert(is_ok(evr_persister_destroy_task(&tasks[i])));
     }
     evr_temp_persister_stop();
 }
 
 int main(){
     test_config = create_temp_evr_glacier_storage_configuration();
-    assert_not_null(test_config);
+    assert(test_config);
     run_test(test_queue_one_blob_success);
     run_test(test_queue_one_blob_write_error);
     run_test(test_queue_many_blobs_race);

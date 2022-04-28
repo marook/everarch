@@ -31,15 +31,15 @@ const char *temp_dir_template = "/tmp/evr-glacier-test-XXXXXX";
 char *new_temp_dir_path(){
     size_t dir_len = strlen(temp_dir_template);
     char *s = (char*)malloc(dir_len + 1);
-    assert_not_null(s);
+    assert(s);
     memcpy(s, temp_dir_template, dir_len + 1);
-    assert_not_null(mkdtemp(s));
+    assert(mkdtemp(s));
     return s;
 }
 
 struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration(){
     struct evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
-    assert_not_null(config);
+    assert(config);
     if(config->bucket_dir_path){
         free(config->bucket_dir_path);
     }
@@ -50,7 +50,7 @@ struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_config
 
 struct evr_attr_index_db_configuration *create_temp_attr_index_db_configuration(){
     struct evr_attr_index_db_configuration *cfg = evr_create_attr_index_db_configuration();
-    assert_not_null(cfg);
+    assert(cfg);
     if(cfg->state_dir_path){
         free(cfg->state_dir_path);
     }

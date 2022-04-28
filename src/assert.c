@@ -25,14 +25,28 @@
 
 #include "errors.h"
 
-void print_backtrace();
+void vfail(const char* format, va_list args);
 
-void fail(const char *format, ...){
+void loc_fail(const char *loc, const char *format, ...){
+    const char *sep = ": assertion failed: ";
+    const size_t sep_len = strlen(sep);
+    size_t loc_len = strlen(loc);
+    size_t fmt_len = strlen(format);
+    char buf[loc_len + sep_len + fmt_len + 1 + 1];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_push_concat(&bp, loc);
+    evr_push_concat(&bp, sep);
+    evr_push_concat(&bp, format);
+    evr_push_concat(&bp, "\n");
+    evr_push_eos(&bp);
     va_list args;
     va_start(args, format);
-    vfail(format, args);
+    vfail(buf, args);
     va_end(args);
 }
+
+void print_backtrace();
 
 void vfail(const char* format, va_list args){
     vfprintf(stderr, format, args);
@@ -47,119 +61,18 @@ void print_backtrace(){
     backtrace_symbols_fd(buffer, len, 2);
 }
 
-void assert_zero(int i){
-    if(i){
-        fail("Expected %d to be 0\n", i);
-    }
+int is_ok(int result){
+    return result == evr_ok;
 }
 
-void assert_ok(int result){
-    assert_ok_msg(result, "Expected result to be evr_ok but was 0x%02x\n", result);
+int is_err(int result){
+    return result == evr_error;
 }
 
-void assert_ok_msg(int result, const char *format, ...){
-    if(result != evr_ok){
-        va_list args;
-        va_start(args, format);
-        vfail(format, args);
-        va_end(args);
-    }
+int is_str_eq(const char *a, const char *b){
+    return a && b && strcmp(a, b) == 0;
 }
 
-void assert_err(int result){
-    assert_err_msg(result, "Expected result to be error but was evr_ok");
-}
-
-void assert_err_msg(int result, const char *format, ...){
-    if(result == evr_ok){
-        va_list args;
-        va_start(args, format);
-        vfail(format, args);
-        va_end(args);
-    }
-}
-
-void assert_equal(int actual, int expected){
-    assert_equal_msg(actual, expected, "Expected %d to be %d\n", actual, expected);
-}
-
-void assert_equal_msg(int actual, int expected, const char *format, ...){
-    if(actual != expected){
-        va_list args;
-        va_start(args, format);
-        vfail(format, args);
-        va_end(args);
-    }
-}
-
-void assert_greater_equal(long actual, long min){
-    if(actual < min){
-        fail("Expected %l to be >= %l\n", actual, min);
-    }
-}
-
-void assert_greater_then(long actual, long min){
-    if(actual <= min){
-        fail("Expected %l to be > %l\n", actual, min);
-    }
-}
-
-void assert_truthy(int i){
-    if(!i){
-        fail("Expected %d to be truthy\n", i);
-    }
-}
-
-void assert_null(const void *p){
-    if(p){
-        fail("Expected pointer to be null\n");
-    }
-}
-
-void assert_not_null(const void *p){
-    assert_not_null_msg(p, "Expected pointer to be not null\n");
-}
-
-void assert_not_null_msg(const void *p, const char *format, ...){
-    if(!p){
-        va_list args;
-        va_start(args, format);
-        vfail(format, args);
-        va_end(args);
-    }
-}
-
-#define assert_eq(formatStr) if(actual != expected) {fail("Expected " formatStr " to be " formatStr "\n", actual, expected);}
-
-void assert_str_eq(const char *actual, const char *expected){
-    assert_not_null_msg(actual, "actual must not be null\n");
-    assert_not_null_msg(expected, "expected must not be null\n");
-    if(strcmp(actual, expected)){
-        fail("Expected '%s' to be '%s'\n", actual, expected);
-    }
-}
-
-void assert_str_contains(const char *haystack, const char *needle){
-    assert_not_null(strstr(haystack, needle));
-}
-
-void assert_int_eq(int actual, int expected){
-    assert_eq("%d");
-}
-
-void assert_int_eq_msg(int actual, int expected, const char *format, ...){
-    if(actual != expected){
-        va_list args;
-        va_start(args, format);
-        vfail(format, args);
-        va_end(args);
-    }
-}
-
-void assert_p_eq(void *actual, void *expected){
-    assert_eq("%p");
-}
-
-void assert_size_eq(size_t actual, size_t expected){
-    assert_eq("%ld");
+int is_str_in(const char *haystack, const char *needle){
+    return haystack && needle && strstr(haystack, needle);
 }

@@ -29,64 +29,64 @@ int is_ignored(int c);
 
 void test_fill_dynamic_array(){
     struct dynamic_array *a = alloc_dynamic_array(1);
-    assert_not_null(a);
+    assert(a);
     a->size_used = 1;
     *(char*)a->data = 42;
-    assert_equal(*(char*)a->data, 42);
+    assert(*(char*)a->data == 42);
     free(a);
 }
 
 void test_rtrim_empty_array(){
     struct dynamic_array *a = alloc_dynamic_array(1);
-    assert_not_null(a);
+    assert(a);
     rtrim_dynamic_array(a, is_ignored);
-    assert_size_eq(a->size_used, 0);
+    assert(a->size_used == 0);
     free(a);
 }
 
 void test_rtrim_end_of_array(){
     struct dynamic_array *a = alloc_dynamic_array(1024);
-    assert_not_null(a);
+    assert(a);
     strcpy((char*)a->data, "test   ");
     a->size_used = strlen((char*)a->data) + 1;
     rtrim_dynamic_array(a, is_ignored);
-    assert_size_eq(a->size_used, strlen("test"));
+    assert(a->size_used == strlen("test"));
     free(a);
 }
 
 void test_grow_dynamic_array_at_least_existing(){
     struct dynamic_array *a = alloc_dynamic_array(1);
-    assert_not_null(a);
-    assert_equal(a->size_allocated, 1);
+    assert(a);
+    assert(a->size_allocated == 1);
     a->size_used = 1;
     *(char*)a->data = 42;
     a = grow_dynamic_array_at_least(a, 2);
-    assert_not_null(a);
-    assert_equal(a->size_allocated, 2);
-    assert_equal(a->size_used, 1);
-    assert_equal(*(char*)a->data, 42);
+    assert(a);
+    assert(a->size_allocated == 2);
+    assert(a->size_used == 1);
+    assert(*(char*)a->data == 42);
     free(a);
 }
 
 void test_grow_dynamic_array_at_least_null(){
     struct dynamic_array *a = NULL;
     a = grow_dynamic_array_at_least(a, 1);
-    assert_not_null(a);
-    assert_equal(a->size_allocated, 1);
-    assert_equal(a->size_used, 0);
+    assert(a);
+    assert(a->size_allocated == 1);
+    assert(a->size_used == 0);
     free(a);
 }
 
 void test_dynamic_array_remove(){
     struct dynamic_array *a = alloc_dynamic_array(100);
-    assert_not_null(a);
+    assert(a);
     for(size_t i = 0; i < a->size_allocated; ++i){
         a->data[i] = i;
     }
     a->size_used = a->size_allocated;
-    assert_ok(dynamic_array_remove(a, 20, 40));
-    assert_equal(a->data[19], 19);
-    assert_equal(a->data[20], 60);
+    assert(is_ok(dynamic_array_remove(a, 20, 40)));
+    assert(a->data[19] == 19);
+    assert(a->data[20] == 60);
     free(a);
 }
 
@@ -96,8 +96,8 @@ int is_ignored(int c){
 
 void test_allocate_chunk_set(){
     struct chunk_set *cs = evr_allocate_chunk_set(3);
-    assert_not_null(cs);
-    assert_equal(cs->chunks_len, 3);
+    assert(cs);
+    assert(cs->chunks_len == 3);
     // write into every byte of the chunk set to force an error in
     // valgrind if too less memory was allocated.
     for(int i = 0; i < cs->chunks_len; i++){

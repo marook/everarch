@@ -25,11 +25,11 @@ void test_format_parse_cmd_header(){
     in.type = evr_cmd_type_get_blob;
     in.body_size = 42;
     char buffer[evr_cmd_header_n_size];
-    assert_ok(evr_format_cmd_header(buffer, &in));
+    assert(is_ok(evr_format_cmd_header(buffer, &in)));
     struct evr_cmd_header out;
-    assert_ok(evr_parse_cmd_header(&out, buffer));
-    assert_equal(out.type, evr_cmd_type_get_blob);
-    assert_equal(out.body_size, 42);
+    assert(is_ok(evr_parse_cmd_header(&out, buffer)));
+    assert(out.type == evr_cmd_type_get_blob);
+    assert(out.body_size == 42);
 }
 
 void test_format_parse_resp_header(){
@@ -37,11 +37,11 @@ void test_format_parse_resp_header(){
     in.status_code = evr_status_code_unknown_cmd;
     in.body_size = 666;
     char buffer[evr_resp_header_n_size];
-    assert_ok(evr_format_resp_header(buffer, &in));
+    assert(is_ok(evr_format_resp_header(buffer, &in)));
     struct evr_resp_header out;
-    assert_ok(evr_parse_resp_header(&out, buffer));
-    assert_equal(out.status_code, evr_status_code_unknown_cmd);
-    assert_equal(out.body_size, 666);
+    assert(is_ok(evr_parse_resp_header(&out, buffer)));
+    assert(out.status_code == evr_status_code_unknown_cmd);
+    assert(out.body_size == 666);
 }
 
 int main(){

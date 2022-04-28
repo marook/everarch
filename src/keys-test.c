@@ -30,28 +30,28 @@ void test_evr_fmt_key_into(){
     evr_blob_ref key;
     memset(key, 0, evr_blob_ref_size);
     evr_fmt_blob_ref(fmt_key, key);
-    assert_str_eq(fmt_key, "sha3-224-00000000000000000000000000000000000000000000000000000000");
+    assert(is_str_eq(fmt_key, "sha3-224-00000000000000000000000000000000000000000000000000000000"));
     memset(key, 255, evr_blob_ref_size);
     evr_fmt_blob_ref(fmt_key, key);
-    assert_str_eq(fmt_key, "sha3-224-ffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    assert(is_str_eq(fmt_key, "sha3-224-ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
 }
 
 void test_evr_parse_blob_ref(){
     evr_blob_ref key;
-    assert_ok(evr_parse_blob_ref(key, "sha3-224-010203ff000000000000000000000000000000000000000000000000"));
-    assert_equal(key[0], 0x01);
-    assert_equal(key[1], 0x02);
-    assert_equal(key[2], 0x03);
-    assert_equal(key[3], 0xff);
+    assert(is_ok(evr_parse_blob_ref(key, "sha3-224-010203ff000000000000000000000000000000000000000000000000")));
+    assert(key[0] == 0x01);
+    assert(key[1] == 0x02);
+    assert(key[2] == 0x03);
+    assert(key[3] == 0xff);
 }
 
 void test_calc_blob_key(){
     evr_blob_ref key;
     evr_blob_ref_str fmt_key;
     char *chunks = "hello world";
-    assert_ok(evr_calc_blob_ref(key, strlen(chunks), (char**)&chunks));
+    assert(is_ok(evr_calc_blob_ref(key, strlen(chunks), (char**)&chunks)));
     evr_fmt_blob_ref(fmt_key, key);
-    assert_str_eq(fmt_key, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
+    assert(is_str_eq(fmt_key, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5"));
 }
 
 void test_build_fmt_claim_ref(){
@@ -61,17 +61,17 @@ void test_build_fmt_claim_ref(){
     evr_build_claim_ref(cref, bref, 65000);
     evr_claim_ref_str cref_str;
     evr_fmt_claim_ref(cref_str, cref);
-    assert_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+    assert(is_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8"));
     evr_blob_ref sbref;
     int claim;
     evr_split_claim_ref(sbref, &claim, cref);
     evr_blob_ref_str fmt_sbref;
     evr_fmt_blob_ref(fmt_sbref, sbref);
-    assert_str_eq(fmt_sbref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
-    assert_int_eq(claim, 65000);
+    assert(is_str_eq(fmt_sbref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5"));
+    assert_msg(claim == 65000, "Claim was %d", claim);
     evr_build_claim_ref(cref, bref, 0);
     evr_fmt_claim_ref(cref_str, cref);
-    assert_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-0000");
+    assert(is_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-0000"));
 }
 
 void test_parse_fmt_claim_ref(){
@@ -79,7 +79,7 @@ void test_parse_fmt_claim_ref(){
     evr_parse_claim_ref(in, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
     evr_claim_ref_str out_str;
     evr_fmt_claim_ref(out_str, in);
-    assert_str_eq(out_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+    assert(is_str_eq(out_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8"));
 }
 
 int main(){

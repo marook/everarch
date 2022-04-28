@@ -41,7 +41,7 @@ int print_splits(char *buffer, size_t buffer_size, size_t *splits);
 void test_zero_input_rollsum(){
     const size_t buffer_size = 5 * 8 * 1024;
     char *buffer = malloc(buffer_size);
-    assert_not_null(buffer);
+    assert(buffer);
     srand(1);
     for(size_t i = 0; i < buffer_size; ++i){
         buffer[i] = rand();
@@ -64,15 +64,15 @@ void test_zero_input_rollsum(){
     memset(splits2, 0, sizeof(size_t) * max_splits);
     size_t splits2_len = print_splits(buffer, buffer_size, splits2);
 
-    assert_equal(splits0_len, splits1_len);
-    assert_equal(splits0_len, splits2_len);
-    assert_greater_equal(splits0_len, 1);
+    assert(splits0_len == splits1_len);
+    assert(splits0_len == splits2_len);
+    assert(splits0_len >= 1);
     // there are some not very perfect assumptions involved in the
     // next assertion. we assume that the "del buffer[12]" affects the
     // first split. also we assume it affects the first split in a way
     // that makes the split shift. happend to me with glibc rand
     // numbers.
-    assert_equal(splits1[0], splits2[0] + 1);
+    assert(splits1[0] == splits2[0] + 1);
 
     free(buffer);
 }

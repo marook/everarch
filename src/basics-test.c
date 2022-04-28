@@ -31,56 +31,56 @@ void test_evr_trim(){
     
     s = "hello";
     evr_trim(&start, &end, s);
-    assert_p_eq(start, s);
-    assert_p_eq(&s[strlen(s)], end);
+    assert(start == s);
+    assert(&s[strlen(s)] == end);
 
     evr_trim(&start, &end, "");
-    assert_p_eq(start, end);
+    assert(start == end);
 
     evr_trim(&start, &end, " ");
-    assert_p_eq(start, end);
+    assert(start == end);
 
     evr_trim(&start, &end, "\t");
-    assert_p_eq(start, end);
+    assert(start == end);
 
     evr_trim(&start, &end, "\n");
-    assert_p_eq(start, end);
+    assert(start == end);
 
     evr_trim(&start, &end, " \t");
-    assert_p_eq(start, end);
+    assert(start == end);
 
     s = " x ";
     evr_trim(&start, &end, s);
-    assert_p_eq(start, &s[1]);
-    assert_p_eq(end, &s[2]);
+    assert(start == &s[1]);
+    assert(end == &s[2]);
 }
 
 #define assert_invalid_syntaxt(s)                                       \
     do {                                                                \
-        evr_time t;                                                    \
-        assert_err_msg(evr_time_from_iso8601(&t, s), "Expected " s " to be invalid syntax but was successfully parsed\n"); \
+        evr_time t;                                                     \
+        assert_msg(is_err(evr_time_from_iso8601(&t, s)), "Expected " s " to be invalid syntax but was successfully parsed\n", NULL); \
     } while(0)
 
 void test_evr_time(){
     evr_time t_past, t_future;
-    assert_ok_msg(evr_time_from_iso8601(&t_past, "2022-04-01T12:01:02.123000Z"), "Failed to parse 2022-04-01T12:01:02.123000Z\n");
-    assert_ok_msg(evr_time_from_iso8601(&t_future, "2022-04-01T13:00:00.000000Z"), "Failde to parse 2022-04-01T13:00:00.000000Z\n");
-    assert_true(t_past < t_future);
-    assert_true(t_future > t_past);
-    assert_true(t_past != t_future);
+    assert(is_ok(evr_time_from_iso8601(&t_past, "2022-04-01T12:01:02.123000Z")));
+    assert(is_ok(evr_time_from_iso8601(&t_future, "2022-04-01T13:00:00.000000Z")));
+    assert(t_past < t_future);
+    assert(t_future > t_past);
+    assert(t_past != t_future);
     char buf[evr_max_time_iso8601_size];
     evr_time_to_iso8601(buf, sizeof(buf), &t_past);
-    assert_str_eq(buf, "2022-04-01T12:01:02.123000Z");
+    assert(is_str_eq(buf, "2022-04-01T12:01:02.123000Z"));
     evr_time_add_ms(&t_past, 345);
     evr_time_to_iso8601(buf, sizeof(buf), &t_past);
-    assert_str_eq(buf, "2022-04-01T12:01:02.468000Z");
+    assert(is_str_eq(buf, "2022-04-01T12:01:02.468000Z"));
     struct timespec ts;
     ts.tv_sec = 0;
     ts.tv_nsec = 0;
     evr_time t;
     evr_time_from_timespec(&t, &ts);
     evr_time_to_iso8601(buf, sizeof(buf), &t);
-    assert_str_eq(buf, "1970-01-01T00:00:00.000000Z");
+    assert(is_str_eq(buf, "1970-01-01T00:00:00.000000Z"));
     assert_invalid_syntaxt("2022-04-01T12:01:02.123000");
     assert_invalid_syntaxt("2022-04-01T12:01:02.12000Z");
     assert_invalid_syntaxt("2022-04-01T12:01:02.12000aZ");

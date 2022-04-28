@@ -29,16 +29,16 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
 
 void test_empty_claim_without_finalize(){
     struct evr_claim_set cs;
-    assert_ok(evr_init_claim_set(&cs, &t0));
-    assert_ok(evr_free_claim_set(&cs));
+    assert(is_ok(evr_init_claim_set(&cs, &t0)));
+    assert(is_ok(evr_free_claim_set(&cs)));
 }
 
 void test_empty_claim(){
     struct evr_claim_set cs;
-    assert_ok(evr_init_claim_set(&cs, &t0));
-    assert_ok(evr_finalize_claim_set(&cs));
-    assert_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\"/>\n");
-    assert_ok(evr_free_claim_set(&cs));
+    assert(is_ok(evr_init_claim_set(&cs, &t0)));
+    assert(is_ok(evr_finalize_claim_set(&cs)));
+    assert(is_str_eq((char*)cs.out->content, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set dc:created=\"1970-01-01T00:00:00.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\"/>\n"));
+    assert(is_ok(evr_free_claim_set(&cs)));
 }
 
 void test_file_claim_with_filename(){
@@ -99,9 +99,9 @@ void test_file_claim_with_seed(){
 
 void assert_file_claim(const struct evr_file_claim *claim, const char *expected_file_document){
     struct evr_claim_set cs;
-    assert_ok(evr_init_claim_set(&cs, &t0));
-    assert_ok(evr_append_file_claim(&cs, claim));
-    assert_ok(evr_finalize_claim_set(&cs));
+    assert(is_ok(evr_init_claim_set(&cs, &t0)));
+    assert(is_ok(evr_append_file_claim(&cs, claim)));
+    assert(is_ok(evr_finalize_claim_set(&cs)));
     char *content = (char*)cs.out->content;
     size_t content_len = strlen(content);
     char *stripped_content = malloc(content_len + 1);
@@ -126,9 +126,9 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
             break;
         }
     }
-    assert_not_null_msg(strstr(stripped_content, expected_file_document), "Expected\n%s\n to contain\n%s\n", stripped_content, expected_file_document);
+    assert_msg(is_str_in(stripped_content, expected_file_document), "Expected\n%s\n to contain\n%s\n", stripped_content, expected_file_document);
     free(stripped_content);
-    assert_ok(evr_free_claim_set(&cs));
+    assert(is_ok(evr_free_claim_set(&cs)));
 }
 
 void test_parse_file_claim_claim_set(){
@@ -140,32 +140,32 @@ void test_parse_file_claim_claim_set(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     evr_time created;
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
-    assert_ok(evr_parse_created(&created, csn));
-    assert_equal(created, 7000);
+    assert(csn);
+    assert(is_ok(evr_parse_created(&created, csn)));
+    assert(created == 7000);
     int file_claims_found = 0;
     int unknown_claims_found = 0;
     for(xmlNode *cn = evr_first_claim(csn); cn; cn = evr_next_claim(cn)){
         if(evr_is_evr_element(cn, "file")){
             ++file_claims_found;
             struct evr_file_claim *c = evr_parse_file_claim(cn);
-            assert_not_null(c);
-            assert_str_eq(c->title, "test.txt");
-            assert_equal(c->slices_len, 1);
+            assert(c);
+            assert(is_str_eq(c->title, "test.txt"));
+            assert(c->slices_len == 1);
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, c->slices[0].ref);
-            assert_str_eq(fmt_key, "sha3-224-12300000000000000000000000000000000000000000000000000321");
-            assert_equal(c->slices[0].size, 1);
+            assert(is_str_eq(fmt_key, "sha3-224-12300000000000000000000000000000000000000000000000000321"));
+            assert(c->slices[0].size == 1);
             free(c);
         } else {
             ++unknown_claims_found;
         }
     }
-    assert_equal_msg(file_claims_found, 1, "No file claims found");
-    assert_equal_msg(unknown_claims_found, 1, "No unknown claims found");
+    assert(file_claims_found == 1);
+    assert(unknown_claims_found == 1);
     xmlFreeDoc(doc);
 }
 
@@ -182,35 +182,35 @@ void test_parse_attr_claim_with_claim_seed(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_claim *c = evr_parse_attr_claim(cn);
-    assert_not_null(c);
+    assert(c);
     evr_blob_ref_str fmt_seed;
     evr_fmt_claim_ref(fmt_seed, c->seed);
-    assert_int_eq(c->seed_type, evr_seed_type_claim);
-    assert_str_eq(fmt_seed, "sha3-224-32100000000000000000000000000000000000000000000000000123-0000");
-    assert_int_eq(c->index_seed, 0);
-    assert_int_eq(c->attr_len, 4);
-    assert_int_eq(c->attr[0].op, evr_attr_op_replace);
-    assert_str_eq(c->attr[0].key, "title");
-    assert_int_eq(c->attr[0].value_type, evr_attr_value_type_static);
-    assert_str_eq(c->attr[0].value, "test.txt");
-    assert_int_eq(c->attr[1].op, evr_attr_op_add);
-    assert_str_eq(c->attr[1].key, "add");
-    assert_int_eq(c->attr[1].value_type, evr_attr_value_type_static);
-    assert_str_eq(c->attr[1].value, "spice");
-    assert_int_eq(c->attr[2].op, evr_attr_op_rm);
-    assert_str_eq(c->attr[2].key, "rm");
-    assert_int_eq(c->attr[2].value_type, evr_attr_value_type_static);
-    assert_null(c->attr[2].value);
-    assert_int_eq(c->attr[3].op, evr_attr_op_replace);
-    assert_str_eq(c->attr[3].key, "my-ref");
-    assert_int_eq(c->attr[3].value_type, evr_attr_value_type_self_claim_ref);
-    assert_null(c->attr[3].value);
+    assert(c->seed_type == evr_seed_type_claim);
+    assert(is_str_eq(fmt_seed, "sha3-224-32100000000000000000000000000000000000000000000000000123-0000"));
+    assert(c->index_seed == 0);
+    assert(c->attr_len == 4);
+    assert(c->attr[0].op == evr_attr_op_replace);
+    assert(is_str_eq(c->attr[0].key, "title"));
+    assert(c->attr[0].value_type == evr_attr_value_type_static);
+    assert(is_str_eq(c->attr[0].value, "test.txt"));
+    assert(c->attr[1].op == evr_attr_op_add);
+    assert(is_str_eq(c->attr[1].key, "add"));
+    assert(c->attr[1].value_type == evr_attr_value_type_static);
+    assert(is_str_eq(c->attr[1].value, "spice"));
+    assert(c->attr[2].op == evr_attr_op_rm);
+    assert(is_str_eq(c->attr[2].key, "rm"));
+    assert(c->attr[2].value_type == evr_attr_value_type_static);
+    assert(c->attr[2].value == NULL);
+    assert(c->attr[3].op == evr_attr_op_replace);
+    assert(is_str_eq(c->attr[3].key, "my-ref"));
+    assert(c->attr[3].value_type == evr_attr_value_type_self_claim_ref);
+    assert(c->attr[3].value == NULL);
     free(c);
     xmlFreeDoc(doc);
 }
@@ -223,16 +223,16 @@ void test_parse_attr_claim_with_self_ref(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_claim *c = evr_parse_attr_claim(cn);
-    assert_not_null(c);
-    assert_int_eq(c->seed_type, evr_seed_type_self);
-    assert_int_eq(c->index_seed, 0);
-    assert_int_eq(c->attr_len, 0);
+    assert(c);
+    assert(c->seed_type == evr_seed_type_self);
+    assert(c->index_seed == 0);
+    assert(c->attr_len == 0);
     free(c);
     xmlFreeDoc(doc);
 }
@@ -245,16 +245,16 @@ void test_parse_attr_claim_with_index_seed(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_claim *c = evr_parse_attr_claim(cn);
-    assert_not_null(c);
-    assert_int_eq(c->seed_type, evr_seed_type_self);
-    assert_int_eq(c->index_seed, 1024);
-    assert_int_eq(c->attr_len, 0);
+    assert(c);
+    assert(c->seed_type == evr_seed_type_self);
+    assert(c->index_seed == 1024);
+    assert(c->attr_len == 0);
     free(c);
     xmlFreeDoc(doc);
 }
@@ -268,23 +268,23 @@ void test_parse_two_attr_claims(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_claim *c = evr_parse_attr_claim(cn);
-    assert_not_null(c);
-    assert_int_eq(c->seed_type, evr_seed_type_self);
-    assert_int_eq(c->index_seed, 0);
-    assert_int_eq(c->attr_len, 0);
+    assert(c);
+    assert(c->seed_type == evr_seed_type_self);
+    assert(c->index_seed == 0);
+    assert(c->attr_len == 0);
     free(c);
     cn = evr_next_claim(cn);
     c = evr_parse_attr_claim(cn);
-    assert_not_null(c);
-    assert_int_eq(c->seed_type, evr_seed_type_self);
-    assert_int_eq(c->index_seed, 1);
-    assert_int_eq(c->attr_len, 0);
+    assert(c);
+    assert(c->seed_type == evr_seed_type_self);
+    assert(c->index_seed == 1);
+    assert(c->attr_len == 0);
     free(c);
     xmlFreeDoc(doc);
 }
@@ -302,27 +302,27 @@ void test_parse_attr_spec_claim(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
-    assert_not_null(c);
-    assert_int_eq(c->attr_def_len, 2);
+    assert(c);
+    assert(c->attr_def_len == 2);
     struct evr_attr_def *tag_def = &c->attr_def[0];
-    assert_str_eq(tag_def->key, "tag");
-    assert_int_eq(tag_def->type, evr_type_str);
+    assert(is_str_eq(tag_def->key, "tag"));
+    assert(tag_def->type == evr_type_str);
     struct evr_attr_def *size_def = &c->attr_def[1];
-    assert_str_eq(size_def->key, "body-size");
-    assert_int_eq(size_def->type, evr_type_int);
+    assert(is_str_eq(size_def->key, "body-size"));
+    assert(size_def->type == evr_type_int);
     evr_blob_ref_str fmt_transformation_blob_ref;
     evr_fmt_blob_ref(fmt_transformation_blob_ref, c->transformation_blob_ref);
-    assert_str_eq(fmt_transformation_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123");
-    assert_int_eq(c->attr_factories_len, 1);
+    assert(is_str_eq(fmt_transformation_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123"));
+    assert(c->attr_factories_len == 1);
     evr_blob_ref_str attr_factory_ref_str;
     evr_fmt_blob_ref(attr_factory_ref_str, *c->attr_factories);
-    assert_str_eq(attr_factory_ref_str, "sha3-224-99900000000000000000000000000000000000000000000000000000");
+    assert(is_str_eq(attr_factory_ref_str, "sha3-224-99900000000000000000000000000000000000000000000000000000"));
     free(c);
     xmlFreeDoc(doc);
 }
@@ -337,13 +337,13 @@ void test_parse_attr_spec_claim_error_unknown_transformation_type(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
-    assert_null(c);
+    assert(c == NULL);
     xmlFreeDoc(doc);
 }
 
@@ -358,13 +358,13 @@ void test_parse_attr_spec_claim_error_unknown_attr_factory_type(){
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
     xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
-    assert_not_null(doc);
+    assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
-    assert_not_null(csn);
+    assert(csn);
     xmlNode *cn = evr_first_claim(csn);
-    assert_not_null(cn);
+    assert(cn);
     struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
-    assert_null(c);
+    assert(c == NULL);
     xmlFreeDoc(doc);
 }
 

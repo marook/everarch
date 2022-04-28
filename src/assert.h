@@ -22,28 +22,31 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-void fail(const char *format, ...);
-void vfail(const char* format, va_list args);
+#include "basics.h"
 
-void assert_zero(int i);
-void assert_ok(int result);
-void assert_ok_msg(int result, const char *format, ...);
-void assert_err(int result);
-void assert_err_msg(int result, const char *format, ...);
-void assert_equal(int actual, int expected);
-void assert_equal_msg(int actual, int expected, const char *format, ...);
-void assert_greater_equal(long actual, long min);
-void assert_greater_then(long actual, long min);
-#define assert_true assert_truthy
-void assert_truthy(int i);
-void assert_null(const void *p);
-void assert_not_null(const void *p);
-void assert_not_null_msg(const void *p, const char *format, ...);
-void assert_str_eq(const char *actual, const char *expected);
-void assert_str_contains(const char *haystack, const char *needle);
-void assert_int_eq(int actual, int expected);
-void assert_int_eq_msg(int actual, int expected, const char *format, ...);
-void assert_p_eq(void *actual, void *expected);
-void assert_size_eq(size_t actual, size_t expected);
+#define evr_src_loc() (__FILE__ ":" to_string(__LINE__))
+
+void loc_fail(const char *loc, const char *format, ...);
+#define fail() loc_fail(evr_src_loc(), "Assertion failed")
+#define fail_msg(msg, ...) loc_fail(evr_src_loc(), msg, __VA_ARGS__)
+
+#define assert(check)                                   \
+    do {                                                \
+        if(!(check)) {                                  \
+            fail();                                     \
+        }                                               \
+    } while(0)                                  
+
+#define assert_msg(check, msg, ...)                      \
+    do {                                                 \
+        if(!(check)) {                                   \
+            fail_msg(evr_src_loc(), msg, __VA_ARGS__);   \
+        }                                                \
+    } while(0)
+
+int is_ok(int result);
+int is_err(int result);
+int is_str_eq(const char *a, const char *b);
+int is_str_in(const char *haystack, const char *needle);
 
 #endif

@@ -26,33 +26,33 @@ void stringify_dynamic_array(struct dynamic_array **da);
 
 void test_hello_world_signature(){
     struct dynamic_array *out = NULL;
-    assert_ok(evr_sign(&out, "hello world!"));
-    assert_not_null(out);
+    assert(is_ok(evr_sign(&out, "hello world!")));
+    assert(out);
     stringify_dynamic_array(&out);
-    assert_str_contains((char*)out->data, "hello world");
-    assert_str_contains((char*)out->data, "-----BEGIN PGP SIGNATURE-----");
+    assert(is_str_in((char*)out->data, "hello world"));
+    assert(is_str_in((char*)out->data, "-----BEGIN PGP SIGNATURE-----"));
     free(out);
 }
 
 void test_validate_hello_world_signature(){
     struct dynamic_array *sgn = NULL;
-    assert_ok(evr_sign(&sgn, "hello world!"));
-    assert_not_null(sgn);
+    assert(is_ok(evr_sign(&sgn, "hello world!")));
+    assert(sgn);
     struct dynamic_array *msg = NULL;
-    assert_ok(evr_verify(&msg, sgn->data, sgn->size_used));
+    assert(is_ok(evr_verify(&msg, sgn->data, sgn->size_used)));
     free(sgn);
     stringify_dynamic_array(&msg);
     if(msg->data[msg->size_used - 2] == '\n'){
         msg->data[msg->size_used - 2] = '\0';
     }
-    assert_str_eq(msg->data, "hello world!");
+    assert(is_str_eq(msg->data, "hello world!"));
     free(msg);
 }
 
 void stringify_dynamic_array(struct dynamic_array **da){
     char buf[1];
     *da = write_n_dynamic_array(*da, buf, sizeof(buf));
-    assert_not_null(*da);
+    assert(*da);
 }
 
 int main(){

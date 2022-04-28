@@ -1,4 +1,3 @@
-* make failed assertions in unit tests report source file and line number
 * replace libxslt with calls to xsltproc
 libxslt has issues handling xsl:attribute elements nested in
 xsl:template elements. they lead to error like:
