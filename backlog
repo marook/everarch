@@ -1,11 +1,3 @@
-* replace libxslt with calls to xsltproc
-libxslt has issues handling xsl:attribute elements nested in
-xsl:template elements. they lead to error like:
-
-#+BEGIN_SRC
-runtime error: element attribute
-xsl:attribute: Cannot add attributes to an element if children have been already added to the element.
-#+END_SRC
 * add get-claim cmd to evr cli
 get-claim should fetch the claim set, validate the signature and print
 the referenced claim to stdout.
@@ -20,6 +12,12 @@ hitting enter on a claim ref which points to a evr:file should open
 the file in a new buffer.
 * add evr-file-minor-mode to buffers which show evr:file contents
 evr-file-minor-mode should save the buffer back to everarch on save.
+* log failed transformations and attr factory calls with claim-sets
+failed xslt transformations and failed attr factory interactions
+should be logged in the attr-index directory. the file name should be
+the claim's ref with a .log extension. the log file should contain one
+line which indicates what went wrong. then one empty line. then the
+claim-set input or output which lead to an error.
 * give claims a validity period
 right now only claim attributes have a validity period. claims should
 also have one.
