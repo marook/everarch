@@ -368,6 +368,33 @@ void test_parse_attr_spec_claim_error_unknown_attr_factory_type(){
     xmlFreeDoc(doc);
 }
 
+void test_nth_claim(){
+    const char *buf =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
+        "<attr id=\"first\"></attr>"
+        "<attr id=\"second\"></attr>"
+        "</claim-set>\n";
+    size_t buf_size = strlen(buf);
+    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    assert(doc);
+    xmlNode *csn = evr_get_root_claim_set(doc);
+    assert(csn);
+    xmlNode *first = evr_nth_claim(csn, 0);
+    assert(first);
+    char *id = (char *)xmlGetProp(first, BAD_CAST "id");
+    assert_msg(is_str_eq(id, "first"), "Got id '%s'", id);
+    xmlFree(id);
+    xmlNode *second = evr_nth_claim(csn, 1);
+    assert(second);
+    id = (char *)xmlGetProp(second, BAD_CAST "id");
+    assert_msg(is_str_eq(id, "second"), "Got id '%s'", id);
+    xmlFree(id);
+    xmlNode *third = evr_nth_claim(csn, 2);
+    assert(third == NULL);
+    xmlFreeDoc(doc);
+}
+
 int main(){
     xmlInitParser();
     run_test(test_empty_claim_without_finalize);
@@ -384,6 +411,7 @@ int main(){
     run_test(test_parse_attr_spec_claim);
     run_test(test_parse_attr_spec_claim_error_unknown_transformation_type);
     run_test(test_parse_attr_spec_claim_error_unknown_attr_factory_type);
+    run_test(test_nth_claim);
     xmlCleanupParser();
     return 0;
 }

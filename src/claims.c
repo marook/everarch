@@ -180,7 +180,7 @@ xmlNode *evr_next_claim(xmlNode *claim_node){
 
 xmlNode *evr_nth_claim(xmlNode *claim_set, int n){
     xmlNode *node = evr_first_claim(claim_set);
-    for(int i = 1; node && i < n; ++i){
+    for(int i = 0; node && i < n; ++i){
         node = evr_next_claim(node);
     }
     return node;
