@@ -40,7 +40,7 @@ void loc_fail(const char *loc, const char *format, ...);
 #define assert_msg(check, msg, ...)                      \
     do {                                                 \
         if(!(check)) {                                   \
-            fail_msg(evr_src_loc(), msg, __VA_ARGS__);   \
+            fail_msg(msg, __VA_ARGS__);                  \
         }                                                \
     } while(0)
 
