@@ -1,11 +1,20 @@
-* follow refs in emacs' evr-attr-index-results-mode
-hitting enter on a claim ref should follow that reference. the claim
-should be shown in a new buffer.
 * open file refs in emacs' evr-attr-index-results-mode
 hitting enter on a claim ref which points to a evr:file should open
 the file in a new buffer.
-* add evr-file-minor-mode to buffers which show evr:file contents
-evr-file-minor-mode should save the buffer back to everarch on save.
+
+in order to do so the claim should be fetched via 'evr get-claim'. the
+buffer with the claim should be shown if it is not a file claim.
+
+if it is a file claim the file content should be fetched via 'evr
+get-file' and shown in another buffer. the buffer should decide it's
+major mode via normal-mode.
+* add evr-sourced-minor-mode to buffers which show evr:file contents
+evr-sourced-minor-mode should save the buffer back to everarch on save.
+* an empty string attr-query should return any seeds
+* attr-query searches should return the found claims ordered by date desc
+the sort order should be by creation date of the seed in descending
+order. sorting by last modified will require extra work to store the
+latest modification timestamp. so it's down below in the backlog.
 * log failed transformations and attr factory calls with claim-sets
 failed xslt transformations and failed attr factory interactions
 should be logged in the attr-index directory. the file name should be
@@ -103,6 +112,31 @@ using evr_parse_claim_ref(…).
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
 perkeep stuff.
+* sort attr-query results by last modified timestamp
+right now found claims are sorted by their creation date desc. further
+sort orders should be able to be specified using a order by query
+expression.
+
+examples:
+#+BEGIN_SRC
+tag=todo order by last-modified
+tag=todo order by last-modified desc
+tag=todo order by last-modified asc
+tag=todo order by created
+tag=todo order by created desc
+tag=todo order by created asc
+#+END_SRC
+* sort attr-query results by a certain attr key
+right now found claims are sortable by their creation and last
+modification date. with this task sorting by a certain attr should be
+possible.
+
+examples:
+#+BEGIN_SRC
+tag=todo order by title
+tag=todo order by title desc
+tag=todo order by title asc
+#+END_SRC
 * add match functions to attr query language
 #+BEGIN_SRC
 tag=todo && is_image(mime_type)
@@ -113,6 +147,12 @@ the query might be something like: select title where tag=todo
 #+BEGIN_SRC
 (tag=todo || tag=backlog) tag=howto
 #+END_SRC
+* follow claim-refs in emacs' evr-attr-index-results-mode
+hitting enter on a claim ref should follow that reference. the claim
+should be shown in a new buffer just like 'evr get-claim' prints it to
+stdout.
+
+the new buffer's major mode should be some sane mode for printing xml.
 * gracefully handle sqlite database is locked in evr-glacier-storage
 sqlite's step function will exit with SQLITE_LOCKED if a table is
 locked for more than 1sec (configured right now).
