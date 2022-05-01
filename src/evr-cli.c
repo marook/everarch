@@ -46,6 +46,7 @@ static char doc[] =
     "evr-glacier-cli is a command line client for interacting with evr-glacier-storage servers.\n\n"
     "Possible commands are get, put, sign-put, post-file or watch.\n\n"
     "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout\n\n"
+    "The get-claim command expects the key of the to be fetched claim as second argument. The claim will be written to stdout\n\n"
     "The put command retrieves a blob via stdin and sends it to the evr-glacier-storage.\n\n"
     "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
@@ -65,11 +66,12 @@ static struct argp_option options[] = {
 
 #define cli_cmd_none 0
 #define cli_cmd_get 1
-#define cli_cmd_put 2
-#define cli_cmd_sign_put 3
-#define cli_cmd_get_file 4
-#define cli_cmd_post_file 5
-#define cli_cmd_watch_blobs 6
+#define cli_cmd_get_claim 2
+#define cli_cmd_put 3
+#define cli_cmd_sign_put 4
+#define cli_cmd_get_file 5
+#define cli_cmd_post_file 6
+#define cli_cmd_watch_blobs 7
 
 struct cli_arguments {
     int cmd;
@@ -124,6 +126,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
         case 0:
             if(strcmp("get", arg) == 0){
                 cli_args->cmd = cli_cmd_get;
+            } else if(strcmp("get-claim", arg) == 0){
+                cli_args->cmd = cli_cmd_get_claim;
             } else if(strcmp("put", arg) == 0){
                 cli_args->cmd = cli_cmd_put;
             } else if(strcmp("sign-put", arg) == 0){
@@ -140,7 +144,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             }
             break;
         case 1:
-            if(cli_args->cmd == cli_cmd_get || cli_args->cmd == cli_cmd_get_file){
+            if(cli_args->cmd == cli_cmd_get || cli_args->cmd == cli_cmd_get_claim || cli_args->cmd == cli_cmd_get_file){
                 cli_args->key = arg;
             } else if(cli_args->cmd == cli_cmd_post_file){
                 cli_args->file = arg;
@@ -157,6 +161,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
             argp_usage (state);
             return ARGP_ERR_UNKNOWN;
         case cli_cmd_get:
+        case cli_cmd_get_claim:
         case cli_cmd_get_file:
             if (state->arg_num < 2) {
                 // not enough arguments
@@ -178,6 +183,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
 int evr_cli_get(char *fmt_key);
+int evr_cli_get_claim(char *claim_ref_str);
 int evr_cli_put(int flags);
 int evr_cli_sign_put(int flags);
 int evr_cli_get_file(char *fmt_key);
@@ -206,6 +212,9 @@ int main(int argc, char **argv){
         break;
     case cli_cmd_get:
         ret = evr_cli_get(cli_args.key);
+        break;
+    case cli_cmd_get_claim:
+        ret = evr_cli_get_claim(cli_args.key);
         break;
     case cli_cmd_put:
         ret = evr_cli_put(cli_args.flags);
@@ -243,29 +252,98 @@ int evr_cli_get(char *fmt_key){
     }
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(c, key, &resp) != evr_ok){
-        goto cmd_format_fail;
+        goto out_with_close_c;
     }
     if(resp.status_code == evr_status_code_blob_not_found){
         log_error("not found");
-        goto cmd_format_fail;
+        goto out_with_close_c;
     } else if(resp.status_code != evr_status_code_ok){
-        goto cmd_format_fail;
+        goto out_with_close_c;
     }
     // read flags but don't use them
     char buf[1];
     if(read_n(c, buf, sizeof(buf)) != evr_ok){
-        goto cmd_format_fail;
+        goto out_with_close_c;
     }
     if(pipe_n(STDOUT_FILENO, c, resp.body_size - 1) != evr_ok){
-        goto cmd_format_fail;
+        goto out_with_close_c;
     }
     result = evr_ok;
- cmd_format_fail:
+ out_with_close_c:
     if(close(c)){
         result = evr_error;
     }
  fail:
     return result;
+}
+
+int evr_cli_get_claim(char *claim_ref_str){
+    int ret = evr_error;
+    evr_init_signatures();
+    xmlInitParser();
+    evr_claim_ref claim_ref;
+    if(evr_parse_claim_ref(claim_ref, claim_ref_str) != evr_ok){
+        log_error("Invalid key format");
+        goto out;
+    }
+    int c = evr_connect_to_storage();
+    if(c < 0){
+        log_error("Failed to connect to evr-glacier-storage server");
+        goto out;
+    }
+    evr_blob_ref blob_ref;
+    int claim_index;
+    evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
+    xmlDocPtr doc = evr_fetch_signed_xml(c, blob_ref);
+    if(!doc){
+        log_error("No validly signed XML found for ref %s", claim_ref_str);
+        goto out_with_close_c;
+    }
+    xmlNode *cs = evr_get_root_claim_set(doc);
+    if(!cs){
+        log_error("No claim set found in blob");
+        goto out_with_free_doc;
+    }
+    xmlNode *cn = evr_nth_claim(cs, claim_index);
+    if(!c){
+        log_error("There is no claim with index %d in claim-set with ref %s", claim_index, claim_ref_str);
+        goto out_with_free_doc;
+    }
+    xmlDocPtr out_doc = xmlNewDoc(BAD_CAST "1.0");
+    if(!out_doc){
+        goto out_with_free_doc;
+    }
+    if(xmlDOMWrapAdoptNode(NULL, doc, cn, out_doc, NULL, 0)){
+        goto out_with_free_out_doc;
+    }
+    if(xmlDocSetRootElement(out_doc, cn) != 0){
+        goto out_with_free_out_doc;
+    }
+    xmlDOMWrapReconcileNamespaces(NULL, cn, 0);
+    char *out_doc_str = NULL;
+    int out_doc_str_size;
+    xmlDocDumpMemoryEnc(out_doc, (xmlChar**)&out_doc_str, &out_doc_str_size, "UTF-8");
+    if(!out_doc_str){
+        log_error("Failed to format output doc");
+        goto out_with_free_out_doc;
+    }
+    if(write_n(STDOUT_FILENO, out_doc_str, out_doc_str_size) != evr_ok){
+        goto out_with_free_out_doc_str;
+    }
+    ret = evr_ok;
+ out_with_free_out_doc_str:
+    xmlFree(out_doc_str);
+ out_with_free_out_doc:
+    xmlFreeDoc(out_doc);
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out_with_close_c:
+    if(close(c)){
+        ret = evr_error;
+    }
+ out:
+    xmlCleanupParser();
+    return ret;
 }
 
 int evr_cli_put(int flags){
@@ -397,7 +475,7 @@ int evr_cli_get_file(char *fmt_cref){
     xmlDocPtr doc = evr_fetch_signed_xml(c, bref);
     if(!doc){
         log_error("No validly signed XML found for ref %s", fmt_cref);
-        goto out;
+        goto out_with_close_c;
     }
     xmlNode *cs = evr_get_root_claim_set(doc);
     if(!cs){
@@ -459,6 +537,10 @@ int evr_cli_get_file(char *fmt_cref){
     ret = evr_ok;
  out_with_free_doc:
     xmlFreeDoc(doc);
+ out_with_close_c:
+    if(close(c)){
+        ret = evr_error;
+    }
  out:
     xmlCleanupParser();
     return ret;

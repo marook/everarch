@@ -59,3 +59,16 @@ then
     echo "Expected 'piped content' but got: ${content}" >&2
     exit 1
 fi
+
+# evr get-claim
+claim=`evr get-claim ${ref}`
+if [[ "${claim}" != "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<file xmlns=\"https://evr.ma300k.de/claims/\">
+  <body>
+   <slice ref=\"sha3-224-0890c2f681f23e2c67aa9f9685cf753be459f460b4ee8404752aa449\" size=\"14\"/>
+  </body>
+ </file>" ]]
+then
+    echo "Retrieved unexpected claim: ${claim}" >&2
+    exit 1
+fi

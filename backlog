@@ -1,9 +1,3 @@
-* add get-claim cmd to evr cli
-get-claim should fetch the claim set, validate the signature and print
-the referenced claim to stdout.
-
-this should be later used to follow references in emacs's
-evr-attr-index-results-mode.
 * follow refs in emacs' evr-attr-index-results-mode
 hitting enter on a claim ref should follow that reference. the claim
 should be shown in a new buffer.
