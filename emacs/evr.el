@@ -16,6 +16,8 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+(setq evr--claim-ref-pattern "sha[0-9]+-224-\\([0-9a-z]\\)\\{56\\}-\\([0-9a-f]\\)\\{4\\}")
+
 ;;;###autoload
 (defun evr-attr-index-search (query)
   "evr-search performs a search against the default
@@ -67,24 +69,18 @@ evr-attr-index and prints the results into a new buffer."
     (define-key map "r" 'isearch-backward)
     (define-key map "s" 'isearch-forward)
     (define-key map "g" 'evr-attr-index-search-from-buffer)
+    (define-key map "f" 'evr-follow-claim-ref)
+    (define-key map "\C-m" 'evr-follow-claim-ref)
     map)
   "Local keymap for evr-attr-index-results-mode buffers.")
 
 (defface evr-claim-ref
-  '((t (:inherit shadow)))
+  '((t (:inherit link)))
   "Face used for everarch claim refs."
   :group 'evr-faces
   :version "22.1")
 (defvar evr-claim-ref-face 'evr-claim-ref
   "Face name used for everarch claim refs.")
-
-(defface evr-claim-attribute-claim-ref
-  '((t (:inherit link)))
-  "Face used for claim attributes which reference claims."
-  :group 'evr-faces
-  :version "22.1")
-(defvar evr-claim-attribute-claim-ref-face 'evr-claim-attribute-claim-ref
-  "Face name used for claim attributes which reference claims.")
 
 (defface evr-claim-attribute
   '()
@@ -96,10 +92,8 @@ evr-attr-index and prints the results into a new buffer."
 
 (defvar evr-attr-index-results-font-lock-keywords
   (list
-   (list "^sha[0-9]+-[0-9]+-[a-z0-9]+-[a-f0-9]+$" '(0 evr-claim-ref-face))
-   ;; TODO parameterize the following "file" key name
-   (list "^\tfile=.*$" '(0 evr-claim-attribute-claim-ref-face))
-   (list "^\t[^\t=][^=]*=.*$" '(0 evr-claim-attribute-face))
+   (list evr--claim-ref-pattern '(0 evr-claim-ref-face))
+   (list "[^\t=][^=]*=.*$" '(0 evr-claim-attribute-face))
   ))
 
 (defun evr-attr-index-results-mode ()
@@ -114,3 +108,79 @@ evr-attr-index and prints the results into a new buffer."
               '(evr-attr-index-results-font-lock-keywords t nil nil beginning-of-line))
   (font-lock-ensure)
   (run-mode-hooks 'evr-attr-index-results-mode-hook))
+
+(defun evr--goto-claim-ref-beginning ()
+  (interactive)
+  (end-of-line)
+  (re-search-backward evr--claim-ref-pattern))
+
+(defun evr--get-claim-ref ()
+  "Returns the claim reference at or before point."
+  (interactive)
+  (save-excursion
+    (evr--goto-claim-ref-beginning)
+    (let ((start (point)))
+      (end-of-line)
+      (buffer-substring-no-properties start (point)))))
+
+(defun evr-find-claim (claim-ref)
+  "Visit claim with given claim ref."
+  (interactive "sRef: ")
+  (let ((old-claim-buffer (get-buffer claim-ref)))
+    (if old-claim-buffer (kill-buffer old-claim-buffer)))
+  (let ((claim-ref-buffer (get-buffer-create claim-ref)))
+    (make-process
+     :name (concat "evr get-claim " claim-ref)
+     :buffer claim-ref
+     :command `("evr" "get-claim" ,claim-ref)
+     :sentinel
+     (lambda (process event)
+       (if (string= event "finished\n")
+           (with-current-buffer claim-ref-buffer
+             (set-buffer-modified-p nil)
+             (normal-mode)
+             (setq-local evr-claim-ref claim-ref)
+             )))
+     :stderr (get-buffer-create "*evr get-claim errors*")
+     )
+    (switch-to-buffer claim-ref)))
+
+(defun evr-follow-claim ()
+  "Follows the root claim within the current buffer."
+  (interactive)
+  (let ((claim-doc (libxml-parse-xml-region (point-min) (point-max))))
+    ;; TODO add xml namespace handling here
+    (if (string= (symbol-name (car claim-doc)) "file")
+        (let ((file-attrs (car (cdr claim-doc)))
+              (title evr-claim-ref))
+          (if file-attrs
+              (let ((title-attr-value (alist-get 'title file-attrs)))
+                (if title-attr-value
+                    (setq title title-attr-value))))
+          (evr--follow-file-claim evr-claim-ref title))
+      (message "No idea how to follow this claim"))
+  ))
+
+(defun evr--follow-file-claim (claim-ref buffer-name)
+  ;; TODO assert evr-claim-ref buffer local variable is set
+  (message (concat "evr get " buffer-name "..."))
+  (make-process
+   :name (concat "evr get-file " claim-ref)
+   :buffer buffer-name
+   :command `("evr" "get-file" ,claim-ref)
+   :sentinel
+   (lambda (process event)
+     (if (string= event "finished\n")
+         (with-current-buffer buffer-name
+           (set-buffer-modified-p nil)
+           (normal-mode)
+           (setq-local evr-claim-ref claim-ref)
+           (switch-to-buffer buffer-name)
+           )))
+   :stderr (get-buffer-create "*evr get-file errors*")
+   ))
+
+(defun evr-follow-claim-ref ()
+  "Follows the claim ref at point."
+  (interactive)
+  (evr-find-claim (evr--get-claim-ref)))
