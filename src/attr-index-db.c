@@ -642,13 +642,15 @@ int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, cha
     return evr_ok;
 }
 
+int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref seed, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
+
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, evr_claim_ref cref, struct evr_attr_claim *claim){
     int ret = evr_error;
     if(claim->seed_type != evr_seed_type_claim){
         log_error("Only attr claims with claim seed can be merged into attr-index");
         goto out;
     }
-    if(evr_merge_attr_index_attr(db, t, claim->seed, claim->attr, claim->attr_len) != evr_ok){
+    if(evr_merge_attr_index_attr(db, t, claim->seed, cref, claim->attr, claim->attr_len) != evr_ok){
         goto out;
     }
     if(sqlite3_bind_blob(db->insert_claim, 1, cref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
@@ -684,7 +686,7 @@ int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, evr_time t, evr_
 
 int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, evr_time t, evr_claim_ref seed, char *key, char* value);
 
-int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len){
+int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref seed, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len){
     int ret = evr_error;
     struct evr_attr *end = &attr[attr_len];
     int ref_str_built = 0;
@@ -717,17 +719,17 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
             log_error("Requested to merge attr with unknown op 0x%02x", a->op);
             goto out;
         case evr_attr_op_replace:
-            if(evr_merge_attr_index_attr_replace(db, t, ref, a->key, value) != evr_ok){
+            if(evr_merge_attr_index_attr_replace(db, t, seed, a->key, value) != evr_ok){
                 goto out;
             }
             break;
         case evr_attr_op_add:
-            if(evr_merge_attr_index_attr_add(db, t, ref, a->key, value) != evr_ok){
+            if(evr_merge_attr_index_attr_add(db, t, seed, a->key, value) != evr_ok){
                 goto out;
             }
             break;
         case evr_attr_op_rm:
-            if(evr_merge_attr_index_attr_rm(db, t, ref, a->key, value) != evr_ok){
+            if(evr_merge_attr_index_attr_rm(db, t, seed, a->key, value) != evr_ok){
                 goto out;
             }
             break;

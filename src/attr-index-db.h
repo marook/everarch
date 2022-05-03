@@ -103,8 +103,6 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, evr_claim_ref cref, struct evr_attr_claim *claim);
 
-int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
-
 typedef int (*evr_attr_visitor)(void *ctx, const char *key, const char *value);
 
 struct evr_attr_tuple {

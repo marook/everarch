@@ -417,6 +417,28 @@ void test_attr_attribute_factories(){
     evr_free_attr_index_db_configuration(cfg);
 }
 
+void test_attr_value_type_self_claim_ref(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
+    evr_claim_ref cref;
+    assert(is_ok(evr_parse_claim_ref(cref, "sha3-224-00000000000000000000000000000000000000000000000000000000-9999")));
+    struct evr_attr attr;
+    attr.op = evr_attr_op_replace;
+    attr.key = "my-key";
+    attr.value_type = evr_attr_value_type_self_claim_ref;
+    attr.value = NULL;
+    struct evr_attr_claim c;
+    c.seed_type = evr_seed_type_claim;
+    assert(is_ok(evr_parse_claim_ref(c.seed, "sha3-224-00000000000000000000000000000000000000000000000000000000-0000")));
+    c.index_seed = 1;
+    c.attr_len = 1;
+    c.attr = &attr;
+    assert(is_ok(evr_merge_attr_index_claim(db, 10, cref, &c)));
+    assert_query_one_result(db, "my-key=sha3-224-00000000000000000000000000000000000000000000000000000000-9999", 20, c.seed);
+    assert(is_ok(evr_free_attr_index_db(db)));
+    evr_free_attr_index_db_configuration(cfg);
+}
+
 xsltStylesheetPtr create_attr_mapping_stylesheet(){
     char content[] =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -465,5 +487,6 @@ int main(){
     run_test(test_query_syntax_error);
     run_test(test_attr_factories);
     run_test(test_attr_attribute_factories);
+    run_test(test_attr_value_type_self_claim_ref);
     return 0;
 }
