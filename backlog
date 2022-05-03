@@ -1,3 +1,8 @@
+* evr cli still uses ref argument name instead of seed :bug:
+for example when posting a file.
+
+the evr.el script must also be adjusted because it calls the evr cli
+with the --ref argument.
 * open file refs in emacs' evr-attr-index-results-mode
 hitting enter on a claim ref which points to a evr:file should open
 the file in a new buffer.
@@ -10,6 +15,22 @@ get-file' and shown in another buffer. the buffer should decide it's
 major mode via normal-mode.
 * add evr-sourced-minor-mode to buffers which show evr:file contents
 evr-sourced-minor-mode should save the buffer back to everarch on save.
+* add ref key to attr query language to match ref
+introduce ref as keyword to match the ref of a claim. later "ref" (in
+double quotes) should mean the attribute with the key ref.
+* evr.el should query the claim ref when hitting enter on attr ref
+right now evr.el fetches and shows the claim xml when hitting enter on
+any claim ref.
+
+in the future hitting enter on a claim ref should query the attr-index
+in a new buffer with a query that matches only the claim ref at point.
+
+pressing f on a claim ref should assume that the pointed at claim ref
+points to a file claim. the claim's file should be show in a new
+buffer.
+* evr.el should provide a hook which runs after saving a file
+that way it should be possible to store extra claims for the saved
+file. for example a todo tag.
 * an empty string attr-query should return any seeds
 * attr-query searches should return the found claims ordered by date desc
 the sort order should be by creation date of the seed in descending
@@ -66,9 +87,6 @@ tag=todo t=12345
 tag=todo t=1970-01-01T00:00:07Z
 * implement offset and limit in attr queries
 tag=todo offset=0 limit=100
-* add ref key to attr query language to match ref
-introduce ref as keyword to match the ref of a claim. later "ref" (in
-double quotes) should mean the attribute with the key ref.
 * add boolean or operator to attr query language
 #+BEGIN_SRC
 (tag=todo || tag=backlog) && tag=howto
@@ -108,6 +126,10 @@ reference the gpg keys sha3-224 hashes.
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable
 using evr_parse_claim_ref(…).
+* reserve keywords in attr-query language
+right now there are some keywords in attr-query language like for
+example 'ref'. think about future keywords and reserve them so nobody
+must rewrite queries in the future.
 * ---- v0.1 boundary ----
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
