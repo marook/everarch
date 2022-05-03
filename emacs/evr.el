@@ -110,20 +110,30 @@ evr-attr-index and prints the results into a new buffer."
   (run-mode-hooks 'evr-attr-index-results-mode-hook))
 
 (defun evr--goto-claim-ref-beginning ()
-  (interactive)
   (end-of-line)
   (re-search-backward evr--claim-ref-pattern))
 
 (defun evr--get-claim-ref ()
   "Returns the claim reference at or before point."
-  (interactive)
   (save-excursion
     (evr--goto-claim-ref-beginning)
     (let ((start (point)))
       (end-of-line)
       (buffer-substring-no-properties start (point)))))
 
-(defun evr-find-claim (claim-ref)
+(defun evr--goto-seed-ref-beginning ()
+  (end-of-line)
+  (re-search-backward (concat "^" evr--claim-ref-pattern "$")))
+
+(defun evr--get-seed-ref ()
+  "Returns the seed reference at or before point."
+  (save-excursion
+    (evr--goto-seed-ref-beginning)
+    (let ((start (point)))
+      (end-of-line)
+      (buffer-substring-no-properties start (point)))))
+
+(defun evr-find-claim (claim-ref seed-ref)
   "Visit claim with given claim ref."
   (interactive "sRef: ")
   (let ((old-claim-buffer (get-buffer claim-ref)))
@@ -139,6 +149,7 @@ evr-attr-index and prints the results into a new buffer."
            (with-current-buffer claim-ref-buffer
              (set-buffer-modified-p nil)
              (normal-mode)
+             (setq-local evr-seed-ref seed-ref)
              (setq-local evr-claim-ref claim-ref)
              )))
      :stderr (get-buffer-create "*evr get-claim errors*")
@@ -157,13 +168,13 @@ evr-attr-index and prints the results into a new buffer."
               (let ((title-attr-value (alist-get 'title file-attrs)))
                 (if title-attr-value
                     (setq title title-attr-value))))
-          (evr--follow-file-claim evr-claim-ref title))
+          (evr--follow-file-claim evr-claim-ref evr-seed-ref title))
       (message "No idea how to follow this claim"))
   ))
 
-(defun evr--follow-file-claim (claim-ref buffer-name)
+(defun evr--follow-file-claim (claim-ref seed-ref buffer-name)
   ;; TODO assert evr-claim-ref buffer local variable is set
-  (message (concat "evr get " buffer-name "..."))
+  (message "evr get %s" buffer-name)
   (make-process
    :name (concat "evr get-file " claim-ref)
    :buffer buffer-name
@@ -172,9 +183,13 @@ evr-attr-index and prints the results into a new buffer."
    (lambda (process event)
      (if (string= event "finished\n")
          (with-current-buffer buffer-name
+           ;; TODO should we call set-visited-file-name?
            (set-buffer-modified-p nil)
+           (goto-char (point-min))
            (normal-mode)
+           (setq-local evr-seed-ref seed-ref)
            (setq-local evr-claim-ref claim-ref)
+           (evr-file-claim-mode nil)
            (switch-to-buffer buffer-name)
            )))
    :stderr (get-buffer-create "*evr get-file errors*")
@@ -183,4 +198,54 @@ evr-attr-index and prints the results into a new buffer."
 (defun evr-follow-claim-ref ()
   "Follows the claim ref at point."
   (interactive)
-  (evr-find-claim (evr--get-claim-ref)))
+  nil
+  (evr-find-claim (evr--get-claim-ref) (evr--get-seed-ref)))
+
+(defun evr-file-claim-mode (&optional arg)
+  "This minor mode makes a buffer an everarch sourced file."
+  (interactive (list (or current-prefix-arg 'toggle)))
+  (let ((enable
+         (if (eq arg 'toggle)
+             (not evr-file-claim-mode)
+           (> (prefix-numeric-value arg) 0))))
+    (if enable
+        (evr-enable-file-claim-mode)
+      (evr-disable-file-claim-mode))))
+
+;;;###autoload
+(defun evr-save-file ()
+  "Saves the current buffer as file in everarch."
+  (interactive)
+  (let ((file-buffer-name (buffer-name)))
+    (message "Saving evr file %s..." file-buffer-name)
+    (let ((proc (make-process
+                 :name (concat "evr post-file " file-buffer-name)
+                 :buffer (get-buffer-create "*evr post-file errors*")
+                 ;; TODO use buffer's file name instead of buffer-name
+                 :command
+                 (nconc
+                  `("evr" "post-file" "--title" ,file-buffer-name)
+                  (if (local-variable-p 'evr-seed-ref)
+                      `("--ref" ,evr-seed-ref)
+                    ()))
+                 :filter
+                 (lambda (proc out)
+                   (with-current-buffer file-buffer-name
+                     (if (not (local-variable-p 'evr-seed-ref))
+                         (setq-local evr-seed-ref (string-trim out)))
+                     (evr-file-claim-mode t)
+                     (set-buffer-modified-p nil))
+                   (message "Wrote %s" file-buffer-name)
+                   nil)
+                 :stderr (get-buffer-create "*evr post-file errors*")
+                 )))
+      (process-send-region proc (point-min) (point-max))
+      (process-send-eof proc)
+      ))
+  t)
+
+(defun evr-enable-file-claim-mode ()
+  (add-hook 'write-contents-functions 'evr-save-file nil t))
+
+(defun evr-disable-file-claim-mode ()
+  (remove-hook 'write-contents-finctions 'evr-save-file t))
