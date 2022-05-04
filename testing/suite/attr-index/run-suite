@@ -54,7 +54,7 @@ ipid=$!
 
 sleep 1
 
-echo "Running test queryies…"
+echo "Running test queries…"
 
 results=`nc localhost 2362 <<EOF
 s tag=no-such-tag-exists
