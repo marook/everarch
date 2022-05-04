@@ -226,7 +226,7 @@ evr-attr-index and prints the results into a new buffer."
                  (nconc
                   `("evr" "post-file" "--title" ,file-buffer-name)
                   (if (local-variable-p 'evr-seed-ref)
-                      `("--ref" ,evr-seed-ref)
+                      `("--seed" ,evr-seed-ref)
                     ()))
                  :filter
                  (lambda (proc out)

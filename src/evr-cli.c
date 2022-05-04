@@ -60,7 +60,7 @@ static struct argp_option options[] = {
     {"flags-filter", 'f', "F", 0, "Only watch blobs which have set at least the given flag bits."},
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
     {"title", 't', "T", 0, "Title of the created claim. Might be used together with post-file."},
-    {"ref", 'r', "REF", 0, "Makes the created claim reference another original claim."},
+    {"seed", 's', "REF", 0, "Makes the created claim reference another claim as seed."},
     {0}
 };
 
@@ -79,8 +79,8 @@ struct cli_arguments {
     char *file;
     int flags;
     char *title;
-    int has_ref;
-    evr_claim_ref ref;
+    int has_seed;
+    evr_claim_ref seed;
     unsigned long long last_modified_after;
 };
 
@@ -110,12 +110,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
     case 't':
         cli_args->title = strdup(arg);
         break;
-    case 'r': {
-        if(evr_parse_claim_ref(cli_args->ref, arg) != evr_ok){
+    case 's': {
+        if(evr_parse_claim_ref(cli_args->seed, arg) != evr_ok){
             argp_usage(state);
             return ARGP_ERR_UNKNOWN;
         }
-        cli_args->has_ref = 1;
+        cli_args->has_seed = 1;
         break;
     }
     case ARGP_KEY_ARG:
@@ -200,7 +200,7 @@ int main(int argc, char **argv){
     cli_args.file = NULL;
     cli_args.flags = 0;
     cli_args.title = NULL;
-    cli_args.has_ref = 0;
+    cli_args.has_seed = 0;
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
     cli_args.last_modified_after = LLONG_MAX;
@@ -226,7 +226,7 @@ int main(int argc, char **argv){
         ret = evr_cli_get_file(cli_args.key);
         break;
     case cli_cmd_post_file:
-        ret = evr_cli_post_file(cli_args.file, cli_args.title, cli_args.has_ref, cli_args.ref);
+        ret = evr_cli_post_file(cli_args.file, cli_args.title, cli_args.has_seed, cli_args.seed);
         break;
     case cli_cmd_watch_blobs:
         ret = evr_cli_watch_blobs(cli_args.flags, cli_args.last_modified_after);
