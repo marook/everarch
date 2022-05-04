@@ -1,28 +1,20 @@
-* open file refs in emacs' evr-attr-index-results-mode
-hitting enter on a claim ref which points to a evr:file should open
-the file in a new buffer.
-
-in order to do so the claim should be fetched via 'evr get-claim'. the
-buffer with the claim should be shown if it is not a file claim.
-
-if it is a file claim the file content should be fetched via 'evr
-get-file' and shown in another buffer. the buffer should decide it's
-major mode via normal-mode.
-* add evr-sourced-minor-mode to buffers which show evr:file contents
-evr-sourced-minor-mode should save the buffer back to everarch on save.
 * add ref key to attr query language to match ref
 introduce ref as keyword to match the ref of a claim. later "ref" (in
 double quotes) should mean the attribute with the key ref.
-* evr.el should query the claim ref when hitting enter on attr ref
-right now evr.el fetches and shows the claim xml when hitting enter on
-any claim ref.
+* open refs as seed search in evr.el
+right now hitting enter on a claim ref will fetch the claim and show
+in in another buffer. that behavior should be bound to the 'c'
+key.
 
-in the future hitting enter on a claim ref should query the attr-index
-in a new buffer with a query that matches only the claim ref at point.
+the enter key gets a new behavior. if it is a ref of the found claim
+it should show the refs which are poining to that claim as seed.
 
-pressing f on a claim ref should assume that the pointed at claim ref
-points to a file claim. the claim's file should be show in a new
-buffer.
+if it is a ref which is the value of an attribute it should perform a
+attr-query just for that ref in a new buffer. this will show all the
+attributes of the ref.
+* open ref as file in evr.el
+whenever a ref is shown the key 'f' should follow the ref to the evr
+file it's pointing to. the file must be shown in a new buffer.
 * evr.el should provide a hook which runs after saving a file
 that way it should be possible to store extra claims for the saved
 file. for example a todo tag.
