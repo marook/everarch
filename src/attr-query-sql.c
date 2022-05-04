@@ -22,6 +22,54 @@
 
 #include "basics.h"
 #include "errors.h"
+#include "keys.h"
+
+struct evr_attr_query_ref_cnd_data {
+    evr_claim_ref ref;
+};
+
+int evr_append_ref_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd));
+
+int evr_bind_ref_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column);
+
+struct evr_attr_query_node *evr_attr_query_ref_cnd(char *ref_str){
+    struct evr_attr_query_node *ret = NULL;
+    char *buf = malloc(sizeof(struct evr_attr_query_node) + sizeof(struct evr_attr_query_ref_cnd_data));
+    if(!buf){
+        goto out;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_map_struct(&bp, ret);
+    ret->append_cnd = evr_append_ref_cnd;
+    ret->bind = evr_bind_ref_cnd;
+    ret->free_data = NULL;
+    struct evr_attr_query_ref_cnd_data *data;
+    evr_map_struct(&bp, data);
+    ret->data = data;
+    if(evr_parse_claim_ref(data->ref, ref_str) != evr_ok){
+        // log_error("Unable to parse claim ref in attr query: %s", ref_str);
+        goto out_with_free_buf;
+    }
+    free(ref_str);
+ out:
+    return ret;
+ out_with_free_buf:
+    free(buf);
+    return NULL;
+}
+
+int evr_append_ref_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)){
+    return append(ctx, "seed = ?");
+}
+
+int evr_bind_ref_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column){
+    struct evr_attr_query_ref_cnd_data *data = node->data;
+    if(sqlite3_bind_blob(stmt, (*column)++, data->ref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+        return evr_error;
+    }
+    return evr_ok;
+}
 
 struct evr_attr_query_eq_cnd_data {
     char *key;
@@ -32,7 +80,7 @@ int evr_append_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node
 
 int evr_bind_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column);
 
-int evr_free_data_eq_cnd(void *data);
+void evr_free_data_eq_cnd(void *data);
 
 struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value){
     struct evr_attr_query_node *ret = NULL;
@@ -79,11 +127,10 @@ int evr_bind_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *
     return ret;
 }
 
-int evr_free_data_eq_cnd(void *data){
+void evr_free_data_eq_cnd(void *data){
     struct evr_attr_query_eq_cnd_data *d = data;
     free(d->key);
     free(d->value);
-    return evr_ok;
 }
 
 struct evr_attr_query_bool_and_data {
@@ -95,7 +142,7 @@ int evr_append_bool_and(struct evr_attr_query_ctx *ctx, struct evr_attr_query_no
 
 int evr_bind_bool_and(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column);
 
-int evr_free_data_bool_and(void *data);
+void evr_free_data_bool_and(void *data);
 
 struct evr_attr_query_node *evr_attr_query_bool_and(struct evr_attr_query_node *l, struct evr_attr_query_node *r){
     struct evr_attr_query_node *ret = NULL;
@@ -155,27 +202,19 @@ int evr_bind_bool_and(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node
     return ret;
 }
 
-int evr_free_data_bool_and(void *data){
-    int ret = evr_error;
+void evr_free_data_bool_and(void *data){
     struct evr_attr_query_bool_and_data *d = data;
-    if(d->l->free_data(d->l->data) != evr_ok){
-        goto out;
-    }
-    free(d->l);
-    if(d->r->free_data(d->r->data) != evr_ok){
-        goto out;
-    }
-    free(d->r);
-    ret = evr_ok;
- out:
-    return ret;
+    evr_free_attr_query_node(d->l);
+    evr_free_attr_query_node(d->r);
 }
 
 void evr_free_attr_query_node(struct evr_attr_query_node *node){
     if(!node){
         return;
     }
-    node->free_data(node->data);
+    if(node->free_data){
+        node->free_data(node->data);
+    }
     free(node);
 }
 

@@ -91,6 +91,19 @@ then
 fi
 
 results=`nc localhost 2362 <<EOF
+s select * where ref=${test_ref}-0000
+exit
+EOF`
+if [[ "${results}" != "OK
+${test_ref}-0000
+	tag=todo
+	title=test claim" ]]
+then
+    echo "Unexpected result from 'select * where s ref=${test_ref}-0000' query: ${results}" >&2
+    exit 1
+fi
+
+results=`nc localhost 2362 <<EOF
 s waduup?
 exit
 EOF`

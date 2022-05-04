@@ -65,6 +65,7 @@ int yylex(YYSTYPE *yylval_param);
 %token EQ
 %token <string> STRING
 %destructor { free($$); } <string>;
+%token REF
 %token SELECT
 %token WHERE
 %token WILDCARD
@@ -94,11 +95,12 @@ attr_selector:
 
 conditions:
   condition
-| conditions BOOL_AND condition { $$ = evr_attr_query_bool_and($1, $3); }
+| conditions BOOL_AND condition { evr_ret_node($$, evr_attr_query_bool_and($1, $3), "Unable to parse * && * condition."); }
 ;
 
 condition:
-  STRING EQ STRING { $$ = evr_attr_query_eq_cnd($1, $3); }
+  REF EQ STRING { evr_ret_node($$, evr_attr_query_ref_cnd($3), "Unable to parse ref=* condition."); }
+| STRING EQ STRING { evr_ret_node($$, evr_attr_query_eq_cnd($1, $3), "Unable to parse *=* condition."); }
 ;
 
 %%

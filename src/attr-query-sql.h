@@ -40,9 +40,21 @@ struct evr_attr_query_ctx {
 struct evr_attr_query_node {
     int (*append_cnd)(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd));
     int (*bind)(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column);
-    int (*free_data)(void *data);
+    void (*free_data)(void *data);
     void *data;
 };
+
+// TODO make this a variadic macro and allow msg to be printf format string
+#define evr_ret_node($$, node, msg)             \
+    do {                                        \
+        $$ = node;                              \
+        if(!($$)) {                             \
+            yyerror(res, msg);                  \
+            YYERROR;                            \
+        }                                       \
+    } while(0)
+
+struct evr_attr_query_node *evr_attr_query_ref_cnd(char *ref_str);
 
 struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value);
 

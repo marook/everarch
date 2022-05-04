@@ -1,6 +1,3 @@
-* add ref key to attr query language to match ref
-introduce ref as keyword to match the ref of a claim. later "ref" (in
-double quotes) should mean the attribute with the key ref.
 * open refs as seed search in evr.el
 right now hitting enter on a claim ref will fetch the claim and show
 in in another buffer. that behavior should be bound to the 'c'
