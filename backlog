@@ -1,20 +1,3 @@
-* open refs as seed search in evr.el
-right now hitting enter on a claim ref will fetch the claim and show
-in in another buffer. that behavior should be bound to the 'c'
-key.
-
-the enter key gets a new behavior. if it is a ref of the found claim
-it should show the refs which are poining to that claim as seed.
-
-if it is a ref which is the value of an attribute it should perform a
-attr-query just for that ref in a new buffer. this will show all the
-attributes of the ref.
-* open ref as file in evr.el
-whenever a ref is shown the key 'f' should follow the ref to the evr
-file it's pointing to. the file must be shown in a new buffer.
-* evr.el should provide a hook which runs after saving a file
-that way it should be possible to store extra claims for the saved
-file. for example a todo tag.
 * an empty string attr-query should return any seeds
 * attr-query searches should return the found claims ordered by date desc
 the sort order should be by creation date of the seed in descending
