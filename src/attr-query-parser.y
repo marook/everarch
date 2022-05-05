@@ -82,11 +82,15 @@ int yylex(YYSTYPE *yylval_param);
 
 %%
 
-line: query END { res->query = $1; };
+line:
+  END { res->query = evr_build_attr_query(NULL, NULL); }
+| query END { res->query = $1; }
+;
 
 query:
   conditions { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1); }
 | SELECT attr_selector WHERE conditions { $$ = evr_build_attr_query($2, $4); }
+| SELECT attr_selector {{ $$ = evr_build_attr_query($2, NULL); }}
 ;
 
 attr_selector:

@@ -23,7 +23,11 @@
   "evr-search performs a search against the default
 evr-attr-index and prints the results into a new buffer."
   (interactive "sQuery: ")
-  (switch-to-buffer (generate-new-buffer query))
+  (switch-to-buffer
+   (generate-new-buffer
+    (if (string-empty-p query)
+        "every"
+      query)))
   (insert query "\n")
   (evr-attr-index-results-mode)
   (evr-attr-index-search-from-buffer))
@@ -51,7 +55,7 @@ evr-attr-index and prints the results into a new buffer."
     (setq inhibit-read-only t)
     (delete-region (point) (point-max))
     (setq inhibit-read-only ro))
-  (let ((query (buffer-substring
+  (let ((query (buffer-substring-no-properties
                 (point-min)
                 (progn
                   (goto-char (point-min))
@@ -65,7 +69,19 @@ evr-attr-index and prints the results into a new buffer."
        ;; prevent process status from being printed to the search
        ;; results buffer
        nil))
-    (process-send-string con (concat "s select * where " query "\n"))))
+    (process-send-string
+     con
+     (concat
+      (mapconcat
+       (lambda (args)
+         (apply 'concat args))
+       `(
+         ("s select *")
+         ,(if (string-empty-p query)
+              ()
+            `("where " ,query)))
+       " ")
+      "\n"))))
 
 (defvar evr-attr-index-results-mode-map
   (let ((map (make-keymap)))

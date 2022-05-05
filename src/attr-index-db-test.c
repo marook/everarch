@@ -435,6 +435,7 @@ void test_attr_value_type_self_claim_ref(){
     c.attr = &attr;
     assert(is_ok(evr_merge_attr_index_claim(db, 10, cref, &c)));
     assert_query_one_result(db, "my-key=sha3-224-00000000000000000000000000000000000000000000000000000000-9999", 20, c.seed);
+    assert_query_one_result(db, "", 20, c.seed);
     assert(is_ok(evr_free_attr_index_db(db)));
     evr_free_attr_index_db_configuration(cfg);
 }

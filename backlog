@@ -1,4 +1,3 @@
-* an empty string attr-query should return any seeds
 * attr-query searches should return the found claims ordered by date desc
 the sort order should be by creation date of the seed in descending
 order. sorting by last modified will require extra work to store the

@@ -1198,7 +1198,7 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
         goto out_with_free_sql;
     }
     int column = 1;
-    if(query->root->bind(&ctx, query->root, query_stmt, &column) != evr_ok){
+    if(query->root && query->root->bind(&ctx, query->root, query_stmt, &column) != evr_ok){
         goto out_with_finalize_query_stmt;
     }
     struct evr_collect_selected_attrs_ctx attr_ctx;
@@ -1310,10 +1310,20 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
         goto out;
     }
     ctx->more = &ret;
-    const char prefix[] = "select distinct seed from claim where ";
+    const char prefix[] = "select distinct seed from claim";
     ret = write_n_dynamic_array(ret, prefix, strlen(prefix));
-    if(root->append_cnd(ctx, root, evr_attr_build_sql_append) != evr_ok){
-        goto out_with_free_ret;
+    if(!ret){
+        goto out;
+    }
+    if(root){
+        const char where[] = " where ";
+        ret = write_n_dynamic_array(ret, where, strlen(where));
+        if(!ret){
+            goto out;
+        }
+        if(root->append_cnd(ctx, root, evr_attr_build_sql_append) != evr_ok){
+            goto out_with_free_ret;
+        }
     }
     // TODO append limit X offset X
     ret = write_n_dynamic_array(ret, "", 1);
@@ -1327,6 +1337,10 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
 int evr_collect_selected_attrs_visitor(void *context, const char *key, const char *value);
 
 int evr_collect_selected_attrs(struct evr_collect_selected_attrs_ctx *ctx, struct evr_attr_index_db *db, struct evr_attr_selector *selector, evr_time t, const evr_claim_ref seed){
+    if(!selector){
+        // no selector is like evr_attr_selector_none
+        return evr_ok;
+    }
     switch(selector->type){
     default:
         log_error("Unknown selector type %d", selector->type);

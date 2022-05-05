@@ -74,7 +74,10 @@ struct evr_attr_selector {
 
 struct evr_attr_selector *evr_build_attr_selector(int type);
 
-#define evr_free_attr_selector(s) free(s)
+#define evr_free_attr_selector(s)               \
+    do {                                        \
+        if(s) free(s);                          \
+    } while(0)
 
 struct evr_attr_query {
     struct evr_attr_selector *selector;
