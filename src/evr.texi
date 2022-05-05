@@ -31,8 +31,10 @@ archive.
 @end ifnottex
 
 @menu
-* Overview::    Explains what everarch is about.
-* Index::            Complete index.
+* Overview::   Explains what everarch is about.
+* Claims::     Details about the central data structure in everarch.
+* evr-attr-index::  How indexing and finding claims works.
+* Index::      Complete index.
 @end menu
 
 @node Overview
@@ -97,33 +99,131 @@ evr-attr-index server and a command line interface evr.
 
 The evr-glacier-storage server stores claims and blob data in the
 bucket files. Claims are actually also stored as blobs but have some
-additional attributes. Claims are PGP signed XML documents which
-contain claim-set root elements. An example claim-set is located in
-doc/claims/claim-set-file.xml.
+additional attributes.
+
+We assume every blob has a unique reference which is derived from the
+blob's content. So blobs with the same content always have the same
+reference. A blob reference might be
+sha3-224-00000000000000000000000000000000000000000000000000000000.
+
+@node Claims
+@chapter Claims
+Claims are PGP signed XML documents which contain claim-set root
+elements. An example claim-set may be:
+
+@example
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-04-23T16:32:07.000000Z"
+    >
+  <some-claim xmlns="https://my.claim.ns">
+    This is the pice of fact we would like to store.
+  </some-claim>
+</claim-set>
+@end example
 
 A claim-set contains claims. everarch comes with a limited set of
-supported claims. These include a attr claim which can set or remove
-attributes from another claim. Also a file claim is supported which
-defines blobs which make up the pieces of a bigger file.
+supported claims. These include for example an attr claim which can
+define attributes for itself or another seed claim.
 
-You should be able to easily add your own self defined claims. In
-order to make them indexable you must provide an XSLT stylesheet which
-converts your claim into attr claims. doc/claims/file-to-attr.xslt
-contains a stylesheet which converts a file claim for example into
-attr claims.
+Just like blobs claims also have references. A claim reference is the
+blob reference which contains the claim-set concatinated with the
+index of the claim in the claim-set. The index is encoded in
+hexadecimal form. A claim reference might be
+sha3-224-00000000000000000000000000000000000000000000000000000000-0000.
 
+The following attr claim defines some attribute changes for a
+referenced seed claim which was created in the past.
+
+@example
+<attr
+    xmlns="https://evr.ma300k.de/claims/"
+    seed="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
+  <!-- adds the value v to the set of tag values -->
+  <a op="+" k="tag" v="todo"/>
+
+  <!-- empties the set of values for someKey -->
+  <a op="-" k="someKey"/>
+
+  <!-- removes the value v from the set of values for someKey -->
+  <a op="-" k="someKey" v="someVal"/>
+
+  <!-- replaces the set of values for replacedKey with replacedVal -->
+  <a op="=" k="replacedKey" v="replacedVal"/>
+</attr>
+@end example
+
+As you can see in the example you should be able to easily add your
+own self defined claims. In order to make them searchable you must
+provide an XSLT stylesheet which converts your claim into attr
+claims.
+
+@c TODO Also a file claim is supported which defines blobs which make up the pieces of a bigger file.
+
+@node evr-attr-index
+@chapter evr-attr-index
 attr claims are the only claims which can be indexed by the
 evr-attr-index server.
 
-The stylesheet is referenced by a attr-spec claim. An example
-attr-spec claim is located in doc/claims/attr-spec.xml. The
-evr-attr-index server searches for attr-spec claims and will
+You should provide a XSLT stylesheet to the evr-attr-index server which
+converts your custom claims into attr claims. Such a stylesheet might
+look like the following example:
+
+@verbatim
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet
+    version="1.0"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:evr="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    xmlns:myns="https://my.claim.ns"
+    >
+  <xsl:output encoding="UTF-8"/>
+
+  <xsl:template match="/evr:claim-set">
+    <evr:claim-set dc:created="{@dc:created}">
+      <xsl:apply-templates/>
+    </evr:claim-set>
+  </xsl:template>
+
+  <xsl:template match="myns:some-claim">
+    <evr:attr index-seed="{count(preceding-sibling::*)}">
+      <evr:a op="=" k="class" v="some-claim"/>
+    </evr:attr>
+  </xsl:template>
+</xsl:stylesheet>
+@end verbatim
+
+The evr-attr-index server needs a attr-spec claim to find the
+stylesheet. The stylesheet and attr-spec claim are also located within
+the evr-glacier-storage server as blobs. That way they are stored and
+backed up just like any other data in everarch.
+
+An example attr-spec might look like this:
+
+@example
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-04-23T16:32:07.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+  </attr-spec>
+</claim-set>
+@end example
+
+The evr-attr-index server searches for attr-spec claims and will
 automatically start indexing the evr-glacier-storage in the way
 defined in the attr-spec.
 
-Claims just like any other data in everarch can't be deleted. So what
-do you do if you like to store your contacts in everarch and also want
-to delete them one day? You need one claim type to define a
+Claims, just like any other data in everarch, can't be deleted. So
+what do you do if you like to store your contacts in everarch and also
+want to delete them one day? You need one claim type to define a
 contact. For example:
 
 @example
