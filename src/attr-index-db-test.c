@@ -52,26 +52,58 @@ int asserting_claims_visitor_calls;
 evr_claim_ref asserting_claims_visitor_expected_ref;
 int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 
+xsltStylesheetPtr create_attr_mapping_stylesheet();
+
+xmlDocPtr create_xml_doc(char *content);
+
 void test_open_new_attr_index_db_twice(){
-    const evr_time merge_attrs_t[merge_attrs_len] = {
-        10,
-        20,
-        30,
+    struct evr_attr_def attr_def[2];
+    attr_def[0].key = "tag";
+    attr_def[0].type = evr_type_str;
+    attr_def[1].key = "size";
+    attr_def[1].type = evr_type_int;
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 2;
+    spec.attr_def = attr_def;
+    spec.attr_factories_len = 0;
+    spec.attr_factories = NULL;
+    memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
+    xsltStylesheetPtr style = create_attr_mapping_stylesheet();
+#define seed_ref "sha3-224-c0000000000000000000000000000000000000000000000000000000-0000"
+    char *merge_claim_refs[merge_attrs_len] = {
+        "sha3-224-c0000000000000000000000000000000000000000000000000000001",
+        "sha3-224-c0000000000000000000000000000000000000000000000000000002",
+        "sha3-224-c0000000000000000000000000000000000000000000000000000003",
     };
-    struct evr_attr merge_attrs[merge_attrs_len] = {
-        { evr_attr_op_replace, "tag", evr_attr_value_type_static, "A" },
-        { evr_attr_op_add, "tag", evr_attr_value_type_static, "B" },
-        { evr_attr_op_rm, "tag", evr_attr_value_type_static, NULL },
+#define tstr(s) "1970-01-01T00:00:" to_string(s) ".000000Z"
+#define hdr "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+#define ns "xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\""
+#define seed_attr "seed=\"" seed_ref "\""
+    char *merge_claims[merge_attrs_len] = {
+        hdr "<claim-set " ns " dc:created=\"" tstr(10) "\"><attr " seed_attr "><a op=\"=\" k=\"tag\" v=\"A\"/></attr></claim-set>",
+        hdr "<claim-set " ns " dc:created=\"" tstr(20) "\"><attr " seed_attr "><a op=\"+\" k=\"tag\" v=\"B\"/></attr></claim-set>",
+        hdr "<claim-set " ns " dc:created=\"" tstr(30) "\"><attr " seed_attr "><a op=\"-\" k=\"tag\"/></attr></claim-set>",
     };
+#undef ns
+#undef hdr
+    evr_time t00, t10, t15, t20, t25, t30, t35;
+    assert(is_ok(evr_time_from_iso8601(&t00, tstr(0))));
+    assert(is_ok(evr_time_from_iso8601(&t10, tstr(10))));
+    assert(is_ok(evr_time_from_iso8601(&t15, tstr(15))));
+    assert(is_ok(evr_time_from_iso8601(&t20, tstr(20))));
+    assert(is_ok(evr_time_from_iso8601(&t25, tstr(25))));
+    assert(is_ok(evr_time_from_iso8601(&t30, tstr(30))));
+    assert(is_ok(evr_time_from_iso8601(&t35, tstr(35))));
     const int attr_merge_permutations[permutations][merge_attrs_len] = {
         { 0, 1, 2 },
         { 1, 0, 2 },
         { 2, 1, 0 },
     };
     evr_claim_ref ref;
-    assert(is_ok(evr_parse_claim_ref(ref, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000")));
+    assert(is_ok(evr_parse_claim_ref(ref, seed_ref)));
+#undef seed_ref
     evr_claim_ref other_ref;
-    assert(is_ok(evr_parse_claim_ref(other_ref, "sha3-224-00000000000000000000000000000000000000000000000000000001-0000")));
+    assert(is_ok(evr_parse_claim_ref(other_ref, "sha3-224-00000100003000050000070000000080000000900000100000000001-0000")));
     for(size_t pi = 0; pi < permutations; ++pi){
         log_info("Permutation %d…", pi);
         struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
@@ -80,89 +112,79 @@ void test_open_new_attr_index_db_twice(){
             struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, "ye-db", never_called_blob_file_writer, NULL);
             assert(db);
             if(round == 0){
-                struct evr_attr_def attr_def[2];
-                attr_def[0].key = "tag";
-                attr_def[0].type = evr_type_str;
-                attr_def[1].key = "size";
-                attr_def[1].type = evr_type_int;
-                struct evr_attr_spec_claim spec;
-                spec.attr_def_len = 2;
-                spec.attr_def = attr_def;
-                spec.attr_factories_len = 0;
-                spec.attr_factories = NULL;
-                memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
                 assert(is_ok(evr_setup_attr_index_db(db, &spec)));
             }
             assert(is_ok(evr_prepare_attr_index_db(db)));
             if(round == 0){
                 for(size_t rai = 0; rai < merge_attrs_len; ++rai){
                     size_t aai = attr_merge_permutations[pi][rai];
-                    evr_time t = merge_attrs_t[aai];
-                    struct evr_attr_claim claim;
-                    claim.seed_type = evr_seed_type_claim;
-                    evr_build_claim_ref(claim.seed, ref, 0);
-                    claim.index_seed = 0;
-                    claim.attr_len = 1;
-                    claim.attr = &merge_attrs[aai];
-                    assert(is_ok(evr_merge_attr_index_claim(db, t, claim.seed, &claim)));
+                    evr_blob_ref claim_set_ref;
+                    assert(is_ok(evr_parse_blob_ref(claim_set_ref, merge_claim_refs[aai])));
+                    xmlDoc *claim_set_doc = create_xml_doc(merge_claims[aai]);
+                    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
+                    xmlFreeDoc(claim_set_doc);
                 }
             }
-            log_info("Assert t=0");
+            log_info("Assert t=00");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 0, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t00, ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
             log_info("Assert t=10");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 10, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t10, ref, visit_attrs, NULL)));
             assert_attrs(1, 0);
             log_info("Assert t=15");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 15, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t15, ref, visit_attrs, NULL)));
             assert_attrs(1, 0);
             log_info("Assert t=20");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 20, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t20, ref, visit_attrs, NULL)));
             assert_attrs(1, 1);
             log_info("Assert t=25");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 25, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t25, ref, visit_attrs, NULL)));
             assert_attrs(1, 1);
             log_info("Assert t=30");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 30, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t30, ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
             log_info("Assert t=35");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 35, ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t35, ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
             log_info("Assert not existing ref");
             reset_visit_attrs();
-            assert(is_ok(evr_get_seed_attrs(db, 25, other_ref, visit_attrs, NULL)));
+            assert(is_ok(evr_get_seed_attrs(db, t25, other_ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
             log_info("Assert evr_attr_query_claims tag=A t=0");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A", 0, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A", t00, 0, 100, claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             log_info("Assert evr_attr_query_claims tag=A t=25");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A", 25, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
             assert_claims(1);
             log_info("Assert evr_attr_query_claims tag=X t=25");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=X", 25, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=X", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             log_info("Assert evr_attr_query_claims tag=A && tag=B t=25");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", 25, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
             assert_claims(1);
             log_info("Assert evr_attr_query_claims tag=A && tag=B t=15");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", 15, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", t15, 0, 100, claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             assert(is_ok(evr_free_attr_index_db(db)));
         }
         evr_free_attr_index_db_configuration(cfg);
     }
+#undef t0_str
+#undef t1_str
+#undef t2_str
+    xsltFreeStylesheet(style);
 }
 
 int never_called_blob_file_writer(void *ctx, char *path, mode_t mode, evr_blob_ref ref){
@@ -232,7 +254,7 @@ int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attr
     assert(ctx == NULL);
     evr_claim_ref_str ref_str;
     evr_fmt_claim_ref(ref_str, ref);
-    if(strcmp(ref_str, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000") == 0){
+    if(strcmp(ref_str, "sha3-224-c0000000000000000000000000000000000000000000000000000000-0000") == 0){
         found_claim_0 = 1;
     }
     assert(attrs == NULL);
@@ -319,9 +341,6 @@ int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     assert(is_str_eq(parse_error, "syntax error, unexpected END, expecting EQ"));
     return evr_ok;
 }
-
-xsltStylesheetPtr create_attr_mapping_stylesheet();
-xmlDocPtr create_xml_doc(char *content);
 
 void assert_query_one_result(struct evr_attr_index_db *db, char *query, time_t t, evr_claim_ref expected_ref);
 
@@ -420,23 +439,33 @@ void test_attr_attribute_factories(){
 void test_attr_value_type_self_claim_ref(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
-    evr_claim_ref cref;
-    assert(is_ok(evr_parse_claim_ref(cref, "sha3-224-00000000000000000000000000000000000000000000000000000000-9999")));
-    struct evr_attr attr;
-    attr.op = evr_attr_op_replace;
-    attr.key = "my-key";
-    attr.value_type = evr_attr_value_type_self_claim_ref;
-    attr.value = NULL;
-    struct evr_attr_claim c;
-    c.seed_type = evr_seed_type_claim;
-    assert(is_ok(evr_parse_claim_ref(c.seed, "sha3-224-00000000000000000000000000000000000000000000000000000000-0000")));
-    c.index_seed = 1;
-    c.attr_len = 1;
-    c.attr = &attr;
-    assert(is_ok(evr_merge_attr_index_claim(db, 10, cref, &c)));
-    assert_query_one_result(db, "my-key=sha3-224-00000000000000000000000000000000000000000000000000000000-9999", 20, c.seed);
-    assert_query_one_result(db, "", 20, c.seed);
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 0;
+    spec.attr_def = NULL;
+    spec.attr_factories_len = 0;
+    spec.attr_factories = NULL;
+    memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
+    xsltStylesheetPtr style = create_attr_mapping_stylesheet();
+#define seed_str "sha3-224-00000000000000000000000000000000000000000000000000000000-0000"
+    char doc_str[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:00.000000Z\">"
+        "<attr seed=\"" seed_str "\">"
+        "<a op=\"=\" k=\"my-key\" vf=\"claim-ref\"/>"
+        "</attr>"
+        "</claim-set>";
+    xmlDoc *claim_set_doc = create_xml_doc(doc_str);
+    evr_blob_ref claim_set_ref;
+    assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
+    xmlFreeDoc(claim_set_doc);
+    evr_claim_ref seed;
+    assert(is_ok(evr_parse_claim_ref(seed, seed_str)));
+#undef seed_str
+    assert_query_one_result(db, "my-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000", 20, seed);
+    assert_query_one_result(db, "", 20, seed);
     assert(is_ok(evr_free_attr_index_db(db)));
+    xsltFreeStylesheet(style);
     evr_free_attr_index_db_configuration(cfg);
 }
 

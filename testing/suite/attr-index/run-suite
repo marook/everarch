@@ -16,7 +16,6 @@ stop(){
         echo "storage/lock still existing after storage quit" >&2
         exit 1
     fi
-    rm -rf 'storage' 'attr-index'
 }
 
 rm -rf 'storage' 'attr-index'
@@ -45,8 +44,10 @@ evr -f 3 sign-put <<EOF
 </claim-set>
 EOF
 
-echo "Uploading test claim…"
-test_ref=`evr -f 1 sign-put < attr-claim.xml`
+echo "Uploading test claims…"
+test_ref=`evr -f 1 sign-put < attr-claim-1.xml`
+test2_ref=`evr -f 1 sign-put < attr-claim-2.xml`
+evr -f 1 sign-put < attr-claim-future.xml
 
 echo "Starting evr-attr-index…"
 evr-attr-index &
@@ -120,6 +121,32 @@ EOF`
 if [[ "${results}" != "${test_ref}-0000" ]]
 then
     echo "Unexpected result from 'c ${test_ref}-0000' query: ${results}" >&2
+    exit 1
+fi
+
+# this test has a space character after the 's'
+results=`nc localhost 2362 <<EOF
+s 
+exit
+EOF`
+if [[ "${results}" != "OK
+${test2_ref}-0000
+${test_ref}-0000" ]]
+then
+    echo "Unexpected result from empty expression search query: ${results}" >&2
+    exit 1
+fi
+
+# this test has no space character after the 's'
+results=`nc localhost 2362 <<EOF
+s
+exit
+EOF`
+if [[ "${results}" != "OK
+${test2_ref}-0000
+${test_ref}-0000" ]]
+then
+    echo "Unexpected result from empty expression search query: ${results}" >&2
     exit 1
 fi
 

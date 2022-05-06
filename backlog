@@ -1,36 +1,4 @@
-* attr-query searches should return the found claims ordered by date desc
-the sort order should be by creation date of the seed in descending
-order. sorting by last modified will require extra work to store the
-latest modification timestamp. so it's down below in the backlog.
-* log failed transformations and attr factory calls with claim-sets
-failed xslt transformations and failed attr factory interactions
-should be logged in the attr-index directory. the file name should be
-the claim's ref with a .log extension. the log file should contain one
-line which indicates what went wrong. then one empty line. then the
-claim-set input or output which lead to an error.
-* give claims a validity period
-right now only claim attributes have a validity period. claims should
-also have one.
-
-the validity period starts with the creation timestamp of the seed
-claim set.
-
-the validity period ends for now never.
-
-the attr-index db should be extended to hold the validity period.
 * a new evr:archive claim should end the validity period of a claim
-* add documentation on how to write attr-specs
-** describe how attr is the central claim
-** describe archive claim
-** describe the seed and index-seed attributes
-seed is provided before attr-factory calls and before each
-transformation.
-
-index-seed must be provided by transformation.
-** describe how seed and index-seed must be handled in transformations
-* plan backlog tasks for evr-glacier-storage sync
-it should be possible to sync two evr-glacier-storage instances via
-the evr cli.
 * implement contains operator in attr queries
 the contains operator should be the tilde. for example: title~peng.
 * evr-attr-index must collect counts of seen claims
@@ -48,6 +16,24 @@ expected.
 it also might help finding out which transformations should further be
 added to the transformation xslt.
 * count of seen claims should be queryable via attr-index cmd
+* log failed transformations and attr factory calls with claim-sets
+failed xslt transformations and failed attr factory interactions
+should be logged in the attr-index directory. the file name should be
+the claim's ref with a .log extension. the log file should contain one
+line which indicates what went wrong. then one empty line. then the
+claim-set input or output which lead to an error.
+* plan backlog tasks for evr-glacier-storage sync
+it should be possible to sync two evr-glacier-storage instances via
+the evr cli.
+* add documentation on how to write attr-specs
+** describe how attr is the central claim
+** describe archive claim
+** describe the seed and index-seed attributes
+seed is provided before attr-factory calls and before each
+transformation.
+
+index-seed must be provided by transformation.
+** describe how seed and index-seed must be handled in transformations
 * implement t in attr queries
 tag=todo t=12345
 tag=todo t=1970-01-01T00:00:07Z
@@ -67,6 +53,21 @@ tag=todo offset=0 limit=100
 #+END_SRC
 * make evr-glacier-storage port configurable
 * make evr-attr-index port configurable
+* gracefully handle sqlite database is locked in evr-attr-index
+sqlite's step function will exit with SQLITE_LOCKED if a table is
+locked for more than 1sec (configured right now). these locks happend
+to me quite regularly when querrying the attr index while the index is
+heavily fed with new claims.
+
+a SQLITE_LOCKED error should be indicated as 'resource temporary not
+available' to the client.
+
+maybe the locks can be worked around when implementing journal mode as
+mentioned in [[https://sqlite.org/wal.html][sqlite's WAL mode]] or [[https://phiresky.github.io/blog/2020/sqlite-performance-tuning/][SQLite performance tuning]]:
+
+#+BEGIN_SRC
+pragma journal_mode = WAL;
+#+END_SRC
 * store flags and blob size redundant in buckets
 right now flags and blob size in the evr-glacier-storage are storend
 once for every blob and without any checksum.
@@ -129,25 +130,18 @@ tag=todo order by title asc
 #+BEGIN_SRC
 tag=todo && is_image(mime_type)
 #+END_SRC
+
+the open question is how to define what the match functions are
+actually doing. for example which mime types are treated as
+image. this should not be coded into everarch. it would be nice to be
+able to define them somehow in blobs.
 * report ref and some attributes specified by key in attr querries
 the query might be something like: select title where tag=todo
 * make boolean and operator '&&' optional in attr query language
 #+BEGIN_SRC
 (tag=todo || tag=backlog) tag=howto
 #+END_SRC
-* follow claim-refs in emacs' evr-attr-index-results-mode
-hitting enter on a claim ref should follow that reference. the claim
-should be shown in a new buffer just like 'evr get-claim' prints it to
-stdout.
-
-the new buffer's major mode should be some sane mode for printing xml.
 * gracefully handle sqlite database is locked in evr-glacier-storage
-sqlite's step function will exit with SQLITE_LOCKED if a table is
-locked for more than 1sec (configured right now).
-
-a SQLITE_LOCKED error should be indicated as 'resource temporary not
-available' to the client.
-* gracefully handle sqlite database is locked in evr-attr-index
 sqlite's step function will exit with SQLITE_LOCKED if a table is
 locked for more than 1sec (configured right now).
 

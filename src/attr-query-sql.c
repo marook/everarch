@@ -60,7 +60,7 @@ struct evr_attr_query_node *evr_attr_query_ref_cnd(char *ref_str){
 }
 
 int evr_append_ref_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)){
-    return append(ctx, "seed = ?");
+    return append(ctx, "c.seed = ?");
 }
 
 int evr_bind_ref_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column){
@@ -104,7 +104,7 @@ struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value){
 }
 
 int evr_append_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)){
-    return append(ctx, "seed in (select seed from attr where key = ? and val_str = ? and valid_from <= ? and (valid_until > ? or valid_until is null) and val_str not null)");
+    return append(ctx, "c.seed in (select seed from attr where key = ? and val_str = ? and valid_from <= ? and (valid_until > ? or valid_until is null) and val_str not null)");
 }
 
 int evr_bind_eq_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column){

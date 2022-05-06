@@ -740,6 +740,13 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
     return ret;
 }
 
+// TODO using a substr to extract the claim ref's blob ref part is
+// error prone. we should split up the c.ref column into a c.ref and
+// c.index column. then we can get rid of the substr call which makes
+// assumptions about the formatting of a claim ref.
+#define evr_sql_extract_blob_ref(column) \
+    "substr(" column ", 0, " to_string(evr_blob_ref_size + 1)  ")"
+
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
     if(evr_prepare_stmt(db->db, "select value from state where key = ?", &db->find_state) != evr_ok){
@@ -772,12 +779,7 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "select key, val_str from attr where seed = ?1 and valid_from <= ?2 and (valid_until > ?2 or valid_until is null) and val_str not null", &db->find_seed_attrs) != evr_ok){
         goto out;
     }
-    // TODO using a substr to exctract the claim ref's blob ref part
-    // is error prone. we should split up the c.ref column into a
-    // c.ref and c.index column. then we can get rid of the substr
-    // call which makes assumptions about the formatting of a claim
-    // ref.
-    if(evr_prepare_stmt(db->db, "select c.ref from claim c inner join claim_set cs where c.seed = ? and cs.ref = substr(c.ref, 0, " to_string(evr_blob_ref_size + 1)  ") order by cs.created", &db->find_claims_for_seed) != evr_ok){
+    if(evr_prepare_stmt(db->db, "select c.ref from claim c inner join claim_set cs where c.seed = ? and cs.ref = " evr_sql_extract_blob_ref("c.ref") " order by cs.created", &db->find_claims_for_seed) != evr_ok){
         goto out;
     }
     ret = evr_ok;
@@ -1198,6 +1200,9 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
         goto out_with_free_sql;
     }
     int column = 1;
+    if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)t) != SQLITE_OK){
+        goto out_with_finalize_query_stmt;
+    }
     if(query->root && query->root->bind(&ctx, query->root, query_stmt, &column) != evr_ok){
         goto out_with_finalize_query_stmt;
     }
@@ -1310,14 +1315,18 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
         goto out;
     }
     ctx->more = &ret;
-    const char prefix[] = "select distinct seed from claim";
+    const char prefix[] =
+        "select distinct seed from claim c "
+        "inner join claim_set cs "
+        "where cs.ref = " evr_sql_extract_blob_ref("c.ref")
+        " and cs.created <= ?";
     ret = write_n_dynamic_array(ret, prefix, strlen(prefix));
     if(!ret){
         goto out;
     }
     if(root){
-        const char where[] = " where ";
-        ret = write_n_dynamic_array(ret, where, strlen(where));
+        const char sep[] = " and ";
+        ret = write_n_dynamic_array(ret, sep, strlen(sep));
         if(!ret){
             goto out;
         }
@@ -1326,7 +1335,9 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
         }
     }
     // TODO append limit X offset X
-    ret = write_n_dynamic_array(ret, "", 1);
+    const char suffix[] = " order by cs.created desc";
+    // sizeof(suffix) because we also want to copy the \0
+    ret = write_n_dynamic_array(ret, suffix, sizeof(suffix));
  out:
     return ret;
  out_with_free_ret:

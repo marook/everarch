@@ -1101,6 +1101,9 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
 
 int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     int ret = evr_error;
+    if(query == NULL){
+        query = "";
+    }
     log_debug("Connection worker %d retrieved query: %s", ctx->socket, query);
     evr_blob_ref index_ref;
     int res = evr_get_current_index_ref(index_ref);
@@ -1183,6 +1186,9 @@ int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr
 int evr_respond_claims_for_seed_result(void *ctx, const evr_claim_ref claim);
 
 int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str){
+    if(seed_ref_str == NULL){
+        seed_ref_str = "";
+    }
     log_debug("Connection worker %d retrieved list claims for seed %s", ctx->socket, seed_ref_str);
     int ret = evr_error;
     evr_claim_ref seed_ref;
