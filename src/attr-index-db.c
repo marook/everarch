@@ -99,6 +99,7 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->find_future_attr_siblings = NULL;
     db->insert_attr = NULL;
     db->insert_claim = NULL;
+    db->archive_claim = NULL;
     db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
     db->find_seed_attrs = NULL;
@@ -141,6 +142,7 @@ int evr_free_attr_index_db(struct evr_attr_index_db *db){
     evr_finalize_stmt(find_seed_attrs);
     evr_finalize_stmt(update_attr_valid_until);
     evr_finalize_stmt(insert_claim_set);
+    evr_finalize_stmt(archive_claim);
     evr_finalize_stmt(insert_claim);
     evr_finalize_stmt(insert_attr);
     evr_finalize_stmt(find_future_attr_siblings);
@@ -214,6 +216,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table attr_def (key text primary key not null, type integer not null)",
         "create table attr (seed blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
         "create table claim (ref blob primary key not null, seed blob not null)",
+        "create table claim_archive (seed blob primary key not null, valid_until integer not null)",
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
         "insert into state (key, value) values (" to_string(evr_state_key_stage) ", " to_string(evr_attr_index_stage_initial) ")",
@@ -377,6 +380,46 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             goto out_with_free_claim_set_doc;
         }
         c_node = c_node->next;
+    }
+    c_node = evr_first_claim(cs_node);
+    struct evr_archive_claim *arch;
+    while(c_node){
+        c_node = evr_find_next_element(c_node, "archive");
+        if(!c_node){
+            break;
+        }
+        arch = evr_parse_archive_claim(c_node);
+        if(!arch){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Failed to parse archive claim from transformed claim-set for blob with ref %s", ref_str);
+            goto out_with_free_claim_set_doc;
+        }
+#ifdef EVR_LOG_DEBUG
+        {
+            evr_claim_ref_str seed_str;
+            evr_fmt_claim_ref(seed_str, arch->seed);
+            log_debug("Merging archive seed %s", seed_str);
+        }
+#endif
+        if(sqlite3_bind_blob(db->archive_claim, 1, arch->seed, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+            goto out_with_reset_archive_claim;
+        }
+        if(sqlite3_bind_int64(db->archive_claim, 2, (sqlite3_int64)created) != SQLITE_OK){
+            goto out_with_reset_archive_claim;
+        }
+        if(evr_step_stmt(db->db, db->archive_claim) != SQLITE_DONE){
+            goto out_with_reset_archive_claim;
+        }
+        free(arch);
+        c_node = c_node->next;
+        continue;
+    out_with_reset_archive_claim:
+        if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
+            evr_panic("Failed to reset archive_claim statement");
+        }
+        free(arch);
+        goto out_with_free_claim_set_doc;
     }
     if(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, claim_set_last_modified) != evr_ok){
         goto out_with_free_claim_set_doc;
@@ -768,6 +811,9 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "insert into claim (ref, seed) values (?, ?)", &db->insert_claim) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "insert into claim_archive (seed, valid_until) values (?, ?)", &db->archive_claim) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "insert into claim_set (ref, created) values (?, ?)", &db->insert_claim_set) != evr_ok){
@@ -1203,6 +1249,9 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
     if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)t) != SQLITE_OK){
         goto out_with_finalize_query_stmt;
     }
+    if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)t) != SQLITE_OK){
+        goto out_with_finalize_query_stmt;
+    }
     if(query->root && query->root->bind(&ctx, query->root, query_stmt, &column) != evr_ok){
         goto out_with_finalize_query_stmt;
     }
@@ -1319,7 +1368,8 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
         "select distinct seed from claim c "
         "inner join claim_set cs "
         "where cs.ref = " evr_sql_extract_blob_ref("c.ref")
-        " and cs.created <= ?";
+        " and cs.created <= ?"
+        " and c.seed not in (select ca.seed from claim_archive ca where ca.seed = c.seed and ca.valid_until <= ?)";
     ret = write_n_dynamic_array(ret, prefix, strlen(prefix));
     if(!ret){
         goto out;

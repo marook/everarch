@@ -30,8 +30,8 @@
 #include "attr-index-db.h"
 #include "files.h"
 
-#define permutations 3
-#define merge_attrs_len 3
+#define permutations 4
+#define merge_attrs_len 4
 
 int found_tag_a = 0;
 int found_tag_b = 0;
@@ -74,6 +74,7 @@ void test_open_new_attr_index_db_twice(){
         "sha3-224-c0000000000000000000000000000000000000000000000000000001",
         "sha3-224-c0000000000000000000000000000000000000000000000000000002",
         "sha3-224-c0000000000000000000000000000000000000000000000000000003",
+        "sha3-224-c0000000000000000000000000000000000000000000000000000004",
     };
 #define tstr(s) "1970-01-01T00:00:" to_string(s) ".000000Z"
 #define hdr "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -83,10 +84,11 @@ void test_open_new_attr_index_db_twice(){
         hdr "<claim-set " ns " dc:created=\"" tstr(10) "\"><attr " seed_attr "><a op=\"=\" k=\"tag\" v=\"A\"/></attr></claim-set>",
         hdr "<claim-set " ns " dc:created=\"" tstr(20) "\"><attr " seed_attr "><a op=\"+\" k=\"tag\" v=\"B\"/></attr></claim-set>",
         hdr "<claim-set " ns " dc:created=\"" tstr(30) "\"><attr " seed_attr "><a op=\"-\" k=\"tag\"/></attr></claim-set>",
+        hdr "<claim-set " ns " dc:created=\"" tstr(40) "\"><archive " seed_attr "/></claim-set>",
     };
 #undef ns
 #undef hdr
-    evr_time t00, t10, t15, t20, t25, t30, t35;
+    evr_time t00, t10, t15, t20, t25, t30, t35, t45;
     assert(is_ok(evr_time_from_iso8601(&t00, tstr(0))));
     assert(is_ok(evr_time_from_iso8601(&t10, tstr(10))));
     assert(is_ok(evr_time_from_iso8601(&t15, tstr(15))));
@@ -94,10 +96,12 @@ void test_open_new_attr_index_db_twice(){
     assert(is_ok(evr_time_from_iso8601(&t25, tstr(25))));
     assert(is_ok(evr_time_from_iso8601(&t30, tstr(30))));
     assert(is_ok(evr_time_from_iso8601(&t35, tstr(35))));
+    assert(is_ok(evr_time_from_iso8601(&t45, tstr(45))));
     const int attr_merge_permutations[permutations][merge_attrs_len] = {
-        { 0, 1, 2 },
-        { 1, 0, 2 },
-        { 2, 1, 0 },
+        { 0, 1, 2, 3 },
+        { 1, 0, 2, 3 },
+        { 2, 1, 0, 3 },
+        { 3, 0, 1, 2 },
     };
     evr_claim_ref ref;
     assert(is_ok(evr_parse_claim_ref(ref, seed_ref)));
@@ -149,7 +153,7 @@ void test_open_new_attr_index_db_twice(){
             reset_visit_attrs();
             assert(is_ok(evr_get_seed_attrs(db, t30, ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
-            log_info("Assert t=35");
+            log_info("Assert t=45");
             reset_visit_attrs();
             assert(is_ok(evr_get_seed_attrs(db, t35, ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
@@ -173,6 +177,10 @@ void test_open_new_attr_index_db_twice(){
             reset_visit_claims();
             assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
             assert_claims(1);
+            log_info("Assert evr_attr_query_claims t=45");
+            reset_visit_claims();
+            assert(is_ok(evr_attr_query_claims(db, "", t45, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert_claims(0);
             log_info("Assert evr_attr_query_claims tag=A && tag=B t=15");
             reset_visit_claims();
             assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", t15, 0, 100, claims_status_ok, visit_claims, NULL)));
@@ -476,6 +484,7 @@ xsltStylesheetPtr create_attr_mapping_stylesheet(){
         "<xsl:output encoding=\"UTF-8\"/>"
         "<xsl:template match=\"/evr:claim-set\"><evr:claim-set dc:created=\"{@dc:created}\"><xsl:apply-templates/></evr:claim-set></xsl:template>"
         "<xsl:template match=\"evr:attr\"><xsl:copy-of select=\".\"/></xsl:template>"
+        "<xsl:template match=\"evr:archive\"><xsl:copy-of select=\".\"/></xsl:template>"
         "</xsl:stylesheet>";
     xmlDocPtr doc = create_xml_doc(content);
     xsltStylesheetPtr style = xsltParseStylesheetDoc(doc);

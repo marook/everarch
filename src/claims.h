@@ -114,6 +114,10 @@ struct evr_attr_claim {
     struct evr_attr *attr;
 };
 
+struct evr_archive_claim {
+    evr_claim_ref seed;
+};
+
 int evr_init_claim_set(struct evr_claim_set *cs, const evr_time *created);
 
 int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim *claim);
@@ -179,6 +183,8 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node);
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node);
 
 struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node);
+
+struct evr_archive_claim *evr_parse_archive_claim(xmlNode *claim_node);
 
 /**
  * evr_find_next_element searches for a node with name

@@ -601,6 +601,26 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     return NULL;
 }
 
+struct evr_archive_claim *evr_parse_archive_claim(xmlNode *claim_node){
+    char *seed_str = (char*)xmlGetProp(claim_node, BAD_CAST "seed");
+    if(!seed_str){
+        log_error("seed attribute is missing on archive claim.");
+        return NULL;
+    }
+    struct evr_archive_claim *c = malloc(sizeof(struct evr_archive_claim));
+    if(!c){
+        goto out_with_free_seed_str;
+    }
+    if(evr_parse_claim_ref(c->seed, seed_str) != evr_ok){
+        free(c);
+        c = NULL;
+        goto out_with_free_seed_str;
+    }
+ out_with_free_seed_str:
+    xmlFree(seed_str);
+    return c;
+}
+
 int evr_parse_claim_index_seed_attr(size_t *index_seed, xmlNode *claim){
     char *fmt_index_seed = (char*)xmlGetProp(claim, BAD_CAST "index-seed");
     if(!fmt_index_seed){
