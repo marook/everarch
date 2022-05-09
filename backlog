@@ -1,9 +1,3 @@
-* log failed transformations and attr factory calls with claim-sets
-failed xslt transformations and failed attr factory interactions
-should be logged in the attr-index directory. the file name should be
-the claim's ref with a .log extension. the log file should contain one
-line which indicates what went wrong. then one empty line. then the
-claim-set input or output which lead to an error.
 * plan backlog tasks for evr-glacier-storage sync
 it should be possible to sync two evr-glacier-storage instances via
 the evr cli.

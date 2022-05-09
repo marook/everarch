@@ -22,6 +22,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "errors.h"
 
@@ -75,4 +78,9 @@ int is_str_eq(const char *a, const char *b){
 
 int is_str_in(const char *haystack, const char *needle){
     return haystack && needle && strstr(haystack, needle);
+}
+
+int path_exists(char *path){
+    struct stat s;
+    return stat(path, &s) == 0;
 }

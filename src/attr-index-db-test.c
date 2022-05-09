@@ -463,6 +463,7 @@ void test_attr_value_type_self_claim_ref(){
         "</attr>"
         "</claim-set>";
     xmlDoc *claim_set_doc = create_xml_doc(doc_str);
+    assert(claim_set_doc);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
     assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
@@ -474,6 +475,47 @@ void test_attr_value_type_self_claim_ref(){
     assert_query_one_result(db, "", 20, seed);
     assert_query_one_result(db, "my-key~224", 20, seed);
     assert_query_one_result(db, "my-key~SHA", 20, seed);
+    assert(is_ok(evr_free_attr_index_db(db)));
+    xsltFreeStylesheet(style);
+    evr_free_attr_index_db_configuration(cfg);
+}
+
+void test_failed_transformation(){
+    struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 0;
+    spec.attr_def = NULL;
+    spec.attr_factories_len = 0;
+    spec.attr_factories = NULL;
+    memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
+    char style_str[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:evr=\"https://evr.ma300k.de/claims/\">"
+        "<xsl:output encoding=\"UTF-8\"/>"
+        "<xsl:template match=\"/evr:claim-set\"><xsl:call-template name=\"no-such-template\"/></xsl:template>"
+        "</xsl:stylesheet>";
+    xmlDocPtr style_doc = create_xml_doc(style_str);
+    xsltStylesheetPtr style = xsltParseStylesheetDoc(style_doc);
+    assert(style);
+    char doc_str[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:07.000000Z\">"
+        "</claim-set>";
+    xmlDoc *claim_set_doc = create_xml_doc(doc_str);
+    assert(claim_set_doc);
+    evr_blob_ref claim_set_ref;
+    assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
+    assert(is_err(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
+    xmlFreeDoc(claim_set_doc);
+    const size_t state_dir_path_len = strlen(cfg->state_dir_path);
+    const char log_path_suffix[] = "/ye-db/sha3-224-c0000000000000000000000000000000000000000000000000000000.log";
+    char log_path[state_dir_path_len + sizeof(log_path_suffix)];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, log_path);
+    evr_push_n(&bp, cfg->state_dir_path, state_dir_path_len);
+    evr_push_n(&bp, log_path_suffix, sizeof(log_path_suffix));
+    assert(path_exists(log_path));
     assert(is_ok(evr_free_attr_index_db(db)));
     xsltFreeStylesheet(style);
     evr_free_attr_index_db_configuration(cfg);
@@ -529,5 +571,6 @@ int main(){
     run_test(test_attr_factories);
     run_test(test_attr_attribute_factories);
     run_test(test_attr_value_type_self_claim_ref);
+    run_test(test_failed_transformation);
     return 0;
 }

@@ -48,5 +48,6 @@ int is_ok(int result);
 int is_err(int result);
 int is_str_eq(const char *a, const char *b);
 int is_str_in(const char *haystack, const char *needle);
+int path_exists(char *path);
 
 #endif

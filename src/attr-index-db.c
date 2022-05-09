@@ -22,8 +22,10 @@
 #include <string.h>
 #include <libxslt/transform.h>
 #include <threads.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #include "dyn-mem.h"
 #include "basics.h"
@@ -285,6 +287,8 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
 
 int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_claim_set_doc, struct evr_attr_spec_claim *spec, evr_blob_ref claim_set_ref);
 
+void evr_log_failed_claim_set(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, xmlDocPtr claim_set_doc, char *fail_reason);
+
 int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
     int ret = evr_error;
     xmlNode *cs_node = evr_get_root_claim_set(raw_claim_set_doc);
@@ -333,12 +337,16 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     }
 #endif
     if(evr_add_claim_seed_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
+        evr_log_failed_claim_set(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set before attr factories.");
         goto out_with_reset_insert_claim_set;
     }
     if(evr_append_attr_factory_claims(db, raw_claim_set_doc, spec, claim_set_ref) != evr_ok){
+        // evr_append_attr_factory_claims is not called here because
+        // we call it from within evr_append_attr_factory_claims
         goto out_with_reset_insert_claim_set;
     }
     if(evr_add_claim_seed_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
+        evr_log_failed_claim_set(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set after attr factories.");
         goto out_with_reset_insert_claim_set;
     }
     const char *xslt_params[] = {
@@ -346,6 +354,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     };
     xmlDocPtr claim_set_doc = xsltApplyStylesheet(style, raw_claim_set_doc, xslt_params);
     if(!claim_set_doc){
+        evr_log_failed_claim_set(db, claim_set_ref, raw_claim_set_doc, "Unable to transform claim-set using XSLT stylesheet.");
         goto out_with_reset_insert_claim_set;
     }
     cs_node = evr_get_root_claim_set(claim_set_doc);
@@ -357,6 +366,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             log_info("Transformed claim set blob %s does not contain claim-set element", ref_str);
         }
 #endif
+        evr_log_failed_claim_set(db, claim_set_ref, claim_set_doc, "No claim-set element found in transformed claim-set.");
         ret = evr_ok;
         goto out_with_free_claim_set_doc;
     }
@@ -375,6 +385,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
 #endif
         attr = evr_parse_attr_claim(c_node);
         if(!attr){
+            evr_log_failed_claim_set(db, claim_set_ref, claim_set_doc, "Failed to parse attr claim from transformed claim-set.");
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
             log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s", ref_str);
@@ -408,6 +419,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
 #endif
         arch = evr_parse_archive_claim(c_node);
         if(!arch){
+            evr_log_failed_claim_set(db, claim_set_ref, claim_set_doc, "Failed to parse archive claim from transformed claim-set.");
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
             log_error("Failed to parse archive claim from transformed claim-set for blob with ref %s", ref_str);
@@ -542,6 +554,7 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
                 evr_fmt_blob_ref(attr_factory_str, c->attr_factory);
                 log_error("Failed to merged attr-factory %s's dynamic claim-set for original claim-set %s", attr_factory_str, claim_set_ref_str);
                 ret = evr_error;
+                evr_log_failed_claim_set(db, claim_set_ref, c->built_doc, "Unable to merge attr-factory built document into claim-set document.");
                 goto out_with_free_built_docs;
             }
         }
@@ -718,6 +731,50 @@ int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, cha
         sc = sc->next;
     }
     return evr_ok;
+}
+
+void evr_log_failed_claim_set(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, xmlDocPtr claim_set_doc, char *fail_reason){
+#define log_scope "Failed to log failed claim-set operation."
+    const char suffix[] = ".log";
+    const size_t dir_len = strlen(db->dir);
+    char log_path[dir_len + evr_blob_ref_str_size - 1 + sizeof(suffix)];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, log_path);
+    evr_push_n(&bp, db->dir, dir_len);
+    evr_fmt_blob_ref(bp.pos, claim_set_ref);
+    evr_inc_buf_pos(&bp, evr_blob_ref_str_size - 1);
+    evr_push_n(&bp, suffix, sizeof(suffix));
+    log_debug("Logging failed claim-set operation to %s: %s", log_path, fail_reason);
+    int f = open(log_path, O_WRONLY | O_APPEND | O_CREAT);
+    if(f < 0){
+        log_error(log_scope " Can't open claim-set log file.");
+        return;
+    }
+    if(write_n(f, fail_reason, strlen(fail_reason)) != evr_ok){
+        log_error(log_scope " Can't write fail reason to log file.");
+        goto out_with_close_f;
+    }
+    const char sep[] = "\n\n";
+    if(write_n(f, sep, strlen(sep)) != evr_ok){
+        log_error(log_scope " Can't write separator to log file.");
+        goto out_with_close_f;
+    }
+    char *claim_set_str = NULL;
+    int claim_set_str_size;
+    xmlDocDumpMemoryEnc(claim_set_doc, (xmlChar**)&claim_set_str, &claim_set_str_size, "UTF-8");
+    if(!claim_set_str){
+        goto out_with_close_f;
+    }
+    if(write_n(f, claim_set_str, claim_set_str_size) != evr_ok){
+        log_error(log_scope " Can't write XML string to log file.");
+        goto out_with_free_claim_set;
+    }
+ out_with_free_claim_set:
+    xmlFree(claim_set_str);
+ out_with_close_f:
+    if(close(f) != 0){
+        log_error(log_scope " Can't close claim-set log file.");
+    }
 }
 
 int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref seed, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);
