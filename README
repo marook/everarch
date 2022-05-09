@@ -2,26 +2,25 @@ everarch - the hopefully ever lasting archive
 
 1) Introduction
 2) Build & Installation
-3) Configuration
-4) Usage
-5) Tests
-6) License
-7) Contact
+3) Usage
+4) Tests
+5) License
+6) Contact
 
 
 ------------------------------------------------------------------------
 Introduction
 
-everarch is a collection of applications to store your data. The goals
-of everarch are:
+everarch is a collection of applications to store your personal
+data. The goals of everarch are:
 
-- store your tiny and GB sized files and provide an index
+- store your tiny and GB sized files
+- provide a customized index over your data
 - make backups complete and fast
 - store your data in a format which you still can read in 20 years in
-  _future scripting language_
+  _future programming language_
 - store your data in a way that allows you to easily adopt new data
-  structures without the need to migrate the existing data. 20 years of
-  migration will rot your data away.
+  structures without the need to migrate the existing data
 - detect corrupt or externally modified data and restore it with a
   partial backup
 
@@ -29,86 +28,11 @@ What everarch is not:
 
 - a database which handles inserts every few milliseconds over a long
   amount of time very well
+- a multi user storage with fine grained access permissions
 
 everarch is right now in a pre alpha state. It's not intended to be
 used for your production data yet. Check out the backlog file to see
 what we are heading for in the v0.1 release.
-
-The core everarch applications are the evr-glacier-storage server, the
-evr-attr-index server and a command line interface evr.
-
-        ________
-       / bucket \
-       | files  |
-       \________/
-
-           ^
-           | reads / writes
-
-  -----------------------    watches   ------------------
-  | evr-glacier-storage |  <---------  | evr-attr-index |
-  -----------------------              ------------------
-
-           ^                                   ^
-           | get / put                         | search index
-
-  -----------------------               -----------------
-  |       evr           |               |    netcat     |
-  -----------------------               -----------------
-
-
-The evr-glacier-storage server stores claims and blob data in the
-bucket files. Claims are actually also stored as blobs but have some
-additional attributes. Claims are PGP signed XML documents which
-contain claim-set root elements. An example claim-set is located in
-doc/claims/claim-set-file.xml.
-
-A claim-set contains claims. everarch comes with a limited set of
-supported claims. These include a attr claim which can set or remove
-attributes from another claim. Also a file claim is supported which
-defines blobs which make up the pieces of a bigger file.
-
-You should be able to easily add your own self defined claims. In
-order to make them indexable you must provide an XSLT stylesheet which
-converts your claim into attr claims. doc/claims/file-to-attr.xslt
-contains a stylesheet which converts a file claim for example into
-attr claims.
-
-attr claims are the only claims which can be indexed by the
-evr-attr-index server.
-
-The stylesheet is referenced by a attr-spec claim. An example
-attr-spec claim is located in doc/claims/attr-spec.xml. The
-evr-attr-index server searches for attr-spec claims and will
-automatically start indexing the evr-glacier-storage in the way
-defined in the attr-spec.
-
-Claims just like any other data in everarch can't be deleted. So what
-do you do if you like to store your contacts in everarch and also want
-to delete them one day? You need one claim type to define a
-contact. For example:
-
-<contact
-    xmlns="https://whatever.my.domain/is">
-  <name>Heribert Huber</name>
-</contact>
-
-And if you wish another claim for archiving it:
-
-<archive-contact
-    xmlns="https://whatever.my.domain/is"
-    seed="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
-<archive-contact>
-
-The seed attribute on the archive-contact claim points to the contact
-claim which initially created the contact. The seed attribute can also
-be used to update existing claims:
-
-<contact
-    xmlns="https://whatever.my.domain/is"
-    seed="sha3-224-00000000000000000000000000000000000000000000000000000000-0000">
-  <name>Heribert Meier</name>
-</contact>
 
 
 ------------------------------------------------------------------------
@@ -122,6 +46,12 @@ Setup the build system once after you clone the repository:
 $ autoreconf --install
 $ ./configure
 
+There are some feature toggles available with the configure
+script. For example --enable-futile-claim-set-tracking. List them
+with:
+
+$ ./configure --help
+
 Run every time you want to build the applications:
 
 $ make
@@ -132,90 +62,9 @@ $ make install
 
 
 ------------------------------------------------------------------------
-Configuration
-
-everarch stores it's configuration files in ~/.config/everarch. Most
-of the configuration file properties are subject to change. The
-following shows some minimalistic configurations:
-
-The evr-glacier-storage configuration file is called
-glacier-storage.json and may contain something like this:
-
-{
-    "bucket_dir": "path/to/my/storage"
-}
-
-The evr-attr-index configuration file is called attr-index.json and
-may contain something like this:
-
-{
-    "state_dir": "path/to/attr-index"
-}
-
-Make sure you have a GPG key pair. It will be used for signing claims.
-
-
-------------------------------------------------------------------------
 Usage
 
-The following assumes you have built, installed and configured the
-application. The following commands should be executable from the
-everarch source directory in which this README is also located.
-
-First should start the evr-glacier-storage server and keep it running:
-
-$ evr-glacier-storage
-
-Upload your attr-spec stylesheet:
-
-$ evr-glacier-storage put < doc/claims/file-to-attr.xslt
-
-The stylesheet put will output a stylesheet reference which looks for
-example like
-sha3-224-00000000000000000000000000000000000000000000000000000000.
-
-This reference must be used in the following attr-spec claim:
-
-$ evr -f 3 sign-put <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<claim-set
-    xmlns="https://evr.ma300k.de/claims/"
-    xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="2022-03-01T00:00:00.000000Z"
-    >
-  <attr-spec>
-    <attr-def k="title" type="str"/>
-    <attr-def k="size" type="int"/>
-    <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
-  </attr-spec>
-</claim-set>
-EOF
-
-Now you can start the evr-attr-index server and keep it running:
-
-$ evr-attr-index
-
-It should find your attr-spec and start indexing your otherwise empty
-evr-glacier-storage.
-
-In order to test the server you can now post a file into the storage:
-
-$ evr post-file README
-
-The evr-attr-index server should index the created file claim.
-
-You can query the index using netcat:
-
-$ nc localhost 2362
-s select * where title=README
-
-The 's' command searches for query expressions. It prints the found
-claim references.
-
-You can also type help to see your options.
-
-If you don't want to leave emacs you could also load emacs/evr.el and
-call evr-attr-index-search.
+A detailed manual can be found in src/evr.texi.
 
 
 ------------------------------------------------------------------------
