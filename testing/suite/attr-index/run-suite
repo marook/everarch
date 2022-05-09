@@ -108,7 +108,7 @@ results=`nc localhost 2362 <<EOF
 s waduup?
 exit
 EOF`
-if [[ "${results}" != "ERROR syntax error, unexpected UNKNOWN, expecting EQ" ]]
+if [[ "${results}" != "ERROR syntax error, unexpected UNKNOWN, expecting EQ or CONTAINS" ]]
 then
     echo "Unexpected result from 's waruup?' query: ${results}" >&2
     exit 1

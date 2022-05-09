@@ -133,6 +133,66 @@ void evr_free_data_eq_cnd(void *data){
     free(d->value);
 }
 
+struct evr_attr_query_contains_cnd_data {
+    char *key;
+    char *needle;
+};
+
+int evr_append_contains_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd));
+
+int evr_bind_contains_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column);
+
+void evr_free_data_contains_cnd(void *data);
+
+struct evr_attr_query_node *evr_attr_query_contains_cnd(char *key, char *needle){
+    struct evr_attr_query_node *ret = NULL;
+    char *buf = malloc(sizeof(struct evr_attr_query_node) + sizeof(struct evr_attr_query_contains_cnd_data));
+    if(!buf){
+        goto out;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_map_struct(&bp, ret);
+    ret->append_cnd = evr_append_contains_cnd;
+    ret->bind = evr_bind_contains_cnd;
+    ret->free_data = evr_free_data_contains_cnd;
+    struct evr_attr_query_contains_cnd_data *data;
+    evr_map_struct(&bp, data);
+    ret->data = data;
+    data->key = key;
+    data->needle = needle;
+ out:
+    return ret;
+}
+
+int evr_append_contains_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)){
+    // TODO lower only works for ascii -> use icu extension for utf-8 lower function
+    return append(ctx, "c.seed in (select seed from attr where key = ? and glob(lower(\"*\" || ? || \"*\"), lower(val_str)) and valid_from <= ? and (valid_until > ? or valid_until is null) and val_str not null)");
+}
+
+int evr_bind_contains_cnd(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, sqlite3_stmt *stmt, int *column){
+    struct evr_attr_query_contains_cnd_data *data = node->data;
+    if(sqlite3_bind_text(stmt, (*column)++, data->key, -1, NULL) != SQLITE_OK){
+        return evr_error;
+    }
+    if(sqlite3_bind_text(stmt, (*column)++, data->needle, -1, NULL) != SQLITE_OK){
+        return evr_error;
+    }
+    if(sqlite3_bind_int64(stmt, (*column)++, (sqlite3_int64)ctx->t) != SQLITE_OK){
+        return evr_error;
+    }
+    if(sqlite3_bind_int64(stmt, (*column)++, (sqlite3_int64)ctx->t) != SQLITE_OK){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+void evr_free_data_contains_cnd(void *data){
+    struct evr_attr_query_contains_cnd_data *d = data;
+    free(d->key);
+    free(d->needle);
+}
+
 struct evr_attr_query_bool_and_data {
     struct evr_attr_query_node *l;
     struct evr_attr_query_node *r;

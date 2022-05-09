@@ -1,5 +1,3 @@
-* implement contains operator in attr queries
-the contains operator should be the tilde. for example: title~peng.
 * evr-attr-index must collect counts of seen claims
 evr-attr-index must collect the element name and namespace of every
 seen claims from the raw claim sets. the counts should be stored in
@@ -103,6 +101,14 @@ own.
 also the gpg public keys should be stored in the storage as
 blobs. that way they should never be lost. the configuration should
 reference the gpg keys sha3-224 hashes.
+* add i18n support in attr query contains operator
+right now sqlite is used for comparing values when using the attr
+query contains (~) operator in a case insensitive way. the lower case
+operation works only on ASCII characters. in order to get utf-8 lower
+case conversion support the [[https://github.com/sqlite/sqlite/tree/master/ext/icu][sqlite ICU extension]] must be loaded.
+
+test if this extension is part of the sqlite3 debian packaging. load
+it gracefully. log info if it can't be loaded and continue.
 * add claim-ref type in attr-spec's attr-def
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable

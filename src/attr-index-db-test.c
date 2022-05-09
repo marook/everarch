@@ -346,7 +346,7 @@ void test_query_syntax_error(){
 int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     ++claims_status_syntax_error_calls;
     assert(is_err(parse_res));
-    assert(is_str_eq(parse_error, "syntax error, unexpected END, expecting EQ"));
+    assert(is_str_eq(parse_error, "syntax error, unexpected END, expecting EQ or CONTAINS"));
     return evr_ok;
 }
 
@@ -472,6 +472,8 @@ void test_attr_value_type_self_claim_ref(){
 #undef seed_str
     assert_query_one_result(db, "my-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000", 20, seed);
     assert_query_one_result(db, "", 20, seed);
+    assert_query_one_result(db, "my-key~224", 20, seed);
+    assert_query_one_result(db, "my-key~SHA", 20, seed);
     assert(is_ok(evr_free_attr_index_db(db)));
     xsltFreeStylesheet(style);
     evr_free_attr_index_db_configuration(cfg);

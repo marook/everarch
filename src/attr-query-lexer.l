@@ -40,6 +40,7 @@
 
 "&&"	{ return BOOL_AND; };
 "="	{ return EQ; };
+"~"	{ return CONTAINS; };
 "ref"	{ return REF; };
 "select"	{ return SELECT; };
 "where"		{ return WHERE; };

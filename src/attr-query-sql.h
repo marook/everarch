@@ -58,6 +58,8 @@ struct evr_attr_query_node *evr_attr_query_ref_cnd(char *ref_str);
 
 struct evr_attr_query_node *evr_attr_query_eq_cnd(char *key, char *value);
 
+struct evr_attr_query_node *evr_attr_query_contains_cnd(char *key, char *needle);
+
 struct evr_attr_query_node *evr_attr_query_bool_and(struct evr_attr_query_node *l, struct evr_attr_query_node *r);
 
 void evr_free_attr_query_node(struct evr_attr_query_node *node);

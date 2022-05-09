@@ -69,6 +69,7 @@ int yylex(YYSTYPE *yylval_param);
 %token SELECT
 %token WHERE
 %token WILDCARD
+%token CONTAINS
 %token END
 %token UNKNOWN
 
@@ -105,6 +106,7 @@ conditions:
 condition:
   REF EQ STRING { evr_ret_node($$, evr_attr_query_ref_cnd($3), "Unable to parse ref=* condition."); }
 | STRING EQ STRING { evr_ret_node($$, evr_attr_query_eq_cnd($1, $3), "Unable to parse *=* condition."); }
+| STRING CONTAINS STRING { evr_ret_node($$, evr_attr_query_contains_cnd($1, $3), "Unable to parse *~* condition."); }
 ;
 
 %%
