@@ -13,6 +13,11 @@ AC_DEFINE(_POSIX_C_SOURCE, 200809L, We want to use for example strnlen)
 AC_DEFINE(_GNU_SOURCE, 1, We use for example fcntl's F_GETSIG)
 AC_DEFINE(EVR_LOG_DEBUG, , Turns on log message output on level debug)
 
+AC_ARG_ENABLE([futile-claim-set-tracking],
+              [AS_HELP_STRING([--enable-futile-claim-set-tracking], [Enables tracking of claim-sets without any effect to the attr-index. Helpful for finding custom claims which are missing in the transformation.])],
+              [AC_DEFINE([EVR_FUTILE_CLAIM_SET_TRACKING], [1], [Enables futile claim set tracking.])],
+)
+
 AC_STDC_HEADERS
 AC_HAVE_HEADERS(string.h)
 

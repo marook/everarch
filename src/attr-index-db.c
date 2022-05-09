@@ -104,6 +104,9 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->update_attr_valid_until = NULL;
     db->find_seed_attrs = NULL;
     db->find_claims_for_seed = NULL;
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+    db->insert_futile_claim_set = NULL;
+#endif
     size_t dir_len = strlen(db->dir);
     const char filename[] = "index.db";
     char db_path[dir_len + sizeof(filename)];
@@ -138,6 +141,9 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
 
 int evr_free_attr_index_db(struct evr_attr_index_db *db){
     int ret = evr_error;
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+    evr_finalize_stmt(insert_futile_claim_set);
+#endif
     evr_finalize_stmt(find_claims_for_seed);
     evr_finalize_stmt(find_seed_attrs);
     evr_finalize_stmt(update_attr_valid_until);
@@ -221,6 +227,9 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
         "insert into state (key, value) values (" to_string(evr_state_key_stage) ", " to_string(evr_attr_index_stage_initial) ")",
         "create table claim_set (ref blob primary key not null, created integer not null)",
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+        "create table futile_claim_set (ref blob primary key not null)",
+#endif
         NULL
     };
     for(size_t i = 0; ; ++i){
@@ -351,6 +360,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         ret = evr_ok;
         goto out_with_free_claim_set_doc;
     }
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+    int claim_set_futile = 1;
+#endif
     xmlNode *c_node = evr_first_claim(cs_node);
     struct evr_attr_claim *attr;
     while(c_node){
@@ -358,6 +370,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         if(!c_node){
             break;
         }
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+        claim_set_futile = 0;
+#endif
         attr = evr_parse_attr_claim(c_node);
         if(!attr){
             evr_blob_ref_str ref_str;
@@ -388,6 +403,9 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         if(!c_node){
             break;
         }
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+        claim_set_futile = 0;
+#endif
         arch = evr_parse_archive_claim(c_node);
         if(!arch){
             evr_blob_ref_str ref_str;
@@ -424,7 +442,24 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     if(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, claim_set_last_modified) != evr_ok){
         goto out_with_free_claim_set_doc;
     }
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+    if(claim_set_futile){
+        if(sqlite3_bind_blob(db->insert_futile_claim_set, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+            goto out_with_reset_insert_futile_claim_set;
+        }
+        if(evr_step_stmt(db->db, db->insert_futile_claim_set) != SQLITE_DONE){
+            goto out_with_reset_insert_futile_claim_set;
+        }
+    }
+#endif
     ret = evr_ok;
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+ out_with_reset_insert_futile_claim_set:
+    if(claim_set_futile && sqlite3_reset(db->insert_futile_claim_set) != SQLITE_OK){
+        evr_panic("Failed to reset insert_futile_claim_set statement");
+        ret = evr_error;
+    }
+#endif
  out_with_free_claim_set_doc:
     xmlFreeDoc(claim_set_doc);
     int reset_res;
@@ -828,6 +863,11 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "select c.ref from claim c inner join claim_set cs where c.seed = ? and cs.ref = " evr_sql_extract_blob_ref("c.ref") " order by cs.created", &db->find_claims_for_seed) != evr_ok){
         goto out;
     }
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+    if(evr_prepare_stmt(db->db, "insert into futile_claim_set (ref) values (?)", &db->insert_futile_claim_set) != evr_ok){
+        goto out;
+    }
+#endif
     ret = evr_ok;
  out:
     return ret;

@@ -61,6 +61,9 @@ struct evr_attr_index_db {
     sqlite3_stmt *update_attr_valid_until;
     sqlite3_stmt *find_seed_attrs;
     sqlite3_stmt *find_claims_for_seed;
+#ifdef EVR_FUTILE_CLAIM_SET_TRACKING
+    sqlite3_stmt *insert_futile_claim_set;
+#endif
     evr_blob_file_writer blob_file_writer;
     void *blob_file_writer_ctx;
 };

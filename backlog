@@ -1,18 +1,3 @@
-* evr-attr-index must collect counts of seen claims
-evr-attr-index must collect the element name and namespace of every
-seen claims from the raw claim sets. the counts should be stored in
-the index db.
-
-there must be a command in the evr-attr-index search interface to
-query the counts.
-
-this feature should make it easier to gain an insight on the indexed
-claims. mostly i want the feature to validate the attr-index works as
-expected.
-
-it also might help finding out which transformations should further be
-added to the transformation xslt.
-* count of seen claims should be queryable via attr-index cmd
 * log failed transformations and attr factory calls with claim-sets
 failed xslt transformations and failed attr factory interactions
 should be logged in the attr-index directory. the file name should be
