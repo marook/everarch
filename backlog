@@ -65,6 +65,13 @@ mentioned in [[https://sqlite.org/wal.html][sqlite's WAL mode]] or [[https://phi
 #+BEGIN_SRC
 pragma journal_mode = WAL;
 #+END_SRC
+* turn off fsync for attr-index's sqlite
+fsync calls can be turned off via sqlite pragma statement as show in
+[[https://phiresky.github.io/blog/2020/sqlite-performance-tuning/][SQLite performance tuning]].
+
+#+BEGIN_SRC
+pragma synchronous = off;
+#+END_SRC
 * store flags and blob size redundant in buckets
 right now flags and blob size in the evr-glacier-storage are storend
 once for every blob and without any checksum.
