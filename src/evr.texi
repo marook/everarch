@@ -34,6 +34,7 @@ archive.
 * Overview::   Explains what everarch is about.
 * Claims::     Details about the central data structure in everarch.
 * evr-attr-index::  How indexing and finding claims works.
+* Query Language::  Explains the claim query language.
 * Index::      Complete index.
 @end menu
 
@@ -254,6 +255,11 @@ be used to update existing claims:
   <name>Heribert Meier</name>
 </contact>
 @end example
+
+@node Query Language
+@chapter Query Language
+
+TODO
 
 @node Index
 @unnumbered Index
