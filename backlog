@@ -1,15 +1,3 @@
-* plan backlog tasks for evr-glacier-storage sync
-it should be possible to sync two evr-glacier-storage instances via
-the evr cli.
-* add documentation on how to write attr-specs
-** describe how attr is the central claim
-** describe archive claim
-** describe the seed and index-seed attributes
-seed is provided before attr-factory calls and before each
-transformation.
-
-index-seed must be provided by transformation.
-** describe how seed and index-seed must be handled in transformations
 * implement t in attr queries
 tag=todo t=12345
 tag=todo t=1970-01-01T00:00:07Z
@@ -66,6 +54,35 @@ fsync calls can be turned off via sqlite pragma statement as show in
 #+BEGIN_SRC
 pragma synchronous = off;
 #+END_SRC
+* evr-attr-index should handle out of order blobs well
+right now the blobs which make up a file must be present in the
+evr-glacier-storage before the file claim is indexed by the
+attr-index. otherwise the indexing might fail if attr-factories fetch
+the file.
+
+whenever an attr-factory fails the affected claim-set should be marked
+as failed via a counter and the timestamp of the first time if failed
+should be stored.
+* re-index failed claim-sets
+re-indexing of failed claim-sets should be performed regularly. maybe
+we check for failed claim-sets every 30 seconds. the retries for
+claim-sets should be made more sparse in an exponential manner. that
+way a long failing claim-set will take up less resources.
+* add sort order to watch command
+by default the watch command emits the changed blob refs in the
+temporal order the changes appeared.
+
+it should be possible to emit the changed blob refs sorted by blob
+ref.
+* sync two evr-glacier-storage instances via evr cli
+#+BEGIN_SRC
+evr sync src-host:1234 dst-host:4321
+evr sync --two-way first-host:1234 second-host:4321
+#+END_SRC
+synchronization should execute in two thread groups. one thread group
+with one thread for comparing the blob refs which arrive via the
+watches. a second thread group for performing a sync of one blob. the
+second thread group should be able to scale to multiple threads.
 * store flags and blob size redundant in buckets
 right now flags and blob size in the evr-glacier-storage are storend
 once for every blob and without any checksum.
@@ -99,6 +116,15 @@ it gracefully. log info if it can't be loaded and continue.
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable
 using evr_parse_claim_ref(…).
+* add documentation on how to write attr-specs
+** describe how attr is the central claim
+** describe archive claim
+** describe the seed and index-seed attributes
+seed is provided before attr-factory calls and before each
+transformation.
+
+index-seed must be provided by transformation.
+** describe how seed and index-seed must be handled in transformations
 * reserve keywords in attr-query language
 right now there are some keywords in attr-query language like for
 example 'ref'. think about future keywords and reserve them so nobody
