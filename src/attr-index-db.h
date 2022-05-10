@@ -131,7 +131,7 @@ int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_a
  */
 typedef int (*evr_claim_visitor)(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *ctx);
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *ctx);
 
 int evr_attr_visit_claims_for_seed(struct evr_attr_index_db *db, evr_claim_ref seed_ref, int (*visit)(void *ctx, const evr_claim_ref claim), void *ctx);
 

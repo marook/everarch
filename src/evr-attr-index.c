@@ -1121,11 +1121,9 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     if(!db){
         goto out;
     }
-    evr_time t;
-    evr_now(&t);
     struct evr_search_ctx sctx;
     sctx.con = ctx;
-    if(evr_attr_query_claims(db, query, t, 0, 100, evr_respond_search_status, evr_respond_search_result, &sctx) != evr_ok){
+    if(evr_attr_query_claims(db, query, evr_respond_search_status, evr_respond_search_result, &sctx) != evr_ok){
         goto out_with_free_db;
     }
     if(evr_respond_message_end(ctx) != evr_ok){

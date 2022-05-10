@@ -30,6 +30,7 @@
 
 #include <string.h>
 
+#include "errors.h"
 #include "logger.h"
 #include "attr-query-sql.h"
 
@@ -54,6 +55,8 @@ void yyerror(struct evr_attr_query_result *res, char const *e){
   struct evr_attr_selector *selector;
   struct evr_attr_query_node *node;
   char *string;
+  evr_time timestamp;
+  int i;
 }
 
 %{
@@ -62,13 +65,19 @@ int yylex(YYSTYPE *yylval_param);
 
 %token attr_key
 %token BOOL_AND
+%token BOOL_OR
 %token EQ
+%token B_OPEN
+%token B_CLOSE
 %token <string> STRING
 %destructor { free($$); } <string>;
 %token REF
 %token SELECT
 %token WHERE
 %token WILDCARD
+%token AT
+%token OFFSET
+%token LIMIT
 %token CONTAINS
 %token END
 %token UNKNOWN
@@ -77,36 +86,57 @@ int yylex(YYSTYPE *yylval_param);
 %destructor { evr_free_attr_query($$); } <query>;
 %type <selector> attr_selector;
 %destructor { evr_free_attr_selector($$); } <selector>;
-%type <node> conditions;
 %type <node> condition;
 %destructor { evr_free_attr_query_node($$); } <node>;
+%type <timestamp> at_expression;
+%type <i> offset_expression;
+%type <i> limit_expression;
+
+%left EQ CONTAINS
+%left BOOL_OR
+%left BOOL_AND
 
 %%
 
 line:
-  END { res->query = evr_build_attr_query(NULL, NULL); }
+  END { evr_time t; evr_now(&t); res->query = evr_build_attr_query(NULL, NULL, t, evr_default_attr_query_limit, 0); }
 | query END { res->query = $1; }
 ;
 
 query:
-  conditions { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1); }
-| SELECT attr_selector WHERE conditions { $$ = evr_build_attr_query($2, $4); }
-| SELECT attr_selector {{ $$ = evr_build_attr_query($2, NULL); }}
+  condition at_expression limit_expression offset_expression { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1, $2, $3, $4); }
+| attr_selector WHERE condition at_expression limit_expression offset_expression { $$ = evr_build_attr_query($1, $3, $4, $5, $6); }
+| attr_selector at_expression limit_expression offset_expression {{ $$ = evr_build_attr_query($1, NULL, $2, $3, $4); }}
 ;
 
 attr_selector:
-  WILDCARD { $$ = evr_build_attr_selector(evr_attr_selector_all); }
-;
-
-conditions:
-  condition
-| conditions BOOL_AND condition { evr_ret_node($$, evr_attr_query_bool_and($1, $3), "Unable to parse * && * condition."); }
+%empty { $$ = NULL; }
+|  SELECT WILDCARD { $$ = evr_build_attr_selector(evr_attr_selector_all); }
 ;
 
 condition:
-  REF EQ STRING { evr_ret_node($$, evr_attr_query_ref_cnd($3), "Unable to parse ref=* condition."); }
+%empty { $$ = NULL; }
+| REF EQ STRING { evr_ret_node($$, evr_attr_query_ref_cnd($3), "Unable to parse ref=* condition."); }
 | STRING EQ STRING { evr_ret_node($$, evr_attr_query_eq_cnd($1, $3), "Unable to parse *=* condition."); }
 | STRING CONTAINS STRING { evr_ret_node($$, evr_attr_query_contains_cnd($1, $3), "Unable to parse *~* condition."); }
+| B_OPEN condition B_CLOSE { $$ = $2; }
+| condition BOOL_OR condition { evr_ret_node($$, evr_attr_query_bool_or($1, $3), "Unable to parse * && * condition."); }
+| condition BOOL_AND condition { evr_ret_node($$, evr_attr_query_bool_and($1, $3), "Unable to parse * && * condition."); }
+;
+
+at_expression:
+%empty { evr_now(&($$)); }
+| AT STRING { int time_parse_res = evr_time_from_anything(&($$), $2); free($2); if(time_parse_res != evr_ok){ yyerror(res, "Unable to parse 'at' timestamp"); YYERROR; }  }
+;
+
+limit_expression:
+%empty { $$ = evr_default_attr_query_limit; }
+| LIMIT STRING { int int_parse_res = evr_parse_attr_query_int(&($$), $2); free($2); if(int_parse_res != evr_ok) { yyerror(res, "Unable to parse limit integer"); YYERROR; } }
+;
+
+offset_expression:
+%empty { $$ = 0; }
+| OFFSET STRING { int int_parse_res = evr_parse_attr_query_int(&($$), $2); free($2); if(int_parse_res != evr_ok) { yyerror(res, "Unable to parse offset integer"); YYERROR; } }
 ;
 
 %%

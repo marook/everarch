@@ -39,14 +39,20 @@
 %%
 
 "&&"	{ return BOOL_AND; };
+"||"	{ return BOOL_OR; };
 "="	{ return EQ; };
 "~"	{ return CONTAINS; };
+"("	{ return B_OPEN; };
+")"	{ return B_CLOSE; };
 "ref"	{ return REF; };
 "select"	{ return SELECT; };
 "where"		{ return WHERE; };
+"at" { return AT; };
+"offset" { return OFFSET; };
+"limit" { return LIMIT; };
 "*"	{ return WILDCARD; };
 
-[a-zA-Z0-9][a-zA-Z0-9_.-]*	{ yylval->string = strdup(yytext); return STRING; };
+[a-zA-Z0-9][a-zA-Z0-9_.:-]*	{ yylval->string = strdup(yytext); return STRING; };
 
 [ \t]*	{ };
 

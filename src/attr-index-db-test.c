@@ -161,29 +161,46 @@ void test_open_new_attr_index_db_twice(){
             reset_visit_attrs();
             assert(is_ok(evr_get_seed_attrs(db, t25, other_ref, visit_attrs, NULL)));
             assert_attrs(0, 0);
+            // TODO make the assert calls after here declarative
             log_info("Assert evr_attr_query_claims tag=A t=0");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A", t00, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A at " tstr(0), claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             log_info("Assert evr_attr_query_claims tag=A t=25");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A at " tstr(25), claims_status_ok, visit_claims, NULL)));
             assert_claims(1);
             log_info("Assert evr_attr_query_claims tag=X t=25");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=X", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=X at " tstr(25), claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             log_info("Assert evr_attr_query_claims tag=A && tag=B t=25");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", t25, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B at " tstr(25), claims_status_ok, visit_claims, NULL)));
+            assert_claims(1);
+            log_info("Assert evr_attr_query_claims tag=A || tag=X t=25");
+            reset_visit_claims();
+            assert(is_ok(evr_attr_query_claims(db, "tag=A || tag=X at " tstr(25), claims_status_ok, visit_claims, NULL)));
+            assert_claims(1);
+            log_info("Assert evr_attr_query_claims tag=X && tag=A || tag=Y && tag=B t=25");
+            reset_visit_claims();
+            assert(is_ok(evr_attr_query_claims(db, "tag=X && tag=A || tag=Y && tag=B at " tstr(25), claims_status_ok, visit_claims, NULL)));
+            assert_claims(0);
+            log_info("Assert evr_attr_query_claims (tag=X && tag=Y || tag=A) && tag=B t=25");
+            reset_visit_claims();
+            assert(is_ok(evr_attr_query_claims(db, "(tag=X && tag=Y || tag=A) && tag=B at " tstr(25), claims_status_ok, visit_claims, NULL)));
+            assert_claims(1);
+            log_info("Assert evr_attr_query_claims tag=X || tag=A && tag=B || tag=Y t=25");
+            reset_visit_claims();
+            assert(is_ok(evr_attr_query_claims(db, "tag=X || tag=A && tag=B || tag=Y at " tstr(25), claims_status_ok, visit_claims, NULL)));
             assert_claims(1);
             log_info("Assert evr_attr_query_claims t=45");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "", t45, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "at " tstr(45), claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             log_info("Assert evr_attr_query_claims tag=A && tag=B t=15");
             reset_visit_claims();
-            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B", t15, 0, 100, claims_status_ok, visit_claims, NULL)));
+            assert(is_ok(evr_attr_query_claims(db, "tag=A && tag=B at " tstr(15), claims_status_ok, visit_claims, NULL)));
             assert_claims(0);
             assert(is_ok(evr_free_attr_index_db(db)));
         }
@@ -271,7 +288,7 @@ int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attr
 }
 
 void assert_claims(int expected_found_claim_0){
-    assert_msg(found_claim_0 == expected_found_claim_0, "Expected to have found claim 0 but found %d", found_claim_0);
+    assert_msg(found_claim_0 == expected_found_claim_0, "Expected to %shave found claim 0 but found it%s", expected_found_claim_0 ? "" : "not ", found_claim_0 ? "" : " not");
 }
 
 struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_db_configuration *cfg, struct evr_attr_spec_claim *custom_spec, evr_blob_file_writer custom_writer){
@@ -337,7 +354,7 @@ void test_query_syntax_error(){
     struct evr_attr_index_db_configuration *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     claims_status_syntax_error_calls = 0;
-    assert(is_ok(evr_attr_query_claims(db, "tag=todo && tachjen", 0, 0, 100, claims_status_syntax_error, NULL, NULL)));
+    assert(is_ok(evr_attr_query_claims(db, "tag=todo && tachjen at 1970-01-01T00:00:07.000000Z", claims_status_syntax_error, NULL, NULL)));
     assert(claims_status_syntax_error_calls == 1);
     assert(is_ok(evr_free_attr_index_db(db)));
     evr_free_attr_index_db_configuration(cfg);
@@ -346,11 +363,11 @@ void test_query_syntax_error(){
 int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     ++claims_status_syntax_error_calls;
     assert(is_err(parse_res));
-    assert(is_str_eq(parse_error, "syntax error, unexpected END, expecting EQ or CONTAINS"));
+    assert(is_str_eq(parse_error, "syntax error, unexpected AT, expecting EQ or CONTAINS"));
     return evr_ok;
 }
 
-void assert_query_one_result(struct evr_attr_index_db *db, char *query, time_t t, evr_claim_ref expected_ref);
+void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_claim_ref expected_ref);
 
 int visited_seed_refs = 0;
 
@@ -378,12 +395,14 @@ void test_attr_factories(){
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
     evr_time t;
-    assert(is_ok(evr_time_from_iso8601(&t, "2022-01-01T00:00:00.000000Z")));
+#define t_str "2022-01-01T00:00:00.000000Z"
+    assert(is_ok(evr_time_from_iso8601(&t, t_str)));
     assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, t, raw_claim_set)));
     evr_claim_ref static_claim_ref;
     evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
-    assert_query_one_result(db, "source=original", t, static_claim_ref);
-    assert_query_one_result(db, "source=factory", t, static_claim_ref);
+    assert_query_one_result(db, "source=original at " t_str, static_claim_ref);
+    assert_query_one_result(db, "source=factory at " t_str, static_claim_ref);
+#undef t_str
     xmlFreeDoc(raw_claim_set);
     xsltFreeStylesheet(style);
     evr_claim_ref visited_refs[2];
@@ -430,14 +449,16 @@ void test_attr_attribute_factories(){
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
     evr_time t;
-    assert(is_ok(evr_time_from_iso8601(&t, "2022-01-01T00:00:00.000000Z")));
+#define t_str "2022-01-01T00:00:00.000000Z"
+    assert(is_ok(evr_time_from_iso8601(&t, t_str)));
     assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, t, raw_claim_set)));
     evr_claim_ref attr_claim_ref;
     evr_build_claim_ref(attr_claim_ref, claim_set_ref, 0);
-    assert_query_one_result(db, "my-key=ye-value", t, attr_claim_ref);
-    assert_query_one_result(db, "my-static-key=ye-value", t, attr_claim_ref);
-    assert_query_one_result(db, "my-claim-ref-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000", t, attr_claim_ref);
-    assert_query_one_result(db, "title=win10.jpg", t, attr_claim_ref);
+    assert_query_one_result(db, "my-key=ye-value at " t_str, attr_claim_ref);
+    assert_query_one_result(db, "my-static-key=ye-value at " t_str, attr_claim_ref);
+    assert_query_one_result(db, "my-claim-ref-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000 at " t_str, attr_claim_ref);
+    assert_query_one_result(db, "title=win10.jpg at " t_str, attr_claim_ref);
+#undef t_str
     xmlFreeDoc(raw_claim_set);
     xsltFreeStylesheet(style);
     assert(is_ok(evr_free_attr_index_db(db)));
@@ -471,10 +492,10 @@ void test_attr_value_type_self_claim_ref(){
     evr_claim_ref seed;
     assert(is_ok(evr_parse_claim_ref(seed, seed_str)));
 #undef seed_str
-    assert_query_one_result(db, "my-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000", 20, seed);
-    assert_query_one_result(db, "", 20, seed);
-    assert_query_one_result(db, "my-key~224", 20, seed);
-    assert_query_one_result(db, "my-key~SHA", 20, seed);
+    assert_query_one_result(db, "my-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000 at 1970-01-01T00:00:00.020000Z", seed);
+    assert_query_one_result(db, "at 1970-01-01T00:00:00.020000Z", seed);
+    assert_query_one_result(db, "my-key~224 at 1970-01-01T00:00:00.020000Z", seed);
+    assert_query_one_result(db, "my-key~SHA at 1970-01-01T00:00:00.020000Z", seed);
     assert(is_ok(evr_free_attr_index_db(db)));
     xsltFreeStylesheet(style);
     evr_free_attr_index_db_configuration(cfg);
@@ -542,11 +563,11 @@ xmlDocPtr create_xml_doc(char *content){
     return doc;
 }
 
-void assert_query_one_result(struct evr_attr_index_db *db, char *query, time_t t, evr_claim_ref expected_ref){
+void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_claim_ref expected_ref){
     log_info("Asserting query %s has one result", query);
     asserting_claims_visitor_calls = 0;
     memcpy(asserting_claims_visitor_expected_ref, expected_ref, evr_claim_ref_size);
-    assert(is_ok(evr_attr_query_claims(db, query, t, 0, 2, claims_status_ok, asserting_claims_visitor, NULL)));
+    assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, asserting_claims_visitor, NULL)));
     assert_msg(asserting_claims_visitor_calls == 1, "No claim found but expected one", NULL);
 }
 

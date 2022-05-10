@@ -31,9 +31,14 @@
 // https://stackoverflow.com/questions/44103798/cyclic-dependency-in-reentrant-flex-bison-headers-with-union-yystype
 typedef void * yyscan_t;
 
+#define evr_default_attr_query_limit 100
+
 struct evr_attr_query_ctx {
-    // TODO selected attributes
-    evr_time t;
+    evr_time effective_time;
+    int limit;
+    int offset;
+    // TODO why did i name this void* more? right now it holds the
+    // built sql query string.
     void *more;
 };
 
@@ -62,6 +67,8 @@ struct evr_attr_query_node *evr_attr_query_contains_cnd(char *key, char *needle)
 
 struct evr_attr_query_node *evr_attr_query_bool_and(struct evr_attr_query_node *l, struct evr_attr_query_node *r);
 
+struct evr_attr_query_node *evr_attr_query_bool_or(struct evr_attr_query_node *l, struct evr_attr_query_node *r);
+
 void evr_free_attr_query_node(struct evr_attr_query_node *node);
 
 #define evr_attr_selector_none 0x01
@@ -84,9 +91,12 @@ struct evr_attr_selector *evr_build_attr_selector(int type);
 struct evr_attr_query {
     struct evr_attr_selector *selector;
     struct evr_attr_query_node *root;
+    evr_time effective_time;;
+    int limit;
+    int offset;
 };
 
-struct evr_attr_query *evr_build_attr_query(struct evr_attr_selector *selector, struct evr_attr_query_node *root);
+struct evr_attr_query *evr_build_attr_query(struct evr_attr_selector *selector, struct evr_attr_query_node *root, evr_time effective_time, int limit, int offset);
 
 void evr_free_attr_query(struct evr_attr_query *query);
 
@@ -94,5 +104,7 @@ struct evr_attr_query_result {
     struct evr_attr_query *query;
     char *error;
 };
+
+int evr_parse_attr_query_int(int *i, char *s);
 
 #endif

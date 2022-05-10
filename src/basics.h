@@ -184,6 +184,9 @@ void evr_now(evr_time *t);
  */
 #define evr_max_time_iso8601_size 30
 
+// TODO allow further parse variants for dates here like "2021" or "-3d"
+#define evr_time_from_anything(t, s) evr_time_from_iso8601(t, s)
+
 int evr_time_from_iso8601(evr_time *t, const char *s);
 
 void evr_time_to_iso8601(char *s, size_t sn, const evr_time *t);

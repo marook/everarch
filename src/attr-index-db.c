@@ -1297,7 +1297,7 @@ int evr_visit_attr_query(struct evr_attr_index_db *db, sqlite3_stmt *stmt, evr_a
 
 struct evr_attr_query *evr_attr_parse_query(const char *query, char **query_error);
 
-struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit);
+struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx);
 
 #define evr_collect_selected_attrs_attrs_size (2000 * sizeof(struct evr_attr_tuple))
 #define evr_collect_selected_attrs_data_size (2000 * 2 * 32)
@@ -1310,7 +1310,7 @@ struct evr_collect_selected_attrs_ctx {
 
 int evr_collect_selected_attrs(struct evr_collect_selected_attrs_ctx *ctx, struct evr_attr_index_db *db, struct evr_attr_selector *selector, evr_time t, const evr_claim_ref seed);
 
-int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, evr_time t, size_t offset, size_t limit, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *visit_ctx){
+int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, int (*status)(void *ctx, int parse_res, char *parse_error), evr_claim_visitor visit, void *visit_ctx){
     int ret = evr_error;
     char *query_error = NULL;
     struct evr_attr_query *query = evr_attr_parse_query(query_str, &query_error);
@@ -1333,8 +1333,8 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
         goto out_with_free_query;
     }
     struct evr_attr_query_ctx ctx;
-    ctx.t = t;
-    struct dynamic_array *sql = evr_attr_build_sql_query(query->root, &ctx, offset, limit);
+    ctx.effective_time = query->effective_time;
+    struct dynamic_array *sql = evr_attr_build_sql_query(query->root, &ctx);
     if(!sql){
         goto out_with_free_query;
     }
@@ -1343,13 +1343,19 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
         goto out_with_free_sql;
     }
     int column = 1;
-    if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)t) != SQLITE_OK){
+    if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)query->effective_time) != SQLITE_OK){
         goto out_with_finalize_query_stmt;
     }
-    if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)t) != SQLITE_OK){
+    if(sqlite3_bind_int64(query_stmt, column++, (sqlite3_int64)query->effective_time) != SQLITE_OK){
         goto out_with_finalize_query_stmt;
     }
     if(query->root && query->root->bind(&ctx, query->root, query_stmt, &column) != evr_ok){
+        goto out_with_finalize_query_stmt;
+    }
+    if(sqlite3_bind_int(query_stmt, column++, query->limit) != SQLITE_OK){
+        goto out_with_finalize_query_stmt;
+    }
+    if(sqlite3_bind_int(query_stmt, column++, query->offset) != SQLITE_OK){
         goto out_with_finalize_query_stmt;
     }
     struct evr_collect_selected_attrs_ctx attr_ctx;
@@ -1371,7 +1377,7 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, e
         const evr_claim_ref *seed = sqlite3_column_blob(query_stmt, 0);
         evr_reset_buf_pos(&attr_ctx.attrs);
         evr_reset_buf_pos(&attr_ctx.data);
-        if(evr_collect_selected_attrs(&attr_ctx, db, query->selector, t, *seed) != evr_ok){
+        if(evr_collect_selected_attrs(&attr_ctx, db, query->selector, query->effective_time, *seed) != evr_ok){
             goto out_with_free_attrs;
         }
         size_t attrs_len = (attr_ctx.attrs.pos - attr_ctx.attrs.buf) / sizeof(struct evr_attr_tuple);
@@ -1455,7 +1461,7 @@ int evr_attr_build_sql_append(struct evr_attr_query_ctx *ctx, const char *cnd){
     return ret;
 }
 
-struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx, size_t offset, size_t limit){
+struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root, struct evr_attr_query_ctx *ctx){
     struct dynamic_array *ret = alloc_dynamic_array(4 * 1024);
     if(!ret){
         goto out;
@@ -1481,8 +1487,7 @@ struct dynamic_array *evr_attr_build_sql_query(struct evr_attr_query_node *root,
             goto out_with_free_ret;
         }
     }
-    // TODO append limit X offset X
-    const char suffix[] = " order by cs.created desc";
+    const char suffix[] = " order by cs.created desc limit ? offset ?";
     // sizeof(suffix) because we also want to copy the \0
     ret = write_n_dynamic_array(ret, suffix, sizeof(suffix));
  out:
