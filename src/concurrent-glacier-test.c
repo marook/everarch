@@ -38,7 +38,7 @@ struct timespec short_delay = {
 
 struct timespec *append_blob_delay = NULL;
 
-struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_storage_configuration *config){
+struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_storage_cfg *config){
     return (struct evr_glacier_write_ctx*)1;
 }
 
@@ -57,7 +57,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     return evr_glacier_append_blob_result;
 }
 
-struct evr_glacier_storage_configuration *test_config;
+struct evr_glacier_storage_cfg *test_config;
 
 void evr_temp_persister_start(){
     assert(is_ok(evr_persister_start(test_config)));
@@ -156,13 +156,13 @@ void queue_and_process_many_blobs(struct timespec *queue_delay){
 }
 
 int main(){
-    test_config = create_temp_evr_glacier_storage_configuration();
+    test_config = create_temp_evr_glacier_storage_cfg();
     assert(test_config);
     run_test(test_queue_one_blob_success);
     run_test(test_queue_one_blob_write_error);
     run_test(test_queue_many_blobs_race);
     run_test(test_queue_many_blobs_slow_append);
     run_test(test_queue_many_blobs_slow_queue);
-    free_evr_glacier_storage_configuration(test_config);
+    evr_free_glacier_storage_cfg(test_config);
     return 0;
 }

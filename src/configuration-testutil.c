@@ -37,23 +37,18 @@ char *new_temp_dir_path(){
     return s;
 }
 
-struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration(){
-    struct evr_glacier_storage_configuration *config = create_evr_glacier_storage_configuration();
+struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(){
+    struct evr_glacier_storage_cfg *config = malloc(sizeof(struct evr_glacier_storage_cfg));
     assert(config);
-    if(config->bucket_dir_path){
-        free(config->bucket_dir_path);
-    }
+    config->max_bucket_size = 10<<20;
     config->bucket_dir_path = new_temp_dir_path();
     log_info("Using %s as bucket dir", config->bucket_dir_path);
     return config;
 }
 
-struct evr_attr_index_db_configuration *create_temp_attr_index_db_configuration(){
-    struct evr_attr_index_db_configuration *cfg = evr_create_attr_index_db_configuration();
+struct evr_attr_index_cfg *create_temp_attr_index_db_configuration(){
+    struct evr_attr_index_cfg *cfg = malloc(sizeof(struct evr_attr_index_cfg));
     assert(cfg);
-    if(cfg->state_dir_path){
-        free(cfg->state_dir_path);
-    }
     cfg->state_dir_path = new_temp_dir_path();
     log_info("Using %s as attr-index state dir", cfg->state_dir_path);
     return cfg;

@@ -35,15 +35,15 @@ int status_mock_expected_blob_size;
 int status_mock(void *arg, int exists, int flags, size_t blob_size);
 int store_into_dynamic_array(void *arg, const char *data, size_t data_len);
 int store_into_void(void *arg, const char *data, size_t data_len);
-struct evr_glacier_storage_configuration* clone_config(struct evr_glacier_storage_configuration *config);
+struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *config);
 char* clone_string(const char* s);
 void free_glacier_ctx(struct evr_glacier_write_ctx *ctx);
 
 void test_evr_glacier_open_same_empty_glacier_twice(){
-    struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     for(int i = 0; i < 2; i++){
         log_info("Round %d…", i);
-        struct evr_glacier_storage_configuration *round_config = clone_config(config);
+        struct evr_glacier_storage_cfg *round_config = clone_config(config);
         struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
         assert(ctx);
         assert(ctx->current_bucket_index == 1);
@@ -51,11 +51,11 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
         assert(ctx->current_bucket_pos == 4);
         free_glacier_ctx(ctx);
     }
-    free_evr_glacier_storage_configuration(config);
+    evr_free_glacier_storage_cfg(config);
 }
 
 void test_evr_glacier_create_context_twice_fails(){
-    struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *ctx1 = evr_create_glacier_write_ctx(config);
     assert(ctx1);
     struct evr_glacier_write_ctx *ctx2 = evr_create_glacier_write_ctx(config);
@@ -64,7 +64,7 @@ void test_evr_glacier_create_context_twice_fails(){
 }
 
 void test_evr_glacier_write_smal_blob(){
-    struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(config);
     assert(write_ctx);
     {
@@ -170,7 +170,7 @@ int store_into_void(void *arg, const char *data, size_t data_len){
 }
 
 void test_evr_glacier_write_big_blob(){
-    struct evr_glacier_storage_configuration *config = create_temp_evr_glacier_storage_configuration();
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
     assert(ctx);
     {
@@ -202,12 +202,9 @@ void test_evr_glacier_write_big_blob(){
     free_glacier_ctx(ctx);
 }
 
-struct evr_glacier_storage_configuration* clone_config(struct evr_glacier_storage_configuration *config){
-    struct evr_glacier_storage_configuration *clone = (struct evr_glacier_storage_configuration*)malloc(sizeof(struct evr_glacier_storage_configuration));
+struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *config){
+    struct evr_glacier_storage_cfg *clone = (struct evr_glacier_storage_cfg*)malloc(sizeof(struct evr_glacier_storage_cfg));
     assert(clone);
-    clone->cert_path = clone_string(config->cert_path);
-    clone->key_path = clone_string(config->key_path);
-    clone->cert_root_path = clone_string(config->cert_root_path);
     clone->max_bucket_size = config->max_bucket_size;
     clone->bucket_dir_path = clone_string(config->bucket_dir_path);
     return clone;
@@ -226,9 +223,9 @@ char* clone_string(const char* s){
 
 void free_glacier_ctx(struct evr_glacier_write_ctx *ctx){
     // TODO delete buckets dir
-    struct evr_glacier_storage_configuration *config = ctx->config;
+    struct evr_glacier_storage_cfg *config = ctx->config;
     assert(is_ok(evr_free_glacier_write_ctx(ctx)));
-    free_evr_glacier_storage_configuration(config);
+    evr_free_glacier_storage_cfg(config);
 }
 
 void test_evr_free_glacier_read_ctx_with_null_ctx(){

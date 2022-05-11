@@ -1,18 +1,3 @@
-* change config file format from json to config
-right now json is used to configure the evr-glacier-storage and
-attr-index storage directories.
-
-the configuration file format should be changed to config. for example:
-
-#+BEGIN_SRC
-# this is a comment
-bucket-path-template=path/to/buckets
-#+END_SRC
-
-the idea is to allow exactly the same keys in the config file which
-are also available via the command line arguments. that's why the argp
-data structures for defining the command line arguments must be reused
-when parsing the config file.
 * make evr-glacier-storage port configurable
 * make evr-attr-index port configurable
 * gracefully handle sqlite database is locked in evr-attr-index

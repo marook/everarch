@@ -37,8 +37,13 @@
 #include <sqlite3.h>
 #include <libxslt/documents.h>
 
-#include "attr-index-db-configuration.h"
 #include "claims.h"
+
+struct evr_attr_index_cfg {
+    char *state_dir_path;
+};
+
+void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg);
 
 typedef int (*evr_blob_file_writer)(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
 
@@ -68,7 +73,7 @@ struct evr_attr_index_db {
     void *blob_file_writer_ctx;
 };
 
-struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx);
+struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_cfg *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx);
 
 struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *db);
 

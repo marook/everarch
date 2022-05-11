@@ -14,6 +14,7 @@ check_PROGRAMS = \
 	basics-test \
 	claims-test \
 	concurrent-glacier-test \
+	configp-test \
 	dyn-mem-test \
 	files-test \
 	glacier-cmd-test \
@@ -27,6 +28,7 @@ TESTS = \
 	attr-index-db-test \
 	basics-test \
 	claims-test \
+	configp-test \
 	concurrent-glacier-test \
 	dyn-mem-test \
 	files-test \
@@ -40,7 +42,6 @@ TESTS = \
 attr_index_db_test_SOURCES = \
 	assert.c \
 	attr-index-db.c \
-	attr-index-db-configuration.c \
 	attr-index-db-test.c \
 	attr-query-lexer.l \
 	attr-query-parser.y \
@@ -77,7 +78,6 @@ claims_test_LDADD = $(XML_LIBS) $(GCRYPT_LIBS)
 
 concurrent_glacier_test_SOURCES = \
 	assert.c \
-	attr-index-db-configuration.c \
 	concurrent-glacier-test.c \
 	concurrent-glacier.c \
 	configuration-testutil.c \
@@ -88,6 +88,12 @@ concurrent_glacier_test_SOURCES = \
 	logger.c
 concurrent_glacier_test_LDADD = $(EVERARCH_LIBS)
 
+configp_test_SOURCES = \
+	assert.c \
+	configp.c \
+	configp-test.c \
+	logger.c
+
 dyn_mem_test_SOURCES = \
 	assert.c \
 	dyn-mem.c \
@@ -96,13 +102,13 @@ dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
 evr_attr_index_SOURCES = \
 	attr-index-db.c \
-	attr-index-db-configuration.c \
 	attr-query-lexer.l \
 	attr-query-parser.y \
 	attr-query-sql.c \
 	basics.c \
 	claims.c \
 	configurations.c \
+	configp.c \
 	db.c \
 	dyn-mem.c \
 	evr-attr-index.c \
@@ -134,6 +140,7 @@ evr_glacier_storage_SOURCES = \
 	basics.c \
 	concurrent-glacier.c \
 	configurations.c \
+	configp.c \
 	db.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \
@@ -163,7 +170,6 @@ glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
-	attr-index-db-configuration.c \
 	basics.c \
 	configuration-testutil.c \
 	configurations.c \

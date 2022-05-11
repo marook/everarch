@@ -34,10 +34,42 @@
 #include "evr-glacier-client.h"
 #include "signatures.h"
 #include "server.h"
-#include "attr-index-db-configuration.h"
 #include "attr-index-db.h"
 #include "configurations.h"
 #include "files.h"
+#include "configp.h"
+
+const char *argp_program_version = "evr-attr-index " VERSION;
+const char *argp_program_bug_address = PACKAGE_BUGREPORT;
+
+static char doc[] = "evr-attr-index provides an index over a evr-glacier-storage server.";
+
+static char args_doc[] = "";
+
+static struct argp_option options[] = {
+    {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted."},
+    {0},
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*usage)(const struct argp_state *state)){
+    struct evr_attr_index_cfg *cfg = (struct evr_attr_index_cfg*)state->input;
+    switch(key){
+    default:
+        return ARGP_ERR_UNKNOWN;
+    case 'd': {
+        if(cfg->state_dir_path){
+            free(cfg->state_dir_path);
+        }
+        cfg->state_dir_path = strdup(arg);
+        break;
+    }
+    }
+    return 0;
+}
+
+static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
+    return parse_opt(key, arg, state, argp_usage);
+}
 
 sig_atomic_t running = 1;
 mtx_t stop_lock;
@@ -53,7 +85,7 @@ struct evr_connection {
 #define watch_overlap (10 * 60)
 #define apply_watch_overlap(t) (t <= watch_overlap ? 0 : t - watch_overlap)
 
-struct evr_attr_index_db_configuration *cfg;
+struct evr_attr_index_cfg *cfg;
 
 struct evr_handover_ctx {
     int occupied;
@@ -88,8 +120,9 @@ struct evr_search_ctx {
     int parse_res;
 };
 
+void evr_load_attr_index_cfg(int argc, char **argv);
+
 void handle_sigterm(int signum);
-struct evr_attr_index_db_configuration *evr_load_attr_index_db_cfg();
 #define evr_init_attr_spec_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
 int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
 #define evr_init_index_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
@@ -125,12 +158,9 @@ int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
 int evr_respond_message_end(struct evr_connection *ctx);
 int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
 
-int main(){
+int main(int argc, char **argv){
     int ret = evr_error;
-    cfg = evr_load_attr_index_db_cfg();
-    if(!cfg){
-        goto out;
-    }
+    evr_load_attr_index_cfg(argc, argv);
     if(mtx_init(&stop_lock, mtx_plain) != thrd_success){
         goto out_with_free_cfg;
     }
@@ -252,25 +282,39 @@ int main(){
  out_with_free_stop_lock:
     mtx_destroy(&stop_lock);
  out_with_free_cfg:
-    evr_free_attr_index_db_configuration(cfg);
- out:
+    evr_free_attr_index_cfg(cfg);
     return ret;
 }
 
-struct evr_attr_index_db_configuration *evr_load_attr_index_db_cfg(){
-    struct evr_attr_index_db_configuration *cfg = evr_create_attr_index_db_configuration();
-    const char *config_paths[] = {
-        "~/.config/everarch/attr-index.json",
-        "attr-index.json",
-    };
-    if(evr_load_configurations(cfg, config_paths, sizeof(config_paths) / sizeof(char*), evr_merge_attr_index_db_configuration, evr_expand_attr_index_db_configuration) != evr_ok){
-        log_error("Failed to load configuration");
-        goto out_with_free_cfg;
+void evr_load_attr_index_cfg(int argc, char **argv){
+    cfg = malloc(sizeof(struct evr_attr_index_cfg));
+    if(!cfg){
+        evr_panic("Unable to allocate memory for configuration.");
+        return;
     }
-    return cfg;
- out_with_free_cfg:
-    evr_free_attr_index_db_configuration(cfg);
-    return NULL;
+    cfg->state_dir_path = strdup(EVR_PREFIX "/var/everarch/attr-index");
+    if(!cfg->state_dir_path){
+        evr_panic("Unable to allocate memory for configuration.");
+    }
+    struct configp configp = {
+        options, parse_opt, args_doc, doc
+    };
+    char *config_paths[] = {
+        "/etc/everarch/attr-index.conf",
+        "~/.config/everarch/attr-index.conf",
+        "attr-index.conf",
+        NULL,
+    };
+    if(configp_parse(&configp, config_paths, cfg) != 0){
+        evr_panic("Unable to parse config files");
+        return;
+    }
+    struct argp argp = { options, parse_opt_adapter, args_doc, doc };
+    argp_parse(&argp, argc, argv, 0, 0, cfg);
+    evr_single_expand_property(cfg->state_dir_path, panic);
+    return;
+ panic:
+    evr_panic("Unable to expand configuration values");
 }
 
 void handle_sigterm(int signum){

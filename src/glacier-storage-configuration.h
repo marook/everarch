@@ -24,17 +24,13 @@
 #include <stddef.h>
 
 /**
- * evr_glacier_storage_configuration aggregates configuration options
+ * evr_glacier_storage_cfg aggregates configuration options
  * for the evr-glacier-storage application.
  *
  * All pointers within this structure must be freed using
- * free_evr_glacier_storage_configuration function.
+ * free_evr_glacier_storage_cfg function.
  */
-struct evr_glacier_storage_configuration {
-    char *cert_path;
-    char *key_path;
-    char *cert_root_path;
-
+struct evr_glacier_storage_cfg {
     /**
      * max_bucket_size is the maximum size of one bucket in bytes.
      */
@@ -49,16 +45,6 @@ struct evr_glacier_storage_configuration {
     char *bucket_dir_path;
 };
 
-struct evr_glacier_storage_configuration *create_evr_glacier_storage_configuration();
-
-void free_evr_glacier_storage_configuration(struct evr_glacier_storage_configuration *config);
-
-int merge_evr_glacier_storage_configuration_file(void *config, const char *config_path);
-
-/**
- * expand_evr_glacier_storage_configuration expands placeholders in
- * evr_glacier_storage_configuration paths.
- */
-int expand_evr_glacier_storage_configuration(void *config);
+void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg);
 
 #endif

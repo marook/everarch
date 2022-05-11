@@ -22,9 +22,6 @@
 #include "config.h"
 
 #include <string.h>
-#include <cjson/cJSON.h>
-
-#include "dyn-mem.h"
 
 #define replace_string(dest, src, error_target) \
     do {                                        \
@@ -44,16 +41,5 @@
     }
 
 int evr_single_wordexp(char **pathname);
-
-cJSON *evr_parse_json_config(const char *path);
-
-/**
- * evr_load_configurations walks over a list of to be expanded paths
- * and merges the config behind that path into a root config.
- */
-int evr_load_configurations(void *config, const char **paths, size_t paths_len, int (*merge)(void *config, const char *config_path), int (*expand)(void *config));
-
-
-char *evr_get_object_string_property(const cJSON *obj, const char* key);
 
 #endif

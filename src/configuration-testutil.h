@@ -19,18 +19,18 @@
 #ifndef __evr_configuration_testutil_h__
 #define __evr_configuration_testutil_h__
 
-#include "attr-index-db-configuration.h"
 #include "glacier-storage-configuration.h"
+#include "attr-index-db.h"
 
 /**
- * create_temp_evr_glacier_storage_configuration allocates a new
- * struct evr_glacier_storage_configuration which points to a temporary
+ * create_temp_evr_glacier_storage_cfg allocates a new
+ * struct evr_glacier_storage_cfg which points to a temporary
  * glacier directory.
  *
  * Every call can assume to point to an empty glacier.
  */
-struct evr_glacier_storage_configuration *create_temp_evr_glacier_storage_configuration();
+struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg();
 
-struct evr_attr_index_db_configuration *create_temp_attr_index_db_configuration();
+struct evr_attr_index_cfg *create_temp_attr_index_db_configuration();
 
 #endif

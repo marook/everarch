@@ -42,6 +42,40 @@
 #include "concurrent-glacier.h"
 #include "server.h"
 #include "configurations.h"
+#include "configp.h"
+
+const char *argp_program_version = "evr-glacier-storage " VERSION;
+const char *argp_program_bug_address = PACKAGE_BUGREPORT;
+
+static char doc[] = "evr-glacier-storage is a content addressable storage server.";
+
+static char args_doc[] = "";
+
+static struct argp_option options[] = {
+    // TODO max-bucket-size
+    {"bucket-dir-path", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted."},
+    {0},
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*usage)(const struct argp_state *state)){
+    struct evr_glacier_storage_cfg *cfg = (struct evr_glacier_storage_cfg*)state->input;
+    switch(key){
+    default:
+        return ARGP_ERR_UNKNOWN;
+    case 'd': {
+        if(cfg->bucket_dir_path){
+            free(cfg->bucket_dir_path);
+        }
+        cfg->bucket_dir_path = strdup(arg);
+        break;
+    }
+    }
+    return 0;
+}
+
+static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
+    return parse_opt(key, arg, state, argp_usage);
+}
 
 sig_atomic_t running = 1;
 
@@ -66,8 +100,10 @@ struct evr_list_blobs_ctx {
     struct evr_modified_blob blobs[evr_list_blobs_blobs_len];
 };
 
+void evr_load_glacier_storage_cfg(int argc, char **argv);
+
 void handle_sigterm(int signum);
-int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config);
+int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg);
 int evr_connection_worker(void *context);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
@@ -80,16 +116,13 @@ int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
 /**
- * config exists until the program is terminated.
+ * cfg exists until the program is terminated.
  */
-struct evr_glacier_storage_configuration *config;
+struct evr_glacier_storage_cfg *cfg;
 
-int main(){
+int main(int argc, char **argv){
     int ret = evr_error;
-    config = create_evr_glacier_storage_configuration();
-    if(!config){
-        goto out;
-    }
+    evr_load_glacier_storage_cfg(argc, argv);
     {
         struct sigaction action;
         memset(&action, 0, sizeof(action));
@@ -97,29 +130,21 @@ int main(){
         sigaction(SIGINT, &action, NULL);
         signal(SIGPIPE, SIG_IGN);
     }
-    const char *config_paths[] = {
-        "~/.config/everarch/glacier-storage.json",
-        "glacier-storage.json",
-    };
-    if(evr_load_configurations(config, config_paths, sizeof(config_paths) / sizeof(char*), merge_evr_glacier_storage_configuration_file, expand_evr_glacier_storage_configuration) != evr_ok){
-        log_error("Failed to load configuration");
-        goto out_with_free_configuration;
-    }
     if(sqlite3_config(SQLITE_CONFIG_MULTITHREAD) != SQLITE_OK){
         // read https://sqlite.org/threadsafe.html if you run into
         // this error
         log_error("Failed to configure multi-threaded mode for sqlite3");
         goto out_with_free_configuration;
     }
-    if(evr_quick_check_glacier(config) != evr_ok){
+    if(evr_quick_check_glacier(cfg) != evr_ok){
         log_error("Glacier quick check failed");
         goto out_with_free_configuration;
     }
-    if(evr_persister_start(config) != evr_ok){
+    if(evr_persister_start(cfg) != evr_ok){
         log_error("Failed to start glacier persister thread");
         goto out_with_free_configuration;
     }
-    int tcpret = evr_glacier_tcp_server(config);
+    int tcpret = evr_glacier_tcp_server(cfg);
     if(tcpret != evr_ok && tcpret != evr_end){
         log_error("TCP server failed");
         goto out_with_stop_persister;
@@ -132,9 +157,40 @@ int main(){
     }
  out_with_free_configuration:
     // TODO we should wait for the worker threads to be finished before freeing config or maybe free config by OS when program ends?
-    free_evr_glacier_storage_configuration(config);
- out:
+    evr_free_glacier_storage_cfg(cfg);
     return ret;
+}
+
+void evr_load_glacier_storage_cfg(int argc, char **argv){
+    cfg = malloc(sizeof(struct evr_glacier_storage_cfg));
+    if(!cfg){
+        evr_panic("Unable to allocate memory for configuration");
+        return;
+    }
+    cfg->max_bucket_size = 1024 << 20;
+    cfg->bucket_dir_path = strdup("~/var/everarch/glacier");
+    if(!cfg->bucket_dir_path){
+        evr_panic("Unable to allocate memory for configuration");
+    }
+    struct configp configp = {
+        options, parse_opt, args_doc, doc
+    };
+    char *config_paths[] = {
+        "/etc/everarch/glacier-storage.conf",
+        "~/.config/everarch/glacier-storage.conf",
+        "glacier-storage.conf",
+        NULL,
+    };
+    if(configp_parse(&configp, config_paths, cfg) != 0){
+        evr_panic("Unable to parse config files");
+        return;
+    }
+    struct argp argp = { options, parse_opt_adapter, args_doc, doc };
+    argp_parse(&argp, argc, argv, 0, 0, cfg);
+    evr_single_expand_property(cfg->bucket_dir_path, panic);
+    return;
+ panic:
+    evr_panic("Unable to expand configuration values");
 }
 
 void handle_sigterm(int signum){
@@ -144,7 +200,7 @@ void handle_sigterm(int signum){
     }
 }
 
-int evr_glacier_tcp_server(const struct evr_glacier_storage_configuration *config){
+int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
     int ret = evr_error;
     int s = evr_make_tcp_socket(evr_glacier_storage_port);
     if(s < 0){
@@ -679,7 +735,7 @@ int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const stru
         return evr_ok;
     }
     log_debug("Worker %d creates a glacier read ctx", ctx->socket);
-    *rctx = evr_create_glacier_read_ctx(config);
+    *rctx = evr_create_glacier_read_ctx(cfg);
     if(!*rctx){
         return evr_error;
     }

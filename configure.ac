@@ -18,6 +18,12 @@ AC_ARG_ENABLE([futile-claim-set-tracking],
               [AC_DEFINE([EVR_FUTILE_CLAIM_SET_TRACKING], [1], [Enables futile claim set tracking.])],
 )
 
+if test x$prefix = xNONE ; then
+  prefix=${ac_default_prefix}
+fi
+
+AC_DEFINE_UNQUOTED([EVR_PREFIX], ["${prefix}"], [Path prefix where everarch will be installed])
+
 AC_STDC_HEADERS
 AC_HAVE_HEADERS(string.h)
 
@@ -40,7 +46,6 @@ PKG_CHECK_MODULES([GCRYPT], [
 ])
 
 PKG_CHECK_MODULES([EVERARCH], [
-    libcjson
     sqlite3
 ])
 

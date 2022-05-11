@@ -38,13 +38,23 @@
 #include "subprocess.h"
 #include "files.h"
 
+void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
+    if(!cfg){
+        return;
+    }
+    if(cfg->state_dir_path){
+        free(cfg->state_dir_path);
+    }
+    free(cfg);
+}
+
 struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db);
 int evr_attr_index_update_valid_until(sqlite3 *db, sqlite3_stmt *update_stmt, int rowid, evr_time valid_until);
 int evr_attr_index_bind_find_siblings(sqlite3_stmt *find_stmt, evr_claim_ref ref, char *key, evr_time t);
 int evr_get_attr_type_for_key(struct evr_attr_index_db *db, int *attr_type, char *key);
 int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, char* value, evr_time valid_from, int is_valid_until, evr_time valid_until, int trunc);
 
-struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_db_configuration *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx){
+struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_cfg *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx){
     const char slash = '/';
     size_t slash_len = 1;
     size_t state_dir_path_len = strlen(cfg->state_dir_path);
