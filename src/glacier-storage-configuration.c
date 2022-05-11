@@ -24,8 +24,16 @@ void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg){
     if(!cfg){
         return;
     }
-    if(cfg->bucket_dir_path){
-        free(cfg->bucket_dir_path);
+    char *str_options[] = {
+        cfg->host,
+        cfg->port,
+        cfg->bucket_dir_path,
+    };
+    char **str_options_end = &str_options[sizeof(str_options) / sizeof(char*)];
+    for(char **it = str_options; it != str_options_end; ++it){
+        if(*it){
+            free(*it);
+        }
     }
     free(cfg);
 }

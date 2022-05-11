@@ -23,6 +23,6 @@
 
 #include <netinet/in.h>
 
-int evr_make_tcp_socket(in_port_t port);
+int evr_make_tcp_socket(char *host, char *port);
 
 #endif

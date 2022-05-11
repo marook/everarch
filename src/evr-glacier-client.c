@@ -21,6 +21,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <netdb.h>
 
 #include "basics.h"
 #include "files.h"
@@ -28,22 +29,33 @@
 #include "logger.h"
 #include "signatures.h"
 
-int evr_connect_to_storage(){
-    int s = socket(PF_INET, SOCK_STREAM, 0);
-    if(s < 0){
-        goto socket_fail;
+int evr_connect_to_storage(char *host, char *port){
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+    struct addrinfo *result;
+    int res = getaddrinfo(host, port, &hints, &result);
+    if(res != 0){
+        log_error("Failed to resolve %s:%s: %s", host, port, gai_strerror(res));
+        return -1;
     }
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(evr_glacier_storage_port);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if(connect(s, (struct sockaddr*)&addr, sizeof(addr)) != 0){
-        goto connect_fail;
+    for(struct addrinfo *p = result; p != NULL; p = p->ai_next){
+        int s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if(s == -1){
+            continue;
+        }
+        if(connect(s, p->ai_addr, p->ai_addrlen) != 0){
+            close(s);
+            continue;
+        }
+        freeaddrinfo(result);
+        return s;
     }
-    return s;
- connect_fail:
-    close(s);
- socket_fail:
+    freeaddrinfo(result);
+    log_error("Unable to connect to glacier storage %s:%s", host, port);
     return -1;
 }
 

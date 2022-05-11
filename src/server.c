@@ -19,27 +19,45 @@
 #include "server.h"
 
 #include <unistd.h>
+#include <netdb.h>
+#include <string.h>
 
 #include "logger.h"
 
-int evr_make_tcp_socket(in_port_t port){
-    int s = socket(PF_INET, SOCK_STREAM, 0);
-    if(s < 0){
+int evr_make_tcp_socket(char *host, char *port){
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = 0;
+    hints.ai_protocol = 0;
+    hints.ai_canonname = NULL;
+    hints.ai_addr = NULL;
+    hints.ai_next = NULL;
+    struct addrinfo *result;
+    int res = getaddrinfo(host, port, &hints, &result);
+    if(res != 0){
+        log_error("Unable to resolve bind service %s:%s: %s", host, port, gai_strerror(res));
         return -1;
     }
-    int enable = 1;
-    if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
-        close(s);
-        return -1;
+    for(struct addrinfo *p = result; p != NULL; p = p->ai_next){
+        int s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if(s == -1){
+            continue;
+        }
+        int enable = 1;
+        if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
+            close(s);
+            return -1;
+        }
+        if(bind(s, p->ai_addr, p->ai_addrlen) < 0){
+            close(s);
+            continue;
+        }
+        freeaddrinfo(result);
+        return s;
     }
-        
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    if(bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0){
-        log_error("Failed to bind to localhost:%d", port);
-        return -1;
-    }
-    return s;
+    freeaddrinfo(result);
+    log_error("Unable to bind to %s:%s", host, port);
+    return -1;
 }

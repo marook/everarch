@@ -36,6 +36,14 @@
 #define _stringify(n) #n
 #define to_string(n) _stringify(n)
 
+#define evr_replace_str(s, arg)                 \
+    do {                                        \
+        if(s) {                                 \
+            free(s);                            \
+        }                                       \
+        s = strdup(arg);                        \
+    } while(0)
+
 #define evr_glacier_storage_port 2361
 #define evr_glacier_attr_index_port 2362
 

@@ -42,8 +42,18 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
     if(!cfg){
         return;
     }
-    if(cfg->state_dir_path){
-        free(cfg->state_dir_path);
+    char *str_options[] = {
+        cfg->state_dir_path,
+        cfg->host,
+        cfg->port,
+        cfg->storage_host,
+        cfg->storage_port,
+    };
+    char **str_options_end = &str_options[sizeof(str_options) / sizeof(char*)];
+    for(char **it = str_options; it != str_options_end; ++it){
+        if(*it){
+            free(*it);
+        }
     }
     free(cfg);
 }

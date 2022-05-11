@@ -23,18 +23,6 @@
 
 #include <string.h>
 
-#define replace_string(dest, src, error_target) \
-    do {                                        \
-        char *src_var = src;                    \
-        if(src_var){                            \
-            if(dest){free(dest);}               \
-            size_t src_len = strlen(src_var);   \
-            dest = malloc(src_len+1);           \
-            if(!dest){goto error_target;}       \
-            memcpy(dest, src_var, src_len+1);   \
-        }                                       \
-    } while(0)
-
 #define evr_single_expand_property(p, fail)     \
     if(evr_single_wordexp(&p) != evr_ok) {      \
         goto fail;                              \

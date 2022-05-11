@@ -46,8 +46,19 @@ static char doc[] = "evr-attr-index provides an index over a evr-glacier-storage
 
 static char args_doc[] = "";
 
+#define default_host "localhost"
+#define default_storage_host "localhost"
+
+#define arg_host 256
+#define arg_storage_host 257
+#define arg_storage_port 258
+
 static struct argp_option options[] = {
     {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted."},
+    {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
+    {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_glacier_attr_index_port) "."},
+    {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " default_storage_host "."},
+    {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
     {0},
 };
 
@@ -56,13 +67,21 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     switch(key){
     default:
         return ARGP_ERR_UNKNOWN;
-    case 'd': {
-        if(cfg->state_dir_path){
-            free(cfg->state_dir_path);
-        }
-        cfg->state_dir_path = strdup(arg);
+    case 'd':
+        evr_replace_str(cfg->state_dir_path, arg);
         break;
-    }
+    case arg_host:
+        evr_replace_str(cfg->host, arg);
+        break;
+    case 'p':
+        evr_replace_str(cfg->port, arg);
+        break;
+    case arg_storage_host:
+        evr_replace_str(cfg->storage_host, arg);
+        break;
+    case arg_storage_port:
+        evr_replace_str(cfg->storage_port, arg);
+        break;
     }
     return 0;
 }
@@ -293,7 +312,11 @@ void evr_load_attr_index_cfg(int argc, char **argv){
         return;
     }
     cfg->state_dir_path = strdup(EVR_PREFIX "/var/everarch/attr-index");
-    if(!cfg->state_dir_path){
+    cfg->host = strdup(default_host);
+    cfg->port = strdup(to_string(evr_glacier_attr_index_port));
+    cfg->storage_host = strdup(default_storage_host);
+    cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
+    if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
         evr_panic("Unable to allocate memory for configuration.");
     }
     struct configp configp = {
@@ -497,7 +520,7 @@ int evr_watch_index_claims_worker(void *arg){
     struct evr_attr_spec_handover_ctx *ctx = arg;
     log_debug("Started watch index claims worker");
     // cw is the connection used for watching for blob changes.
-    int cw = evr_connect_to_storage();
+    int cw = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
     if(cw < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
@@ -545,7 +568,7 @@ int evr_watch_index_claims_worker(void *arg){
         } while(0);
 #endif
         if(cs == -1){
-            cs = evr_connect_to_storage();
+            cs = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
             if(cs < 0){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free_latest_spec;
@@ -720,7 +743,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         ret = evr_ok;
         goto out_with_free_db;
     }
-    int cw = evr_connect_to_storage();
+    int cw = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
     if(cw < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_db;
@@ -799,7 +822,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
     }
 #endif
     if(*c == -1){
-        *c = evr_connect_to_storage();
+        *c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
         if(*c < 0){
             log_error("Failed to connect to evr-glacier-storage server");
             goto out;
@@ -899,7 +922,7 @@ int evr_index_sync_worker(void *arg){
             if(!db){
                 goto out_with_free;
             }
-            cw = evr_connect_to_storage();
+            cw = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
             if(cw < 0){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free;
@@ -997,16 +1020,15 @@ int evr_index_sync_worker(void *arg){
 
 int evr_attr_index_tcp_server(){
     int ret = evr_error;
-    int s = evr_make_tcp_socket(evr_glacier_attr_index_port);
+    int s = evr_make_tcp_socket(cfg->host, cfg->port);
     if(s < 0){
-        log_error("Failed to create socket");
         goto out;
     }
     if(listen(s, 7) < 0){
-        log_error("Failed to listen on localhost:%d", evr_glacier_attr_index_port);
+        log_error("Failed to listen on %s:%s", cfg->host, cfg->port);
         goto out_with_close_s;
     }
-    log_info("Listening on localhost:%d", evr_glacier_attr_index_port);
+    log_info("Listening on %s:%s", cfg->host, cfg->port);
     fd_set active_fd_set;
     struct timeval timeout;
     struct sockaddr_in client_addr;
@@ -1342,7 +1364,7 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
     if(f < 0){
         goto out;
     }
-    int c = evr_connect_to_storage();
+    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_close_f;

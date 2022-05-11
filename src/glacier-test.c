@@ -205,6 +205,8 @@ void test_evr_glacier_write_big_blob(){
 struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *config){
     struct evr_glacier_storage_cfg *clone = (struct evr_glacier_storage_cfg*)malloc(sizeof(struct evr_glacier_storage_cfg));
     assert(clone);
+    clone->host = clone_string(config->host);
+    clone->port = clone_string(config->port);
     clone->max_bucket_size = config->max_bucket_size;
     clone->bucket_dir_path = clone_string(config->bucket_dir_path);
     return clone;

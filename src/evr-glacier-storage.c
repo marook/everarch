@@ -51,7 +51,13 @@ static char doc[] = "evr-glacier-storage is a content addressable storage server
 
 static char args_doc[] = "";
 
+#define default_host "localhost"
+
+#define arg_host 256
+
 static struct argp_option options[] = {
+    {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
+    {"port", 'p', "PORT", 0, "The tcp port at which the glacier storage server will listen. The default port is " to_string(evr_glacier_storage_port) "."},
     // TODO max-bucket-size
     {"bucket-dir-path", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted."},
     {0},
@@ -62,13 +68,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     switch(key){
     default:
         return ARGP_ERR_UNKNOWN;
-    case 'd': {
-        if(cfg->bucket_dir_path){
-            free(cfg->bucket_dir_path);
-        }
-        cfg->bucket_dir_path = strdup(arg);
+    case 'd':
+        evr_replace_str(cfg->bucket_dir_path, arg);
         break;
-    }
+    case arg_host:
+        evr_replace_str(cfg->host, arg);
+        break;
+    case 'p':
+        evr_replace_str(cfg->port, arg);
+        break;
     }
     return 0;
 }
@@ -167,9 +175,11 @@ void evr_load_glacier_storage_cfg(int argc, char **argv){
         evr_panic("Unable to allocate memory for configuration");
         return;
     }
+    cfg->host = strdup(default_host);
+    cfg->port = strdup(to_string(evr_glacier_storage_port));
     cfg->max_bucket_size = 1024 << 20;
     cfg->bucket_dir_path = strdup("~/var/everarch/glacier");
-    if(!cfg->bucket_dir_path){
+    if(!cfg->host || !cfg->port || !cfg->bucket_dir_path){
         evr_panic("Unable to allocate memory for configuration");
     }
     struct configp configp = {
@@ -202,16 +212,16 @@ void handle_sigterm(int signum){
 
 int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
     int ret = evr_error;
-    int s = evr_make_tcp_socket(evr_glacier_storage_port);
+    int s = evr_make_tcp_socket(cfg->host, cfg->port);
     if(s < 0){
         log_error("Failed to create socket");
         goto out;
     }
     if(listen(s, 7) < 0){
-        log_error("Failed to listen on localhost:%d", evr_glacier_storage_port);
+        log_error("Failed to listen on %s:%s", cfg->host, cfg->port);
         goto out_with_close_s;
     }
-    log_info("Listening on localhost:%d", evr_glacier_storage_port);
+    log_info("Listening on %s:%s", cfg->host, cfg->port);
     fd_set active_fd_set;
     struct sockaddr_in client_addr;
     while(running){

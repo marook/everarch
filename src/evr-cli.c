@@ -245,7 +245,8 @@ int evr_cli_get(char *fmt_key){
         log_error("Invalid key format");
         goto fail;
     }
-    int c = evr_connect_to_storage();
+    // TODO add host and port to configuration
+    int c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto fail;
@@ -286,7 +287,7 @@ int evr_cli_get_claim(char *claim_ref_str){
         log_error("Invalid key format");
         goto out;
     }
-    int c = evr_connect_to_storage();
+    int c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
@@ -364,7 +365,7 @@ int evr_cli_put(int flags){
     if(evr_calc_blob_ref(key, blob->size_used, blob->chunks) != evr_ok){
         goto out_with_free_blob;
     }
-    int c = evr_connect_to_storage();
+    int c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
@@ -423,7 +424,7 @@ int evr_cli_sign_put(int flags){
     if(evr_calc_blob_ref(key, signed_cs.size_used, signed_cs.chunks) != evr_ok){
         goto out_with_free_signed_buf;
     }
-    int c = evr_connect_to_storage();
+    int c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_signed_buf;
@@ -464,7 +465,7 @@ int evr_cli_get_file(char *fmt_cref){
     if(evr_parse_claim_ref(cref, fmt_cref) != evr_ok){
         goto out;
     }
-    int c = evr_connect_to_storage();
+    int c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
@@ -557,7 +558,7 @@ int evr_cli_post_file(char *file, char *title, int has_seed, evr_claim_ref seed)
         }
     }
     struct post_file_ctx ctx;
-    ctx.c = evr_connect_to_storage();
+    ctx.c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(ctx.c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_close_f;
@@ -679,7 +680,7 @@ int evr_cli_watch_blobs(int flags_filter, unsigned long long last_modified_after
     struct evr_blob_filter f;
     f.flags_filter = flags_filter;
     f.last_modified_after = last_modified_after;
-    int c = evr_connect_to_storage();
+    int c = evr_connect_to_storage("localhost", to_string(evr_glacier_storage_port));
     if(c < 0){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;

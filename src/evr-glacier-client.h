@@ -39,7 +39,7 @@
 
 #include "glacier-cmd.h"
 
-int evr_connect_to_storage();
+int evr_connect_to_storage(char *host, char *port);
 
 xmlDocPtr evr_fetch_xml(int fd, evr_blob_ref key);
 

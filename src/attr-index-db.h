@@ -36,11 +36,16 @@
 
 #include <sqlite3.h>
 #include <libxslt/documents.h>
+#include <netinet/in.h>
 
 #include "claims.h"
 
 struct evr_attr_index_cfg {
     char *state_dir_path;
+    char *host;
+    char *port;
+    char *storage_host;
+    char *storage_port;
 };
 
 void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg);

@@ -31,6 +31,9 @@
  * free_evr_glacier_storage_cfg function.
  */
 struct evr_glacier_storage_cfg {
+    char *host;
+    char *port;
+    
     /**
      * max_bucket_size is the maximum size of one bucket in bytes.
      */

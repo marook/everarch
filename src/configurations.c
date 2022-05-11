@@ -24,6 +24,18 @@
 #include "errors.h"
 #include "logger.h"
 
+#define replace_string(dest, src, error_target) \
+    do {                                        \
+        char *src_var = src;                    \
+        if(src_var){                            \
+            if(dest){free(dest);}               \
+            size_t src_len = strlen(src_var);   \
+            dest = malloc(src_len+1);           \
+            if(!dest){goto error_target;}       \
+            memcpy(dest, src_var, src_len+1);   \
+        }                                       \
+    } while(0)
+
 int evr_single_wordexp(char **pathname){
     int ret = evr_error;
     if(*pathname){
