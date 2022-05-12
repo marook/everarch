@@ -45,7 +45,8 @@ struct configp {
 /**
  * configp_parse parses the given file paths in order.
  *
- * Files must be terminated by a NULL pointer.
+ * Files must be terminated by a NULL pointer. Only the first existing
+ * file is parsed.
  *
  * Returns 0 on success. Will eventually not return because exit is
  * called on parse errors.

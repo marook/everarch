@@ -3,28 +3,11 @@ set -e
 set -o pipefail
 . ../config
 
-stop(){
-    if [[ -n "${ipid}" ]]
-    then
-        kill -s sigint "${ipid}"
-        wait "${ipid}" || true
-    fi
-    kill -s sigint "${spid}"
-    wait "${spid}" || true
-    if [[ -e 'storage/lock' ]]
-    then
-        echo "storage/lock still existing after storage quit" >&2
-        exit 1
-    fi
-}
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
 
-rm -rf 'storage' 'attr-index'
-mkdir 'storage' 'attr-index'
-
-evr-glacier-storage &
-spid=$!
-trap stop EXIT
-
+start_glacier_storage
 wait_for_glacier_storage
 
 echo "Uploading basic attr-spec…"
@@ -49,15 +32,11 @@ test_ref=`evr -f 1 sign-put < attr-claim-1.xml`
 test2_ref=`evr -f 1 sign-put < attr-claim-2.xml`
 evr -f 1 sign-put < attr-claim-future.xml
 
-echo "Starting evr-attr-index…"
-evr-attr-index &
-ipid=$!
-
-sleep 1
+start_attr_index
+wait_for_attr_index
 
 echo "Running test queries…"
-
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s tag=no-such-tag-exists
 exit
 EOF`
@@ -67,7 +46,7 @@ then
     exit 1
 fi
 
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s tag=todo
 exit
 EOF`
@@ -78,7 +57,7 @@ then
     exit 1
 fi
 
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s select * where tag=todo
 exit
 EOF`
@@ -91,7 +70,7 @@ then
     exit 1
 fi
 
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s select * where ref=${test_ref}-0000
 exit
 EOF`
@@ -104,7 +83,7 @@ then
     exit 1
 fi
 
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s waduup?
 exit
 EOF`
@@ -114,7 +93,7 @@ then
     exit 1
 fi
 
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 c ${test_ref}-0000
 exit
 EOF`
@@ -125,7 +104,7 @@ then
 fi
 
 # this test has a space character after the 's'
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s 
 exit
 EOF`
@@ -138,7 +117,7 @@ then
 fi
 
 # this test has no space character after the 's'
-results=`nc localhost 2362 <<EOF
+results=`nc localhost "${attr_index_port}" <<EOF
 s
 exit
 EOF`

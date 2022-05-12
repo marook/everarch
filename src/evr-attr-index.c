@@ -47,7 +47,6 @@ static char doc[] = "evr-attr-index provides an index over a evr-glacier-storage
 static char args_doc[] = "";
 
 #define default_host "localhost"
-#define default_storage_host "localhost"
 
 #define arg_host 256
 #define arg_storage_host 257
@@ -57,7 +56,7 @@ static struct argp_option options[] = {
     {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted."},
     {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
     {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_glacier_attr_index_port) "."},
-    {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " default_storage_host "."},
+    {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
     {0},
 };
@@ -314,7 +313,7 @@ void evr_load_attr_index_cfg(int argc, char **argv){
     cfg->state_dir_path = strdup(EVR_PREFIX "/var/everarch/attr-index");
     cfg->host = strdup(default_host);
     cfg->port = strdup(to_string(evr_glacier_attr_index_port));
-    cfg->storage_host = strdup(default_storage_host);
+    cfg->storage_host = strdup(evr_glacier_storage_host);
     cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
     if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
         evr_panic("Unable to allocate memory for configuration.");
@@ -323,9 +322,9 @@ void evr_load_attr_index_cfg(int argc, char **argv){
         options, parse_opt, args_doc, doc
     };
     char *config_paths[] = {
-        "/etc/everarch/attr-index.conf",
-        "~/.config/everarch/attr-index.conf",
         "attr-index.conf",
+        "~/.config/everarch/attr-index.conf",
+        "/etc/everarch/attr-index.conf",
         NULL,
     };
     if(configp_parse(&configp, config_paths, cfg) != 0){

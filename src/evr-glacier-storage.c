@@ -186,9 +186,9 @@ void evr_load_glacier_storage_cfg(int argc, char **argv){
         options, parse_opt, args_doc, doc
     };
     char *config_paths[] = {
-        "/etc/everarch/glacier-storage.conf",
-        "~/.config/everarch/glacier-storage.conf",
         "glacier-storage.conf",
+        "~/.config/everarch/glacier-storage.conf",
+        "/etc/everarch/glacier-storage.conf",
         NULL,
     };
     if(configp_parse(&configp, config_paths, cfg) != 0){

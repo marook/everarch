@@ -27,11 +27,21 @@
 
 #include "logger.h"
 
+#define configp_ok 0
+#define configp_error 1
+#define configp_no_such_file 2
+
+
 int configp_parse_file(struct configp *p, char *file, void *input);
 
 int configp_parse(struct configp *p, char **files, void *input){
     for(char **f = files; *f; ++f){
-        if(configp_parse_file(p, *f, input) != 0){
+        int res = configp_parse_file(p, *f, input);
+        if(res == configp_no_such_file){
+            continue;
+        } else if (res == configp_ok) {
+            break;
+        } else {
             _exit(1);
         }
     }
@@ -64,7 +74,7 @@ int configp_consume_arg(struct configp *p, char *key, char *val, struct argp_sta
     } while(0)
 
 int configp_parse_file(struct configp *p, char *file, void *input){
-    int ret = 1;
+    int ret = configp_error;
     wordexp_t wexp;
     wordexp(file, &wexp, 0);
     if(wexp.we_wordc != 1){
@@ -75,7 +85,7 @@ int configp_parse_file(struct configp *p, char *file, void *input){
     int f = open(exp_file, O_RDONLY);
     if(f < 0){
         if(errno == ENOENT){
-            ret = 0;
+            ret = configp_no_such_file;
             goto out_with_free_wexp;
         }
         log_error("Config file %s not found", exp_file);
@@ -175,11 +185,11 @@ int configp_parse_file(struct configp *p, char *file, void *input){
         log_error("Missing final newline in config file %s", exp_file);
         goto out_with_close_f;
     }
-    ret = 0;
+    ret = configp_ok;
  out_with_close_f:
     if(close(f) != 0){
         evr_panic("Failed to close config file %s", exp_file);
-        ret = 1;
+        ret = configp_error;
     }
  out_with_free_wexp:
     wordfree(&wexp);

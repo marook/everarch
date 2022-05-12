@@ -126,6 +126,7 @@ evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 evr_SOURCES = \
 	basics.c \
 	claims.c \
+	configp.c \
 	dyn-mem.c \
 	evr-cli.c \
 	evr-glacier-client.c \

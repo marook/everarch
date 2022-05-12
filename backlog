@@ -1,9 +1,3 @@
-* make hosts and port configurabe in evr cli
-right now the host and port of the evr-glacier-storage server are hard
-coded in evr cli.
-
-the host and port should be specifyable via the command line and via a
-config file.
 * gracefully handle sqlite database is locked in evr-attr-index
 sqlite's step function will exit with SQLITE_LOCKED if a table is
 locked for more than 1sec (configured right now). these locks happend

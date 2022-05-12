@@ -3,16 +3,91 @@ ulimit -c unlimited
 
 PATH="../../../src:${PATH}"
 
-wait_for_glacier_storage(){
-    wait_for_port 2361
+glacier_storage_port=2461
+glacier_storage_bucket_dir=storage
+glacier_storage_pid=
+
+attr_index_port=2462
+attr_index_state_dir=attr-index
+attr_index_pid=
+
+allocate_ports() {
+    ensure_port_available "${glacier_storage_port}"
+    ensure_port_available "${attr_index_port}"
 }
 
-wait_for_port(){
+write_evr_conf() {
+    cat > evr.conf <<EOF
+storage-port=${glacier_storage_port}
+EOF
+}
+
+start_glacier_storage() {
+    rm -rf -- "${glacier_storage_bucket_dir}"
+    mkdir -- "${glacier_storage_bucket_dir}"
+    echo "Starting evr-glacier-storage…"
+    evr-glacier-storage --port "${glacier_storage_port}" --bucket-dir-path "${glacier_storage_bucket_dir}" &
+    glacier_storage_pid=$!
+}
+
+wait_for_glacier_storage() {
+    wait_for_port "${glacier_storage_port}"
+}
+
+start_attr_index() {
+    rm -rf -- "${attr_index_state_dir}"
+    mkdir -- "${attr_index_state_dir}"
+    echo "Starting evr-attr-index…"
+    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" &
+    attr_index_pid=$!
+}
+
+wait_for_attr_index() {
+    wait_for_port "${attr_index_port}"
+    # TODO we should find a better way to wait until the index is
+    # ready as sleeping for one second
+    sleep 1
+}
+
+wait_for_port() {
     port="$1"
+    sleep 0.1
     while true
     do
-        nc -q 0 localhost "$1" < /dev/null && break
-        echo "Waiting for port $1…"
-        sleep 1
+        nc -q 0 localhost "${port}" < /dev/null && break
+        echo "Waiting for port ${port}…"
+        sleep 0.2
     done
+}
+
+ensure_port_available() {
+    port="$1"
+    nc -z localhost "${port}" && occupied=1 || occupied=0
+    if [[ "${occupied}" == '1' ]]
+    then
+        echo "Port ${port} is not available for integration test. Aborting." >&2
+        exit 1
+    fi
+}
+
+# stop_everarch_servers is usually the target of a trap:
+# trap stop_everarch_servers EXIT
+stop_everarch_servers() {
+    if [[ -n "${attr_index_pid}" ]]
+    then
+        kill -s sigint "${attr_index_pid}"
+        wait "${attr_index_pid}" || true
+        attr_index_pid=
+    fi
+    if [[ -n "${glacier_storage_pid}" ]]
+    then
+        kill -s sigint "${glacier_storage_pid}"
+        wait "${glacier_storage_pid}" || true
+        glacier_storage_pid=
+        if [[ -e "${glacier_storage_bucket_dir}/lock" ]]
+        then
+            echo "${glacier_storage_bucket_dir}/lock still existing after storage quit" >&2
+            exit 1
+        fi
+    fi
 }

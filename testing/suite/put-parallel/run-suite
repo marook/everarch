@@ -2,23 +2,15 @@
 set -e
 . ../config
 
-stop(){
-    kill -s sigint "${spid}"
-    wait "${spid}" || true
-    if [[ -e 'storage/lock' ]]
-    then
-        echo "storage/lock still existing after storage quit" >&2
-        exit 1
-    fi
-    rm -rf 'storage' 'running'
-}
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
 
-rm -rf 'storage'
-mkdir 'storage'
-
-evr-glacier-storage >/dev/null &
-spid=$!
-trap stop EXIT
+rm -rf -- "${glacier_storage_bucket_dir}"
+mkdir -- "${glacier_storage_bucket_dir}"
+echo "Starting evr-glacier-storage…"
+evr-glacier-storage --port "${glacier_storage_port}" --bucket-dir-path "${glacier_storage_bucket_dir}" > /dev/null &
+glacier_storage_pid=$!
 
 wait_for_glacier_storage
 
@@ -44,7 +36,7 @@ rm running
 
 for pid in $put_pids
 do
-    kill "${pid}" && wait "${pid}" || true
+    wait "${pid}" || true
 done
 
 storage_size=`du -hs storage | awk '{print $1}'`

@@ -3,24 +3,13 @@ set -e
 set -o pipefail
 . ../config
 
-stop(){
-    kill -s sigint "${spid}"
-    wait "${spid}" || true
-    if [[ -e 'storage/lock' ]]
-    then
-        echo "storage/lock still existing after storage quit" >&2
-        exit 1
-    fi
-    rm -rf 'storage' 'early-watch.actual.log' 'late-watch.actual.log' 'past-watch.actual.log' 'watch.actual.log'
-}
+rm -rf 'early-watch.actual.log' 'late-watch.actual.log' 'past-watch.actual.log' 'watch.actual.log'
 
-rm -rf 'storage' 'early-watch.actual.log' 'late-watch.actual.log' 'past-watch.actual.log' 'watch.actual.log'
-mkdir 'storage'
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
 
-evr-glacier-storage &
-spid=$!
-trap stop EXIT
-
+start_glacier_storage
 wait_for_glacier_storage
 
 # tests that watch will report blobs modified while the watch was

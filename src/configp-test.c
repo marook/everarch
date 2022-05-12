@@ -60,8 +60,8 @@ void test_parse_config(){
 #define files_dir "../testing/data/configs/"
     char *files[] = {
         files_dir "no-such-config-file.conf",
-        files_dir "a.conf",
         files_dir "b.conf",
+        files_dir "a.conf",
         NULL,
     };
 #undef files_dir
