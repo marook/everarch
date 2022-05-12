@@ -475,6 +475,9 @@ int evr_open_index_db(struct evr_glacier_storage_cfg *config, int sqliteFlags, s
     if(sqlite3_busy_timeout(_db, evr_sqlite3_busy_timeout) != SQLITE_OK){
         goto out_with_close_db;
     }
+    if(sqlite3_exec(_db, "pragma journal_mode=WAL", NULL, NULL, NULL) != SQLITE_OK){
+        goto out_with_close_db;
+    }
     *db = _db;
     ret = evr_ok;
  out:

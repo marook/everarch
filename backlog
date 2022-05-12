@@ -1,25 +1,3 @@
-* gracefully handle sqlite database is locked in evr-attr-index
-sqlite's step function will exit with SQLITE_LOCKED if a table is
-locked for more than 1sec (configured right now). these locks happend
-to me quite regularly when querrying the attr index while the index is
-heavily fed with new claims.
-
-a SQLITE_LOCKED error should be indicated as 'resource temporary not
-available' to the client.
-
-maybe the locks can be worked around when implementing journal mode as
-mentioned in [[https://sqlite.org/wal.html][sqlite's WAL mode]] or [[https://phiresky.github.io/blog/2020/sqlite-performance-tuning/][SQLite performance tuning]]:
-
-#+BEGIN_SRC
-pragma journal_mode = WAL;
-#+END_SRC
-* turn off fsync for attr-index's sqlite
-fsync calls can be turned off via sqlite pragma statement as show in
-[[https://phiresky.github.io/blog/2020/sqlite-performance-tuning/][SQLite performance tuning]].
-
-#+BEGIN_SRC
-pragma synchronous = off;
-#+END_SRC
 * evr-attr-index should handle out of order blobs well
 right now the blobs which make up a file must be present in the
 evr-glacier-storage before the file claim is indexed by the

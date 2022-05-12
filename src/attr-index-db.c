@@ -143,6 +143,12 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     if(sqlite3_busy_timeout(db->db, evr_sqlite3_busy_timeout) != SQLITE_OK){
         goto out_with_close_db;
     }
+    if(sqlite3_exec(db->db, "pragma journal_mode=WAL", NULL, NULL, NULL) != SQLITE_OK){
+        goto out_with_close_db;
+    }
+    if(sqlite3_exec(db->db, "pragma synchronous=off", NULL, NULL, NULL) != SQLITE_OK){
+        goto out_with_close_db;
+    }
     return db;
  out_with_close_db:
     if(sqlite3_close(db->db) != SQLITE_OK){
