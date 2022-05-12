@@ -77,6 +77,15 @@ must rewrite queries in the future.
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
 perkeep stuff.
+* add has key operator to attr query language
+extend the attr query language to support searching for claims which
+have a certain key.
+
+not sure yet about the syntax:
+#+BEGIN_SRC
+tag=todo && some-key
+tag=todo && some-key=*
+#+END_SRC
 * add not operator to attr query language
 #+BEGIN_SRC
 !tag=nsfw
