@@ -834,7 +834,12 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
         log_error("Claim set not fetchable for blob key %s", ref_str);
         goto out;
     }
-    if(evr_merge_attr_index_claim_set(db, spec, style, claim_set_ref, claim_set_last_modified, claim_set) != evr_ok){
+    evr_time t;
+    evr_now(&t);
+    if(evr_merge_attr_index_claim_set(db, spec, style, t, claim_set_ref, claim_set, 0) != evr_ok){
+        goto out_with_free_claim_set;
+    }
+    if(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, claim_set_last_modified) != evr_ok){
         goto out_with_free_claim_set;
     }
     ret = evr_ok;
@@ -843,6 +848,8 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
  out:
     return ret;
 }
+
+xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref);
 
 int evr_index_sync_worker(void *arg){
     int ret = evr_error;
@@ -864,6 +871,7 @@ int evr_index_sync_worker(void *arg){
     struct evr_watch_blobs_body wbody;
     struct evr_attr_spec_claim *spec = NULL;
     xsltStylesheetPtr style = NULL;
+    evr_time last_reindex = 0;
     while(running){
         if(evr_lock_handover(&ctx->handover) != evr_ok){
             goto out_with_free;
@@ -983,6 +991,16 @@ int evr_index_sync_worker(void *arg){
             break;
         }
         if(sret == 0){
+            evr_time now;
+            evr_now(&now);
+            // TODO we should use a time source which does not jump on ntpd actions
+            if(now - last_reindex >= evr_reindex_interval) {
+                last_reindex = now;
+                if(evr_reindex_failed_claim_sets(db, spec, style, now, get_claim_set_for_reindex, &cg) != evr_ok){
+                    log_error("Error while reindexing failed claim-sets");
+                    goto out_with_free;
+                }
+            }
             // TODO close cg after n timeouts in a row and set to -1
             continue;
         }
@@ -1015,6 +1033,18 @@ int evr_index_sync_worker(void *arg){
  out:
     log_debug("Ended index sync worker with result %d", ret);
     return ret;
+}
+
+xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
+    int *c = ctx;
+    if(*c == -1){
+        *c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
+        if(*c < 0){
+            log_error("Failed to connect to evr-glacier-storage server");
+            return NULL;
+        }
+    }
+    return evr_fetch_signed_xml(*c, claim_set_ref);
 }
 
 int evr_attr_index_tcp_server(){

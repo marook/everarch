@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #include "assert.h"
 #include "configuration-testutil.h"
@@ -125,7 +126,7 @@ void test_open_new_attr_index_db_twice(){
                     evr_blob_ref claim_set_ref;
                     assert(is_ok(evr_parse_blob_ref(claim_set_ref, merge_claim_refs[aai])));
                     xmlDoc *claim_set_doc = create_xml_doc(merge_claims[aai]);
-                    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
+                    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
                     xmlFreeDoc(claim_set_doc);
                 }
             }
@@ -219,6 +220,20 @@ int never_called_blob_file_writer(void *ctx, char *path, mode_t mode, evr_blob_r
     return evr_error;
 }
 
+#define attr_factory_fail_flag_file_path "attr-factory-fail.flag"
+
+void one_attr_factory_blob_file_writer_should_fail(struct evr_attr_index_db *db, int should_fail){
+    if(should_fail){
+        int f = open(attr_factory_fail_flag_file_path, O_WRONLY | O_CREAT, 0644);
+        assert_msg(f >= 0, "Create attr-factory fail flag file failed: %s", strerror(errno));
+        assert(close(f) == 0);
+    } else {
+        if(unlink(attr_factory_fail_flag_file_path) != 0){
+            assert_msg(errno == ENOENT, "Failed to delete attr-factory fail flag file: %s", strerror(errno));
+        }
+    }
+}
+
 int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_blob_ref ref){
     assert(ctx == NULL);
     evr_blob_ref_str ref_str;
@@ -228,6 +243,11 @@ int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_bl
     assert_msg(f >= 0, "Failed to create one_attr_factory_blob_file_writer file: %d", f);
     char content[] =
         "#!/bin/sh\n"
+        "if [ -e '" attr_factory_fail_flag_file_path "' ]\n"
+        "then\n"
+        "  echo '" attr_factory_fail_flag_file_path " found' >&2\n"
+        "  exit 1\n"
+        "fi\n"
         "cat <<EOF\n"
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:07.000000Z\">\n"
@@ -367,6 +387,7 @@ int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     return evr_ok;
 }
 
+void assert_query_no_result(struct evr_attr_index_db *db, char *query);
 void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_claim_ref expected_ref);
 
 int visited_seed_refs = 0;
@@ -383,6 +404,7 @@ void test_attr_factories(){
     spec.attr_factories_len = 1;
     spec.attr_factories = &attr_factory_ref;
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, &spec, one_attr_factory_blob_file_writer);
+    one_attr_factory_blob_file_writer_should_fail(db, 0);
     xsltStylesheetPtr style = create_attr_mapping_stylesheet();
     char raw_claim_set_content[] =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -394,12 +416,10 @@ void test_attr_factories(){
     xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    evr_time t;
-#define t_str "2022-01-01T00:00:00.000000Z"
-    assert(is_ok(evr_time_from_iso8601(&t, t_str)));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, t, raw_claim_set)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0)));
     evr_claim_ref static_claim_ref;
     evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
+#define t_str "2022-01-01T00:00:00.000000Z"
     assert_query_one_result(db, "source=original at " t_str, static_claim_ref);
     assert_query_one_result(db, "source=factory at " t_str, static_claim_ref);
 #undef t_str
@@ -413,6 +433,45 @@ void test_attr_factories(){
     assert(is_str_eq(claim_ref_str, "sha3-224-c0000000000000000000000000000000000000000000000000000000-0000"));
     evr_fmt_claim_ref(claim_ref_str, visited_refs[1]);
     assert(is_str_eq(claim_ref_str, "sha3-224-c0000000000000000000000000000000000000000000000000000000-0001"));
+    assert(is_ok(evr_free_attr_index_db(db)));
+    evr_free_attr_index_cfg(cfg);
+}
+
+xmlDocPtr get_claim_set_adapter(void *ctx, evr_blob_ref claim_set_ref){
+    char *claim_set_content = ctx;
+    return create_xml_doc(claim_set_content);
+}
+
+void test_attr_factories_fail_and_reindex(){
+    struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
+    evr_blob_ref attr_factory_ref;
+    assert(is_ok(evr_parse_blob_ref(attr_factory_ref, "sha3-224-fac00000000000000000000000000000000000000000000000000000")));
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 0;
+    spec.attr_def = NULL;
+    spec.attr_factories_len = 1;
+    spec.attr_factories = &attr_factory_ref;
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, &spec, one_attr_factory_blob_file_writer);
+    one_attr_factory_blob_file_writer_should_fail(db, 1);
+    xsltStylesheetPtr style = create_attr_mapping_stylesheet();
+    char raw_claim_set_content[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:07.000000Z\">"
+        "</claim-set>";
+    xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
+    evr_blob_ref claim_set_ref;
+    assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0)));
+    xmlFreeDoc(raw_claim_set);
+    evr_claim_ref static_claim_ref;
+    evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
+    assert_query_no_result(db, "at 2022-01-01T00:00:00.000000Z");
+    one_attr_factory_blob_file_writer_should_fail(db, 0);
+    assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 60*60*1000, get_claim_set_adapter, raw_claim_set_content)));
+    xsltFreeStylesheet(style);
+    evr_claim_ref claim_ref;
+    evr_build_claim_ref(claim_ref, claim_set_ref, 0);
+    assert_query_one_result(db, "at 2022-01-01T00:00:00.000000Z", claim_ref);
     assert(is_ok(evr_free_attr_index_db(db)));
     evr_free_attr_index_cfg(cfg);
 }
@@ -448,12 +507,10 @@ void test_attr_attribute_factories(){
     xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    evr_time t;
-#define t_str "2022-01-01T00:00:00.000000Z"
-    assert(is_ok(evr_time_from_iso8601(&t, t_str)));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, t, raw_claim_set)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0)));
     evr_claim_ref attr_claim_ref;
     evr_build_claim_ref(attr_claim_ref, claim_set_ref, 0);
+#define t_str "2022-01-01T00:00:00.000000Z"
     assert_query_one_result(db, "my-key=ye-value at " t_str, attr_claim_ref);
     assert_query_one_result(db, "my-static-key=ye-value at " t_str, attr_claim_ref);
     assert_query_one_result(db, "my-claim-ref-key=sha3-224-c0000000000000000000000000000000000000000000000000000000-0000 at " t_str, attr_claim_ref);
@@ -487,7 +544,7 @@ void test_attr_value_type_self_claim_ref(){
     assert(claim_set_doc);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
     xmlFreeDoc(claim_set_doc);
     evr_claim_ref seed;
     assert(is_ok(evr_parse_claim_ref(seed, seed_str)));
@@ -527,7 +584,7 @@ void test_failed_transformation(){
     assert(claim_set_doc);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_err(evr_merge_attr_index_claim_set(db, &spec, style, claim_set_ref, 123, claim_set_doc)));
+    assert(is_err(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
     xmlFreeDoc(claim_set_doc);
     const size_t state_dir_path_len = strlen(cfg->state_dir_path);
     const char log_path_suffix[] = "/ye-db/sha3-224-c0000000000000000000000000000000000000000000000000000000.log";
@@ -563,8 +620,16 @@ xmlDocPtr create_xml_doc(char *content){
     return doc;
 }
 
+void assert_query_no_result(struct evr_attr_index_db *db, char *query){
+    log_info("Asserting query '%s' has no results", query);
+    asserting_claims_visitor_calls = 0;
+    memset(asserting_claims_visitor_expected_ref, 0, evr_claim_ref_size);
+    assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, asserting_claims_visitor, NULL)));
+    assert_msg(asserting_claims_visitor_calls == 0, "Claims found but expected none", NULL);
+}
+
 void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_claim_ref expected_ref){
-    log_info("Asserting query %s has one result", query);
+    log_info("Asserting query '%s' has one result", query);
     asserting_claims_visitor_calls = 0;
     memcpy(asserting_claims_visitor_expected_ref, expected_ref, evr_claim_ref_size);
     assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, asserting_claims_visitor, NULL)));
@@ -590,6 +655,7 @@ int main(){
     run_test(test_setup_attr_index_db_twice);
     run_test(test_query_syntax_error);
     run_test(test_attr_factories);
+    run_test(test_attr_factories_fail_and_reindex);
     run_test(test_attr_attribute_factories);
     run_test(test_attr_value_type_self_claim_ref);
     run_test(test_failed_transformation);

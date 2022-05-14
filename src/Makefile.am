@@ -58,7 +58,7 @@ attr_index_db_test_SOURCES = \
 	keys.c \
 	logger.c \
 	subprocess.c
-attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS)
+attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS) -lm
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 basics_test_SOURCES = \
@@ -120,7 +120,7 @@ evr_attr_index_SOURCES = \
 	server.c \
 	signatures.c \
 	subprocess.c
-evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
+evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_SOURCES = \

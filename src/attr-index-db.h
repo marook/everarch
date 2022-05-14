@@ -40,6 +40,12 @@
 
 #include "claims.h"
 
+/**
+ * evr_reindex_interval is the baseline for the interval in evr_time
+ * at which the failed claim-sets should be checked for reindexing.
+ */
+#define evr_reindex_interval (30*1000)
+
 struct evr_attr_index_cfg {
     char *state_dir_path;
     char *host;
@@ -68,6 +74,9 @@ struct evr_attr_index_db {
     sqlite3_stmt *insert_claim;
     sqlite3_stmt *archive_claim;
     sqlite3_stmt *insert_claim_set;
+    sqlite3_stmt *update_claim_set_failed;
+    sqlite3_stmt *reset_claim_set_failed;
+    sqlite3_stmt *find_reindexable_claim_sets;
     sqlite3_stmt *update_attr_valid_until;
     sqlite3_stmt *find_seed_attrs;
     sqlite3_stmt *find_claims_for_seed;
@@ -113,7 +122,9 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc);
+int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, xmlDocPtr (*get_claim_set)(void *ctx, evr_blob_ref claim_set_ref), void *ctx);
+
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc, int reindex);
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, evr_claim_ref cref, struct evr_attr_claim *claim);
 

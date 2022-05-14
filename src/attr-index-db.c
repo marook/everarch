@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <math.h>
 
 #include "dyn-mem.h"
 #include "basics.h"
@@ -112,6 +113,8 @@ struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *odb){
     return evr_init_attr_index_db(fdb);
 }
 
+void evr_sqlite_pow(sqlite3_context *ctx, int argc, sqlite3_value **argv);
+
 struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->db = NULL;
     db->find_state = NULL;
@@ -121,6 +124,9 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->find_future_attr_siblings = NULL;
     db->insert_attr = NULL;
     db->insert_claim = NULL;
+    db->update_claim_set_failed = NULL;
+    db->reset_claim_set_failed = NULL;
+    db->find_reindexable_claim_sets = NULL;
     db->archive_claim = NULL;
     db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
@@ -149,6 +155,9 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     if(sqlite3_exec(db->db, "pragma synchronous=off", NULL, NULL, NULL) != SQLITE_OK){
         goto out_with_close_db;
     }
+    if(sqlite3_create_function(db->db, "pow", 2, SQLITE_UTF8, NULL, &evr_sqlite_pow, NULL, NULL) != SQLITE_OK){
+        goto out_with_close_db;
+    }
     return db;
  out_with_close_db:
     if(sqlite3_close(db->db) != SQLITE_OK){
@@ -157,6 +166,13 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
  out_with_free_db:
     free(db);
     return NULL;
+}
+
+void evr_sqlite_pow(sqlite3_context *ctx, int argc, sqlite3_value **argv){
+    double num = sqlite3_value_double(argv[0]);
+    double exp = sqlite3_value_double(argv[1]);
+    double res = pow(num, exp);
+    sqlite3_result_double(ctx, res);
 }
 
 #define evr_finalize_stmt(stmt)                         \
@@ -175,6 +191,9 @@ int evr_free_attr_index_db(struct evr_attr_index_db *db){
     evr_finalize_stmt(find_claims_for_seed);
     evr_finalize_stmt(find_seed_attrs);
     evr_finalize_stmt(update_attr_valid_until);
+    evr_finalize_stmt(find_reindexable_claim_sets);
+    evr_finalize_stmt(reset_claim_set_failed);
+    evr_finalize_stmt(update_claim_set_failed);
     evr_finalize_stmt(insert_claim_set);
     evr_finalize_stmt(archive_claim);
     evr_finalize_stmt(insert_claim);
@@ -254,7 +273,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
         "insert into state (key, value) values (" to_string(evr_state_key_stage) ", " to_string(evr_attr_index_stage_initial) ")",
-        "create table claim_set (ref blob primary key not null, created integer not null)",
+        "create table claim_set (ref blob primary key not null, created integer not null, fail_counter integer not null default 0, last_fail_timestamp integer)",
 #ifdef EVR_FUTILE_CLAIM_SET_TRACKING
         "create table futile_claim_set (ref blob primary key not null)",
 #endif
@@ -311,11 +330,75 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     return ret;
 }
 
+int evr_find_reindexable_claim_sets(struct evr_attr_index_db *db, evr_time t, size_t max_claim_sets, evr_blob_ref *claim_sets, size_t *found_claim_sets);
+
+int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, xmlDocPtr (*get_claim_set)(void *ctx, evr_blob_ref claim_set_ref), void *ctx){
+    int ret = evr_error;
+    const size_t max_claim_sets = 256;
+    evr_blob_ref reindexed_claim_set_refs[max_claim_sets];
+    size_t found_claim_sets_len;
+    if(evr_find_reindexable_claim_sets(db, t, max_claim_sets, reindexed_claim_set_refs, &found_claim_sets_len) != evr_ok){
+        goto out;
+    }
+    evr_blob_ref *reindexed_claim_set_refs_end = &reindexed_claim_set_refs[found_claim_sets_len];
+    for(evr_blob_ref *cs_ref = reindexed_claim_set_refs; cs_ref != reindexed_claim_set_refs_end; ++cs_ref){
+        xmlDocPtr cs_doc = get_claim_set(ctx, *cs_ref);
+        if(!cs_doc){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, *cs_ref);
+            log_error("Claim set not fetchable for blob key %s", ref_str);
+            goto out;
+        }
+        if(evr_merge_attr_index_claim_set(db, spec, style, t, *cs_ref, cs_doc, 1) != evr_ok){
+            xmlFreeDoc(cs_doc);
+            goto out;
+        }
+        xmlFreeDoc(cs_doc);
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
+int evr_find_reindexable_claim_sets(struct evr_attr_index_db *db, evr_time t, size_t max_claim_sets, evr_blob_ref *claim_sets, size_t *found_claim_sets){
+    int ret = evr_error;
+    if(sqlite3_bind_int64(db->find_reindexable_claim_sets, 1, t) != SQLITE_OK){
+        goto out_with_reset_find_reindexable_claim_sets;
+    }
+    evr_blob_ref *claim_sets_end = &claim_sets[max_claim_sets];
+    for(evr_blob_ref *cs_ref = claim_sets; cs_ref != claim_sets_end; ++cs_ref){
+        int step_res = evr_step_stmt(db->db, db->find_reindexable_claim_sets);
+        if(step_res == SQLITE_DONE){
+            *found_claim_sets = cs_ref - claim_sets;
+            break;
+        }
+        if(step_res != SQLITE_ROW){
+            goto out_with_reset_find_reindexable_claim_sets;
+        }
+        int ref_col_size = sqlite3_column_bytes(db->find_reindexable_claim_sets, 0);
+        if(ref_col_size != evr_blob_ref_size){
+            log_error("claim-set ref of illegal size %d in claim-set table", ref_col_size);
+            goto out_with_reset_find_reindexable_claim_sets;
+        }
+        const evr_claim_ref *sqlite_cs_ref = sqlite3_column_blob(db->find_reindexable_claim_sets, 0);
+        memcpy(*cs_ref, *sqlite_cs_ref, evr_blob_ref_size);
+    }
+    ret = evr_ok;
+ out_with_reset_find_reindexable_claim_sets:
+    if(sqlite3_reset(db->find_reindexable_claim_sets) != SQLITE_OK){
+        evr_panic("Failed to reset find_reindexable_claim_sets");
+        ret = evr_error;
+    }
+    return ret;
+}
+
 int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_claim_set_doc, struct evr_attr_spec_claim *spec, evr_blob_ref claim_set_ref);
 
-void evr_log_failed_claim_set(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, xmlDocPtr claim_set_doc, char *fail_reason);
+void evr_log_failed_claim_set_doc(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, xmlDocPtr claim_set_doc, char *fail_reason);
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, xmlDocPtr raw_claim_set_doc){
+void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, char *claim_set_buf, int claim_set_buf_size, char *fail_reason);
+
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc, int reindex){
     int ret = evr_error;
     xmlNode *cs_node = evr_get_root_claim_set(raw_claim_set_doc);
     if(!cs_node){
@@ -337,42 +420,65 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     if(sqlite3_bind_int64(db->insert_claim_set, 2, (sqlite3_int64)created) != SQLITE_OK){
         goto out_with_reset_insert_claim_set;
     }
-    // sqlite3_step is called here instead of evr_step_stmt because we
-    // don't want evr_step_stmt to report SQLITE_CONSTRAINT result as
-    // an error.
-    int step_res = sqlite3_step(db->insert_claim_set);
-    if(step_res == SQLITE_CONSTRAINT){
-        // SQLITE_CONSTRAINT is ok because it most likely tells us
-        // that the same row already exists.
+    if(reindex){
+#ifdef EVR_LOG_DEBUG
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_debug("Reindexing claim set %s", ref_str);
+#endif
+    } else {
+        // sqlite3_step is called here instead of evr_step_stmt because we
+        // don't want evr_step_stmt to report SQLITE_CONSTRAINT result as
+        // an error.
+        int step_res = sqlite3_step(db->insert_claim_set);
+        if(step_res == SQLITE_CONSTRAINT){
+            // SQLITE_CONSTRAINT is ok because it most likely tells us
+            // that the same row already exists.
+            {
+                evr_blob_ref_str ref_str;
+                evr_fmt_blob_ref(ref_str, claim_set_ref);
+                log_debug("Claim set %s already indexed", ref_str);
+            }
+            ret = evr_ok;
+            goto out_with_reset_insert_claim_set;
+        }
+        if(step_res != SQLITE_DONE){
+            goto out_with_reset_insert_claim_set;
+        }
+#ifdef EVR_LOG_DEBUG
         {
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_debug("Claim set %s already indexed", ref_str);
+            log_debug("Indexing claim set %s", ref_str);
         }
-        ret = evr_ok;
-        goto out_with_reset_insert_claim_set;
-    }
-    if(step_res != SQLITE_DONE){
-        goto out_with_reset_insert_claim_set;
-    }
-#ifdef EVR_LOG_DEBUG
-    {
-        evr_blob_ref_str ref_str;
-        evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_debug("Indexing claim set %s", ref_str);
-    }
 #endif
+    }
     if(evr_add_claim_seed_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
-        evr_log_failed_claim_set(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set before attr factories.");
+        evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set before attr factories.");
         goto out_with_reset_insert_claim_set;
     }
     if(evr_append_attr_factory_claims(db, raw_claim_set_doc, spec, claim_set_ref) != evr_ok){
         // evr_append_attr_factory_claims is not called here because
         // we call it from within evr_append_attr_factory_claims
+        if(sqlite3_bind_int64(db->update_claim_set_failed, 1, t) != SQLITE_OK){
+            goto out_with_reset_update_claim_set_failed;
+        }
+        if(sqlite3_bind_blob(db->update_claim_set_failed, 2, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+            goto out_with_reset_update_claim_set_failed;
+        }
+        if(evr_step_stmt(db->db, db->update_claim_set_failed) != SQLITE_DONE){
+            goto out_with_reset_update_claim_set_failed;
+        }
+        ret = evr_ok;
+    out_with_reset_update_claim_set_failed:
+        if(sqlite3_reset(db->update_claim_set_failed) != SQLITE_OK){
+            evr_panic("Failed to reset update_claim_set_failed statement");
+            ret = evr_error;
+        }
         goto out_with_reset_insert_claim_set;
     }
     if(evr_add_claim_seed_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
-        evr_log_failed_claim_set(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set after attr factories.");
+        evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set after attr factories.");
         goto out_with_reset_insert_claim_set;
     }
     const char *xslt_params[] = {
@@ -380,7 +486,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     };
     xmlDocPtr claim_set_doc = xsltApplyStylesheet(style, raw_claim_set_doc, xslt_params);
     if(!claim_set_doc){
-        evr_log_failed_claim_set(db, claim_set_ref, raw_claim_set_doc, "Unable to transform claim-set using XSLT stylesheet.");
+        evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to transform claim-set using XSLT stylesheet.");
         goto out_with_reset_insert_claim_set;
     }
     cs_node = evr_get_root_claim_set(claim_set_doc);
@@ -392,7 +498,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             log_info("Transformed claim set blob %s does not contain claim-set element", ref_str);
         }
 #endif
-        evr_log_failed_claim_set(db, claim_set_ref, claim_set_doc, "No claim-set element found in transformed claim-set.");
+        evr_log_failed_claim_set_doc(db, claim_set_ref, claim_set_doc, "No claim-set element found in transformed claim-set.");
         ret = evr_ok;
         goto out_with_free_claim_set_doc;
     }
@@ -411,7 +517,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
 #endif
         attr = evr_parse_attr_claim(c_node);
         if(!attr){
-            evr_log_failed_claim_set(db, claim_set_ref, claim_set_doc, "Failed to parse attr claim from transformed claim-set.");
+            evr_log_failed_claim_set_doc(db, claim_set_ref, claim_set_doc, "Failed to parse attr claim from transformed claim-set.");
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
             log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s", ref_str);
@@ -445,7 +551,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
 #endif
         arch = evr_parse_archive_claim(c_node);
         if(!arch){
-            evr_log_failed_claim_set(db, claim_set_ref, claim_set_doc, "Failed to parse archive claim from transformed claim-set.");
+            evr_log_failed_claim_set_doc(db, claim_set_ref, claim_set_doc, "Failed to parse archive claim from transformed claim-set.");
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
             log_error("Failed to parse archive claim from transformed claim-set for blob with ref %s", ref_str);
@@ -477,8 +583,25 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         free(arch);
         goto out_with_free_claim_set_doc;
     }
-    if(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, claim_set_last_modified) != evr_ok){
-        goto out_with_free_claim_set_doc;
+    if(reindex){
+        if(sqlite3_bind_blob(db->reset_claim_set_failed, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            evr_panic("Unable to reset failed counter on claim-set %s", ref_str);
+            // TODO the following goto is not perfect because it does not reset the db->reset_claim_set_failed statement, otherwise we have an evr_panic before it
+            goto out_with_free_claim_set_doc;
+        }
+        if(evr_step_stmt(db->db, db->reset_claim_set_failed) != SQLITE_DONE){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            evr_panic("Unable to reset failed counter on claim-set %s", ref_str);
+            // TODO the following goto is not perfect because it does not reset the db->reset_claim_set_failed statement, otherwise we have an evr_panic before it
+            goto out_with_free_claim_set_doc;
+        }
+        if(sqlite3_reset(db->reset_claim_set_failed) != SQLITE_OK){
+            evr_panic("Unable to reset reset_claim_set_failed statement");
+            goto out_with_free_claim_set_doc;
+        }
     }
 #ifdef EVR_FUTILE_CLAIM_SET_TRACKING
     if(claim_set_futile){
@@ -546,6 +669,7 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
         memcpy(c->claim_set_ref, claim_set_ref, evr_blob_ref_size);
         memcpy(c->attr_factory, af, evr_blob_ref_size);
         c->res = evr_error;
+        c->built_doc = NULL;
         if(thrd_create(t, evr_append_attr_factory_claims_worker, c) != thrd_success){
             ret = evr_error;
             goto out_with_join_threads;
@@ -571,6 +695,7 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
                 evr_blob_ref_str attr_factory_str;
                 evr_fmt_blob_ref(attr_factory_str, c->attr_factory);
                 log_error("attr-factory %s failed with claim set %s", attr_factory_str, claim_set_ref_str);
+                ret = evr_error;
                 continue;
             }
             if(evr_merge_claim_set_docs(raw_claim_set_doc, c->built_doc, "original", "dynamic") != evr_ok){
@@ -580,7 +705,7 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
                 evr_fmt_blob_ref(attr_factory_str, c->attr_factory);
                 log_error("Failed to merged attr-factory %s's dynamic claim-set for original claim-set %s", attr_factory_str, claim_set_ref_str);
                 ret = evr_error;
-                evr_log_failed_claim_set(db, claim_set_ref, c->built_doc, "Unable to merge attr-factory built document into claim-set document.");
+                evr_log_failed_claim_set_doc(db, claim_set_ref, c->built_doc, "Unable to merge attr-factory built document into claim-set document.");
                 goto out_with_free_built_docs;
             }
         }
@@ -613,13 +738,9 @@ int evr_append_attr_factory_claims_worker(void *context){
         claim_set_ref_str,
         NULL
     };
-#ifdef EVR_LOG_DEBUG
-    {
-        evr_blob_ref_str attr_factory_str;
-        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
-        log_debug("Spawn attr-factory %s for claim-set %s", attr_factory_str, claim_set_ref_str);
-    }
-#endif
+    evr_blob_ref_str attr_factory_str;
+    evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
+    log_debug("Spawn attr-factory %s for claim-set %s", attr_factory_str, claim_set_ref_str);
     struct evr_subprocess sp;
     if(evr_spawn(&sp, argv) != evr_ok){
         goto out;
@@ -647,33 +768,23 @@ int evr_append_attr_factory_claims_worker(void *context){
     if(!buf){
         goto out_with_close_sp;
     }
-    ctx->built_doc = evr_parse_claim_set(buf->data, buf->size_used);
-    if(!ctx->built_doc){
-        evr_blob_ref_str attr_factory_str;
-        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
-        char eos = '\0';
-        buf = write_n_dynamic_array(buf, &eos, sizeof(eos));
-        if(buf){
-            log_error("Output from attr-factory %s for claim-set %s not parseable. Output claim set was: %s", attr_factory_str, claim_set_ref_str, buf->data);
-            buf->size_used = 0;
-        } else {
-            log_error("Output from attr-factory %s for claim-set %s not parseable.", attr_factory_str, claim_set_ref_str);
-            buf = alloc_dynamic_array(32 * 1024);
-        }
-        int err_read_res = read_fd(&buf, sp.stderr, evr_max_blob_data_size);
-        if(err_read_res != evr_ok && err_read_res != evr_end){
-            if(buf){
-                free(buf);
-            }
-            goto out_with_close_sp;
-        }
-        buf = write_n_dynamic_array(buf, &eos, sizeof(eos));
-        if(buf){
-            log_error("Stderr output from attr-factory %s for claim-set %s was: %s", attr_factory_str, claim_set_ref_str, buf->data);
-            free(buf);
-        }
+    if(waitpid(sp.pid, &ctx->res, WUNTRACED) < 0){
+        evr_panic("Failed to wait for attr-factory %s subprocess", attr_factory_str);
         goto out_with_close_sp;
     }
+    char *fail_reason;
+    if(ctx->res != 0){
+        log_error("attr-factory %s for claim-set %s ended with exit code %d", attr_factory_str, claim_set_ref_str, ctx->res);
+        fail_reason = "attr-factory failed with exit code unequal 0.";
+        goto out_with_log_buf_and_stderr;
+    }
+    ctx->built_doc = evr_parse_claim_set(buf->data, buf->size_used);
+    if(!ctx->built_doc){
+        log_error("Output from attr-factory %s for claim-set %s not parseable as XML.", attr_factory_str, claim_set_ref_str);
+        fail_reason = "attr-factory output not parseable as claim-set XML.";
+        goto out_with_log_buf_and_stderr;
+    }
+ out_with_free_buf:
     free(buf);
  out_with_close_sp:
     if(sp.stdin != closed_fd){
@@ -681,21 +792,29 @@ int evr_append_attr_factory_claims_worker(void *context){
     }
     close(sp.stdout);
     close(sp.stderr);
-    if(waitpid(sp.pid, &ctx->res, WUNTRACED) < 0){
-        evr_blob_ref_str attr_factory_str;
-        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
-        evr_panic("Failed to wait for attr-factory %s subprocess", attr_factory_str);
-        goto out;
-    }
-#ifdef EVR_LOG_DEBUG
-    {
-        evr_blob_ref_str attr_factory_str;
-        evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
-        log_debug("Joined attr-factory %s for claim-set %s with exit code %d", attr_factory_str, claim_set_ref_str, ctx->res);
-    }
-#endif
+    log_debug("Joined attr-factory %s for claim-set %s with exit code %d", attr_factory_str, claim_set_ref_str, ctx->res);
  out:
     return evr_ok;
+ out_with_log_buf_and_stderr:
+    if(!buf){
+        buf = alloc_dynamic_array(32 * 1024);
+        if(!buf){
+            evr_panic("Unable to log failed attr-factory %s call.", attr_factory_str);
+            goto out_with_close_sp;
+        }
+    }
+    char stderr_msg[] = "\n\n-------- stderr follows --------\n";
+    buf = write_n_dynamic_array(buf, stderr_msg, strlen(stderr_msg));
+    if(!buf){
+        evr_panic("Unable to log failed attr-factory %s call.", attr_factory_str);
+        goto out_with_close_sp;
+    }
+    int err_read_res = read_fd(&buf, sp.stderr, evr_max_blob_data_size);
+    if(err_read_res != evr_ok && err_read_res != evr_end){
+        goto out_with_free_buf;
+    }
+    evr_log_failed_claim_set_buf(ctx->db, ctx->claim_set_ref, buf->data, buf->size_used, fail_reason);
+    goto out_with_free_buf;
 }
 
 int evr_ensure_attr_factory_exe_ready(struct evr_attr_index_db *db, evr_blob_ref attr_factory, char *exe_path){
@@ -759,7 +878,18 @@ int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, cha
     return evr_ok;
 }
 
-void evr_log_failed_claim_set(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, xmlDocPtr claim_set_doc, char *fail_reason){
+void evr_log_failed_claim_set_doc(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, xmlDocPtr claim_set_doc, char *fail_reason){
+    char *claim_set_str = NULL;
+    int claim_set_str_size;
+    xmlDocDumpMemoryEnc(claim_set_doc, (xmlChar**)&claim_set_str, &claim_set_str_size, "UTF-8");
+    if(!claim_set_str){
+        return;
+    }
+    evr_log_failed_claim_set_buf(db, claim_set_ref, claim_set_str, claim_set_str_size, fail_reason);
+    xmlFree(claim_set_str);
+}
+
+void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, char *claim_set_buf, int claim_set_buf_size, char *fail_reason){
 #define log_scope "Failed to log failed claim-set operation."
     const char suffix[] = ".log";
     const size_t dir_len = strlen(db->dir);
@@ -785,18 +915,10 @@ void evr_log_failed_claim_set(struct evr_attr_index_db *db, evr_blob_ref claim_s
         log_error(log_scope " Can't write separator to log file.");
         goto out_with_close_f;
     }
-    char *claim_set_str = NULL;
-    int claim_set_str_size;
-    xmlDocDumpMemoryEnc(claim_set_doc, (xmlChar**)&claim_set_str, &claim_set_str_size, "UTF-8");
-    if(!claim_set_str){
+    if(write_n(f, claim_set_buf, claim_set_buf_size) != evr_ok){
+        log_error(log_scope " Can't write claim-set string to log file.");
         goto out_with_close_f;
     }
-    if(write_n(f, claim_set_str, claim_set_str_size) != evr_ok){
-        log_error(log_scope " Can't write XML string to log file.");
-        goto out_with_free_claim_set;
-    }
- out_with_free_claim_set:
-    xmlFree(claim_set_str);
  out_with_close_f:
     if(close(f) != 0){
         log_error(log_scope " Can't close claim-set log file.");
@@ -937,13 +1059,22 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "insert into claim_set (ref, created) values (?, ?)", &db->insert_claim_set) != evr_ok){
         goto out;
     }
+    if(evr_prepare_stmt(db->db, "update claim_set set fail_counter = fail_counter + 1, last_fail_timestamp = ? where ref = ?", &db->update_claim_set_failed) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "update claim_set set fail_counter = 0 where ref = ?", &db->reset_claim_set_failed) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "select ref from claim_set where fail_counter > 0 and last_fail_timestamp + pow(1.5, fail_counter) * " to_string(evr_reindex_interval) " <= ?", &db->find_reindexable_claim_sets) != evr_ok){
+        goto out;
+    }
     if(evr_prepare_stmt(db->db, "update attr set valid_until = ? where rowid = ?", &db->update_attr_valid_until) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "select key, val_str from attr where seed = ?1 and valid_from <= ?2 and (valid_until > ?2 or valid_until is null) and val_str not null", &db->find_seed_attrs) != evr_ok){
         goto out;
     }
-    if(evr_prepare_stmt(db->db, "select c.ref from claim c inner join claim_set cs where c.seed = ? and cs.ref = " evr_sql_extract_blob_ref("c.ref") " order by cs.created", &db->find_claims_for_seed) != evr_ok){
+    if(evr_prepare_stmt(db->db, "select c.ref from claim c inner join claim_set cs where c.seed = ? and cs.fail_counter = 0 and cs.ref = " evr_sql_extract_blob_ref("c.ref") " order by cs.created", &db->find_claims_for_seed) != evr_ok){
         goto out;
     }
 #ifdef EVR_FUTILE_CLAIM_SET_TRACKING
