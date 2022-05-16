@@ -901,9 +901,9 @@ void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref cla
     evr_inc_buf_pos(&bp, evr_blob_ref_str_size - 1);
     evr_push_n(&bp, suffix, sizeof(suffix));
     log_debug("Logging failed claim-set operation to %s: %s", log_path, fail_reason);
-    int f = open(log_path, O_WRONLY | O_APPEND | O_CREAT);
+    int f = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
     if(f < 0){
-        log_error(log_scope " Can't open claim-set log file.");
+        log_error(log_scope " Can't open claim-set log file: %s", strerror(errno));
         return;
     }
     if(write_n(f, fail_reason, strlen(fail_reason)) != evr_ok){
