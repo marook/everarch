@@ -467,11 +467,11 @@ void test_attr_factories_fail_and_reindex(){
     evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
     assert_query_no_result(db, "at 2022-01-01T00:00:00.000000Z");
     one_attr_factory_blob_file_writer_should_fail(db, 0);
+    assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 30, get_claim_set_adapter, raw_claim_set_content)));
+    assert_query_no_result(db, "at 2022-01-01T00:00:00.000000Z");
     assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 60*60*1000, get_claim_set_adapter, raw_claim_set_content)));
     xsltFreeStylesheet(style);
-    evr_claim_ref claim_ref;
-    evr_build_claim_ref(claim_ref, claim_set_ref, 0);
-    assert_query_one_result(db, "at 2022-01-01T00:00:00.000000Z", claim_ref);
+    assert_query_one_result(db, "at 2022-01-01T00:00:00.000000Z", static_claim_ref);
     assert(is_ok(evr_free_attr_index_db(db)));
     evr_free_attr_index_cfg(cfg);
 }
