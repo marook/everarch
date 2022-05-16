@@ -1,9 +1,3 @@
-* add sort order to watch command
-by default the watch command emits the changed blob refs in the
-temporal order the changes appeared.
-
-it should be possible to emit the changed blob refs sorted by blob
-ref.
 * sync two evr-glacier-storage instances via evr cli
 #+BEGIN_SRC
 evr sync src-host:1234 dst-host:4321

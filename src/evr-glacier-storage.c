@@ -536,7 +536,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     if(evr_parse_blob_filter(&f, buf) != evr_ok){
         goto out;
     }
-    log_debug("Worker %d retrieved cmd watch with flags_filter 0x%02x and last_modified_after %llu", ctx->socket, f.flags_filter, f.last_modified_after);
+    log_debug("Worker %d retrieved cmd watch with sort_order 0x%02x, flags_filter 0x%02x and last_modified_after %llu", ctx->socket, f.sort_order, f.flags_filter, f.last_modified_after);
     struct evr_resp_header resp;
     resp.status_code = evr_status_code_ok;
     resp.body_size = 0;
@@ -546,22 +546,26 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     if(write_n(ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
         goto out;
     }
+    const int live_watch = f.sort_order == evr_cmd_watch_sort_order_last_modified;
     struct evr_work_watch_ctx wctx;
-    wctx.filter = &f;
-    if(mtx_init(&wctx.queue_lock, mtx_timed) != thrd_success){
-        goto out;
-    }
-    if(cnd_init(&wctx.queue_cnd) != thrd_success){
-        goto out_with_free_queue_lock;
-    }
-    wctx.status = evr_ok;
-    wctx.writing_blobs_i = 0;
-    wctx.reading_blobs_i = 0;
-    atomic_thread_fence(memory_order_seq_cst);
-    int wd = evr_persister_add_watcher(evr_handle_blob_modified, &wctx);
-    if(wd < 0){
-        log_error("Worker %d can't add watcher because list full", ctx->socket);
-        goto out_with_free_queue_cnd;
+    int wd = -1;
+    if(live_watch){
+        wctx.filter = &f;
+        if(mtx_init(&wctx.queue_lock, mtx_timed) != thrd_success){
+            goto out;
+        }
+        if(cnd_init(&wctx.queue_cnd) != thrd_success){
+            goto out_with_free_queue_lock;
+        }
+        wctx.status = evr_ok;
+        wctx.writing_blobs_i = 0;
+        wctx.reading_blobs_i = 0;
+        atomic_thread_fence(memory_order_seq_cst);
+        wd = evr_persister_add_watcher(evr_handle_blob_modified, &wctx);
+        if(wd < 0){
+            log_error("Worker %d can't add watcher because list full", ctx->socket);
+            goto out_with_free_queue_cnd;
+        }
     }
     if(evr_ensure_worker_rctx_exists(rctx, ctx) != evr_ok){
         goto out_with_rm_watcher;
@@ -569,102 +573,110 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     struct evr_list_blobs_ctx lctx;
     lctx.connection = ctx;
     lctx.blobs_used = 0;
-    if(evr_glacier_list_blobs(*rctx, evr_handle_blob_list, f.flags_filter, f.last_modified_after, &lctx) != evr_ok){
+    if(evr_glacier_list_blobs(*rctx, evr_handle_blob_list, &f, &lctx) != evr_ok){
         goto out_with_rm_watcher;
     }
     if(evr_flush_list_blobs_ctx(&lctx) != evr_ok){
         goto out_with_rm_watcher;
     }
-    if(mtx_lock(&wctx.queue_lock) != thrd_success){
-        goto out_with_rm_watcher;
-    }
-    struct evr_modified_blob blob;
-    while(running){
+    if(live_watch){
+        if(mtx_lock(&wctx.queue_lock) != thrd_success){
+            goto out_with_rm_watcher;
+        }
+        struct evr_modified_blob blob;
         while(running){
-            if(wctx.status != evr_ok){
-                goto out_with_unlock_queue;
+            while(running){
+                if(wctx.status != evr_ok){
+                    goto out_with_unlock_queue;
+                }
+                if(wctx.writing_blobs_i == wctx.reading_blobs_i){
+                    break;
+                }
+                blob = wctx.blobs[wctx.reading_blobs_i];
+                wctx.reading_blobs_i = (wctx.reading_blobs_i + 1) & (evr_modified_blobs_len - 1);
+                if(mtx_unlock(&wctx.queue_lock) != thrd_success){
+                    evr_panic("Failed to unlock wctx.queue_lock");
+                    return evr_error;
+                }
+#ifdef EVR_LOG_DEBUG
+                {
+                    evr_blob_ref_str fmt_key;
+                    evr_fmt_blob_ref(fmt_key, blob.key);
+                    log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket, fmt_key);
+                }
+#endif
+                struct evr_buf_pos bp;
+                evr_init_buf_pos(&bp, buf);
+                memcpy(bp.pos, blob.key, evr_blob_ref_size);
+                bp.pos += evr_blob_ref_size;
+                evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
+                int flags = evr_watch_flag_eob;
+                evr_push_as(&bp, &flags, uint8_t);
+                if(write_n(ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
+                    goto out_with_rm_watcher;
+                }
+                if(mtx_lock(&wctx.queue_lock) != thrd_success){
+                    goto out_with_rm_watcher;
+                }
             }
-            if(wctx.writing_blobs_i == wctx.reading_blobs_i){
+            if(!running){
                 break;
             }
-            blob = wctx.blobs[wctx.reading_blobs_i];
-            wctx.reading_blobs_i = (wctx.reading_blobs_i + 1) & (evr_modified_blobs_len - 1);
-            if(mtx_unlock(&wctx.queue_lock) != thrd_success){
-                evr_panic("Failed to unlock wctx.queue_lock");
-                return evr_error;
+            struct pollfd fds;
+            fds.fd = ctx->socket;
+            fds.events = POLLRDHUP | POLLHUP;
+            if(poll(&fds, 1, 0) < 0){
+                goto out_with_unlock_queue;
             }
-#ifdef EVR_LOG_DEBUG
-            {
-                evr_blob_ref_str fmt_key;
-                evr_fmt_blob_ref(fmt_key, blob.key);
-                log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket, fmt_key);
+            if(fds.revents & (POLLRDHUP | POLLHUP)){
+                // peer closed connection
+                ret = evr_end;
+                goto out_with_unlock_queue;
             }
-#endif
-            struct evr_buf_pos bp;
-            evr_init_buf_pos(&bp, buf);
-            memcpy(bp.pos, blob.key, evr_blob_ref_size);
-            bp.pos += evr_blob_ref_size;
-            evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
-            int flags = evr_watch_flag_eob;
-            evr_push_as(&bp, &flags, uint8_t);
-            if(write_n(ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
-                goto out_with_rm_watcher;
-            }
-            if(mtx_lock(&wctx.queue_lock) != thrd_success){
-                goto out_with_rm_watcher;
-            }
+            time_t t;
+            time(&t);
+            struct timespec timeout;
+            timeout.tv_sec = t + 10;
+            timeout.tv_nsec = 0;
+            // cnd_timedwait returns an error either if a timeout is met
+            // or another error occured. so we don't check the error
+            // response.
+            cnd_timedwait(&wctx.queue_cnd, &wctx.queue_lock, &timeout);
         }
-        if(!running){
-            break;
-        }
-        struct pollfd fds;
-        fds.fd = ctx->socket;
-        fds.events = POLLRDHUP | POLLHUP;
-        if(poll(&fds, 1, 0) < 0){
-            goto out_with_unlock_queue;
-        }
-        if(fds.revents & (POLLRDHUP | POLLHUP)){
-            // peer closed connection
-            ret = evr_end;
-            goto out_with_unlock_queue;
-        }
-        time_t t;
-        time(&t);
-        struct timespec timeout;
-        timeout.tv_sec = t + 10;
-        timeout.tv_nsec = 0;
-        // cnd_timedwait returns an error either if a timeout is met
-        // or another error occured. so we don't check the error
-        // response.
-        cnd_timedwait(&wctx.queue_cnd, &wctx.queue_lock, &timeout);
     }
     ret = evr_ok;
  out_with_unlock_queue:
     // before unlocking queue_lock we might have a locked OR unlocked
     // queue_lock
-    if(mtx_unlock(&wctx.queue_lock) != thrd_success){
+    if(live_watch && mtx_unlock(&wctx.queue_lock) != thrd_success){
         ret = evr_error;
     }
  out_with_rm_watcher:
-    if(evr_persister_rm_watcher(wd) == evr_ok){
-        // wait until watcher ends
-        if(mtx_lock(&wctx.queue_lock) != thrd_success){
+    if(live_watch){
+        if(evr_persister_rm_watcher(wd) == evr_ok){
+            // wait until watcher ends
+            if(mtx_lock(&wctx.queue_lock) != thrd_success){
+                ret = evr_error;
+            }
+            if(mtx_unlock(&wctx.queue_lock) != thrd_success){
+                ret = evr_error;
+            }
+            log_debug("Worker %d watch context reported status %d", ctx->socket, wctx.status);
+            if(wctx.status != evr_ok){
+                ret = evr_error;
+            }
+        } else {
             ret = evr_error;
         }
-        if(mtx_unlock(&wctx.queue_lock) != thrd_success){
-            ret = evr_error;
-        }
-        log_debug("Worker %d watch context reported status %d", ctx->socket, wctx.status);
-        if(wctx.status != evr_ok){
-            ret = evr_error;
-        }
-    } else {
-        ret = evr_error;
     }
  out_with_free_queue_cnd:
-    cnd_destroy(&wctx.queue_cnd);
+    if(live_watch) {
+        cnd_destroy(&wctx.queue_cnd);
+    }
  out_with_free_queue_lock:
-    mtx_destroy(&wctx.queue_lock);
+    if(live_watch) {
+        mtx_destroy(&wctx.queue_lock);
+    }
  out:
     log_debug("Worker %d watch ends with status %d", ctx->socket, ret);
     return ret;

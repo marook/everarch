@@ -43,6 +43,9 @@
 const char *argp_program_version = "evr-glacier-cli " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
+#define sort_order_last_modified_key "last-modified"
+#define sort_order_blob_ref_key "blob-ref"
+
 static char doc[] =
     "evr-glacier-cli is a command line client for interacting with evr-glacier-storage servers.\n\n"
     "Possible commands are get, put, sign-put, post-file or watch.\n\n"
@@ -58,6 +61,7 @@ static char args_doc[] = "CMD";
 
 #define arg_storage_host 256
 #define arg_storage_port 257
+#define arg_blobs_sort_order 258
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
@@ -67,6 +71,7 @@ static struct argp_option options[] = {
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
     {"title", 't', "T", 0, "Title of the created claim. Might be used together with post-file."},
     {"seed", 's', "REF", 0, "Makes the created claim reference another claim as seed."},
+    {"blobs-sort-order", arg_blobs_sort_order, "ORDER", 0, "Prints watched blobs in this order. Possible values are '" sort_order_last_modified_key "' and '" sort_order_blob_ref_key "'. The sort-order '" sort_order_last_modified_key "' will continue to emit changed blobs as they change live. Other sort orders will end the connection after all relevant blob refs have been emitted. Default is '" sort_order_last_modified_key "'."},
     {0}
 };
 
@@ -90,6 +95,11 @@ struct cli_cfg {
     int has_seed;
     evr_claim_ref seed;
     unsigned long long last_modified_after;
+
+    /**
+     * blobs_sort_order must be one of evr_cmd_watch_sort_order_*.
+     */
+    int blobs_sort_order;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*usage)(const struct argp_state *state)){
@@ -131,6 +141,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case arg_storage_port:
         evr_replace_str(cfg->storage_port, arg);
+        break;
+    case arg_blobs_sort_order:
+        if(strcmp(arg, sort_order_last_modified_key) == 0){
+            cfg->blobs_sort_order = evr_cmd_watch_sort_order_last_modified;
+        } else if(strcmp(arg, sort_order_blob_ref_key) == 0){
+            cfg->blobs_sort_order = evr_cmd_watch_sort_order_ref;
+        } else {
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
         break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
@@ -223,6 +243,7 @@ int main(int argc, char **argv){
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
     cfg.last_modified_after = LLONG_MAX;
+    cfg.blobs_sort_order = evr_cmd_watch_sort_order_last_modified;
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, &cfg);
     char *config_paths[] = {
@@ -716,6 +737,7 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
 int evr_cli_watch_blobs(struct cli_cfg *cfg){
     int ret = evr_error;
     struct evr_blob_filter f;
+    f.sort_order = cfg->blobs_sort_order;
     f.flags_filter = cfg->flags;
     f.last_modified_after = cfg->last_modified_after;
     int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);

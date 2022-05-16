@@ -525,6 +525,7 @@ int evr_watch_index_claims_worker(void *arg){
         goto out;
     }
     struct evr_blob_filter filter;
+    filter.sort_order = evr_cmd_watch_sort_order_last_modified;
     filter.flags_filter = evr_blob_flag_index_rule_claim;
     filter.last_modified_after = 0;
     if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
@@ -756,6 +757,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         goto out_with_free_style;
     }
     struct evr_blob_filter filter;
+    filter.sort_order = evr_cmd_watch_sort_order_last_modified;
     filter.flags_filter = evr_blob_flag_claim;
     filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
     if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
@@ -966,6 +968,7 @@ int evr_index_sync_worker(void *arg){
                 goto out_with_free;
             }
             struct evr_blob_filter filter;
+            filter.sort_order = evr_cmd_watch_sort_order_last_modified;
             filter.flags_filter = evr_blob_flag_claim;
             filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
             if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){

@@ -69,19 +69,24 @@ struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_stor
     ctx->read_buffer = (char*)(ctx + 1);
     ctx->db = NULL;
     ctx->find_blob_stmt = NULL;
-    ctx->list_blobs_stmt = NULL;
+    ctx->list_blobs_stmt_order_last_modified = NULL;
+    ctx->list_blobs_stmt_order_blob_ref = NULL;
     if(evr_open_index_db(config, SQLITE_OPEN_READONLY, &(ctx->db))){
         goto fail_with_db;
     }
     if(evr_prepare_stmt(ctx->db, "select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?", &(ctx->find_blob_stmt))){
         goto fail_with_db;
     }
-    if(evr_prepare_stmt(ctx->db, "select key, flags, last_modified from blob_position where last_modified >= ?", &(ctx->list_blobs_stmt))){
+    if(evr_prepare_stmt(ctx->db, "select key, flags, last_modified from blob_position where last_modified >= ? order by last_modified", &(ctx->list_blobs_stmt_order_last_modified))){
+        goto fail_with_db;
+    }
+    if(evr_prepare_stmt(ctx->db, "select key, flags, last_modified from blob_position where last_modified >= ? order by key", &(ctx->list_blobs_stmt_order_blob_ref))){
         goto fail_with_db;
     }
     return ctx;
  fail_with_db:
-    sqlite3_finalize(ctx->list_blobs_stmt);
+    sqlite3_finalize(ctx->list_blobs_stmt_order_blob_ref);
+    sqlite3_finalize(ctx->list_blobs_stmt_order_last_modified);
     sqlite3_finalize(ctx->find_blob_stmt);
     sqlite3_close(ctx->db);
     free(ctx);
@@ -93,21 +98,23 @@ int evr_free_glacier_read_ctx(struct evr_glacier_read_ctx *ctx){
     if(!ctx){
         return evr_ok;
     }
-    int ret = evr_error;
-    if(sqlite3_finalize(ctx->list_blobs_stmt) != SQLITE_OK){
-        // TODO evr_panic?
-        goto end;
+    int ret = evr_ok; // BIG OTHER WAY ROUND WARNING!!!
+    if(sqlite3_finalize(ctx->list_blobs_stmt_order_blob_ref) != SQLITE_OK){
+        evr_panic("Unable to finalize list_blobs_stmt_order_blob_ref statement");
+        ret = evr_error;
+    }
+    if(sqlite3_finalize(ctx->list_blobs_stmt_order_last_modified) != SQLITE_OK){
+        evr_panic("Unable to finalize list_blobs_stmt_order_last_modified statement");
+        ret = evr_error;
     }
     if(sqlite3_finalize(ctx->find_blob_stmt) != SQLITE_OK){
-        // TODO evr_panic?
-        goto end;
+        evr_panic("Unable to finalize find_blob_stmt statement");
+        ret = evr_error;
     }
     if(evr_close_index_db(ctx->config, ctx->db)){
-        // TODO evr_panic?
-        goto end;
+        evr_panic("Unable to close index db");
+        ret = evr_error;
     }
-    ret = evr_ok;
- end:
     free(ctx);
     return ret;
 }
@@ -188,26 +195,38 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     return ret;
 }
 
-int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob), int flags_filter, evr_time last_modified_after, void *vctx){
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob), struct evr_blob_filter *filter, void *vctx){
     int ret = evr_error;
-    if(last_modified_after > LLONG_MAX){
+    if(filter->last_modified_after > LLONG_MAX){
         // sqlite3 api only provides bind for signed int64. so we must
         // make sure that value does not overflow.
         goto out;
     }
-    if(sqlite3_bind_int64(ctx->list_blobs_stmt, 1, last_modified_after) != SQLITE_OK){
+    sqlite3_stmt *list_stmt;
+    switch(filter->sort_order){
+    default:
+        log_error("Unknown sort-order 0x%02x requested", filter->sort_order);
         goto out;
+    case evr_cmd_watch_sort_order_last_modified:
+        list_stmt = ctx->list_blobs_stmt_order_last_modified;
+        break;
+    case evr_cmd_watch_sort_order_ref:
+        list_stmt = ctx->list_blobs_stmt_order_blob_ref;
+        break;
+    }
+    if(sqlite3_bind_int64(list_stmt, 1, filter->last_modified_after) != SQLITE_OK){
+        goto out_with_reset_stmt;
     }
     int has_found_key = 0;
     evr_blob_ref found_key;
     int flags;
     evr_time last_modified;
     while(1){
-        int step_ret = evr_step_stmt(ctx->db, ctx->list_blobs_stmt);
+        int step_ret = evr_step_stmt(ctx->db, list_stmt);
         if(step_ret == SQLITE_DONE){
             if(has_found_key){
                 if(visit(vctx, found_key, flags, last_modified, 1) != evr_ok){
-                    goto out;
+                    goto out_with_reset_stmt;
                 }
             }
             break;
@@ -215,30 +234,32 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
         if(step_ret != SQLITE_ROW){
             goto out;
         }
-        int new_flags = sqlite3_column_int(ctx->list_blobs_stmt, 1);
-        if((new_flags & flags_filter) != flags_filter){
+        int new_flags = sqlite3_column_int(list_stmt, 1);
+        if((new_flags & filter->flags_filter) != filter->flags_filter){
             continue;
         }
         if(has_found_key){
             if(visit(vctx, found_key, flags, last_modified, 0) != evr_ok){
-                goto out;
+                goto out_with_reset_stmt;
             }
         }
-        int key_col_size = sqlite3_column_bytes(ctx->list_blobs_stmt, 0);
+        int key_col_size = sqlite3_column_bytes(list_stmt, 0);
         if(key_col_size != evr_blob_ref_size){
-            goto out;
+            goto out_with_reset_stmt;
         }
         has_found_key = 1;
         flags = new_flags;
-        const void *sqkey = sqlite3_column_blob(ctx->list_blobs_stmt, 0);
+        const void *sqkey = sqlite3_column_blob(list_stmt, 0);
         memcpy(found_key, sqkey, evr_blob_ref_size);
-        last_modified = sqlite3_column_int64(ctx->list_blobs_stmt, 2);
+        last_modified = sqlite3_column_int64(list_stmt, 2);
     }
     ret = evr_ok;
- out:
-    if(sqlite3_reset(ctx->list_blobs_stmt) != SQLITE_OK){
+ out_with_reset_stmt:
+    if(sqlite3_reset(list_stmt) != SQLITE_OK){
+        evr_panic("Unable to reset list_stmt for sort-order 0x%02x", filter->sort_order);
         ret = evr_error;
     }
+ out:
     return ret;
 }
 

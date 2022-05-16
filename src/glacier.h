@@ -45,7 +45,8 @@ struct evr_glacier_read_ctx {
     struct evr_glacier_storage_cfg *config;
     sqlite3 *db;
     sqlite3_stmt *find_blob_stmt;
-    sqlite3_stmt *list_blobs_stmt;
+    sqlite3_stmt *list_blobs_stmt_order_last_modified;
+    sqlite3_stmt *list_blobs_stmt_order_blob_ref;
     char *read_buffer;
 };
 
@@ -95,7 +96,42 @@ int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
  */
 int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg);
 
-int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob), int flags_filter, evr_time last_modified_after, void *vctx);
+/**
+ * evr_cmd_watch_sort_order_last_modified indicates sort by last
+ * modified ascending.
+ */
+#define evr_cmd_watch_sort_order_last_modified 0x01
+
+/**
+ * evr_cmd_watch_sort_order_ref indicates sort by blob ref ascending.
+ */
+#define evr_cmd_watch_sort_order_ref 0x02
+
+struct evr_blob_filter {
+    /**
+     * sort_order must be one of evr_cmd_watch_sort_order_*.
+     */
+    int sort_order;
+    
+    /**
+     * flags_filter is a set of bits which must be set at least so
+     * that the blob is passed by the filter.
+     */
+    int flags_filter;
+
+    /**
+     * last_modified_after is the timestamp after which a blob must
+     * have been modified in order to be passed by the filter.
+     *
+     * Future last_modified_after values will not report any
+     * modifications already persisted into the glacier storage. But
+     * live modifications on blobs will be reported even if they lie
+     * behind last_modified_after.
+     */
+    evr_time last_modified_after;
+};
+
+int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *vctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob), struct evr_blob_filter *filter, void *vctx);
 
 struct evr_glacier_write_ctx {
     struct evr_glacier_storage_cfg *config;

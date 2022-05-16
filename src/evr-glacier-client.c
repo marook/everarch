@@ -223,7 +223,7 @@ int evr_write_cmd_watch_blobs(int fd, struct evr_blob_filter *filter){
     if(evr_format_blob_filter(bp.pos, filter) != evr_ok){
         goto out;
     }
-    log_debug("Sending watch command to server with flags filter 0x%02x and last_modified_after %llu", filter->flags_filter, filter->last_modified_after);
+    log_debug("Sending watch command to server with sort order 0x%02x, flags filter 0x%02x and last_modified_after %llu", filter->sort_order, filter->flags_filter, filter->last_modified_after);
     if(write_n(fd, buf, evr_cmd_header_n_size + evr_blob_filter_n_size) != evr_ok){
         goto out;
     }
