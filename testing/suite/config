@@ -7,12 +7,17 @@ glacier_storage_port=2461
 glacier_storage_bucket_dir=storage
 glacier_storage_pid=
 
+secondary_glacier_storage_port=2561
+secondary_glacier_storage_bucket_dir=secondary-storage
+secondary_glacier_storage_pid=
+
 attr_index_port=2462
 attr_index_state_dir=attr-index
 attr_index_pid=
 
 allocate_ports() {
     ensure_port_available "${glacier_storage_port}"
+    ensure_port_available "${secondary_glacier_storage_port}"
     ensure_port_available "${attr_index_port}"
 }
 
@@ -32,6 +37,18 @@ start_glacier_storage() {
 
 wait_for_glacier_storage() {
     wait_for_port "${glacier_storage_port}"
+}
+
+start_secondary_glacier_storage() {
+    rm -rf -- "${secondary_glacier_storage_bucket_dir}"
+    mkdir -- "${secondary_glacier_storage_bucket_dir}"
+    echo "Starting secondary evr-glacier-storage…"
+    evr-glacier-storage --port "${secondary_glacier_storage_port}" --bucket-dir-path "${secondary_glacier_storage_bucket_dir}" &
+    secondary_glacier_storage_pid=$!
+}
+
+wait_for_secondary_glacier_storage() {
+    wait_for_port "${secondary_glacier_storage_port}"
 }
 
 start_attr_index() {
@@ -87,6 +104,17 @@ stop_everarch_servers() {
         if [[ -e "${glacier_storage_bucket_dir}/lock" ]]
         then
             echo "${glacier_storage_bucket_dir}/lock still existing after storage quit" >&2
+            exit 1
+        fi
+    fi
+    if [[ -n "${secondary_glacier_storage_pid}" ]]
+    then
+        kill -s sigint "${secondary_glacier_storage_pid}"
+        wait "${secondary_glacier_storage_pid}" || true
+        secondary_glacier_storage_pid=
+        if [[ -e "${secondary_glacier_storage_bucket_dir}/lock" ]]
+        then
+            echo "${secondary_glacier_storage_bucket_dir}/lock still existing after storage quit" >&2
             exit 1
         fi
     fi

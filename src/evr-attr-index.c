@@ -38,6 +38,7 @@
 #include "configurations.h"
 #include "files.h"
 #include "configp.h"
+#include "handover.h"
 
 const char *argp_program_version = "evr-attr-index " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
@@ -105,13 +106,6 @@ struct evr_connection {
 
 struct evr_attr_index_cfg *cfg;
 
-struct evr_handover_ctx {
-    int occupied;
-    mtx_t lock;
-    cnd_t on_push_spec;
-    cnd_t on_empty_spec;
-};
-
 struct evr_attr_spec_handover_ctx {
     struct evr_handover_ctx handover;
 
@@ -147,16 +141,6 @@ int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx);
 #define evr_free_index_handover_ctx(ctx) evr_free_handover_ctx(&(ctx)->handover)
 #define evr_init_current_index_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
 #define evr_free_current_index_ctx(ctx) evr_free_handover_ctx(&(ctx)->handover)
-
-int evr_init_handover_ctx(struct evr_handover_ctx *ctx);
-int evr_free_handover_ctx(struct evr_handover_ctx *ctx);
-int evr_stop_handover(struct evr_handover_ctx *ctx);
-int evr_wait_for_handover_available(struct evr_handover_ctx *ctx);
-int evr_wait_for_handover_occupied(struct evr_handover_ctx *ctx);
-int evr_lock_handover(struct evr_handover_ctx *ctx);
-int evr_unlock_handover(struct evr_handover_ctx *ctx);
-int evr_occupy_handover(struct evr_handover_ctx *ctx);
-int evr_empty_handover(struct evr_handover_ctx *ctx);
 
 int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
@@ -245,13 +229,13 @@ int main(int argc, char **argv){
         evr_panic("Failed to unlock stop lock");
         goto out_with_join_watch_index_claims_thrd;
     }
-    if(evr_stop_handover(&index_handover_ctx.handover) != evr_ok){
+    if(evr_abort_handover(&index_handover_ctx.handover, 1) != evr_ok){
         goto out_with_join_watch_index_claims_thrd;
     }
-    if(evr_stop_handover(&attr_spec_handover_ctx.handover) != evr_ok){
+    if(evr_abort_handover(&attr_spec_handover_ctx.handover, 1) != evr_ok){
         goto out_with_join_watch_index_claims_thrd;
     }
-    if(evr_stop_handover(&current_index_ctx.handover) != evr_ok){
+    if(evr_abort_handover(&current_index_ctx.handover, 1) != evr_ok){
         goto out_with_join_watch_index_claims_thrd;
     }
     ret = evr_ok;
@@ -371,149 +355,6 @@ int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx){
     return ret;
 }
 
-int evr_init_handover_ctx(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    ctx->occupied = 0;
-    if(mtx_init(&ctx->lock, mtx_plain) != thrd_success){
-        goto out;
-    }
-    if(cnd_init(&ctx->on_push_spec) != thrd_success){
-        goto out_with_free_lock;
-    }
-    if(cnd_init(&ctx->on_empty_spec) != thrd_success){
-        goto out_with_free_on_push_spec;
-    }
-    ret = evr_ok;
- out:
-    return ret;
- out_with_free_on_push_spec:
-    cnd_destroy(&ctx->on_push_spec);
- out_with_free_lock:
-    mtx_destroy(&ctx->lock);
-    return ret;
-}
-
-int evr_free_handover_ctx(struct evr_handover_ctx *ctx){
-    cnd_destroy(&ctx->on_empty_spec);
-    cnd_destroy(&ctx->on_push_spec);
-    mtx_destroy(&ctx->lock);
-    return evr_ok;
-}
-
-int evr_stop_handover(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    if(cnd_signal(&ctx->on_push_spec) != thrd_success){
-        evr_panic("Failed to signal on_push on termination");
-        goto out;
-    }
-    if(cnd_signal(&ctx->on_empty_spec) != thrd_success){
-        evr_panic("Failed to signal on_empty on termination");
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-int evr_wait_for_handover_available(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    if(evr_lock_handover(ctx) != evr_ok){
-        evr_panic("Failed to lock handover lock");
-        goto out;
-    }
-    while(ctx->occupied){
-        if(!running){
-            if(mtx_unlock(&ctx->lock) != thrd_success){
-                evr_panic("Failed to unlock handover lock");
-                goto out;
-            }
-            break;
-        }
-        if(cnd_wait(&ctx->on_empty_spec, &ctx->lock) != thrd_success){
-            evr_panic("Failed to wait for empty handover signal");
-            goto out;
-        }
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-int evr_wait_for_handover_occupied(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    if(evr_lock_handover(ctx) != evr_ok){
-        evr_panic("Failed to lock handover lock");
-        goto out;
-    }
-    while(!ctx->occupied){
-        if(!running){
-            if(mtx_unlock(&ctx->lock) != thrd_success){
-                evr_panic("Failed to unlock handover lock");
-                goto out;
-            }
-            break;
-        }
-        if(cnd_wait(&ctx->on_push_spec, &ctx->lock) != thrd_success){
-            evr_panic("Failed to wait for handover push");
-            goto out;
-        }
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-int evr_lock_handover(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    if(mtx_lock(&ctx->lock) != thrd_success){
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-int evr_unlock_handover(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    if(mtx_unlock(&ctx->lock) != thrd_success){
-        evr_panic("Failed to unlock handover");
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-int evr_occupy_handover(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    ctx->occupied = 1;
-    if(cnd_signal(&ctx->on_push_spec) != thrd_success){
-        evr_panic("Failed to signal spec pushed on occupy");
-        goto out;
-    }
-    if(evr_unlock_handover(ctx) != evr_ok){
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
-int evr_empty_handover(struct evr_handover_ctx *ctx){
-    int ret = evr_error;
-    ctx->occupied = 0;
-    if(cnd_signal(&ctx->on_empty_spec) != thrd_success){
-        evr_panic("Failed to signal handover empty");
-        goto out;
-    }
-    if(evr_unlock_handover(ctx) != evr_ok){
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
 int evr_watch_index_claims_worker(void *arg){
     int ret = evr_error;
     struct evr_attr_spec_handover_ctx *ctx = arg;
@@ -615,11 +456,11 @@ int evr_watch_index_claims_worker(void *arg){
         }
         close(cs);
         cs = -1;
-        if(evr_wait_for_handover_available(&ctx->handover) != evr_ok){
-            goto out_with_free_latest_spec;
-        }
-        if(!running){
+        int wait_res = evr_wait_for_handover_available(&ctx->handover);
+        if(wait_res == evr_end){
             break;
+        } else if(wait_res != evr_ok){
+            goto out_with_free_latest_spec;
         }
         // handover ctx is available
 #ifdef EVR_LOG_DEBUG
@@ -662,12 +503,13 @@ int evr_build_index_worker(void *arg){
     struct evr_attr_spec_handover_ctx *sctx = evr_build_index_worker_ctx[0];
     struct evr_index_handover_ctx *ictx = evr_build_index_worker_ctx[1];
     log_debug("Started build index worker");
-    while(running){
-        if(evr_wait_for_handover_occupied(&sctx->handover) != evr_ok){
-            goto out;
-        }
-        if(!running){
+    int wait_res;
+    while(1){
+        wait_res = evr_wait_for_handover_occupied(&sctx->handover);
+        if(wait_res == evr_end){
             break;
+        } else if(wait_res != evr_ok){
+            goto out;
         }
         struct evr_attr_spec_claim *claim = sctx->claim;
         sctx->claim = NULL;
@@ -697,11 +539,11 @@ int evr_build_index_worker(void *arg){
         }
 #endif
         free(claim);
-        if(evr_wait_for_handover_available(&ictx->handover) != evr_ok){
-            goto out;
-        }
-        if(!running){
+        wait_res = evr_wait_for_handover_available(&ictx->handover);
+        if(wait_res == evr_end){
             break;
+        } else if(wait_res != evr_ok){
+            goto out;
         }
 #ifdef EVR_LOG_DEBUG
         {
@@ -857,7 +699,11 @@ int evr_index_sync_worker(void *arg){
     int ret = evr_error;
     struct evr_index_handover_ctx *ctx = arg;
     log_debug("Started index sync worker");
-    if(evr_wait_for_handover_occupied(&ctx->handover) != evr_ok){
+    int wait_res = evr_wait_for_handover_occupied(&ctx->handover);
+    if(wait_res == evr_end){
+        ret = evr_ok;
+        goto out;
+    } else if(wait_res != evr_ok){
         goto out;
     }
     evr_blob_ref index_ref;
@@ -1335,16 +1181,16 @@ int evr_respond_claims_for_seed_result(void *context, const evr_claim_ref claim)
 }
 
 int evr_get_current_index_ref(evr_blob_ref index_ref){
-    if(evr_wait_for_handover_occupied(&current_index_ctx.handover) != evr_ok){
+    int wait_res = evr_wait_for_handover_occupied(&current_index_ctx.handover);
+    if(wait_res == evr_end){
+        return evr_end;
+    } else if(wait_res != evr_ok){
         return evr_error;
     }
     memcpy(index_ref, current_index_ctx.index_ref, evr_blob_ref_size);
     if(evr_unlock_handover(&current_index_ctx.handover) != evr_ok){
         evr_panic("Failed to unlock current index handover");
         return evr_error;
-    }
-    if(!running){
-        return evr_end;
     }
     return evr_ok;
 }

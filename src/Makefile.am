@@ -115,6 +115,7 @@ evr_attr_index_SOURCES = \
 	evr-glacier-client.c \
 	files.c \
 	glacier-cmd.c \
+	handover.c \
 	keys.c \
 	logger.c \
 	server.c \
@@ -132,6 +133,7 @@ evr_SOURCES = \
 	evr-glacier-client.c \
 	files.c \
 	glacier-cmd.c \
+	handover.c \
 	keys.c \
 	logger.c \
 	signatures.c

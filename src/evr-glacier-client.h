@@ -47,9 +47,15 @@ xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_ref key);
 
 xsltStylesheetPtr evr_fetch_stylesheet(int fd, evr_blob_ref ref);
 
+int evr_req_cmd_stat_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp);
+
+int evr_write_cmd_stat_blob(int fd, evr_blob_ref key);
+
 int evr_req_cmd_get_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp);
 
 int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
+
+int evr_write_cmd_put_blob(int fd, evr_blob_ref key, int flags, size_t blob_size);
 
 int evr_req_cmd_watch_blobs(int fd, struct evr_blob_filter *filter);
 

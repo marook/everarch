@@ -146,6 +146,39 @@ xsltStylesheetPtr evr_fetch_stylesheet(int fd, evr_blob_ref ref){
     return style;
 }
 
+int evr_req_cmd_stat_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp){
+    if(evr_write_cmd_stat_blob(fd, key) != evr_ok){
+        return evr_error;
+    }
+    if(evr_read_resp_header(fd, resp) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+int evr_write_cmd_stat_blob(int fd, evr_blob_ref key){
+    char buf[evr_cmd_header_n_size + evr_blob_ref_size];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_cmd_header cmd;
+    cmd.type = evr_cmd_type_stat_blob;
+    cmd.body_size = evr_blob_ref_size;
+    if(evr_format_cmd_header(bp.pos, &cmd) != evr_ok){
+        return evr_error;
+    }
+    evr_inc_buf_pos(&bp, evr_cmd_header_n_size);
+    evr_push_n(&bp, key, evr_blob_ref_size);
+#ifdef EVR_LOG_DEBUG
+    evr_blob_ref_str key_str;
+    evr_fmt_blob_ref(key_str, key);
+    log_debug("Sending stat %s command", key_str);
+#endif
+    if(write_n(fd, buf, sizeof(buf)) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
 int evr_req_cmd_get_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp){
     int ret = evr_error;
     if(evr_write_cmd_get_blob(fd, key) != evr_ok){
@@ -186,6 +219,26 @@ int evr_write_cmd_get_blob(int fd, evr_blob_ref key){
     ret = evr_ok;
  out:
     return ret;
+}
+
+int evr_write_cmd_put_blob(int fd, evr_blob_ref key, int flags, size_t blob_size){
+    const size_t body_size = evr_blob_ref_size + sizeof(uint8_t);
+    char buf[evr_cmd_header_n_size + body_size];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_cmd_header cmd;
+    cmd.type = evr_cmd_type_put_blob;
+    cmd.body_size = body_size + blob_size;
+    if(evr_format_cmd_header(buf, &cmd) != evr_ok){
+        return evr_error;
+    }
+    evr_inc_buf_pos(&bp, evr_cmd_header_n_size);
+    evr_push_n(&bp, key, evr_blob_ref_size);
+    evr_push_as(&bp, &flags, uint8_t);
+    if(write_n(fd, buf, sizeof(buf)) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
 }
 
 int evr_req_cmd_watch_blobs(int fd, struct evr_blob_filter *filter){
@@ -248,15 +301,16 @@ int evr_read_resp_header(int fd, struct evr_resp_header *resp){
 }
 
 int evr_read_watch_blobs_body(int fd, struct evr_watch_blobs_body *body){
-    int ret = evr_error;
     char buf[evr_watch_blobs_body_n_size];
-    if(read_n(fd, buf, evr_watch_blobs_body_n_size) != evr_ok){
-        goto out;
+    int read_res = read_n(fd, buf, evr_watch_blobs_body_n_size);
+    if(read_res == evr_end){
+        return evr_end;
+    }
+    if(read_res != evr_ok){
+        return evr_error;
     }
     if(evr_parse_watch_blobs_body(body, buf) != evr_ok){
-        goto out;
+        return evr_error;
     }
-    ret = evr_ok;
- out:
-    return ret;
+    return evr_ok;
 }

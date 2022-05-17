@@ -39,6 +39,7 @@
 #include "signatures.h"
 #include "evr-glacier-client.h"
 #include "configp.h"
+#include "handover.h"
 
 const char *argp_program_version = "evr-glacier-cli " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
@@ -55,13 +56,16 @@ static char doc[] =
     "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
     "The post-file command expects one optional file name argument for upload to the evr-glacier-storage. File will be read from stdin if no file name argument is given.\n\n"
-    "The watch command prints modified blob keys.";
+    "The watch command prints modified blob keys.\n\n"
+    "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST SRC_PORT DST_HOST DST_PORT after the sync argument."
+    ;
 
 static char args_doc[] = "CMD";
 
 #define arg_storage_host 256
 #define arg_storage_port 257
 #define arg_blobs_sort_order 258
+#define arg_two_way 259
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
@@ -72,6 +76,7 @@ static struct argp_option options[] = {
     {"title", 't', "T", 0, "Title of the created claim. Might be used together with post-file."},
     {"seed", 's', "REF", 0, "Makes the created claim reference another claim as seed."},
     {"blobs-sort-order", arg_blobs_sort_order, "ORDER", 0, "Prints watched blobs in this order. Possible values are '" sort_order_last_modified_key "' and '" sort_order_blob_ref_key "'. The sort-order '" sort_order_last_modified_key "' will continue to emit changed blobs as they change live. Other sort orders will end the connection after all relevant blob refs have been emitted. Default is '" sort_order_last_modified_key "'."},
+    {"two-way", arg_two_way, NULL, 0, "Synchronizes also from destination server to source server instead of just from source to destination server."},
     {0}
 };
 
@@ -83,6 +88,7 @@ static struct argp_option options[] = {
 #define cli_cmd_get_file 5
 #define cli_cmd_post_file 6
 #define cli_cmd_watch_blobs 7
+#define cli_cmd_sync 8
 
 struct cli_cfg {
     int cmd;
@@ -95,11 +101,17 @@ struct cli_cfg {
     int has_seed;
     evr_claim_ref seed;
     unsigned long long last_modified_after;
+    int two_way;
 
     /**
      * blobs_sort_order must be one of evr_cmd_watch_sort_order_*.
      */
     int blobs_sort_order;
+
+    char *src_storage_host;
+    char *src_storage_port;
+    char *dst_storage_host;
+    char *dst_storage_port;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*usage)(const struct argp_state *state)){
@@ -152,6 +164,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
             return ARGP_ERR_UNKNOWN;
         }
         break;
+    case arg_two_way:
+        cfg->two_way = 1;
+        break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
         default:
@@ -172,24 +187,65 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 cfg->cmd = cli_cmd_post_file;
             } else if(strcmp("watch", arg) == 0){
                 cfg->cmd = cli_cmd_watch_blobs;
+            } else if(strcmp("sync", arg) == 0){
+                cfg->cmd = cli_cmd_sync;
             } else {
                 usage(state);
                 return ARGP_ERR_UNKNOWN;
             }
             break;
         case 1:
-            if(cfg->cmd == cli_cmd_get || cfg->cmd == cli_cmd_get_claim || cfg->cmd == cli_cmd_get_file){
-                evr_replace_str(cfg->key, arg);
-            } else if(cfg->cmd == cli_cmd_post_file){
-                evr_replace_str(cfg->file, arg);
-            } else {
+            switch(cfg->cmd){
+            default:
                 usage(state);
                 return ARGP_ERR_UNKNOWN;
+            case cli_cmd_get:
+            case cli_cmd_get_claim:
+            case cli_cmd_get_file:
+                evr_replace_str(cfg->key, arg);
+                break;
+            case cli_cmd_post_file:
+                evr_replace_str(cfg->file, arg);
+                break;
+            case cli_cmd_sync:
+                evr_replace_str(cfg->src_storage_host, arg);
+                break;
+            }
+            break;
+        case 2:
+            switch(cfg->cmd){
+            default:
+                usage(state);
+                return ARGP_ERR_UNKNOWN;
+            case cli_cmd_sync:
+                evr_replace_str(cfg->src_storage_port, arg);
+                break;
+            }
+            break;
+        case 3:
+            switch(cfg->cmd){
+            default:
+                usage(state);
+                return ARGP_ERR_UNKNOWN;
+            case cli_cmd_sync:
+                evr_replace_str(cfg->dst_storage_host, arg);
+                break;
+            }
+            break;
+        case 4:
+            switch(cfg->cmd){
+            default:
+                usage(state);
+                return ARGP_ERR_UNKNOWN;
+            case cli_cmd_sync:
+                evr_replace_str(cfg->dst_storage_port, arg);
+                break;
             }
             break;
         }
         break;
     case ARGP_KEY_END:
+        // not enough arguments?
         switch(cfg->cmd){
         default:
             usage (state);
@@ -197,9 +253,14 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         case cli_cmd_get:
         case cli_cmd_get_claim:
         case cli_cmd_get_file:
-            if (state->arg_num < 2) {
-                // not enough arguments
-                usage (state);
+            if(state->arg_num < 2){
+                usage(state);
+                return ARGP_ERR_UNKNOWN;
+            }
+            break;
+        case cli_cmd_sync:
+            if(state->arg_num < 5){
+                usage(state);
                 return ARGP_ERR_UNKNOWN;
             }
             break;
@@ -227,6 +288,7 @@ int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
 int evr_cli_post_file(struct cli_cfg *cfg);
 int evr_cli_watch_blobs(struct cli_cfg *cfg);
 int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob);
+int evr_cli_sync(struct cli_cfg *cfg);
 
 int main(int argc, char **argv){
     int ret = 1;
@@ -243,9 +305,12 @@ int main(int argc, char **argv){
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
     cfg.last_modified_after = LLONG_MAX;
+    cfg.two_way = 0;
     cfg.blobs_sort_order = evr_cmd_watch_sort_order_last_modified;
-    struct argp argp = { options, parse_opt_adapter, args_doc, doc };
-    argp_parse(&argp, argc, argv, 0, 0, &cfg);
+    cfg.src_storage_host = NULL;
+    cfg.src_storage_port = NULL;
+    cfg.dst_storage_host = NULL;
+    cfg.dst_storage_port = NULL;
     char *config_paths[] = {
         "evr.conf",
         "~/.config/everarch/evr.conf",
@@ -256,6 +321,8 @@ int main(int argc, char **argv){
     if(configp_parse(&configp, config_paths, &cfg) != 0){
         goto out_with_free_cfg;
     }
+    struct argp argp = { options, parse_opt_adapter, args_doc, doc };
+    argp_parse(&argp, argc, argv, 0, 0, &cfg);
     switch(cfg.cmd){
     case cli_cmd_get:
         ret = evr_cli_get(&cfg);
@@ -278,22 +345,26 @@ int main(int argc, char **argv){
     case cli_cmd_watch_blobs:
         ret = evr_cli_watch_blobs(&cfg);
         break;
+    case cli_cmd_sync:
+        ret = evr_cli_sync(&cfg);
     }
+    void *tbfree[] = {
+        cfg.storage_host,
+        cfg.storage_port,
+        cfg.key,
+        cfg.file,
+        cfg.title,
+        cfg.src_storage_host,
+        cfg.src_storage_port,
+        cfg.dst_storage_host,
+        cfg.dst_storage_port,
+    };
+    void **tbfree_end = &tbfree[sizeof(tbfree) / sizeof(void*)];
  out_with_free_cfg:
-    if(cfg.storage_host){
-        free(cfg.storage_host);
-    }
-    if(cfg.storage_port){
-        free(cfg.storage_port);
-    }
-    if(cfg.key){
-        free(cfg.key);
-    }
-    if(cfg.file){
-        free(cfg.file);
-    }
-    if(cfg.title){
-        free(cfg.title);
+    for(void **it = tbfree; it != tbfree_end; ++it){
+        if(*it){
+            free(*it);
+        }
     }
     return ret;
 }
@@ -325,7 +396,8 @@ int evr_cli_get(struct cli_cfg *cfg){
     if(read_n(c, buf, sizeof(buf)) != evr_ok){
         goto out_with_close_c;
     }
-    if(pipe_n(STDOUT_FILENO, c, resp.body_size - 1) != evr_ok){
+    int pipe_res = pipe_n(STDOUT_FILENO, c, resp.body_size - 1);
+    if(pipe_res != evr_ok && pipe_res != evr_end){
         goto out_with_close_c;
     }
     result = evr_ok;
@@ -589,7 +661,11 @@ int evr_cli_get_file(struct cli_cfg *cfg){
         if(read_n(c, buf, 1) != evr_ok){
             goto out_with_free_doc;
         }
-        if(pipe_n(STDOUT_FILENO, c, resp.body_size - 1) != evr_ok){
+        int pipe_res = pipe_n(STDOUT_FILENO, c, resp.body_size - 1);
+        if(pipe_res == evr_end){
+            break;
+        }
+        if(pipe_res != evr_ok){
             goto out_with_free_doc;
         }
         slice = evr_find_next_element(slice->next, "slice");
@@ -769,92 +845,362 @@ int evr_cli_watch_blobs(struct cli_cfg *cfg){
 
 int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob){
     int ret = evr_error;
-    char buffer[max(max(evr_cmd_header_n_size + evr_blob_ref_size + sizeof(uint8_t), evr_resp_header_n_size), evr_stat_blob_resp_n_size)];
 #ifdef EVR_LOG_DEBUG
     evr_blob_ref_str fmt_key;
     evr_fmt_blob_ref(fmt_key, key);
 #endif
-    {
-        struct evr_buf_pos bp;
-        evr_init_buf_pos(&bp, buffer);
-        struct evr_cmd_header cmd;
-        cmd.type = evr_cmd_type_stat_blob;
-        cmd.body_size = evr_blob_ref_size;
-        if(evr_format_cmd_header(bp.pos, &cmd) != evr_ok){
-            goto out;
-        }
-        bp.pos += evr_cmd_header_n_size;
-        evr_push_n(&bp, key, evr_blob_ref_size);
-        log_debug("Sending stat %s command", fmt_key);
-        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_ref_size) != evr_ok){
-            goto out;
-        }
+    struct evr_resp_header resp;
+    if(evr_req_cmd_stat_blob(c, key, &resp) != evr_ok){
+        goto out;
     }
-    {
-        log_debug("Reading storage response");
-        if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
+    if(resp.status_code == evr_status_code_ok){
+        log_debug("blob already exists");
+        if(resp.body_size != evr_stat_blob_resp_n_size){
             goto out;
         }
-        struct evr_resp_header resp;
-        if(evr_parse_resp_header(&resp, buffer) != evr_ok){
+        // TODO update flags in storage if necessary
+        if(dump_n(c, evr_stat_blob_resp_n_size) != evr_ok){
             goto out;
         }
-        log_debug("Storage responded with status code 0x%x", resp.status_code);
-        if(resp.status_code == evr_status_code_ok){
-            log_debug("blob already exists");
-            if(resp.body_size != evr_stat_blob_resp_n_size){
-                goto out;
-            }
-            // TODO update flags in storage if necessary
-            if(dump_n(c, evr_stat_blob_resp_n_size) != evr_ok){
-                goto out;
-            }
-            ret = evr_ok;
-            goto out;
-        }
-        if(resp.status_code != evr_status_code_blob_not_found){
-            goto out;
-        }
-        log_debug("Storage indicated blob does not yet exist");
-        if(resp.body_size != 0){
-            goto out;
-        }
+        ret = evr_ok;
+        goto out;
     }
-    {
-        char *p = buffer;
-        struct evr_cmd_header cmd;
-        cmd.type = evr_cmd_type_put_blob;
-        cmd.body_size = evr_blob_ref_size + sizeof(uint8_t) + blob->size_used;
-        if(evr_format_cmd_header(p, &cmd) != evr_ok){
-            goto out;
-        }
-        p += evr_cmd_header_n_size;
-        memcpy(p, key, evr_blob_ref_size);
-        p += evr_blob_ref_size;
-        *(uint8_t*)p = flags;
-        log_debug("Sending put %s command for %d bytes blob", fmt_key, blob->size_used);
-        if(write_n(c, buffer, evr_cmd_header_n_size + evr_blob_ref_size + sizeof(uint8_t)) != evr_ok){
-            goto out;
-        }
-        if(write_chunk_set(c, blob) != evr_ok){
-            goto out;
-        }
+    if(resp.status_code != evr_status_code_blob_not_found){
+        goto out;
     }
-    {
-        log_debug("Reading storage response");
-        if(read_n(c, buffer, evr_resp_header_n_size) != evr_ok){
-            goto out;
-        }
-        struct evr_resp_header resp;
-        if(evr_parse_resp_header(&resp, buffer) != evr_ok){
-            goto out;
-        }
-        log_debug("Storage responded with status code 0x%x", resp.status_code);
-        if(resp.status_code != evr_status_code_ok){
-            goto out;
-        }
+    log_debug("Storage indicated blob does not yet exist");
+    if(resp.body_size != 0){
+        goto out;
+    }
+    if(evr_write_cmd_put_blob(c, key, flags, blob->size_used) != evr_ok){
+        goto out;
+    }
+    if(write_chunk_set(c, blob) != evr_ok){
+        goto out;
+    }
+    if(evr_read_resp_header(c, &resp) != evr_ok){
+        goto out;
+    }
+    if(resp.status_code != evr_status_code_ok){
+        goto out;
     }
     ret = evr_ok;
  out:
+    return ret;
+}
+
+#define sync_dir_src_to_dst 1
+#define sync_dir_dst_to_src 2
+
+struct evr_blob_sync_handover {
+    struct evr_handover_ctx handover;
+
+    struct cli_cfg *cfg;
+
+    /**
+     * sync_dir must be one of sync_dir_*.
+     */
+    int sync_dir;
+    evr_blob_ref ref;
+};
+
+#define evr_init_blob_sync_handover(ctx) evr_init_handover_ctx(&(ctx)->handover)
+#define evr_free_blob_sync_handover(ctx) evr_free_handover_ctx(&(ctx)->handover)
+
+#define sync_state_want_ref 1
+#define sync_state_has_ref 2
+#define sync_state_end 3
+
+int blob_sync_worker(void *ctx);
+
+int evr_cli_sync(struct cli_cfg *cfg) {
+    int ret = evr_error;
+    const size_t sync_thrd_count = 4;
+    thrd_t sync_thrds[sync_thrd_count];
+    int src_c = evr_connect_to_storage(cfg->src_storage_host, cfg->src_storage_port);
+    if(src_c < 0){
+        log_error("Failed to connect to source evr-glacier-storage server");
+        goto out;
+    }
+    int dst_c = evr_connect_to_storage(cfg->dst_storage_host, cfg->dst_storage_port);
+    if(dst_c < 0){
+        log_error("Failed to connect to destination evr-glacier-storage-server");
+        goto out_with_close_src_c;
+    }
+    struct evr_blob_filter f;
+    f.sort_order = evr_cmd_watch_sort_order_ref;
+    f.flags_filter = cfg->flags;
+    f.last_modified_after = 0;
+    if(evr_req_cmd_watch_blobs(src_c, &f) != evr_ok){
+        goto out_with_close_dst_c;
+    }
+    if(evr_req_cmd_watch_blobs(dst_c, &f) != evr_ok){
+        goto out_with_close_dst_c;
+    }
+    struct evr_blob_sync_handover sync_ho;
+    if(evr_init_blob_sync_handover(&sync_ho) != evr_ok){
+        goto out_with_close_dst_c;
+    }
+    sync_ho.cfg = cfg;
+    thrd_t *sync_thrds_end = &sync_thrds[sync_thrd_count];
+    thrd_t *st = sync_thrds;
+    for(; st != sync_thrds_end; ++st){
+        if(thrd_create(st, blob_sync_worker, &sync_ho) != thrd_success){
+            goto out_with_join_sync_thrds;
+        }
+    }
+    int src_state = sync_state_want_ref;
+    struct evr_watch_blobs_body src_next_blob;
+    int dst_state = sync_state_want_ref;
+    struct evr_watch_blobs_body dst_next_blob;
+    fd_set fds;
+    size_t blob_count = 0;
+    while(1){
+        FD_ZERO(&fds);
+        if(src_state == sync_state_want_ref){
+            FD_SET(src_c, &fds);
+        }
+        if(dst_state == sync_state_want_ref){
+            FD_SET(dst_c, &fds);
+        }
+        int sel_ret = select(max(src_c, dst_c) + 1, &fds, NULL, NULL, NULL);
+        if(sel_ret < 0){
+            goto out_with_close_dst_c;
+        }
+        for(int i = 0; i < FD_SETSIZE; ++i){
+            if(FD_ISSET(i, &fds)){
+                struct evr_watch_blobs_body *body;
+                int *state;
+                if(i == src_c){
+                    body = &src_next_blob;
+                    state = &src_state;
+                } else if(i == dst_c) {
+                    body = &dst_next_blob;
+                    state = &dst_state;
+                } else {
+                    evr_panic("Unknown file descriptor is set: %d", i);
+                    goto out_with_close_dst_c;
+                }
+                int read_res = evr_read_watch_blobs_body(i, body);
+                if(read_res == evr_ok){
+                    *state = sync_state_has_ref;
+                } else if(read_res == evr_end){
+                    *state = sync_state_end;
+                } else {
+                    goto out_with_close_dst_c;
+                }
+            }
+        }
+        if(src_state == sync_state_want_ref || dst_state == sync_state_want_ref){
+            continue;
+        }
+        if(src_state == sync_state_end && dst_state == sync_state_end){
+            break;
+        }
+        int ref_cmp;
+        if(src_state == sync_state_end){
+            ref_cmp = 1;
+        } else if(dst_state == sync_state_end){
+            ref_cmp = -1;
+        } else {
+            ref_cmp = memcmp(src_next_blob.key, dst_next_blob.key, evr_blob_ref_size);
+        }
+        ++blob_count;
+        if(ref_cmp == 0){
+            src_state = sync_state_want_ref;
+            dst_state = sync_state_want_ref;
+        } else if(ref_cmp < 0){
+#ifdef EVR_LOG_DEBUG
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, src_next_blob.key);
+            log_debug("Sync %s from src to dst", ref_str);
+#endif
+            if(evr_wait_for_handover_available(&sync_ho.handover) != evr_ok){
+                goto out_with_join_sync_thrds;
+            }
+            sync_ho.sync_dir = sync_dir_src_to_dst;
+            memcpy(sync_ho.ref, src_next_blob.key, evr_blob_ref_size);
+            if(evr_occupy_handover(&sync_ho.handover) != evr_ok){
+                goto out_with_join_sync_thrds;
+            }
+            src_state = sync_state_want_ref;
+        } else { // if(ref_cmp > 0)
+            if(cfg->two_way){
+#ifdef EVR_LOG_DEBUG
+                evr_blob_ref_str ref_str;
+                evr_fmt_blob_ref(ref_str, dst_next_blob.key);
+                log_debug("Sync %s from dst to src", ref_str);
+#endif
+                if(evr_wait_for_handover_available(&sync_ho.handover) != evr_ok){
+                    goto out_with_join_sync_thrds;
+                }
+                sync_ho.sync_dir = sync_dir_dst_to_src;
+                memcpy(sync_ho.ref, dst_next_blob.key, evr_blob_ref_size);
+                if(evr_occupy_handover(&sync_ho.handover) != evr_ok){
+                    goto out_with_join_sync_thrds;
+                }
+            }
+            dst_state = sync_state_want_ref;
+        }
+    }
+    log_info("Visited %lu blobs in two storages", blob_count);
+    ret = evr_ok;
+ out_with_join_sync_thrds:
+    log_debug("Sync blob ref compare done. Waiting for sync threads.");
+    if(evr_finish_handover(&sync_ho.handover, sync_thrd_count) != evr_ok){
+        ret = evr_error;
+    }
+    int thrd_res;
+    for(--st; st >= sync_thrds; --st){
+        if(thrd_join(*st, &thrd_res) != thrd_success){
+            evr_panic("Failed to join sync thread");
+            ret = evr_error;
+        }
+        if(thrd_res != evr_ok){
+            ret = evr_error;
+        }
+    }
+    if(evr_free_blob_sync_handover(&sync_ho) != evr_ok){
+        ret = evr_error;
+    }
+ out_with_close_dst_c:
+    if(close(dst_c) != 0){
+        evr_panic("Unable to close connection to destination server");
+        ret = evr_error;
+    }
+ out_with_close_src_c:
+    if(close(src_c) != 0){
+        evr_panic("Unable to close connection to source server");
+        ret = evr_error;
+    }
+ out:
+    return ret;
+}
+
+int blob_sync_worker(void *context){
+    int ret = evr_error;
+    struct evr_blob_sync_handover *ctx = context;
+    int c_src = -1;
+    int c_dst = -1;
+    int sync_dir;
+    evr_blob_ref ref;
+    struct evr_resp_header get_resp;
+    struct evr_resp_header put_resp;
+    while(1){
+        int wait_res = evr_wait_for_handover_occupied(&ctx->handover);
+        if(wait_res == evr_end){
+            break;
+        } else if(wait_res != evr_ok){
+            goto out;
+        }
+        sync_dir = ctx->sync_dir;
+        memcpy(ref, ctx->ref, evr_blob_ref_size);
+        if(evr_empty_handover(&ctx->handover) != evr_ok){
+            goto out;
+        }
+        const int max_tries = 3;
+        int tries = 0;
+        for(; tries < max_tries; ++tries){
+            if(tries > 0){
+#ifdef EVR_LOG_DEBUG
+                evr_blob_ref_str ref_str;
+                evr_fmt_blob_ref(ref_str, ref);
+                log_debug("Retry sync %s for the %d try", ref_str, tries);
+#endif
+            }
+            if(c_src == -1){
+                c_src = evr_connect_to_storage(ctx->cfg->src_storage_host, ctx->cfg->src_storage_port);
+                if(c_src < 0){
+                    log_error("Failed to connect to source evr-glacier-storage server");
+                    goto continue_with_retry;
+                }
+            }
+            if(c_dst == -1){
+                c_dst = evr_connect_to_storage(ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port);
+                if(c_dst < 0){
+                    log_error("Failed to connect to destination evr-glacier-storage server");
+                    goto continue_with_retry;
+                }
+            }
+            int cg;
+            int cp;
+            switch(sync_dir){
+            default:
+                evr_panic("Unknown sync_dir %d", sync_dir);
+                goto out_with_close_c;
+            case sync_dir_src_to_dst:
+                cg = c_src;
+                cp = c_dst;
+                break;
+            case sync_dir_dst_to_src:
+                cg = c_dst;
+                cp = c_src;
+                break;
+            }
+            if(evr_req_cmd_get_blob(cg, ref, &get_resp) != evr_ok){
+                goto continue_with_retry;
+            }
+            char buf[sizeof(uint8_t)];
+            if(read_n(cg, buf, sizeof(buf)) != evr_ok){
+                goto continue_with_retry;
+            }
+            struct evr_buf_pos bp;
+            evr_init_buf_pos(&bp, buf);
+            int flags;
+            evr_pull_as(&bp, &flags, uint8_t);
+            if(get_resp.status_code != evr_status_code_ok){
+                goto continue_with_retry;
+            }
+            const size_t blob_size = get_resp.body_size - sizeof(uint8_t);
+            if(evr_write_cmd_put_blob(cp, ref, flags, blob_size) != evr_ok){
+                goto continue_with_retry;
+            }
+            if(pipe_n(cp, cg, blob_size) != evr_ok){
+                goto continue_with_retry;
+            }
+            if(evr_read_resp_header(cp, &put_resp) != evr_ok){
+                goto continue_with_retry;
+            }
+            if(put_resp.status_code != evr_status_code_ok){
+                goto continue_with_retry;
+            }
+            break;
+        continue_with_retry:
+            if(c_dst >= 0){
+                if(close(c_dst) != 0){
+                    c_dst = -1;
+                    goto out_with_close_c;
+                }
+                c_dst = -1;
+            }
+            if(c_src >= 0){
+                if(close(c_src) != 0){
+                    c_src = -1;
+                    goto out_with_close_c;
+                }
+                c_src = -1;
+            }
+        }
+        if(tries >= max_tries){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, ref);
+            log_error("Giving up synchronizing %s after %d failed tries.", ref_str, tries);
+            goto out_with_close_c;
+        }
+    }
+    ret = evr_ok;
+ out_with_close_c:
+    if(c_dst >= 0){
+        if(close(c_dst) != 0){
+            ret = evr_error;
+        }
+    }
+    if(c_src >= 0){
+        if(close(c_src) != 0){
+            ret = evr_error;
+        }
+    }
+ out:
+    log_debug("blob_sync_worker ending with status %d", ret);
     return ret;
 }

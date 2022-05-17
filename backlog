@@ -1,12 +1,3 @@
-* sync two evr-glacier-storage instances via evr cli
-#+BEGIN_SRC
-evr sync src-host:1234 dst-host:4321
-evr sync --two-way first-host:1234 second-host:4321
-#+END_SRC
-synchronization should execute in two thread groups. one thread group
-with one thread for comparing the blob refs which arrive via the
-watches. a second thread group for performing a sync of one blob. the
-second thread group should be able to scale to multiple threads.
 * store flags and blob size redundant in buckets
 right now flags and blob size in the evr-glacier-storage are storend
 once for every blob and without any checksum.

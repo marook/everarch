@@ -41,11 +41,21 @@ int read_file_str(struct dynamic_array **buffer, const char *path, size_t max_si
 
 int read_n(int f, char *buffer, size_t bytes);
 
+/**
+ * Returns evr_ok if bytes got written. Returns evr_end if fd signals
+ * an EPIPE on write. Returns evr_error on errors.
+ */
 int write_n(int fd, const void *buffer, size_t size);
 
 int write_chunk_set(int f, const struct chunk_set *cs);
 
-int pipe_n(int dest, int src, size_t size);
+/**
+ * pipe_n will pipe n bytes from src to dest.
+ *
+ * Returns evr_ok if bytes got piped. Returns evr_end if dest signals
+ * an EPIPE on write. Returns evr_error on errors.
+ */
+int pipe_n(int dest, int src, size_t n);
 
 int dump_n(int f, size_t bytes);
 

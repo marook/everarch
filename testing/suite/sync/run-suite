@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+set -o pipefail
+. ../config
+
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
+
+start_glacier_storage
+start_secondary_glacier_storage
+
+wait_for_glacier_storage
+wait_for_secondary_glacier_storage
+
+ref_a=`echo a | evr put`
+ref_b=`echo b | evr put --storage-port "${secondary_glacier_storage_port}"`
+
+echo "ref_a is ${ref_a}"
+echo "ref_b is ${ref_b}"
+
+evr sync localhost ${secondary_glacier_storage_port} localhost ${glacier_storage_port}
+
+# after sync ref_a and ref_b should be in storage
+evr get ${ref_a} > /dev/null
+evr get ${ref_b} > /dev/null

@@ -24,10 +24,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #include "basics.h"
 #include "errors.h"
 #include "rollsum.h"
+#include "logger.h"
 
 int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
     int result = evr_error;
@@ -109,9 +111,11 @@ int write_n(int fd, const void *buffer, size_t size){
     size_t remaining = size;
     while(remaining > 0){
         ssize_t written = write(fd, buffer, remaining);
-        if(written == 0){
-            return evr_end;
-        } else if(written == -1){
+        if(written <= 0){
+            if(errno == EPIPE){
+                log_debug("write_n detected a broken pipe with fd %d", fd);
+                return evr_end;
+            }
             return evr_error;
         }
         buffer += written;
@@ -134,16 +138,19 @@ int write_chunk_set(int f, const struct chunk_set *cs){
     return evr_ok;
 }
 
-int pipe_n(int dest, int src, size_t size){
+int pipe_n(int dest, int src, size_t n){
     char buffer[4096];
-    size_t remaining = size;
+    size_t remaining = n;
     while(remaining > 0){
         ssize_t bytes_read = read(src, buffer, min(remaining, sizeof(buffer)));
         if(bytes_read <= 0){
             return evr_error;
         }
         remaining -= bytes_read;
-        if(write_n(dest, buffer, bytes_read) != evr_ok){
+        int write_res = write_n(dest, buffer, bytes_read);
+        if(write_res == evr_end){
+            return evr_end;
+        } else if(write_res != evr_ok){
             return evr_error;
         }
     }

@@ -355,6 +355,11 @@ int evr_connection_worker(void *context){
         case evr_cmd_type_watch_blobs:
             if(evr_work_watch_blobs(&ctx, &cmd, &rctx) != evr_ok){
                 goto end;
+            } else {
+                // evr_work_watch_blobs must close connection on end
+                // to indicate no more blobs to client.
+                result = evr_ok;
+                goto end;
             }
             break;
         }
