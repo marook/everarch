@@ -35,6 +35,32 @@ void evr_trim(char **start, char **end, char *s){
     }
 }
 
+unsigned char evr_buf_pos_8bit_checksum(struct evr_buf_pos *bp);
+
+void evr_push_8bit_checksum(struct evr_buf_pos *bp){
+    unsigned char cs = evr_buf_pos_8bit_checksum(bp);
+    evr_push_as(bp, &cs, uint8_t);
+}
+
+int evr_pull_8bit_checksum(struct evr_buf_pos *bp){
+    unsigned char calc_cs = evr_buf_pos_8bit_checksum(bp);
+    unsigned char buf_cs;
+    evr_pull_as(bp, &buf_cs, uint8_t);
+    if(calc_cs != buf_cs){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+unsigned char evr_buf_pos_8bit_checksum(struct evr_buf_pos *bp){
+    unsigned char cs = 0;
+    for(char *it = bp->buf; it != bp->pos; ++it){
+        cs += (unsigned char)*it;
+    }
+    cs = ~cs;
+    return cs;
+}
+
 void evr_now(evr_time *t){
     struct timespec ts;
     if(clock_gettime(CLOCK_REALTIME, &ts) != 0){

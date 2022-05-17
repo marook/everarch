@@ -97,7 +97,7 @@ void test_evr_glacier_write_smal_blobs(){
         wb->size = data_len;
         assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &first_last_modified)));
         assert(write_ctx->current_bucket_index == 1);
-        assert(write_ctx->current_bucket_pos == 56);
+        assert_msg(write_ctx->current_bucket_pos == 57, "current_bucket_pos was %d", write_ctx->current_bucket_pos);
         assert(first_last_modified > 1644937656);
         free(buffer);
     }
@@ -128,7 +128,7 @@ void test_evr_glacier_write_smal_blobs(){
         wb->size = data_len;
         assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &second_last_modified)));
         assert(write_ctx->current_bucket_index == 1);
-        assert(write_ctx->current_bucket_pos == 100);
+        assert_msg(write_ctx->current_bucket_pos == 102, "current_bucket_pos was %d", write_ctx->current_bucket_pos);
         assert(second_last_modified > 1644937656);
         free(buffer);
     }

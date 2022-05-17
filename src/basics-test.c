@@ -55,6 +55,26 @@ void test_evr_trim(){
     assert(end == &s[2]);
 }
 
+void test_buf_pos_checksums(){
+    char buf[4];
+    struct evr_buf_pos bp;
+    // write data with checksum
+    evr_init_buf_pos(&bp, buf);
+    evr_push_n(&bp, "abc", 3);
+    evr_push_8bit_checksum(&bp);
+    assert_msg((unsigned char)buf[3] == 217, "Checksum was %u", (unsigned char)buf[3]);
+    // check valid checksum
+    evr_reset_buf_pos(&bp);
+    char buf2[3];
+    evr_pull_n(&bp, buf2, 3);
+    assert(is_ok(evr_pull_8bit_checksum(&bp)));
+    // check invalid checksum
+    buf[0] = 0;
+    evr_reset_buf_pos(&bp);
+    evr_pull_n(&bp, buf2, 3);
+    assert(is_err(evr_pull_8bit_checksum(&bp)));
+}
+
 #define assert_invalid_syntaxt(s)                                       \
     do {                                                                \
         evr_time t;                                                     \
@@ -91,6 +111,7 @@ void test_evr_time(){
 
 int main(){
     run_test(test_evr_trim);
+    run_test(test_buf_pos_checksums);
     run_test(test_evr_time);
     return 0;
 }

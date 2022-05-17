@@ -33,6 +33,7 @@
 #include "logger.h"
 #include "dyn-mem.h"
 #include "db.h"
+#include "files.h"
 
 // TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
@@ -551,9 +552,10 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     int ret = evr_error;
     evr_now(last_modified);
     uint64_t t64 = (uint64_t)*last_modified;
-    size_t blob_size_size = 4;
-    size_t header_disk_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + blob_size_size;
-    size_t disk_size = header_disk_size + blob->size;
+    const size_t blob_size_size = 4;
+    const size_t header_buf_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + blob_size_size + sizeof(uint8_t);
+    char header_buf[header_buf_size];
+    const size_t disk_size = header_buf_size + blob->size;
     if(disk_size > ctx->config->max_bucket_size){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
@@ -568,23 +570,17 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     if(lseek(ctx->current_bucket_f, ctx->current_bucket_pos, SEEK_SET) == -1){
         goto fail;
     }
-    void *header_buffer = alloca(header_disk_size);
-    {
-        // fill header_buffer
-        void *p = header_buffer;
-        memcpy(p, blob->key, sizeof(blob->key));
-        p = (uint8_t*)p + sizeof(blob->key);
-        *((uint8_t*)p) = blob->flags;
-        p = (uint8_t*)p + 1;
-        *((uint64_t*)p) = htobe64(t64);
-        p = (uint64_t*)p + 1;
-        *((uint32_t*)p) = htobe32(blob->size);
-    }
-    // TODO change to write_n so data is always completely written
-    if(write(ctx->current_bucket_f, header_buffer, header_disk_size) != header_disk_size){
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, header_buf);
+    evr_push_n(&bp, blob->key, evr_blob_ref_size);
+    evr_push_as(&bp, &blob->flags, uint8_t);
+    evr_push_map(&bp, &t64, uint64_t, htobe64);
+    evr_push_map(&bp, &blob->size, uint32_t, htobe32);
+    evr_push_8bit_checksum(&bp);
+    if(write_n(ctx->current_bucket_f, header_buf, header_buf_size) != evr_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
-        log_error("Can't completely write blob header for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
+        log_error("Can't write blob header for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
         goto fail;
     }
     char **c = blob->chunks;
@@ -594,26 +590,34 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         if(remaining_blob_bytes < chunk_bytes_len){
             chunk_bytes_len = remaining_blob_bytes;
         }
-        ssize_t chunk_bytes_written = write(ctx->current_bucket_f, *c, chunk_bytes_len);
-        if(chunk_bytes_written != chunk_bytes_len){
+        if(write_n(ctx->current_bucket_f, *c, chunk_bytes_len) != evr_ok){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, blob->key);
-            log_error("Can't completely write blob data for key %s in glacier directory %s after %d bytes written.", fmt_key, ctx->config->bucket_dir_path, bytes_written);
+            log_error("Can't write blob data for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
             goto fail;
         }
-        bytes_written += chunk_bytes_written;
+        bytes_written += chunk_bytes_len;
         c++;
     }
-    size_t blob_offset = ctx->current_bucket_pos + header_disk_size;
-    ctx->current_bucket_pos += header_disk_size + blob->size;
+    if(fdatasync(ctx->current_bucket_f) != 0){
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, blob->key);
+        log_error("Can't fsync blob data for key %s in glacier directory %s.");
+    }
+    size_t blob_offset = ctx->current_bucket_pos + header_buf_size;
+    ctx->current_bucket_pos += header_buf_size + blob->size;
     if(lseek(ctx->current_bucket_f, 0, SEEK_SET) == -1){
         goto fail;
     }
     uint32_t last_bucket_pos = htobe32(ctx->current_bucket_pos);
-    // TODO switch to write_n
-    if(write(ctx->current_bucket_f, &last_bucket_pos, sizeof(last_bucket_pos)) != sizeof(last_bucket_pos)){
-        log_error("Can't completely write bucket end pointer in glacier directory %s", ctx->config->bucket_dir_path);
+    if(write_n(ctx->current_bucket_f, &last_bucket_pos, sizeof(last_bucket_pos)) != evr_ok){
+        log_error("Can't write bucket end pointer in glacier directory %s", ctx->config->bucket_dir_path);
         goto fail;
+    }
+    if(fdatasync(ctx->current_bucket_f) != 0){
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, blob->key);
+        log_error("Can't fsync bucket end pointer for key %s in glacier directory %s.");
     }
     if(sqlite3_bind_blob(ctx->insert_blob_stmt, 1, blob->key, sizeof(blob->key), SQLITE_TRANSIENT) != SQLITE_OK){
         goto fail_with_insert_reset;

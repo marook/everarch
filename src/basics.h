@@ -156,6 +156,17 @@ struct evr_buf_pos {
         evr_push_as(bp, &tmp, type);            \
     } while (0)
 
+/**
+ * Pushes a checksum for the data before the checksum.
+ */
+void evr_push_8bit_checksum(struct evr_buf_pos *bp);
+
+/**
+ * Returns evr_ok if the checksum for the data before the checksum
+ * matches.
+ */
+int evr_pull_8bit_checksum(struct evr_buf_pos *bp);
+
 #define evr_log_buf_pos(bp)                                             \
     do {                                                                \
         size_t size = (bp)->pos - (bp)->buf;                            \
