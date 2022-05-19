@@ -88,7 +88,7 @@ static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
 sig_atomic_t running = 1;
 
 struct evr_connection{
-    int socket;
+    struct evr_file socket;
 };
 
 struct evr_modified_blob {
@@ -119,7 +119,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
 int evr_handle_blob_list(void *ctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob);
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx);
 void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, evr_time last_modified);
-int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx);
+int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, struct evr_connection *ctx);
 int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
 
@@ -249,7 +249,7 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
                     if(!context){
                         goto context_alloc_fail;
                     }
-                    context->socket = c;
+                    evr_file_bind_fd(&context->socket, c);
                     thrd_t t;
                     if(thrd_create(&t, evr_connection_worker, context) != thrd_success){
                         goto thread_create_fail;
@@ -281,7 +281,7 @@ int evr_connection_worker(void *context){
     int result = evr_error;
     struct evr_connection ctx = *(struct evr_connection*)context;
     free(context);
-    log_debug("Started worker %d", ctx.socket);
+    log_debug("Started worker %d", ctx.socket.get_fd(&ctx.socket));
     struct evr_glacier_read_ctx *rctx = NULL;
     // TODO i guess buffer is never used for storing responses. why do
     // we make sure it fits evr_resp_header_n_size
@@ -289,9 +289,9 @@ int evr_connection_worker(void *context){
     char buffer[buffer_size];
     struct evr_cmd_header cmd;
     while(running){
-        const int header_result = read_n(ctx.socket, buffer, evr_cmd_header_n_size);
+        const int header_result = read_n(&ctx.socket, buffer, evr_cmd_header_n_size);
         if(header_result == evr_end){
-            log_debug("Worker %d ends because of remote termination", ctx.socket);
+            log_debug("Worker %d ends because of remote termination", ctx.socket.get_fd(&ctx.socket));
             result = evr_ok;
             goto end;
         } else if (header_result != evr_ok){
@@ -300,11 +300,11 @@ int evr_connection_worker(void *context){
         if(evr_parse_cmd_header(&cmd, buffer) != evr_ok){
             goto end;
         }
-        log_debug("Worker %d retrieved cmd 0x%02x with body size %d", ctx.socket, cmd.type, cmd.body_size);
+        log_debug("Worker %d retrieved cmd 0x%02x with body size %d", ctx.socket.get_fd(&ctx.socket), cmd.type, cmd.body_size);
         switch(cmd.type){
         default:
             // unknown command
-            log_error("Worker %d retieved unknown cmd 0x%02x", ctx.socket, cmd.type);
+            log_error("Worker %d retieved unknown cmd 0x%02x", ctx.socket.get_fd(&ctx.socket), cmd.type);
             // TODO respond evr_status_code_unknown_cmd
             result = evr_ok;
             goto end;
@@ -314,7 +314,7 @@ int evr_connection_worker(void *context){
                 goto end;
             }
             evr_blob_ref key;
-            const int body_result = read_n(ctx.socket, (char*)&key, body_size);
+            const int body_result = read_n(&ctx.socket, (char*)&key, body_size);
             if(body_result != evr_ok){
                 goto end;
             }
@@ -322,7 +322,7 @@ int evr_connection_worker(void *context){
             {
                 evr_blob_ref_str fmt_key;
                 evr_fmt_blob_ref(fmt_key, key);
-                log_debug("Worker %d retrieved cmd get %s", ctx.socket, fmt_key);
+                log_debug("Worker %d retrieved cmd get %s", ctx.socket.get_fd(&ctx.socket), fmt_key);
             }
 #endif
             if(evr_ensure_worker_rctx_exists(&rctx, &ctx) != evr_ok){
@@ -333,7 +333,7 @@ int evr_connection_worker(void *context){
             if(read_res == evr_not_found) {
                 evr_blob_ref_str fmt_key;
                 evr_fmt_blob_ref(fmt_key, key);
-                log_debug("Worker %d did not find key %s", ctx.socket, fmt_key);
+                log_debug("Worker %d did not find key %s", ctx.socket.get_fd(&ctx.socket), fmt_key);
             }
 #endif
             if(read_res != evr_ok && read_res != evr_not_found){
@@ -366,13 +366,16 @@ int evr_connection_worker(void *context){
     }
     result = evr_ok;
  end:
-    close(ctx.socket);
+    if(ctx.socket.close(&ctx.socket) != 0){
+        evr_panic("Unable to close socket");
+        result = evr_error;
+    }
     if(rctx){
         if(evr_free_glacier_read_ctx(rctx) != evr_ok){
             result = evr_error;
         }
     }
-    log_debug("Ended worker %d with result %d", ctx.socket, result);
+    log_debug("Ended worker %d with result %d", ctx.socket.get_fd(&ctx.socket), result);
     return result;
 }
 
@@ -387,21 +390,21 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         goto out;
     }
     struct evr_writing_blob wblob;
-    if(read_n(ctx->socket, (char*)&wblob.key, evr_blob_ref_size) != evr_ok){
+    if(read_n(&ctx->socket, (char*)&wblob.key, evr_blob_ref_size) != evr_ok){
         goto out;
     }
     uint8_t flags;
-    if(read_n(ctx->socket, (char*)&flags, sizeof(flags)) != evr_ok){
+    if(read_n(&ctx->socket, (char*)&flags, sizeof(flags)) != evr_ok){
         goto out;
     }
 #ifdef EVR_LOG_DEBUG
     {
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, wblob.key);
-        log_debug("Worker %d retrieved cmd put %s with flags 0x%02x and %d bytes blob", ctx->socket, fmt_key, flags, blob_size);
+        log_debug("Worker %d retrieved cmd put %s with flags 0x%02x and %d bytes blob", ctx->socket.get_fd(&ctx->socket), fmt_key, flags, blob_size);
     }
 #endif
-    struct chunk_set *blob = read_into_chunks(ctx->socket, blob_size);
+    struct chunk_set *blob = read_into_chunks(&ctx->socket, blob_size);
     if(!blob){
         goto out;
     }
@@ -438,7 +441,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     if(evr_format_resp_header(buffer, &resp) != evr_ok){
         goto out_destroy_task;
     }
-    if(write_n(ctx->socket, buffer, evr_resp_header_n_size) != evr_ok){
+    if(write_n(&ctx->socket, buffer, evr_resp_header_n_size) != evr_ok){
         goto out_destroy_task;
     }
     ret = evr_ok;
@@ -458,14 +461,14 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
         goto out;
     }
     evr_blob_ref key;
-    if(read_n(ctx->socket, (char*)&key, evr_blob_ref_size) != evr_ok){
+    if(read_n(&ctx->socket, (char*)&key, evr_blob_ref_size) != evr_ok){
         goto out;
     }
 #ifdef EVR_LOG_DEBUG
     {
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, key);
-        log_debug("Worker %d retrieved cmd stat %s", ctx->socket, fmt_key);
+        log_debug("Worker %d retrieved cmd stat %s", ctx->socket.get_fd(&ctx->socket), fmt_key);
     }
 #endif
     if(evr_ensure_worker_rctx_exists(rctx, ctx) != evr_ok){
@@ -481,7 +484,7 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
         if(evr_format_resp_header(buf, &resp) != evr_ok){
             goto out;
         }
-        if(write_n(ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
+        if(write_n(&ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
             goto out;
         }
     } else if(stat_ret == evr_ok){
@@ -500,7 +503,7 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
         if(evr_format_stat_blob_resp(p, &stat_resp) != evr_ok){
             goto out;
         }
-        if(write_n(ctx->socket, buf, buf_size) != evr_ok){
+        if(write_n(&ctx->socket, buf, buf_size) != evr_ok){
             goto out;
         }
     } else {
@@ -534,21 +537,21 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         goto out;
     }
     char buf[max(max(evr_blob_filter_n_size, evr_resp_header_n_size), evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t))];
-    if(read_n(ctx->socket, buf, evr_blob_filter_n_size) != evr_ok){
+    if(read_n(&ctx->socket, buf, evr_blob_filter_n_size) != evr_ok){
         goto out;
     }
     struct evr_blob_filter f;
     if(evr_parse_blob_filter(&f, buf) != evr_ok){
         goto out;
     }
-    log_debug("Worker %d retrieved cmd watch with sort_order 0x%02x, flags_filter 0x%02x and last_modified_after %llu", ctx->socket, f.sort_order, f.flags_filter, f.last_modified_after);
+    log_debug("Worker %d retrieved cmd watch with sort_order 0x%02x, flags_filter 0x%02x and last_modified_after %llu", ctx->socket.get_fd(&ctx->socket), f.sort_order, f.flags_filter, f.last_modified_after);
     struct evr_resp_header resp;
     resp.status_code = evr_status_code_ok;
     resp.body_size = 0;
     if(evr_format_resp_header(buf, &resp) != evr_ok){
         goto out;
     }
-    if(write_n(ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
+    if(write_n(&ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
         goto out;
     }
     const int live_watch = f.sort_order == evr_cmd_watch_sort_order_last_modified;
@@ -568,7 +571,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         atomic_thread_fence(memory_order_seq_cst);
         wd = evr_persister_add_watcher(evr_handle_blob_modified, &wctx);
         if(wd < 0){
-            log_error("Worker %d can't add watcher because list full", ctx->socket);
+            log_error("Worker %d can't add watcher because list full", ctx->socket.get_fd(&ctx->socket));
             goto out_with_free_queue_cnd;
         }
     }
@@ -607,7 +610,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
                 {
                     evr_blob_ref_str fmt_key;
                     evr_fmt_blob_ref(fmt_key, blob.key);
-                    log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket, fmt_key);
+                    log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket.get_fd(&ctx->socket), fmt_key);
                 }
 #endif
                 struct evr_buf_pos bp;
@@ -617,7 +620,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
                 evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
                 int flags = evr_watch_flag_eob;
                 evr_push_as(&bp, &flags, uint8_t);
-                if(write_n(ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
+                if(write_n(&ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
                     goto out_with_rm_watcher;
                 }
                 if(mtx_lock(&wctx.queue_lock) != thrd_success){
@@ -628,7 +631,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
                 break;
             }
             struct pollfd fds;
-            fds.fd = ctx->socket;
+            fds.fd = ctx->socket.get_fd(&ctx->socket);
             fds.events = POLLRDHUP | POLLHUP;
             if(poll(&fds, 1, 0) < 0){
                 goto out_with_unlock_queue;
@@ -666,7 +669,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
             if(mtx_unlock(&wctx.queue_lock) != thrd_success){
                 ret = evr_error;
             }
-            log_debug("Worker %d watch context reported status %d", ctx->socket, wctx.status);
+            log_debug("Worker %d watch context reported status %d", ctx->socket.get_fd(&ctx->socket), wctx.status);
             if(wctx.status != evr_ok){
                 ret = evr_error;
             }
@@ -683,7 +686,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         mtx_destroy(&wctx.queue_lock);
     }
  out:
-    log_debug("Worker %d watch ends with status %d", ctx->socket, ret);
+    log_debug("Worker %d watch ends with status %d", ctx->socket.get_fd(&ctx->socket), ret);
     return ret;
 }
 
@@ -718,7 +721,7 @@ int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx){
             evr_push_map(&bp, &b->last_modified, uint64_t, htobe64);
             evr_push_as(&bp, &b->flags, uint8_t);
         }
-        if(write_n(ctx->connection->socket, buf, sizeof(buf)) != evr_ok){
+        if(write_n(&ctx->connection->socket, buf, sizeof(buf)) != evr_ok){
             goto out;
         }
         ctx->blobs_used = 0;
@@ -757,11 +760,11 @@ void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, ev
     }
 }
 
-int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const struct evr_connection *ctx){
+int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, struct evr_connection *ctx){
     if(*rctx){
         return evr_ok;
     }
-    log_debug("Worker %d creates a glacier read ctx", ctx->socket);
+    log_debug("Worker %d creates a glacier read ctx", ctx->socket.get_fd(&ctx->socket));
     *rctx = evr_create_glacier_read_ctx(cfg);
     if(!*rctx){
         return evr_error;
@@ -771,7 +774,7 @@ int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, const stru
 
 int send_get_response(void *arg, int exists, int flags, size_t blob_size){
     int ret = evr_error;
-    int *f = (int*)arg;
+    struct evr_file *f = arg;
     struct evr_resp_header resp;
     if(exists){
         resp.status_code = evr_status_code_ok;
@@ -787,7 +790,7 @@ int send_get_response(void *arg, int exists, int flags, size_t blob_size){
     if(exists){
         *(uint8_t*)&buffer[evr_resp_header_n_size] = flags;
     }
-    if(write_n(*f, buffer, sizeof(buffer)) != evr_ok){
+    if(write_n(f, buffer, sizeof(buffer)) != evr_ok){
         goto end;
     }
     ret = evr_ok;
@@ -796,6 +799,6 @@ int send_get_response(void *arg, int exists, int flags, size_t blob_size){
 }
 
 int pipe_data(void *arg, const char *data, size_t data_size){
-    int *f = (int*)arg;
-    return write_n(*f, data, data_size);
+    struct evr_file *f = arg;
+    return write_n(f, data, data_size);
 }

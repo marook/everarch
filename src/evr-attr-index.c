@@ -39,6 +39,7 @@
 #include "files.h"
 #include "configp.h"
 #include "handover.h"
+#include "evr-tls.h"
 
 const char *argp_program_version = "evr-attr-index " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
@@ -47,16 +48,23 @@ static char doc[] = "evr-attr-index provides an index over a evr-glacier-storage
 
 static char args_doc[] = "";
 
+#define default_state_dir_path EVR_PREFIX "/var/everarch/attr-index"
 #define default_host "localhost"
+#define default_ssl_cert_path EVR_PREFIX "/etc/everarch/attr-index-cert.pem"
+#define default_ssl_key_path EVR_PREFIX "/etc/everarch/attr-index-key.pem"
 
 #define arg_host 256
 #define arg_storage_host 257
 #define arg_storage_port 258
+#define arg_ssl_cert_path 259
+#define arg_ssl_key_path 260
 
 static struct argp_option options[] = {
-    {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted."},
+    {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
     {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
     {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_glacier_attr_index_port) "."},
+    {"cert", arg_ssl_cert_path, "FILE", 0, "The path to the pem file which contains the public SSL certificate. Default path is " default_ssl_cert_path "."},
+    {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
     {0},
@@ -75,6 +83,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case 'p':
         evr_replace_str(cfg->port, arg);
+        break;
+    case arg_ssl_cert_path:
+        evr_replace_str(cfg->ssl_cert_path, arg);
+        break;
+    case arg_ssl_key_path:
+        evr_replace_str(cfg->ssl_key_path, arg);
         break;
     case arg_storage_host:
         evr_replace_str(cfg->storage_host, arg);
@@ -95,7 +109,7 @@ mtx_t stop_lock;
 cnd_t stop_signal;
 
 struct evr_connection {
-    int socket;
+    struct evr_file socket;
 };
 
 /**
@@ -105,6 +119,8 @@ struct evr_connection {
 #define apply_watch_overlap(t) (t <= watch_overlap ? 0 : t - watch_overlap)
 
 struct evr_attr_index_cfg *cfg;
+
+SSL_CTX *ssl_ctx;
 
 struct evr_attr_spec_handover_ctx {
     struct evr_handover_ctx handover;
@@ -146,7 +162,7 @@ int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
 int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
-int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c);
+int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, struct evr_file *c);
 int evr_attr_index_tcp_server();
 int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
@@ -162,9 +178,15 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
 
 int main(int argc, char **argv){
     int ret = evr_error;
+    evr_tls_init();
     evr_load_attr_index_cfg(argc, argv);
-    if(mtx_init(&stop_lock, mtx_plain) != thrd_success){
+    ssl_ctx = evr_create_ssl_server_ctx(cfg->ssl_cert_path, cfg->ssl_key_path);
+    if(!ssl_ctx){
+        log_error("Unable to configure SSL context");
         goto out_with_free_cfg;
+    }
+    if(mtx_init(&stop_lock, mtx_plain) != thrd_success){
+        goto out_with_free_ssl_ctx;
     }
     if(cnd_init(&stop_signal) != thrd_success){
         goto out_with_free_stop_lock;
@@ -283,8 +305,11 @@ int main(int argc, char **argv){
     cnd_destroy(&stop_signal);
  out_with_free_stop_lock:
     mtx_destroy(&stop_lock);
+ out_with_free_ssl_ctx:
+    SSL_CTX_free(ssl_ctx);
  out_with_free_cfg:
     evr_free_attr_index_cfg(cfg);
+    evr_tls_free();
     return ret;
 }
 
@@ -294,9 +319,11 @@ void evr_load_attr_index_cfg(int argc, char **argv){
         evr_panic("Unable to allocate memory for configuration.");
         return;
     }
-    cfg->state_dir_path = strdup(EVR_PREFIX "/var/everarch/attr-index");
+    cfg->state_dir_path = strdup(default_state_dir_path);
     cfg->host = strdup(default_host);
     cfg->port = strdup(to_string(evr_glacier_attr_index_port));
+    cfg->ssl_cert_path = strdup(default_ssl_cert_path);
+    cfg->ssl_key_path = strdup(default_ssl_key_path);
     cfg->storage_host = strdup(evr_glacier_storage_host);
     cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
     if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
@@ -360,8 +387,8 @@ int evr_watch_index_claims_worker(void *arg){
     struct evr_attr_spec_handover_ctx *ctx = arg;
     log_debug("Started watch index claims worker");
     // cw is the connection used for watching for blob changes.
-    int cw = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(cw < 0){
+    struct evr_file cw;
+    if(evr_connect_to_storage(&cw, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
@@ -369,7 +396,7 @@ int evr_watch_index_claims_worker(void *arg){
     filter.sort_order = evr_cmd_watch_sort_order_last_modified;
     filter.flags_filter = evr_blob_flag_index_rule_claim;
     filter.last_modified_after = 0;
-    if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
+    if(evr_req_cmd_watch_blobs(&cw, &filter) != evr_ok){
         goto out_with_close_cw;
     }
     struct evr_watch_blobs_body body;
@@ -378,16 +405,18 @@ int evr_watch_index_claims_worker(void *arg){
     evr_time latest_spec_created = 0;
     // cs is the connection used for finding the most recent
     // attr-spec claim
-    int cs = -1;
+    struct evr_file cs;
+    evr_file_bind_fd(&cs, -1);
     log_debug("Watching index claims");
     fd_set active_fd_set;
     struct timeval timeout;
     while(running){
+        int cw_fd = cw.get_fd(&cw);
         FD_ZERO(&active_fd_set);
-        FD_SET(cw, &active_fd_set);
+        FD_SET(cw_fd, &active_fd_set);
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
-        int sret = select(cw + 1, &active_fd_set, NULL, NULL, &timeout);
+        int sret = select(cw_fd + 1, &active_fd_set, NULL, NULL, &timeout);
         if(sret < 0){
             goto out_with_close_cw;
         }
@@ -398,7 +427,7 @@ int evr_watch_index_claims_worker(void *arg){
         if(sret == 0){
             continue;
         }
-        if(evr_read_watch_blobs_body(cw, &body) != evr_ok){
+        if(evr_read_watch_blobs_body(&cw, &body) != evr_ok){
             goto out_with_free_latest_spec;
         }
 #ifdef EVR_LOG_INFO
@@ -408,14 +437,13 @@ int evr_watch_index_claims_worker(void *arg){
             log_info("Checking index claim %s for attr-spec", fmt_key);
         } while(0);
 #endif
-        if(cs == -1){
-            cs = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-            if(cs < 0){
+        if(cs.get_fd(&cs) == -1){
+            if(evr_connect_to_storage(&cs, cfg->storage_host, cfg->storage_port) != evr_ok){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free_latest_spec;
             }
         }
-        xmlDocPtr claim_doc = evr_fetch_signed_xml(cs, body.key);
+        xmlDocPtr claim_doc = evr_fetch_signed_xml(&cs, body.key);
         if(!claim_doc){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
@@ -454,8 +482,8 @@ int evr_watch_index_claims_worker(void *arg){
         if((body.flags & evr_watch_flag_eob) == 0 || !latest_spec){
             continue;
         }
-        close(cs);
-        cs = -1;
+        cs.close(&cs);
+        evr_file_bind_fd(&cs, -1);
         int wait_res = evr_wait_for_handover_available(&ctx->handover);
         if(wait_res == evr_end){
             break;
@@ -487,11 +515,17 @@ int evr_watch_index_claims_worker(void *arg){
     if(latest_spec){
         free(latest_spec);
     }
-    if(cs >= 0){
-        close(cs);
+    if(cs.get_fd(&cs) >= 0){
+        if(cs.close(&cs) != 0){
+            evr_panic("Unable to close the attr-spec connection");
+            ret = evr_error;
+        };
     }
  out_with_close_cw:
-    close(cw);
+    if(cw.close(&cw) != 0){
+        evr_panic("Unable to close the watch connection");
+        ret = evr_error;
+    }
  out:
     log_debug("Ended watch index claims worker with result %d", ret);
     return ret;
@@ -585,12 +619,12 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         ret = evr_ok;
         goto out_with_free_db;
     }
-    int cw = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(cw < 0){
+    struct evr_file cw;
+    if(evr_connect_to_storage(&cw, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_db;
     }
-    xsltStylesheetPtr style = evr_fetch_stylesheet(cw, spec->transformation_blob_ref);
+    xsltStylesheetPtr style = evr_fetch_stylesheet(&cw, spec->transformation_blob_ref);
     if(!style){
         goto out_with_close_cw;
     }
@@ -602,19 +636,21 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     filter.sort_order = evr_cmd_watch_sort_order_last_modified;
     filter.flags_filter = evr_blob_flag_claim;
     filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
-    if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
+    if(evr_req_cmd_watch_blobs(&cw, &filter) != evr_ok){
         goto out_with_free_style;
     }
     struct evr_watch_blobs_body wbody;
     fd_set active_fd_set;
-    int cs = -1;
+    struct evr_file cs;
+    evr_file_bind_fd(&cs, -1);
     struct timeval timeout;
     while(running){
+        int cw_fd = cw.get_fd(&cw);
         FD_ZERO(&active_fd_set);
-        FD_SET(cw, &active_fd_set);
+        FD_SET(cw_fd, &active_fd_set);
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
-        int sret = select(cw + 1, &active_fd_set, NULL, NULL, &timeout);
+        int sret = select(cw_fd + 1, &active_fd_set, NULL, NULL, &timeout);
         if(sret < 0){
             goto out_with_close_cs;
         }
@@ -625,7 +661,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         if(sret == 0){
             continue;
         }
-        if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
+        if(evr_read_watch_blobs_body(&cw, &wbody) != evr_ok){
             goto out_with_close_cs;
         }
         if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cs) != evr_ok){
@@ -640,13 +676,19 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     }
     ret = evr_ok;
  out_with_close_cs:
-    if(cs >= 0){
-        close(cs);
+    if(cs.get_fd(&cs) >= 0){
+        if(cs.close(&cs) != 0){
+            evr_panic("Unable to close attr-spec connection");
+            ret = evr_error;
+        }
     }
  out_with_free_style:
     xsltFreeStylesheet(style);
  out_with_close_cw:
-    close(cw);
+    if(cw.close(&cw) != 0){
+        evr_panic("Unable to close evr-glacier-storage connection");
+        ret = evr_error;
+    }
  out_with_free_db:
     if(evr_free_attr_index_db(db) != evr_ok){
         ret = evr_error;
@@ -655,7 +697,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     return ret;
 }
 
-int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, int *c){
+int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, struct evr_file *c){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {
@@ -664,14 +706,13 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
         log_debug("Indexing claim set %s", ref_str);
     }
 #endif
-    if(*c == -1){
-        *c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-        if(*c < 0){
+    if(c->get_fd(c) == -1){
+        if(evr_connect_to_storage(c, cfg->storage_host, cfg->storage_port) != evr_ok){
             log_error("Failed to connect to evr-glacier-storage server");
             goto out;
         }
     }
-    xmlDocPtr claim_set = evr_fetch_signed_xml(*c, claim_set_ref);
+    xmlDocPtr claim_set = evr_fetch_signed_xml(c, claim_set_ref);
     if(!claim_set){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
@@ -711,8 +752,10 @@ int evr_index_sync_worker(void *arg){
     if(evr_empty_handover(&ctx->handover) != evr_ok){
         goto out;
     }
-    int cg = -1; // connection get
-    int cw = -1; // connection watch
+    struct evr_file cg; // connection get
+    evr_file_bind_fd(&cg, -1);
+    struct evr_file cw; // connection watch
+    evr_file_bind_fd(&cw, -1);
     struct evr_attr_index_db *db = NULL;
     fd_set active_fd_set;
     struct timeval timeout;
@@ -725,14 +768,17 @@ int evr_index_sync_worker(void *arg){
             goto out_with_free;
         }
         if(ctx->handover.occupied){
-            if(cw != -1){
+            if(cw.get_fd(&cw) != -1){
 #ifdef EVR_LOG_DEBUG
                 evr_blob_ref_str index_ref_str;
                 evr_fmt_blob_ref(index_ref_str, index_ref);
                 log_debug("Index sync worker stop index %s", index_ref_str);
 #endif
-                close(cw);
-                cw = -1;
+                if(cw.close(&cw) != 0){
+                    evr_panic("Unable to close watch connection");
+                    goto out_with_free;
+                }
+                evr_file_bind_fd(&cw, -1);
             }
             memcpy(index_ref, ctx->index_ref, evr_blob_ref_size);
             if(evr_empty_handover(&ctx->handover) != evr_ok){
@@ -744,7 +790,7 @@ int evr_index_sync_worker(void *arg){
                 goto out_with_free;
             }
         }
-        if(cw == -1){
+        if(cw.get_fd(&cw) == -1){
             if(style){
                 xsltFreeStylesheet(style);
                 style = NULL;
@@ -777,15 +823,14 @@ int evr_index_sync_worker(void *arg){
             if(!db){
                 goto out_with_free;
             }
-            cw = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-            if(cw < 0){
+            if(evr_connect_to_storage(&cw, cfg->storage_host, cfg->storage_port) != evr_ok){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free;
             }
             if(evr_prepare_attr_index_db(db) != evr_ok){
                 goto out_with_free;
             }
-            xmlDocPtr cs_doc = evr_fetch_signed_xml(cw, index_ref);
+            xmlDocPtr cs_doc = evr_fetch_signed_xml(&cw, index_ref);
             if(!cs_doc){
                 evr_blob_ref_str fmt_key;
                 evr_fmt_blob_ref(fmt_key, index_ref);
@@ -805,7 +850,7 @@ int evr_index_sync_worker(void *arg){
             if(!spec){
                 goto out_with_free;
             }
-            style = evr_fetch_stylesheet(cw, spec->transformation_blob_ref);
+            style = evr_fetch_stylesheet(&cw, spec->transformation_blob_ref);
             if(!style){
                 goto out_with_free;
             }
@@ -817,7 +862,7 @@ int evr_index_sync_worker(void *arg){
             filter.sort_order = evr_cmd_watch_sort_order_last_modified;
             filter.flags_filter = evr_blob_flag_claim;
             filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
-            if(evr_req_cmd_watch_blobs(cw, &filter) != evr_ok){
+            if(evr_req_cmd_watch_blobs(&cw, &filter) != evr_ok){
                 goto out_with_free;
             }
             goto end_init_style;
@@ -828,11 +873,12 @@ int evr_index_sync_worker(void *arg){
             log_debug("Index sync worker switch done");
             do{} while(0);
         }
+        int cw_fd = cw.get_fd(&cw);
         FD_ZERO(&active_fd_set);
-        FD_SET(cw, &active_fd_set);
+        FD_SET(cw_fd, &active_fd_set);
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
-        int sret = select(cw + 1, &active_fd_set, NULL, NULL, &timeout);
+        int sret = select(cw_fd + 1, &active_fd_set, NULL, NULL, &timeout);
         if(sret < 0){
             goto out_with_free;
         }
@@ -853,7 +899,7 @@ int evr_index_sync_worker(void *arg){
             // TODO close cg after n timeouts in a row and set to -1
             continue;
         }
-        if(evr_read_watch_blobs_body(cw, &wbody) != evr_ok){
+        if(evr_read_watch_blobs_body(&cw, &wbody) != evr_ok){
             goto out_with_free;
         }
         if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cg) != evr_ok){
@@ -862,11 +908,17 @@ int evr_index_sync_worker(void *arg){
     }
     ret = evr_ok;
  out_with_free:
-    if(cg >= 0){
-        close(cg);
+    if(cg.get_fd(&cg) >= 0){
+        if(cg.close(&cg) != 0){
+            evr_panic("Unable to close watch connection");
+            ret = evr_error;
+        }
     }
-    if(cw >= 0){
-        close(cw);
+    if(cw.get_fd(&cw) >= 0){
+        if(cw.close(&cw) != 0){
+            evr_panic("Unable to close watch connection");
+            ret = evr_error;
+        }
     }
     if(style){
         xsltFreeStylesheet(style);
@@ -885,15 +937,14 @@ int evr_index_sync_worker(void *arg){
 }
 
 xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
-    int *c = ctx;
-    if(*c == -1){
-        *c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-        if(*c < 0){
+    struct evr_file *c = ctx;
+    if(c->get_fd(c) == -1){
+        if(evr_connect_to_storage(c, cfg->storage_host, cfg->storage_port) != evr_ok){
             log_error("Failed to connect to evr-glacier-storage server");
             return NULL;
         }
     }
-    return evr_fetch_signed_xml(*c, claim_set_ref);
+    return evr_fetch_signed_xml(c, claim_set_ref);
 }
 
 int evr_attr_index_tcp_server(){
@@ -909,7 +960,6 @@ int evr_attr_index_tcp_server(){
     log_info("Listening on %s:%s", cfg->host, cfg->port);
     fd_set active_fd_set;
     struct timeval timeout;
-    struct sockaddr_in client_addr;
     while(running){
         FD_ZERO(&active_fd_set);
         FD_SET(s, &active_fd_set);
@@ -928,31 +978,27 @@ int evr_attr_index_tcp_server(){
         for(int i = 0; i < FD_SETSIZE; ++i){
             if(FD_ISSET(i, &active_fd_set)){
                 if(i == s){
-                    socklen_t size = sizeof(client_addr);
-                    int c = accept(s, (struct sockaddr*)&client_addr, &size);
-                    if(c < 0){
-                        goto out_with_close_s;
-                    }
-                    log_debug("Connection from %s:%d accepted (will be worker %d)", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), c);
                     struct evr_connection *ctx = malloc(sizeof(struct evr_connection));
                     if(!ctx){
-                        goto out_with_close_c;
+                        goto loop;
                     }
-                    ctx->socket = c;
+                    if(evr_tls_accept(&ctx->socket, s, ssl_ctx) != evr_ok){
+                        goto out_with_free_ctx;
+                    }
                     thrd_t t;
                     if(thrd_create(&t, evr_connection_worker, ctx) != thrd_success){
                         goto out_with_free_ctx;
                     }
                     if(thrd_detach(t) != thrd_success){
-                        evr_panic("Failed to detach connection worker thread for worker %d", c);
+                        evr_panic("Failed to detach connection worker thread for worker %d", ctx->socket.get_fd(&ctx->socket));
                         goto out_with_close_s;
                     }
                     goto loop;
                 out_with_free_ctx:
+                    if(ctx->socket.close(&ctx->socket) != 0){
+                        evr_panic("Unable to close client connection");
+                    }
                     free(ctx);
-                out_with_close_c:
-                    close(c);
-                    log_error("Failed to startup connection from %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
                 loop:
                     continue;
                 }
@@ -970,17 +1016,17 @@ int evr_connection_worker(void *context) {
     int ret = evr_error;
     struct evr_connection ctx = *(struct evr_connection*)context;
     free(context);
-    log_debug("Started connection worker %d", ctx.socket);
+    log_debug("Started connection worker %d", ctx.socket.get_fd(&ctx.socket));
     char query_str[8*1024];
     char *query_scanned = query_str;
     char *query_end = &query_str[sizeof(query_str)];
     while(running){
         size_t max_read = query_end - query_scanned;
         if(max_read == 0){
-            log_debug("Connection worker %d retrieved too big query", ctx.socket);
+            log_debug("Connection worker %d retrieved too big query", ctx.socket.get_fd(&ctx.socket));
             goto out_with_close_socket;
         }
-        ssize_t bytes_read = read(ctx.socket, query_scanned, max_read);
+        ssize_t bytes_read = ctx.socket.read(&ctx.socket, query_scanned, max_read);
         if(bytes_read == 0){
             ret = evr_ok;
             goto out_with_close_socket;
@@ -1011,14 +1057,20 @@ int evr_connection_worker(void *context) {
             query_scanned = query_str;
         }
     }
+#ifdef EVR_LOG_DEBUG
+    int fd;
+#endif
  out_with_close_socket:
-    close(ctx.socket);
-    log_debug("Ended connection worker %d with result %d", ctx.socket, ret);
+#ifdef EVR_LOG_DEBUG
+    fd = ctx.socket.get_fd(&ctx.socket);
+#endif
+    ctx.socket.close(&ctx.socket);
+    log_debug("Ended connection worker %d with result %d", fd, ret);
     return ret;
 }
 
 int evr_work_cmd(struct evr_connection *ctx, char *line){
-    log_debug("Connection worker %d retrieved cmd: %s", ctx->socket, line);
+    log_debug("Connection worker %d retrieved cmd: %s", ctx->socket.get_fd(&ctx->socket), line);
     char *cmd = line;
     char *args = index(line, ' ');
     if(args){
@@ -1048,7 +1100,7 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     if(query == NULL){
         query = "";
     }
-    log_debug("Connection worker %d retrieved query: %s", ctx->socket, query);
+    log_debug("Connection worker %d retrieved query: %s", ctx->socket.get_fd(&ctx->socket), query);
     evr_blob_ref index_ref;
     int res = evr_get_current_index_ref(index_ref);
     if(res == evr_end){
@@ -1060,7 +1112,7 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     }
     evr_blob_ref_str index_ref_str;
     evr_fmt_blob_ref(index_ref_str, index_ref);
-    log_debug("Connection worker %d is using index %s for query", ctx->socket, index_ref_str);
+    log_debug("Connection worker %d is using index %s for query", ctx->socket.get_fd(&ctx->socket), index_ref_str);
     struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, index_ref_str, evr_write_blob_to_file, NULL);
     if(!db){
         goto out;
@@ -1117,7 +1169,7 @@ int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr
             evr_push_concat(&bp, "\n");
         }
     }
-    if(write_n(ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
+    if(write_n(&ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
         goto out;
     }
     ret = evr_ok;
@@ -1131,7 +1183,7 @@ int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str){
     if(seed_ref_str == NULL){
         seed_ref_str = "";
     }
-    log_debug("Connection worker %d retrieved list claims for seed %s", ctx->socket, seed_ref_str);
+    log_debug("Connection worker %d retrieved list claims for seed %s", ctx->socket.get_fd(&ctx->socket), seed_ref_str);
     int ret = evr_error;
     evr_claim_ref seed_ref;
     if(evr_parse_claim_ref(seed_ref, seed_ref_str) != evr_ok){
@@ -1149,7 +1201,7 @@ int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str){
     }
     evr_blob_ref_str index_ref_str;
     evr_fmt_blob_ref(index_ref_str, index_ref);
-    log_debug("Connection worker %d is using index %s for list claims for seed", ctx->socket, index_ref_str);
+    log_debug("Connection worker %d is using index %s for list claims for seed", ctx->socket.get_fd(&ctx->socket), index_ref_str);
     struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, index_ref_str, evr_write_blob_to_file, NULL);
     if(!db){
         goto out;
@@ -1177,7 +1229,7 @@ int evr_respond_claims_for_seed_result(void *context, const evr_claim_ref claim)
     evr_claim_ref_str claim_str;
     evr_fmt_claim_ref(claim_str, claim);
     claim_str[evr_claim_ref_str_size - 1] = '\n';
-    return write_n(ctx->socket, claim_str, evr_claim_ref_str_size);
+    return write_n(&ctx->socket, claim_str, evr_claim_ref_str_size);
 }
 
 int evr_get_current_index_ref(evr_blob_ref index_ref){
@@ -1207,7 +1259,7 @@ int evr_respond_help(struct evr_connection *ctx){
         "s QUERY - searches for claims matching the given query.\n"
         "c REF - lists all claims referencing the given seed claim.\n"
         ;
-    if(write_n(ctx->socket, help, sizeof(help)) != evr_ok){
+    if(write_n(&ctx->socket, help, sizeof(help)) != evr_ok){
         goto out;
     }
     if(evr_respond_message_end(ctx) != evr_ok){
@@ -1229,26 +1281,28 @@ int evr_respond_status(struct evr_connection *ctx, int ok, char *msg){
         evr_push_concat(&bp, msg);
     }
     evr_push_concat(&bp, "\n");
-    return write_n(ctx->socket, buf, bp.pos - bp.buf);
+    return write_n(&ctx->socket, buf, bp.pos - bp.buf);
 }
 
 int evr_respond_message_end(struct evr_connection *ctx){
-    return write_n(ctx->socket, "\n", 1);
+    return write_n(&ctx->socket, "\n", 1);
 }
 
 int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref){
     int ret = evr_error;
-    int f = creat(path, mode);
-    if(f < 0){
+    int fd = creat(path, mode);
+    if(fd < 0){
         goto out;
     }
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file f;
+    evr_file_bind_fd(&f, fd);
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_close_f;
     }
     struct evr_resp_header resp;
-    if(evr_req_cmd_get_blob(c, ref, &resp) != evr_ok){
+    if(evr_req_cmd_get_blob(&c, ref, &resp) != evr_ok){
         goto out_with_close_c;
         return evr_error;
     }
@@ -1264,19 +1318,21 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
     }
     // ignore one byte containing the flags
     char buf[1];
-    if(read_n(c, buf, sizeof(buf)) != evr_ok){
+    if(read_n(&c, buf, sizeof(buf)) != evr_ok){
         goto out_with_close_c;
     }
-    if(pipe_n(f, c, resp.body_size - sizeof(buf)) != evr_ok){
+    if(pipe_n(&f, &c, resp.body_size - sizeof(buf)) != evr_ok){
         goto out_with_close_c;
     }
     ret = evr_ok;
  out_with_close_c:
-    if(close(c)){
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection.");
         ret = evr_error;
     }
  out_with_close_f:
-    if(close(f)){
+    if(f.close(&f) != 0){
+        evr_panic("Unable to close file");
         ret = evr_error;
     }
  out:

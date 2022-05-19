@@ -239,8 +239,10 @@ int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_bl
     evr_blob_ref_str ref_str;
     evr_fmt_blob_ref(ref_str, ref);
     log_debug("one_attr_factory_blob_file_writer invoked with ref %s and path %s", ref_str, path);
-    int f = creat(path, mode);
-    assert_msg(f >= 0, "Failed to create one_attr_factory_blob_file_writer file: %d", f);
+    int fd = creat(path, mode);
+    assert(fd >= 0);
+    struct evr_file f;
+    evr_file_bind_fd(&f, fd);
     char content[] =
         "#!/bin/sh\n"
         "if [ -e '" attr_factory_fail_flag_file_path "' ]\n"
@@ -256,8 +258,8 @@ int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_bl
         "</attr>"
         "</claim-set>\n"
         "EOF\n";
-    assert(is_ok(write_n(f, content, sizeof(content) - 1)));
-    assert(close(f) == 0);
+    assert(is_ok(write_n(&f, content, sizeof(content) - 1)));
+    assert(f.close(&f) == 0);
     return evr_ok;
 }
 

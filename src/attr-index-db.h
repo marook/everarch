@@ -50,6 +50,8 @@ struct evr_attr_index_cfg {
     char *state_dir_path;
     char *host;
     char *port;
+    char *ssl_cert_path;
+    char *ssl_key_path;
     char *storage_host;
     char *storage_port;
 };

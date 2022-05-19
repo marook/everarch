@@ -577,7 +577,9 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     evr_push_map(&bp, &t64, uint64_t, htobe64);
     evr_push_map(&bp, &blob->size, uint32_t, htobe32);
     evr_push_8bit_checksum(&bp);
-    if(write_n(ctx->current_bucket_f, header_buf, header_buf_size) != evr_ok){
+    struct evr_file current_bucket_f;
+    evr_file_bind_fd(&current_bucket_f, ctx->current_bucket_f);
+    if(write_n(&current_bucket_f, header_buf, header_buf_size) != evr_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
         log_error("Can't write blob header for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
@@ -590,7 +592,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         if(remaining_blob_bytes < chunk_bytes_len){
             chunk_bytes_len = remaining_blob_bytes;
         }
-        if(write_n(ctx->current_bucket_f, *c, chunk_bytes_len) != evr_ok){
+        if(write_n(&current_bucket_f, *c, chunk_bytes_len) != evr_ok){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, blob->key);
             log_error("Can't write blob data for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
@@ -610,7 +612,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         goto fail;
     }
     uint32_t last_bucket_pos = htobe32(ctx->current_bucket_pos);
-    if(write_n(ctx->current_bucket_f, &last_bucket_pos, sizeof(last_bucket_pos)) != evr_ok){
+    if(write_n(&current_bucket_f, &last_bucket_pos, sizeof(last_bucket_pos)) != evr_ok){
         log_error("Can't write bucket end pointer in glacier directory %s", ctx->config->bucket_dir_path);
         goto fail;
     }

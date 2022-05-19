@@ -32,21 +32,6 @@ evr-attr-index and prints the results into a new buffer."
   (evr-attr-index-results-mode)
   (evr-attr-index-search-from-buffer))
 
-(defun evr--terminate-on-message-end-filter (proc string)
-  (when (buffer-live-p (process-buffer proc))
-    (with-current-buffer (process-buffer proc)
-      (let ((moving (= (point) (process-mark proc)))
-            (ro inhibit-read-only))
-        (save-excursion
-          (goto-char (process-mark proc))
-          (setq inhibit-read-only t)
-          (insert string)
-          (setq inhibit-read-only ro)
-          (set-marker (process-mark proc) (point)))
-        (if moving (goto-char (process-mark proc))))))
-  (if (cl-search "\n\n" string)
-      (delete-process proc)))
-
 (defun evr-attr-index-search-from-buffer ()
   (interactive)
   (let ((ro inhibit-read-only))
@@ -61,8 +46,11 @@ evr-attr-index and prints the results into a new buffer."
                   (goto-char (point-min))
                   (end-of-line)
                   (point))))
-        (con (open-network-stream "evr-attr-index-search" (buffer-name) "localhost" 2362)))
-    (set-process-filter con 'evr--terminate-on-message-end-filter)
+        (con (open-network-stream
+              "evr-attr-index-search"
+              (buffer-name)
+              "localhost" 2362
+              :type 'tls)))
     (set-process-sentinel
      con
      (lambda (con event)
@@ -81,7 +69,7 @@ evr-attr-index and prints the results into a new buffer."
               ()
             `("where " ,query)))
        " ")
-      "\n"))))
+      "\nexit\n"))))
 
 (defvar evr-attr-index-results-mode-map
   (let ((map (make-keymap)))

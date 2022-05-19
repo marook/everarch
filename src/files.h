@@ -24,30 +24,56 @@
 #include "dyn-mem.h"
 
 /**
- * read_file reads the file content at a given path.
- *
- * *buffer must point to an existing buffer. *buffer may be null if
- * read_file returns with != 0.
+ * union evr_file_ctx is used by struct evr_file so a void pointer OR
+ * a simple integer can easily be stored in the evr_file struct. You
+ * probably guessed that simple file descriptor instances can use the
+ * int to store the file descriptor while more sophisticated instances
+ * could store some context pointer also.
  */
-int read_file(struct dynamic_array **buffer, const char *path, size_t max_size);
+union evr_file_ctx {
+    void *p;
+    int i;
+};
+
+/**
+ * struct evr_file is an abstaction layer over files. It it used to
+ * have a common interface for read and write operations on file
+ * descriptors and OpenSSL connections.
+ */
+struct evr_file {
+    /**
+     * get_fd returns the underlying file descriptor of this evr_file.
+     *
+     * This function should be used for debugging when different, in
+     * parallel open files should be identified in logs.
+     */
+    int (*get_fd)(struct evr_file *f);
+
+    ssize_t (*read)(struct evr_file *f, void *buf, size_t count);
+    ssize_t (*write)(struct evr_file *f, const void *buf, size_t count);
+
+    /**
+     * close must close the underlying file and free resources
+     * allocated by ctx.
+     */
+    int (*close)(struct evr_file *f);
+
+    union evr_file_ctx ctx;
+};
+
+void evr_file_bind_fd(struct evr_file *f, int fd);
 
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size);
 
-/**
- * read_file_str reads a file just like read_file and \0 terminates
- * the string.
- */
-int read_file_str(struct dynamic_array **buffer, const char *path, size_t max_size);
-
-int read_n(int f, char *buffer, size_t bytes);
+int read_n(struct evr_file *f, char *buffer, size_t bytes);
 
 /**
- * Returns evr_ok if bytes got written. Returns evr_end if fd signals
+ * Returns evr_ok if bytes got written. Returns evr_end if f signals
  * an EPIPE on write. Returns evr_error on errors.
  */
-int write_n(int fd, const void *buffer, size_t size);
+int write_n(struct evr_file *f, const void *buffer, size_t size);
 
-int write_chunk_set(int f, const struct chunk_set *cs);
+int write_chunk_set(struct evr_file *f, const struct chunk_set *cs);
 
 /**
  * pipe_n will pipe n bytes from src to dest.
@@ -55,11 +81,11 @@ int write_chunk_set(int f, const struct chunk_set *cs);
  * Returns evr_ok if bytes got piped. Returns evr_end if dest signals
  * an EPIPE on write. Returns evr_error on errors.
  */
-int pipe_n(int dest, int src, size_t n);
+int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n);
 
-int dump_n(int f, size_t bytes);
+int dump_n(struct evr_file *f, size_t bytes);
 
-struct chunk_set *read_into_chunks(int fd, size_t size);
+struct chunk_set *read_into_chunks(struct evr_file *f, size_t size);
 
 int append_into_chunk_set(struct chunk_set *cs, int f);
 

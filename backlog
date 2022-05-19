@@ -35,6 +35,11 @@ case conversion support the [[https://github.com/sqlite/sqlite/tree/master/ext/i
 
 test if this extension is part of the sqlite3 debian packaging. load
 it gracefully. log info if it can't be loaded and continue.
+* auto generate ssl cert and key if they don't exists
+use something like:
+#+BEGIN_SRC
+openssl req -newkey rsa:4096 -x509 -sha512 -nodes -out attr-index-cert.pem -keyout attr-index-key.pem
+#+END_SRC
 * add claim-ref type in attr-spec's attr-def
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable

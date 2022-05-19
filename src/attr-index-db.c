@@ -47,6 +47,8 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
         cfg->state_dir_path,
         cfg->host,
         cfg->port,
+        cfg->ssl_cert_path,
+        cfg->ssl_key_path,
         cfg->storage_host,
         cfg->storage_port,
     };
@@ -745,11 +747,13 @@ int evr_append_attr_factory_claims_worker(void *context){
     if(evr_spawn(&sp, argv) != evr_ok){
         goto out;
     }
-    int write_res = write_n(sp.stdin, ctx->claim_set, ctx->claim_set_len);
+    struct evr_file sp_stdin;
+    evr_file_bind_fd(&sp_stdin, sp.stdin);
+    int write_res = write_n(&sp_stdin, ctx->claim_set, ctx->claim_set_len);
     if(write_res != evr_ok && write_res != evr_end){
         goto out_with_close_sp;
     }
-    if(close(sp.stdin)){
+    if(sp_stdin.close(&sp_stdin)){
         goto out_with_close_sp;
     }
     const int closed_fd = -1;
@@ -901,26 +905,28 @@ void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref cla
     evr_inc_buf_pos(&bp, evr_blob_ref_str_size - 1);
     evr_push_n(&bp, suffix, sizeof(suffix));
     log_debug("Logging failed claim-set operation to %s: %s", log_path, fail_reason);
-    int f = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
-    if(f < 0){
+    int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
+    if(fd < 0){
         log_error(log_scope " Can't open claim-set log file: %s", strerror(errno));
         return;
     }
-    if(write_n(f, fail_reason, strlen(fail_reason)) != evr_ok){
+    struct evr_file f;
+    evr_file_bind_fd(&f, fd);
+    if(write_n(&f, fail_reason, strlen(fail_reason)) != evr_ok){
         log_error(log_scope " Can't write fail reason to log file.");
         goto out_with_close_f;
     }
     const char sep[] = "\n\n";
-    if(write_n(f, sep, strlen(sep)) != evr_ok){
+    if(write_n(&f, sep, strlen(sep)) != evr_ok){
         log_error(log_scope " Can't write separator to log file.");
         goto out_with_close_f;
     }
-    if(write_n(f, claim_set_buf, claim_set_buf_size) != evr_ok){
+    if(write_n(&f, claim_set_buf, claim_set_buf_size) != evr_ok){
         log_error(log_scope " Can't write claim-set string to log file.");
         goto out_with_close_f;
     }
  out_with_close_f:
-    if(close(f) != 0){
+    if(f.close(&f) != 0){
         log_error(log_scope " Can't close claim-set log file.");
     }
 }

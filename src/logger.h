@@ -40,26 +40,31 @@
  */
 extern int evr_log_fd;
 
+#define evr_log_level_debug "D"
+#define evr_log_level_info "I"
+#define evr_log_level_error "E"
+#define evr_log_level_panic "P"
+
 #ifdef EVR_LOG_DEBUG
 #  define EVR_LOG_INFO
-#  define log_debug(args...) evr_log("D", args)
+#  define log_debug(args...) evr_log(evr_log_level_debug, args)
 #else
 #  define log_debug(args...)
 #endif
 
 #ifdef EVR_LOG_INFO
-#  define log_info(args...) evr_log("I", args)
+#  define log_info(args...) evr_log(evr_log_level_info, args)
 #else
 #  define log_info(args...)
 #endif
 
-#define log_error(args...) evr_log("E", args)
+#define log_error(args...) evr_log(evr_log_level_error, args)
 
 void evr_log(const char *level, const char *fmt, ...);
 
 #define evr_panic(args...)                      \
     {                                           \
-        evr_log("P", args);                     \
+        evr_log(evr_log_level_panic, args);     \
         exit(1);                                \
     }
 

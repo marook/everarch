@@ -39,10 +39,14 @@ void test_cat_subprocess(){
     assert(is_ok(evr_spawn(&sp, argv)));
     const char msg[] = "hello world!";
     const size_t msg_len = strlen(msg);
-    assert(is_ok(write_n(sp.stdin, msg, msg_len)));
+    struct evr_file sp_stdin;
+    evr_file_bind_fd(&sp_stdin, sp.stdin);
+    assert(is_ok(write_n(&sp_stdin, msg, msg_len)));
     assert(close(sp.stdin) == 0);
     char buf[msg_len + 1];
-    assert(is_ok(read_n(sp.stdout, buf, msg_len)));
+    struct evr_file sp_stdout;
+    evr_file_bind_fd(&sp_stdout, sp.stdout);
+    assert(is_ok(read_n(&sp_stdout, buf, msg_len)));
     buf[sizeof(buf) - 1] = '\0';
     assert(is_str_eq(msg, buf));
     assert(close(sp.stdout) == 0);

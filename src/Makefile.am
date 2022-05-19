@@ -1,4 +1,4 @@
-AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS)
+AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS)
 BUILT_SOURCES = attr-query-parser.h attr_index_db_test-attr-query-lexer.c evr_attr_index-attr-query-lexer.c
 AM_YFLAGS = -d
 
@@ -113,6 +113,7 @@ evr_attr_index_SOURCES = \
 	dyn-mem.c \
 	evr-attr-index.c \
 	evr-glacier-client.c \
+	evr-tls.c \
 	files.c \
 	glacier-cmd.c \
 	handover.c \
@@ -121,7 +122,7 @@ evr_attr_index_SOURCES = \
 	server.c \
 	signatures.c \
 	subprocess.c
-evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm
+evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_SOURCES = \

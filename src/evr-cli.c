@@ -284,10 +284,10 @@ int evr_cli_get_claim(struct cli_cfg *cfg);
 int evr_cli_put(struct cli_cfg *cfg);
 int evr_cli_sign_put(struct cli_cfg *cfg);
 int evr_cli_get_file(struct cli_cfg *cfg);
-int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
+int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key);
 int evr_cli_post_file(struct cli_cfg *cfg);
 int evr_cli_watch_blobs(struct cli_cfg *cfg);
-int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob);
+int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob);
 int evr_cli_sync(struct cli_cfg *cfg);
 
 int main(int argc, char **argv){
@@ -376,13 +376,13 @@ int evr_cli_get(struct cli_cfg *cfg){
         log_error("Invalid key format");
         goto fail;
     }
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto fail;
     }
     struct evr_resp_header resp;
-    if(evr_req_cmd_get_blob(c, key, &resp) != evr_ok){
+    if(evr_req_cmd_get_blob(&c, key, &resp) != evr_ok){
         goto out_with_close_c;
     }
     if(resp.status_code == evr_status_code_blob_not_found){
@@ -393,16 +393,19 @@ int evr_cli_get(struct cli_cfg *cfg){
     }
     // read flags but don't use them
     char buf[1];
-    if(read_n(c, buf, sizeof(buf)) != evr_ok){
+    if(read_n(&c, buf, sizeof(buf)) != evr_ok){
         goto out_with_close_c;
     }
-    int pipe_res = pipe_n(STDOUT_FILENO, c, resp.body_size - 1);
+    struct evr_file stdout;
+    evr_file_bind_fd(&stdout, STDOUT_FILENO);
+    int pipe_res = pipe_n(&stdout, &c, resp.body_size - 1);
     if(pipe_res != evr_ok && pipe_res != evr_end){
         goto out_with_close_c;
     }
     result = evr_ok;
  out_with_close_c:
-    if(close(c)){
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection");
         result = evr_error;
     }
  fail:
@@ -418,15 +421,15 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
         log_error("Invalid key format");
         goto out;
     }
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
     evr_blob_ref blob_ref;
     int claim_index;
     evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
-    xmlDocPtr doc = evr_fetch_signed_xml(c, blob_ref);
+    xmlDocPtr doc = evr_fetch_signed_xml(&c, blob_ref);
     if(!doc){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
@@ -437,7 +440,7 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
         goto out_with_free_doc;
     }
     xmlNode *cn = evr_nth_claim(cs, claim_index);
-    if(!c){
+    if(!cn){
         log_error("There is no claim with index %d in claim-set with ref %s", claim_index, cfg->key);
         goto out_with_free_doc;
     }
@@ -459,7 +462,9 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
         log_error("Failed to format output doc");
         goto out_with_free_out_doc;
     }
-    if(write_n(STDOUT_FILENO, out_doc_str, out_doc_str_size) != evr_ok){
+    struct evr_file stdout;
+    evr_file_bind_fd(&stdout, STDOUT_FILENO);
+    if(write_n(&stdout, out_doc_str, out_doc_str_size) != evr_ok){
         goto out_with_free_out_doc_str;
     }
     ret = evr_ok;
@@ -470,7 +475,8 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
  out_with_free_doc:
     xmlFreeDoc(doc);
  out_with_close_c:
-    if(close(c)){
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection");
         ret = evr_error;
     }
  out:
@@ -496,12 +502,12 @@ int evr_cli_put(struct cli_cfg *cfg){
     if(evr_calc_blob_ref(key, blob->size_used, blob->chunks) != evr_ok){
         goto out_with_free_blob;
     }
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_blob;
     }
-    if(evr_stat_and_put(c, key, cfg->flags, blob) != evr_ok){
+    if(evr_stat_and_put(&c, key, cfg->flags, blob) != evr_ok){
         goto out_with_close_c;
     }
     evr_blob_ref_str fmt_key;
@@ -509,7 +515,8 @@ int evr_cli_put(struct cli_cfg *cfg){
     printf("%s\n", fmt_key);
     ret = evr_ok;
  out_with_close_c:
-    if(close(c)){
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection");
         ret = evr_error;
     }
  out_with_free_blob:
@@ -555,12 +562,12 @@ int evr_cli_sign_put(struct cli_cfg *cfg){
     if(evr_calc_blob_ref(key, signed_cs.size_used, signed_cs.chunks) != evr_ok){
         goto out_with_free_signed_buf;
     }
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_signed_buf;
     }
-    if(evr_stat_and_put(c, key, cfg->flags, &signed_cs) != evr_ok){
+    if(evr_stat_and_put(&c, key, cfg->flags, &signed_cs) != evr_ok){
         goto out_with_close_c;
     }
     evr_blob_ref_str fmt_key;
@@ -568,7 +575,10 @@ int evr_cli_sign_put(struct cli_cfg *cfg){
     printf("%s\n", fmt_key);
     ret = evr_ok;
  out_with_close_c:
-    close(c);
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection");
+        ret = evr_error;
+    }
  out_with_free_signed_buf:
     if(signed_buf){
         free(signed_buf);
@@ -582,7 +592,7 @@ int evr_cli_sign_put(struct cli_cfg *cfg){
 }
 
 struct post_file_ctx {
-    int c;
+    struct evr_file c;
     struct dynamic_array *slices;
 };
 
@@ -596,15 +606,15 @@ int evr_cli_get_file(struct cli_cfg *cfg){
     if(evr_parse_claim_ref(cref, cfg->key) != evr_ok){
         goto out;
     }
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
     evr_blob_ref bref;
     int claim;
     evr_split_claim_ref(bref, &claim, cref);
-    xmlDocPtr doc = evr_fetch_signed_xml(c, bref);
+    xmlDocPtr doc = evr_fetch_signed_xml(&c, bref);
     if(!doc){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
@@ -645,10 +655,10 @@ int evr_cli_get_file(struct cli_cfg *cfg){
         if(pkret != evr_ok){
             goto out_with_free_doc;
         }
-        if(evr_write_cmd_get_blob(c, sref) != evr_ok){
+        if(evr_write_cmd_get_blob(&c, sref) != evr_ok){
             goto out_with_free_doc;
         }
-        if(evr_read_resp_header(c, &resp) != evr_ok){
+        if(evr_read_resp_header(&c, &resp) != evr_ok){
             goto out_with_free_doc;
         }
         if(resp.status_code != evr_status_code_ok){
@@ -658,10 +668,12 @@ int evr_cli_get_file(struct cli_cfg *cfg){
             goto out_with_free_doc;
         }
         // read flags but don't use them
-        if(read_n(c, buf, 1) != evr_ok){
+        if(read_n(&c, buf, 1) != evr_ok){
             goto out_with_free_doc;
         }
-        int pipe_res = pipe_n(STDOUT_FILENO, c, resp.body_size - 1);
+        struct evr_file stdout;
+        evr_file_bind_fd(&stdout, STDOUT_FILENO);
+        int pipe_res = pipe_n(&stdout, &c, resp.body_size - 1);
         if(pipe_res == evr_end){
             break;
         }
@@ -674,7 +686,8 @@ int evr_cli_get_file(struct cli_cfg *cfg){
  out_with_free_doc:
     xmlFreeDoc(doc);
  out_with_close_c:
-    if(close(c)){
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close connection");
         ret = evr_error;
     }
  out:
@@ -693,8 +706,7 @@ int evr_cli_post_file(struct cli_cfg *cfg){
         }
     }
     struct post_file_ctx ctx;
-    ctx.c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(ctx.c < 0){
+    if(evr_connect_to_storage(&ctx.c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_close_f;
     }
@@ -746,7 +758,7 @@ int evr_cli_post_file(struct cli_cfg *cfg){
     if(evr_calc_blob_ref(key, sc_blob.size_used, sc_blob.chunks) != evr_ok){
         goto out_with_free_sc;
     }
-    if(evr_stat_and_put(ctx.c, key, evr_blob_flag_claim, &sc_blob) != evr_ok){
+    if(evr_stat_and_put(&ctx.c, key, evr_blob_flag_claim, &sc_blob) != evr_ok){
         goto out_with_free_sc;
     }
     evr_claim_ref cref;
@@ -768,7 +780,8 @@ int evr_cli_post_file(struct cli_cfg *cfg){
         free(ctx.slices);
     }
  out_with_close_c:
-    if(close(ctx.c)){
+    if(ctx.c.close(&ctx.c) != 0){
+        evr_panic("Unable to close storage connection");
         ret = evr_error;
     }
  out_with_close_f:
@@ -800,7 +813,7 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     if(evr_calc_blob_ref(fs->ref, size, blob.chunks) != evr_ok){
         goto out;
     }
-    if(evr_stat_and_put(ctx->c, fs->ref, 0, &blob) != evr_ok){
+    if(evr_stat_and_put(&ctx->c, fs->ref, 0, &blob) != evr_ok){
         goto out;
     }
     fs->size = size;
@@ -816,18 +829,18 @@ int evr_cli_watch_blobs(struct cli_cfg *cfg){
     f.sort_order = cfg->blobs_sort_order;
     f.flags_filter = cfg->flags;
     f.last_modified_after = cfg->last_modified_after;
-    int c = evr_connect_to_storage(cfg->storage_host, cfg->storage_port);
-    if(c < 0){
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out;
     }
-    if(evr_req_cmd_watch_blobs(c, &f) != evr_ok){
+    if(evr_req_cmd_watch_blobs(&c, &f) != evr_ok){
         goto out_with_close_c;
     }
     struct evr_watch_blobs_body body;
     evr_blob_ref_str fmt_key;
     while(1){
-        if(evr_read_watch_blobs_body(c, &body) != evr_ok){
+        if(evr_read_watch_blobs_body(&c, &body) != evr_ok){
             goto out_with_close_c;
         }
         evr_fmt_blob_ref(fmt_key, body.key);
@@ -836,14 +849,15 @@ int evr_cli_watch_blobs(struct cli_cfg *cfg){
     }
     ret = evr_ok;
  out_with_close_c:
-    if(close(c)){
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection");
         ret = evr_error;
     }
  out:
     return ret;
 }
 
-int evr_stat_and_put(int c, evr_blob_ref key, int flags, struct chunk_set *blob){
+int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     evr_blob_ref_str fmt_key;
@@ -917,13 +931,13 @@ int evr_cli_sync(struct cli_cfg *cfg) {
     int ret = evr_error;
     const size_t sync_thrd_count = 4;
     thrd_t sync_thrds[sync_thrd_count];
-    int src_c = evr_connect_to_storage(cfg->src_storage_host, cfg->src_storage_port);
-    if(src_c < 0){
+    struct evr_file src_c;
+    if(evr_connect_to_storage(&src_c, cfg->src_storage_host, cfg->src_storage_port) != evr_ok){
         log_error("Failed to connect to source evr-glacier-storage server");
         goto out;
     }
-    int dst_c = evr_connect_to_storage(cfg->dst_storage_host, cfg->dst_storage_port);
-    if(dst_c < 0){
+    struct evr_file dst_c;
+    if(evr_connect_to_storage(&dst_c, cfg->dst_storage_host, cfg->dst_storage_port) != evr_ok){
         log_error("Failed to connect to destination evr-glacier-storage-server");
         goto out_with_close_src_c;
     }
@@ -931,10 +945,10 @@ int evr_cli_sync(struct cli_cfg *cfg) {
     f.sort_order = evr_cmd_watch_sort_order_ref;
     f.flags_filter = cfg->flags;
     f.last_modified_after = 0;
-    if(evr_req_cmd_watch_blobs(src_c, &f) != evr_ok){
+    if(evr_req_cmd_watch_blobs(&src_c, &f) != evr_ok){
         goto out_with_close_dst_c;
     }
-    if(evr_req_cmd_watch_blobs(dst_c, &f) != evr_ok){
+    if(evr_req_cmd_watch_blobs(&dst_c, &f) != evr_ok){
         goto out_with_close_dst_c;
     }
     struct evr_blob_sync_handover sync_ho;
@@ -956,14 +970,16 @@ int evr_cli_sync(struct cli_cfg *cfg) {
     fd_set fds;
     size_t blob_count = 0;
     while(1){
+        int src_fd = src_c.get_fd(&src_c);
+        int dst_fd = dst_c.get_fd(&dst_c);
         FD_ZERO(&fds);
         if(src_state == sync_state_want_ref){
-            FD_SET(src_c, &fds);
+            FD_SET(src_fd, &fds);
         }
         if(dst_state == sync_state_want_ref){
-            FD_SET(dst_c, &fds);
+            FD_SET(dst_fd, &fds);
         }
-        int sel_ret = select(max(src_c, dst_c) + 1, &fds, NULL, NULL, NULL);
+        int sel_ret = select(max(src_fd, dst_fd) + 1, &fds, NULL, NULL, NULL);
         if(sel_ret < 0){
             goto out_with_close_dst_c;
         }
@@ -971,17 +987,20 @@ int evr_cli_sync(struct cli_cfg *cfg) {
             if(FD_ISSET(i, &fds)){
                 struct evr_watch_blobs_body *body;
                 int *state;
-                if(i == src_c){
+                struct evr_file *f;
+                if(i == src_fd){
                     body = &src_next_blob;
                     state = &src_state;
-                } else if(i == dst_c) {
+                    f = &src_c;
+                } else if(i == dst_fd) {
                     body = &dst_next_blob;
                     state = &dst_state;
+                    f = &dst_c;
                 } else {
                     evr_panic("Unknown file descriptor is set: %d", i);
                     goto out_with_close_dst_c;
                 }
-                int read_res = evr_read_watch_blobs_body(i, body);
+                int read_res = evr_read_watch_blobs_body(f, body);
                 if(read_res == evr_ok){
                     *state = sync_state_has_ref;
                 } else if(read_res == evr_end){
@@ -1064,12 +1083,12 @@ int evr_cli_sync(struct cli_cfg *cfg) {
         ret = evr_error;
     }
  out_with_close_dst_c:
-    if(close(dst_c) != 0){
+    if(dst_c.close(&dst_c) != 0){
         evr_panic("Unable to close connection to destination server");
         ret = evr_error;
     }
  out_with_close_src_c:
-    if(close(src_c) != 0){
+    if(src_c.close(&src_c) != 0){
         evr_panic("Unable to close connection to source server");
         ret = evr_error;
     }
@@ -1080,8 +1099,10 @@ int evr_cli_sync(struct cli_cfg *cfg) {
 int blob_sync_worker(void *context){
     int ret = evr_error;
     struct evr_blob_sync_handover *ctx = context;
-    int c_src = -1;
-    int c_dst = -1;
+    struct evr_file c_src;
+    evr_file_bind_fd(&c_src, -1);
+    struct evr_file c_dst;
+    evr_file_bind_fd(&c_dst, -1);
     int sync_dir;
     evr_blob_ref ref;
     struct evr_resp_header get_resp;
@@ -1108,33 +1129,31 @@ int blob_sync_worker(void *context){
                 log_debug("Retry sync %s for the %d try", ref_str, tries);
 #endif
             }
-            if(c_src == -1){
-                c_src = evr_connect_to_storage(ctx->cfg->src_storage_host, ctx->cfg->src_storage_port);
-                if(c_src < 0){
+            if(c_src.get_fd(&c_src) == -1){
+                if(evr_connect_to_storage(&c_src, ctx->cfg->src_storage_host, ctx->cfg->src_storage_port) != evr_ok){
                     log_error("Failed to connect to source evr-glacier-storage server");
                     goto continue_with_retry;
                 }
             }
-            if(c_dst == -1){
-                c_dst = evr_connect_to_storage(ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port);
-                if(c_dst < 0){
+            if(c_dst.get_fd(&c_dst) == -1){
+                if(evr_connect_to_storage(&c_dst, ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port) != evr_ok){
                     log_error("Failed to connect to destination evr-glacier-storage server");
                     goto continue_with_retry;
                 }
             }
-            int cg;
-            int cp;
+            struct evr_file *cg;
+            struct evr_file *cp;
             switch(sync_dir){
             default:
                 evr_panic("Unknown sync_dir %d", sync_dir);
                 goto out_with_close_c;
             case sync_dir_src_to_dst:
-                cg = c_src;
-                cp = c_dst;
+                cg = &c_src;
+                cp = &c_dst;
                 break;
             case sync_dir_dst_to_src:
-                cg = c_dst;
-                cp = c_src;
+                cg = &c_dst;
+                cp = &c_src;
                 break;
             }
             if(evr_req_cmd_get_blob(cg, ref, &get_resp) != evr_ok){
@@ -1166,19 +1185,19 @@ int blob_sync_worker(void *context){
             }
             break;
         continue_with_retry:
-            if(c_dst >= 0){
-                if(close(c_dst) != 0){
-                    c_dst = -1;
+            if(c_dst.get_fd(&c_dst) >= 0){
+                if(c_dst.close(&c_dst) != 0){
+                    evr_file_bind_fd(&c_dst, -1);
                     goto out_with_close_c;
                 }
-                c_dst = -1;
+                evr_file_bind_fd(&c_dst, -1);
             }
-            if(c_src >= 0){
-                if(close(c_src) != 0){
-                    c_src = -1;
+            if(c_src.get_fd(&c_src) >= 0){
+                if(c_src.close(&c_src) != 0){
+                    evr_file_bind_fd(&c_src, -1);
                     goto out_with_close_c;
                 }
-                c_src = -1;
+                evr_file_bind_fd(&c_src, -1);
             }
         }
         if(tries >= max_tries){
@@ -1190,13 +1209,15 @@ int blob_sync_worker(void *context){
     }
     ret = evr_ok;
  out_with_close_c:
-    if(c_dst >= 0){
-        if(close(c_dst) != 0){
+    if(c_dst.get_fd(&c_dst) >= 0){
+        if(c_dst.close(&c_dst) != 0){
+            evr_panic("Unable to close dest connection");
             ret = evr_error;
         }
     }
-    if(c_src >= 0){
-        if(close(c_src) != 0){
+    if(c_src.get_fd(&c_src) >= 0){
+        if(c_src.close(&c_src) != 0){
+            evr_panic("Unable to close source connection");
             ret = evr_error;
         }
     }

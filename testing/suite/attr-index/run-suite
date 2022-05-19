@@ -36,20 +36,14 @@ start_attr_index
 wait_for_attr_index
 
 echo "Running test queries…"
-results=`nc localhost "${attr_index_port}" <<EOF
-s tag=no-such-tag-exists
-exit
-EOF`
+results=`query_attr_index 's tag=no-such-tag-exists'`
 if [[ "${results}" != "OK" ]]
 then
     echo "Unexpected result from tag=no-such-tag-exists query: ${results}" >&2
     exit 1
 fi
 
-results=`nc localhost "${attr_index_port}" <<EOF
-s tag=todo
-exit
-EOF`
+results=`query_attr_index 's tag=todo'`
 if [[ "${results}" != "OK
 ${test_ref}-0000" ]]
 then
@@ -57,10 +51,7 @@ then
     exit 1
 fi
 
-results=`nc localhost "${attr_index_port}" <<EOF
-s select * where tag=todo
-exit
-EOF`
+results=`query_attr_index 's select * where tag=todo'`
 if [[ "${results}" != "OK
 ${test_ref}-0000
 	tag=todo
@@ -70,10 +61,7 @@ then
     exit 1
 fi
 
-results=`nc localhost "${attr_index_port}" <<EOF
-s select * where ref=${test_ref}-0000
-exit
-EOF`
+results=`query_attr_index "s select * where ref=${test_ref}-0000"`
 if [[ "${results}" != "OK
 ${test_ref}-0000
 	tag=todo
@@ -83,20 +71,14 @@ then
     exit 1
 fi
 
-results=`nc localhost "${attr_index_port}" <<EOF
-s waduup?
-exit
-EOF`
+results=`query_attr_index 's waduup?'`
 if [[ "${results}" != "ERROR syntax error, unexpected UNKNOWN, expecting EQ or CONTAINS" ]]
 then
     echo "Unexpected result from 's waruup?' query: ${results}" >&2
     exit 1
 fi
 
-results=`nc localhost "${attr_index_port}" <<EOF
-c ${test_ref}-0000
-exit
-EOF`
+results=`query_attr_index "c ${test_ref}-0000"`
 if [[ "${results}" != "${test_ref}-0000" ]]
 then
     echo "Unexpected result from 'c ${test_ref}-0000' query: ${results}" >&2
@@ -104,10 +86,7 @@ then
 fi
 
 # this test has a space character after the 's'
-results=`nc localhost "${attr_index_port}" <<EOF
-s 
-exit
-EOF`
+results=`query_attr_index 's '`
 if [[ "${results}" != "OK
 ${test2_ref}-0000
 ${test_ref}-0000" ]]
@@ -117,10 +96,7 @@ then
 fi
 
 # this test has no space character after the 's'
-results=`nc localhost "${attr_index_port}" <<EOF
-s
-exit
-EOF`
+results=`query_attr_index 's'`
 if [[ "${results}" != "OK
 ${test2_ref}-0000
 ${test_ref}-0000" ]]

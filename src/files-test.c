@@ -44,29 +44,13 @@ void test_read_fd_partial_file(){
     free(buf);
 }
 
-void test_read_empty_json_with_big_buffer(){
-    struct dynamic_array *buffer = alloc_dynamic_array(1024);
-    assert(buffer);
-    assert(read_file_str(&buffer, "../etc/configuration/empty.json", 1024) == 0);
-    assert(is_str_eq((char*)buffer->data, "{}\n"));
-    assert(buffer->size_used == 4);
-    free(buffer);
-}
-
-void test_read_empty_json_with_small_buffer(){
-    struct dynamic_array *buffer = alloc_dynamic_array(1);
-    assert(buffer);
-    assert(read_file_str(&buffer, "../etc/configuration/empty.json", 1024) == 0);
-    assert(is_str_eq((char*)buffer->data, "{}\n"));
-    assert(buffer->size_used == 4);
-    free(buffer);
-}
-
 void test_read_into_chunks_with_small_file(){
-    int f = open("../etc/configuration/empty.json", O_RDONLY);
-    assert(f >= 0);
-    struct chunk_set *cs = read_into_chunks(f, 2);
-    close(f);
+    int fd = open("../etc/configuration/empty.json", O_RDONLY);
+    assert(fd >= 0);
+    struct evr_file f;
+    evr_file_bind_fd(&f, fd);
+    struct chunk_set *cs = read_into_chunks(&f, 2);
+    assert(f.close(&f) == 0);
     assert(cs);
     assert(cs->chunks_len == 1);
     assert(cs->size_used == 2);
@@ -145,8 +129,6 @@ int visit_slice(char *buf, size_t size, void *ctx){
 
 int main(){
     run_test(test_read_fd_partial_file);
-    run_test(test_read_empty_json_with_big_buffer);
-    run_test(test_read_empty_json_with_small_buffer);
     run_test(test_read_into_chunks_with_small_file);
     run_test(test_append_into_chunk_set_with_small_file);
     run_test(test_rollsum_split_infinite_file);

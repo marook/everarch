@@ -31,21 +31,35 @@
 #include "rollsum.h"
 #include "logger.h"
 
-int read_file(struct dynamic_array **buffer, const char *path, size_t max_size){
-    int result = evr_error;
-    int f = open(path, O_RDONLY);
-    if(f < 0){
-        goto open_fail;
-    }
-    int read_res = read_fd(buffer, f, max_size);
-    if(read_res != evr_end && read_res != evr_ok){
-        goto read_fail;
-    }
-    result = evr_ok;
- read_fail:
-    close(f);
- open_fail:
-    return result;
+int evr_file_fd_get_fd(struct evr_file *f);
+ssize_t evr_file_fd_read(struct evr_file *f, void *buf, size_t count);
+ssize_t evr_file_fd_write(struct evr_file *f, const void *buf, size_t count);
+int evr_file_fd_close(struct evr_file *f);
+
+void evr_file_bind_fd(struct evr_file *f, int fd){
+    f->ctx.i = fd;
+    f->get_fd = evr_file_fd_get_fd;
+    f->read = evr_file_fd_read;
+    f->write = evr_file_fd_write;
+    f->close = evr_file_fd_close;
+}
+
+#define evr_file_get_fd(f) (f->ctx.i)
+
+int evr_file_fd_get_fd(struct evr_file *f){
+    return evr_file_get_fd(f);
+}
+
+ssize_t evr_file_fd_read(struct evr_file *f, void *buf, size_t count){
+    return read(evr_file_get_fd(f), buf, count);
+}
+
+ssize_t evr_file_fd_write(struct evr_file *f, const void *buf, size_t count){
+    return write(evr_file_get_fd(f), buf, count);
+}
+
+int evr_file_fd_close(struct evr_file *f){
+    return close(evr_file_get_fd(f));
 }
 
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
@@ -73,28 +87,10 @@ int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
     }
 }
 
-int read_file_str(struct dynamic_array **buffer, const char *path, size_t max_size){
-    if(read_file(buffer, path, max_size)){
-        return 1;
-    }
-    if((*buffer)->size_used == max_size){
-        return 1;
-    }
-    if((*buffer)->size_allocated == (*buffer)->size_used){
-        *buffer = grow_dynamic_array(*buffer);
-        if(!*buffer){
-            return 1;
-        }
-    }
-    ((char*)(*buffer)->data)[(*buffer)->size_used] = '\0';
-    (*buffer)->size_used++;
-    return 0;
-}
-
-int read_n(int f, char *buffer, size_t bytes){
+int read_n(struct evr_file *f, char *buffer, size_t bytes){
     size_t remaining = bytes;
     while(remaining > 0){
-        size_t nbytes = read(f, buffer, remaining);
+        size_t nbytes = f->read(f, buffer, remaining);
         if(nbytes < 0){
             return evr_error;
         }
@@ -107,13 +103,13 @@ int read_n(int f, char *buffer, size_t bytes){
     return evr_ok;
 }
 
-int write_n(int fd, const void *buffer, size_t size){
+int write_n(struct evr_file *f, const void *buffer, size_t size){
     size_t remaining = size;
     while(remaining > 0){
-        ssize_t written = write(fd, buffer, remaining);
+        ssize_t written = f->write(f, buffer, remaining);
         if(written <= 0){
             if(errno == EPIPE){
-                log_debug("write_n detected a broken pipe with fd %d", fd);
+                log_debug("write_n detected a broken pipe with file %d", f->get_fd(f));
                 return evr_end;
             }
             return evr_error;
@@ -124,7 +120,7 @@ int write_n(int fd, const void *buffer, size_t size){
     return evr_ok;
 }
 
-int write_chunk_set(int f, const struct chunk_set *cs){
+int write_chunk_set(struct evr_file *f, const struct chunk_set *cs){
     size_t remaining = cs->size_used;
     char * const *c = cs->chunks;
     while(remaining > 0){
@@ -138,11 +134,11 @@ int write_chunk_set(int f, const struct chunk_set *cs){
     return evr_ok;
 }
 
-int pipe_n(int dest, int src, size_t n){
+int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n){
     char buffer[4096];
     size_t remaining = n;
     while(remaining > 0){
-        ssize_t bytes_read = read(src, buffer, min(remaining, sizeof(buffer)));
+        ssize_t bytes_read = src->read(src, buffer, min(remaining, sizeof(buffer)));
         if(bytes_read <= 0){
             return evr_error;
         }
@@ -157,11 +153,11 @@ int pipe_n(int dest, int src, size_t n){
     return evr_ok;
 }
 
-int dump_n(int f, size_t bytes){
+int dump_n(struct evr_file *f, size_t bytes){
     char buf[min(bytes, 4096)];
     size_t remaining = bytes;
     while(remaining > 0){
-        size_t nbytes = read(f, buf, min(sizeof(buf), remaining));
+        size_t nbytes = f->read(f, buf, min(sizeof(buf), remaining));
         if(nbytes < 0){
             return evr_error;
         }
@@ -173,7 +169,7 @@ int dump_n(int f, size_t bytes){
     return evr_ok;
 }
 
-struct chunk_set *read_into_chunks(int fd, size_t size){
+struct chunk_set *read_into_chunks(struct evr_file *f, size_t size){
     size_t chunks_len = ceil_div(size, evr_chunk_size);
     struct chunk_set *cs = evr_allocate_chunk_set(chunks_len);
     if(!cs){
@@ -182,7 +178,7 @@ struct chunk_set *read_into_chunks(int fd, size_t size){
     size_t remaining = size;
     for(int i = 0; i < chunks_len; ++i){
         size_t chunk_read_size = min(remaining, evr_chunk_size);
-        if(read_n(fd, cs->chunks[i], chunk_read_size) != evr_ok){
+        if(read_n(f, cs->chunks[i], chunk_read_size) != evr_ok){
             goto out_free_cs;
         }
         remaining -= chunk_read_size;

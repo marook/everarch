@@ -38,31 +38,32 @@
 #include <libxslt/xsltInternals.h>
 
 #include "glacier-cmd.h"
+#include "files.h"
 
-int evr_connect_to_storage(char *host, char *port);
+int evr_connect_to_storage(struct evr_file *f, char *host, char *port);
 
-xmlDocPtr evr_fetch_xml(int fd, evr_blob_ref key);
+xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key);
 
-xmlDocPtr evr_fetch_signed_xml(int fd, evr_blob_ref key);
+xmlDocPtr evr_fetch_signed_xml(struct evr_file *f, evr_blob_ref key);
 
-xsltStylesheetPtr evr_fetch_stylesheet(int fd, evr_blob_ref ref);
+xsltStylesheetPtr evr_fetch_stylesheet(struct evr_file *f, evr_blob_ref ref);
 
-int evr_req_cmd_stat_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp);
+int evr_req_cmd_stat_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_header *resp);
 
-int evr_write_cmd_stat_blob(int fd, evr_blob_ref key);
+int evr_write_cmd_stat_blob(struct evr_file *f, evr_blob_ref key);
 
-int evr_req_cmd_get_blob(int fd, evr_blob_ref key, struct evr_resp_header *resp);
+int evr_req_cmd_get_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_header *resp);
 
-int evr_write_cmd_get_blob(int fd, evr_blob_ref key);
+int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key);
 
-int evr_write_cmd_put_blob(int fd, evr_blob_ref key, int flags, size_t blob_size);
+int evr_write_cmd_put_blob(struct evr_file *f, evr_blob_ref key, int flags, size_t blob_size);
 
-int evr_req_cmd_watch_blobs(int fd, struct evr_blob_filter *filter);
+int evr_req_cmd_watch_blobs(struct evr_file *f, struct evr_blob_filter *filter);
 
-int evr_write_cmd_watch_blobs(int fd, struct evr_blob_filter *filter);
+int evr_write_cmd_watch_blobs(struct evr_file *f, struct evr_blob_filter *filter);
 
-int evr_read_resp_header(int fd, struct evr_resp_header *resp);
+int evr_read_resp_header(struct evr_file *f, struct evr_resp_header *resp);
 
-int evr_read_watch_blobs_body(int fd, struct evr_watch_blobs_body *body);
+int evr_read_watch_blobs_body(struct evr_file *f, struct evr_watch_blobs_body *body);
 
 #endif

@@ -1,6 +1,8 @@
 # enable core dumps
 ulimit -c unlimited
 
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 PATH="../../../src:${PATH}"
 
 glacier_storage_port=2461
@@ -14,6 +16,12 @@ secondary_glacier_storage_pid=
 attr_index_port=2462
 attr_index_state_dir=attr-index
 attr_index_pid=
+attr_index_cert_path=attr-index-cert.pem
+
+if [ -e "${script_dir}/config.local" ]
+then
+    . "${script_dir}/config.local"
+fi
 
 allocate_ports() {
     ensure_port_available "${glacier_storage_port}"
@@ -55,7 +63,7 @@ start_attr_index() {
     rm -rf -- "${attr_index_state_dir}"
     mkdir -- "${attr_index_state_dir}"
     echo "Starting evr-attr-index…"
-    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" &
+    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" --cert "${attr_index_cert_path}" --key attr-index-key.pem &
     attr_index_pid=$!
 }
 
@@ -64,6 +72,14 @@ wait_for_attr_index() {
     # TODO we should find a better way to wait until the index is
     # ready as sleeping for one second
     sleep 1
+}
+
+query_attr_index() {
+    query="$1"
+    socat ${socat_opts} "openssl:localhost:${attr_index_port},cafile=${attr_index_cert_path}" stdio <<EOF
+${query}
+exit
+EOF
 }
 
 wait_for_port() {
