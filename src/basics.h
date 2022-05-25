@@ -46,6 +46,7 @@
 
 #define evr_glacier_storage_host "localhost"
 #define evr_glacier_storage_port 2361
+#define default_storage_ssl_cert_path EVR_PREFIX "/etc/everarch/glacier-cert.pem"
 
 #define evr_glacier_attr_index_port 2362
 

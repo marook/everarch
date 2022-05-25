@@ -49,6 +49,23 @@ struct evr_file {
      */
     int (*get_fd)(struct evr_file *f);
 
+    /**
+     * wait_for_data will block until data is ready to be read.
+     *
+     * timeout is the number of seconds after which the wait times
+     * out. 0 indicates no timeout.
+     *
+     * Returns evr_ok on success. evr_end on timeout. evr_error
+     * otherwise.
+     */
+    int (*wait_for_data)(struct evr_file *f, int timeout);
+
+    /**
+     * pending returns the number bytes which are buffered in user
+     * space and ready to be read.
+     */
+    size_t (*pending)(struct evr_file *f);
+
     ssize_t (*read)(struct evr_file *f, void *buf, size_t count);
     ssize_t (*write)(struct evr_file *f, const void *buf, size_t count);
 
@@ -62,6 +79,8 @@ struct evr_file {
 };
 
 void evr_file_bind_fd(struct evr_file *f, int fd);
+
+int evr_file_select(struct evr_file *f, int timeout);
 
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size);
 

@@ -26,22 +26,26 @@
 #include <unistd.h>
 
 int evr_log_fd = STDOUT_FILENO;
+char *evr_log_app = "";
 
 const char *log_date_format = "%Y-%m-%dT%H:%M:%S";
 
 void evr_log(const char *level, const char *fmt, ...){
     time_t t;
     time(&t);
+    const size_t app_len = strlen(evr_log_app);
     const size_t level_len = strlen(level);
     const size_t fmt_len = strlen(fmt);
     // format: <log level> <datetime> <message fmt> \0
-    const size_t log_fmt_size = level_len + 1 + 19 + 1 + fmt_len + 1 + 1;
+    const size_t log_fmt_size = app_len + level_len + 1 + 19 + 1 + fmt_len + 1 + 1;
     char *log_fmt = alloca(log_fmt_size);
     char *p = log_fmt;
     struct tm bt;
     localtime_r(&t, &bt);
     p += strftime(p, 19 + 1, log_date_format, &bt);
     *p++ = ' ';
+    memcpy(p, evr_log_app, app_len);
+    p += app_len;
     memcpy(p, level, level_len);
     p += level_len;
     *p++ = ' ';

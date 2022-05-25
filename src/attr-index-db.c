@@ -38,6 +38,7 @@
 #include "attr-query-lexer.h"
 #include "subprocess.h"
 #include "files.h"
+#include "evr-tls.h"
 
 void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
     if(!cfg){
@@ -58,6 +59,7 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
             free(*it);
         }
     }
+    evr_free_cert_chain(cfg->ssl_certs);
     free(cfg);
 }
 

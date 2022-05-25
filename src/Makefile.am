@@ -16,6 +16,7 @@ check_PROGRAMS = \
 	concurrent-glacier-test \
 	configp-test \
 	dyn-mem-test \
+	evr-tls-test \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
@@ -31,6 +32,7 @@ TESTS = \
 	configp-test \
 	concurrent-glacier-test \
 	dyn-mem-test \
+	evr-tls-test \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
@@ -52,13 +54,14 @@ attr_index_db_test_SOURCES = \
 	configurations.c \
 	db.c \
 	dyn-mem.c \
+	evr-tls.c \
 	files.c \
 	glacier.c \
 	glacier-storage-configuration.c \
 	keys.c \
 	logger.c \
 	subprocess.c
-attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS) -lm
+attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 basics_test_SOURCES = \
@@ -132,13 +135,14 @@ evr_SOURCES = \
 	dyn-mem.c \
 	evr-cli.c \
 	evr-glacier-client.c \
+	evr-tls.c \
 	files.c \
 	glacier-cmd.c \
 	handover.c \
 	keys.c \
 	logger.c \
 	signatures.c
-evr_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS)
+evr_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	basics.c \
@@ -148,6 +152,7 @@ evr_glacier_storage_SOURCES = \
 	db.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \
+	evr-tls.c \
 	files.c \
 	glacier.c \
 	glacier-cmd.c \
@@ -155,7 +160,17 @@ evr_glacier_storage_SOURCES = \
 	keys.c \
 	logger.c \
 	server.c
-evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(SSL_LIBS)
+
+evr_tls_test_SOURCES = \
+	assert.c \
+	dyn-mem.c \
+	evr-tls.c \
+	evr-tls-test.c \
+	files.c \
+	logger.c \
+	server.c
+evr_tls_test_LDADD = $(SSL_LIBS)
 
 files_test_SOURCES = \
 	assert.c \

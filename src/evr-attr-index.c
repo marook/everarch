@@ -58,6 +58,7 @@ static char args_doc[] = "";
 #define arg_storage_port 258
 #define arg_ssl_cert_path 259
 #define arg_ssl_key_path 260
+#define arg_ssl_cert 261
 
 static struct argp_option options[] = {
     {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
@@ -67,6 +68,7 @@ static struct argp_option options[] = {
     {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
+    {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of remote servers. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
     {0},
 };
 
@@ -96,6 +98,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     case arg_storage_port:
         evr_replace_str(cfg->storage_port, arg);
         break;
+    case arg_ssl_cert:
+        if(evr_parse_and_push_cert(&cfg->ssl_certs, arg) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        break;
     }
     return 0;
 }
@@ -120,7 +128,7 @@ struct evr_connection {
 
 struct evr_attr_index_cfg *cfg;
 
-SSL_CTX *ssl_ctx;
+SSL_CTX *ssl_server_ctx;
 
 struct evr_attr_spec_handover_ctx {
     struct evr_handover_ctx handover;
@@ -178,15 +186,16 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
 
 int main(int argc, char **argv){
     int ret = evr_error;
+    evr_log_app = "i";
     evr_tls_init();
     evr_load_attr_index_cfg(argc, argv);
-    ssl_ctx = evr_create_ssl_server_ctx(cfg->ssl_cert_path, cfg->ssl_key_path);
-    if(!ssl_ctx){
+    ssl_server_ctx = evr_create_ssl_server_ctx(cfg->ssl_cert_path, cfg->ssl_key_path);
+    if(!ssl_server_ctx){
         log_error("Unable to configure SSL context");
         goto out_with_free_cfg;
     }
     if(mtx_init(&stop_lock, mtx_plain) != thrd_success){
-        goto out_with_free_ssl_ctx;
+        goto out_with_free_ssl_server_ctx;
     }
     if(cnd_init(&stop_signal) != thrd_success){
         goto out_with_free_stop_lock;
@@ -305,8 +314,8 @@ int main(int argc, char **argv){
     cnd_destroy(&stop_signal);
  out_with_free_stop_lock:
     mtx_destroy(&stop_lock);
- out_with_free_ssl_ctx:
-    SSL_CTX_free(ssl_ctx);
+ out_with_free_ssl_server_ctx:
+    SSL_CTX_free(ssl_server_ctx);
  out_with_free_cfg:
     evr_free_attr_index_cfg(cfg);
     evr_tls_free();
@@ -326,8 +335,12 @@ void evr_load_attr_index_cfg(int argc, char **argv){
     cfg->ssl_key_path = strdup(default_ssl_key_path);
     cfg->storage_host = strdup(evr_glacier_storage_host);
     cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
+    cfg->ssl_certs = NULL;
     if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
         evr_panic("Unable to allocate memory for configuration.");
+    }
+    if(evr_push_cert(&cfg->ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
+        evr_panic("Unable to configure SSL certs");
     }
     struct configp configp = {
         options, parse_opt, args_doc, doc
@@ -386,11 +399,15 @@ int evr_watch_index_claims_worker(void *arg){
     int ret = evr_error;
     struct evr_attr_spec_handover_ctx *ctx = arg;
     log_debug("Started watch index claims worker");
+    SSL_CTX *ssl_ctx = evr_create_ssl_client_ctx(cfg->storage_host, cfg->storage_port, cfg->ssl_certs);
+    if(!ssl_ctx){
+        goto out;
+    }
     // cw is the connection used for watching for blob changes.
     struct evr_file cw;
-    if(evr_connect_to_storage(&cw, cfg->storage_host, cfg->storage_port) != evr_ok){
+    if(evr_tls_connect(&cw, cfg->storage_host, cfg->storage_port, ssl_ctx) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
-        goto out;
+        goto out_with_free_ssl_ctx;
     }
     struct evr_blob_filter filter;
     filter.sort_order = evr_cmd_watch_sort_order_last_modified;
@@ -408,23 +425,16 @@ int evr_watch_index_claims_worker(void *arg){
     struct evr_file cs;
     evr_file_bind_fd(&cs, -1);
     log_debug("Watching index claims");
-    fd_set active_fd_set;
-    struct timeval timeout;
     while(running){
-        int cw_fd = cw.get_fd(&cw);
-        FD_ZERO(&active_fd_set);
-        FD_SET(cw_fd, &active_fd_set);
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-        int sret = select(cw_fd + 1, &active_fd_set, NULL, NULL, &timeout);
-        if(sret < 0){
+        int read_wait_res = cw.wait_for_data(&cw, 1);
+        if(read_wait_res != evr_ok && read_wait_res != evr_end){
             goto out_with_close_cw;
         }
         if(!running){
             ret = evr_ok;
             goto out_with_close_cw;
         }
-        if(sret == 0){
+        if(read_wait_res == evr_end){
             continue;
         }
         if(evr_read_watch_blobs_body(&cw, &body) != evr_ok){
@@ -438,7 +448,7 @@ int evr_watch_index_claims_worker(void *arg){
         } while(0);
 #endif
         if(cs.get_fd(&cs) == -1){
-            if(evr_connect_to_storage(&cs, cfg->storage_host, cfg->storage_port) != evr_ok){
+            if(evr_tls_connect(&cs, cfg->storage_host, cfg->storage_port, ssl_ctx) != evr_ok){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free_latest_spec;
             }
@@ -484,10 +494,10 @@ int evr_watch_index_claims_worker(void *arg){
         }
         cs.close(&cs);
         evr_file_bind_fd(&cs, -1);
-        int wait_res = evr_wait_for_handover_available(&ctx->handover);
-        if(wait_res == evr_end){
+        int handover_wait_res = evr_wait_for_handover_available(&ctx->handover);
+        if(handover_wait_res == evr_end){
             break;
-        } else if(wait_res != evr_ok){
+        } else if(handover_wait_res != evr_ok){
             goto out_with_free_latest_spec;
         }
         // handover ctx is available
@@ -526,6 +536,8 @@ int evr_watch_index_claims_worker(void *arg){
         evr_panic("Unable to close the watch connection");
         ret = evr_error;
     }
+ out_with_free_ssl_ctx:
+    SSL_CTX_free(ssl_ctx);
  out:
     log_debug("Ended watch index claims worker with result %d", ret);
     return ret;
@@ -620,7 +632,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         goto out_with_free_db;
     }
     struct evr_file cw;
-    if(evr_connect_to_storage(&cw, cfg->storage_host, cfg->storage_port) != evr_ok){
+    if(evr_tls_connect_once(&cw, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_db;
     }
@@ -640,25 +652,18 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         goto out_with_free_style;
     }
     struct evr_watch_blobs_body wbody;
-    fd_set active_fd_set;
     struct evr_file cs;
     evr_file_bind_fd(&cs, -1);
-    struct timeval timeout;
     while(running){
-        int cw_fd = cw.get_fd(&cw);
-        FD_ZERO(&active_fd_set);
-        FD_SET(cw_fd, &active_fd_set);
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-        int sret = select(cw_fd + 1, &active_fd_set, NULL, NULL, &timeout);
-        if(sret < 0){
+        int wait_res = cw.wait_for_data(&cw, 1);
+        if(wait_res != evr_ok && wait_res != evr_end){
             goto out_with_close_cs;
         }
         if(!running){
             ret = evr_ok;
             goto out_with_close_cs;
         }
-        if(sret == 0){
+        if(wait_res == evr_end){
             continue;
         }
         if(evr_read_watch_blobs_body(&cw, &wbody) != evr_ok){
@@ -707,7 +712,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
     }
 #endif
     if(c->get_fd(c) == -1){
-        if(evr_connect_to_storage(c, cfg->storage_host, cfg->storage_port) != evr_ok){
+        if(evr_tls_connect_once(c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
             log_error("Failed to connect to evr-glacier-storage server");
             goto out;
         }
@@ -757,8 +762,6 @@ int evr_index_sync_worker(void *arg){
     struct evr_file cw; // connection watch
     evr_file_bind_fd(&cw, -1);
     struct evr_attr_index_db *db = NULL;
-    fd_set active_fd_set;
-    struct timeval timeout;
     struct evr_watch_blobs_body wbody;
     struct evr_attr_spec_claim *spec = NULL;
     xsltStylesheetPtr style = NULL;
@@ -823,7 +826,7 @@ int evr_index_sync_worker(void *arg){
             if(!db){
                 goto out_with_free;
             }
-            if(evr_connect_to_storage(&cw, cfg->storage_host, cfg->storage_port) != evr_ok){
+            if(evr_tls_connect_once(&cw, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free;
             }
@@ -873,19 +876,14 @@ int evr_index_sync_worker(void *arg){
             log_debug("Index sync worker switch done");
             do{} while(0);
         }
-        int cw_fd = cw.get_fd(&cw);
-        FD_ZERO(&active_fd_set);
-        FD_SET(cw_fd, &active_fd_set);
-        timeout.tv_sec = 1;
-        timeout.tv_usec = 0;
-        int sret = select(cw_fd + 1, &active_fd_set, NULL, NULL, &timeout);
-        if(sret < 0){
+        int wait_res = cw.wait_for_data(&cw, 1);
+        if(wait_res != evr_ok && wait_res != evr_end){
             goto out_with_free;
         }
         if(!running){
             break;
         }
-        if(sret == 0){
+        if(wait_res == evr_end){
             evr_time now;
             evr_now(&now);
             // TODO we should use a time source which does not jump on ntpd actions
@@ -939,7 +937,8 @@ int evr_index_sync_worker(void *arg){
 xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
     struct evr_file *c = ctx;
     if(c->get_fd(c) == -1){
-        if(evr_connect_to_storage(c, cfg->storage_host, cfg->storage_port) != evr_ok){
+        // TODO reuse SSL_CTX and migrate to evr_tls_connect
+        if(evr_tls_connect_once(c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
             log_error("Failed to connect to evr-glacier-storage server");
             return NULL;
         }
@@ -953,7 +952,7 @@ int evr_attr_index_tcp_server(){
     if(s < 0){
         goto out;
     }
-    if(listen(s, 7) < 0){
+    if(listen(s, 7) != 0){
         log_error("Failed to listen on %s:%s", cfg->host, cfg->port);
         goto out_with_close_s;
     }
@@ -982,7 +981,7 @@ int evr_attr_index_tcp_server(){
                     if(!ctx){
                         goto loop;
                     }
-                    if(evr_tls_accept(&ctx->socket, s, ssl_ctx) != evr_ok){
+                    if(evr_tls_accept(&ctx->socket, s, ssl_server_ctx) != evr_ok){
                         goto out_with_free_ctx;
                     }
                     thrd_t t;
@@ -1297,7 +1296,7 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
     struct evr_file f;
     evr_file_bind_fd(&f, fd);
     struct evr_file c;
-    if(evr_connect_to_storage(&c, cfg->storage_host, cfg->storage_port) != evr_ok){
+    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_close_f;
     }

@@ -43,6 +43,7 @@
 #include "server.h"
 #include "configurations.h"
 #include "configp.h"
+#include "evr-tls.h"
 
 const char *argp_program_version = "evr-glacier-storage " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
@@ -52,12 +53,18 @@ static char doc[] = "evr-glacier-storage is a content addressable storage server
 static char args_doc[] = "";
 
 #define default_host "localhost"
+#define default_ssl_cert_path EVR_PREFIX "/etc/everarch/glacier-cert.pem"
+#define default_ssl_key_path EVR_PREFIX "/etc/everarch/glacier-key.pem"
 
 #define arg_host 256
+#define arg_ssl_cert_path 257
+#define arg_ssl_key_path 258
 
 static struct argp_option options[] = {
     {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
     {"port", 'p', "PORT", 0, "The tcp port at which the glacier storage server will listen. The default port is " to_string(evr_glacier_storage_port) "."},
+    {"cert", arg_ssl_cert_path, "FILE", 0, "The path to the pem file which contains the public SSL certificate. Default path is " default_ssl_cert_path "."},
+    {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
     // TODO max-bucket-size
     {"bucket-dir-path", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted."},
     {0},
@@ -76,6 +83,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case 'p':
         evr_replace_str(cfg->port, arg);
+        break;
+    case arg_ssl_cert_path:
+        evr_replace_str(cfg->ssl_cert_path, arg);
+        break;
+    case arg_ssl_key_path:
+        evr_replace_str(cfg->ssl_key_path, arg);
         break;
     }
     return 0;
@@ -128,9 +141,18 @@ int pipe_data(void *arg, const char *data, size_t data_size);
  */
 struct evr_glacier_storage_cfg *cfg;
 
+SSL_CTX *ssl_ctx;
+
 int main(int argc, char **argv){
     int ret = evr_error;
+    evr_log_app = "g";
+    evr_tls_init();
     evr_load_glacier_storage_cfg(argc, argv);
+    ssl_ctx = evr_create_ssl_server_ctx(cfg->ssl_cert_path, cfg->ssl_key_path);
+    if(!ssl_ctx){
+        log_error("Unable to configure SSL context");
+        goto out_with_free_configuration;
+    }
     {
         struct sigaction action;
         memset(&action, 0, sizeof(action));
@@ -142,15 +164,15 @@ int main(int argc, char **argv){
         // read https://sqlite.org/threadsafe.html if you run into
         // this error
         log_error("Failed to configure multi-threaded mode for sqlite3");
-        goto out_with_free_configuration;
+        goto out_with_free_ssl_ctx;
     }
     if(evr_quick_check_glacier(cfg) != evr_ok){
         log_error("Glacier quick check failed");
-        goto out_with_free_configuration;
+        goto out_with_free_ssl_ctx;
     }
     if(evr_persister_start(cfg) != evr_ok){
         log_error("Failed to start glacier persister thread");
-        goto out_with_free_configuration;
+        goto out_with_free_ssl_ctx;
     }
     int tcpret = evr_glacier_tcp_server(cfg);
     if(tcpret != evr_ok && tcpret != evr_end){
@@ -163,9 +185,12 @@ int main(int argc, char **argv){
         log_error("Failed to stop glacier persister thread");
         ret = evr_error;
     }
+ out_with_free_ssl_ctx:
+    SSL_CTX_free(ssl_ctx);
  out_with_free_configuration:
     // TODO we should wait for the worker threads to be finished before freeing config or maybe free config by OS when program ends?
     evr_free_glacier_storage_cfg(cfg);
+    evr_tls_free();
     return ret;
 }
 
@@ -177,6 +202,8 @@ void evr_load_glacier_storage_cfg(int argc, char **argv){
     }
     cfg->host = strdup(default_host);
     cfg->port = strdup(to_string(evr_glacier_storage_port));
+    cfg->ssl_cert_path = strdup(default_ssl_cert_path);
+    cfg->ssl_key_path = strdup(default_ssl_key_path);
     cfg->max_bucket_size = 1024 << 20;
     cfg->bucket_dir_path = strdup("~/var/everarch/glacier");
     if(!cfg->host || !cfg->port || !cfg->bucket_dir_path){
@@ -217,17 +244,17 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
         log_error("Failed to create socket");
         goto out;
     }
-    if(listen(s, 7) < 0){
+    if(listen(s, 7) != 0){
         log_error("Failed to listen on %s:%s", cfg->host, cfg->port);
         goto out_with_close_s;
     }
     log_info("Listening on %s:%s", cfg->host, cfg->port);
     fd_set active_fd_set;
-    struct sockaddr_in client_addr;
     while(running){
         FD_ZERO(&active_fd_set);
         FD_SET(s, &active_fd_set);
-        int sret = select(FD_SETSIZE, &active_fd_set, NULL, NULL, NULL);
+        const int fd_limit = s + 1;
+        int sret = select(fd_limit, &active_fd_set, NULL, NULL, NULL);
         if(sret == -1){
             // select returns -1 on sigint.
             ret = evr_end;
@@ -235,44 +262,43 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
         } else if(sret < 0){
             goto out_with_close_s;
         }
-        for(int i = 0; i < FD_SETSIZE; ++i){
+        for(int i = 0; i < fd_limit; ++i){
             if(FD_ISSET(i, &active_fd_set)){
                 if(i == s){
-                    // incomming connection request
-                    socklen_t size = sizeof(client_addr);
-                    int c = accept(s, (struct sockaddr*)&client_addr, &size);
-                    if(c < 0){
-                        goto out_with_close_s;
+                    struct evr_connection *ctx = malloc(sizeof(struct evr_connection));
+                    if(!ctx){
+                        continue;
                     }
-                    log_debug("Connection from %s:%d accepted (will be worker %d)", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), c);
-                    struct evr_connection *context = malloc(sizeof(struct evr_connection));
-                    if(!context){
-                        goto context_alloc_fail;
+                    if(evr_tls_accept(&ctx->socket, s, ssl_ctx) != evr_ok){
+                        goto out_with_free_ctx;
                     }
-                    evr_file_bind_fd(&context->socket, c);
                     thrd_t t;
-                    if(thrd_create(&t, evr_connection_worker, context) != thrd_success){
-                        goto thread_create_fail;
+                    if(thrd_create(&t, evr_connection_worker, ctx) != thrd_success){
+                        goto out_with_close_socket;
                     }
                     if(thrd_detach(t) != thrd_success){
                         evr_panic("Failed to detach connection worker thread");
+                        goto out_with_close_socket;
+                    }
+                    continue;
+                out_with_close_socket:
+                    if(ctx->socket.close(&ctx->socket) != 0){
+                        evr_panic("Unable to close connection socket");
+                        free(ctx);
                         goto out_with_close_s;
                     }
-                    goto end;
-                thread_create_fail:
-                    free(context);
-                context_alloc_fail:
-                    close(c);
-                    log_error("Failed to startup connection from %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-                end:
-                    continue;
+                out_with_free_ctx:
+                    free(ctx);
                 }
             }
         }
     }
     ret = evr_ok;
  out_with_close_s:
-    close(s);
+    if(close(s) != 0){
+        evr_panic("Unable to close listen socket.");
+        ret = evr_error;
+    }
  out:
     return ret;
 }
@@ -365,9 +391,11 @@ int evr_connection_worker(void *context){
         }
     }
     result = evr_ok;
+    int worker;
  end:
+    worker = ctx.socket.get_fd(&ctx.socket);
     if(ctx.socket.close(&ctx.socket) != 0){
-        evr_panic("Unable to close socket");
+        evr_panic("Unable to close socket of worker %d", worker);
         result = evr_error;
     }
     if(rctx){
@@ -375,7 +403,7 @@ int evr_connection_worker(void *context){
             result = evr_error;
         }
     }
-    log_debug("Ended worker %d with result %d", ctx.socket.get_fd(&ctx.socket), result);
+    log_debug("Ended worker %d with result %d", worker, result);
     return result;
 }
 

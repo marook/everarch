@@ -40,8 +40,6 @@
 #include "glacier-cmd.h"
 #include "files.h"
 
-int evr_connect_to_storage(struct evr_file *f, char *host, char *port);
-
 xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key);
 
 xmlDocPtr evr_fetch_signed_xml(struct evr_file *f, evr_blob_ref key);

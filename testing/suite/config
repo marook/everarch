@@ -8,6 +8,7 @@ PATH="../../../src:${PATH}"
 glacier_storage_port=2461
 glacier_storage_bucket_dir=storage
 glacier_storage_pid=
+glacier_storage_cert_path="${script_dir}/../tls/glacier-cert.pem"
 
 secondary_glacier_storage_port=2561
 secondary_glacier_storage_bucket_dir=secondary-storage
@@ -16,7 +17,7 @@ secondary_glacier_storage_pid=
 attr_index_port=2462
 attr_index_state_dir=attr-index
 attr_index_pid=
-attr_index_cert_path=attr-index-cert.pem
+attr_index_cert_path="${script_dir}/../tls/attr-index-cert.pem"
 
 if [ -e "${script_dir}/config.local" ]
 then
@@ -32,6 +33,8 @@ allocate_ports() {
 write_evr_conf() {
     cat > evr.conf <<EOF
 storage-port=${glacier_storage_port}
+ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
+ssl-cert=localhost:${secondary_glacier_storage_port}:${glacier_storage_cert_path}
 EOF
 }
 
@@ -39,7 +42,7 @@ start_glacier_storage() {
     rm -rf -- "${glacier_storage_bucket_dir}"
     mkdir -- "${glacier_storage_bucket_dir}"
     echo "Starting evr-glacier-storage…"
-    evr-glacier-storage --port "${glacier_storage_port}" --bucket-dir-path "${glacier_storage_bucket_dir}" &
+    evr-glacier-storage --port "${glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --bucket-dir-path "${glacier_storage_bucket_dir}" &
     glacier_storage_pid=$!
 }
 
@@ -51,7 +54,7 @@ start_secondary_glacier_storage() {
     rm -rf -- "${secondary_glacier_storage_bucket_dir}"
     mkdir -- "${secondary_glacier_storage_bucket_dir}"
     echo "Starting secondary evr-glacier-storage…"
-    evr-glacier-storage --port "${secondary_glacier_storage_port}" --bucket-dir-path "${secondary_glacier_storage_bucket_dir}" &
+    evr-glacier-storage --port "${secondary_glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --bucket-dir-path "${secondary_glacier_storage_bucket_dir}" &
     secondary_glacier_storage_pid=$!
 }
 
@@ -63,7 +66,7 @@ start_attr_index() {
     rm -rf -- "${attr_index_state_dir}"
     mkdir -- "${attr_index_state_dir}"
     echo "Starting evr-attr-index…"
-    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" --cert "${attr_index_cert_path}" --key attr-index-key.pem &
+    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" --cert "${attr_index_cert_path}" --key "${script_dir}/../tls/attr-index-key.pem" --ssl-cert "localhost:${glacier_storage_port}:${glacier_storage_cert_path}" &
     attr_index_pid=$!
 }
 

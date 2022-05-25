@@ -33,6 +33,8 @@
 struct evr_glacier_storage_cfg {
     char *host;
     char *port;
+    char *ssl_cert_path;
+    char *ssl_key_path;
     
     /**
      * max_bucket_size is the maximum size of one bucket in bytes.

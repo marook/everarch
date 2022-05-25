@@ -27,6 +27,8 @@ void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg){
     char *str_options[] = {
         cfg->host,
         cfg->port,
+        cfg->ssl_cert_path,
+        cfg->ssl_key_path,
         cfg->bucket_dir_path,
     };
     char **str_options_end = &str_options[sizeof(str_options) / sizeof(char*)];

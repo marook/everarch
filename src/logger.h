@@ -40,6 +40,13 @@
  */
 extern int evr_log_fd;
 
+/**
+ * evr_log_app is an extra identifier which is added to all log
+ * statements. It should identify the application. Usefull if multiple
+ * applications dump their logs to the same output stream.
+ */
+extern char *evr_log_app;
+
 #define evr_log_level_debug "D"
 #define evr_log_level_info "I"
 #define evr_log_level_error "E"

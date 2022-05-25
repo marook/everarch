@@ -32,6 +32,7 @@
 #include "logger.h"
 
 int evr_file_fd_get_fd(struct evr_file *f);
+size_t evr_file_fd_pending(struct evr_file *f);
 ssize_t evr_file_fd_read(struct evr_file *f, void *buf, size_t count);
 ssize_t evr_file_fd_write(struct evr_file *f, const void *buf, size_t count);
 int evr_file_fd_close(struct evr_file *f);
@@ -39,6 +40,8 @@ int evr_file_fd_close(struct evr_file *f);
 void evr_file_bind_fd(struct evr_file *f, int fd){
     f->ctx.i = fd;
     f->get_fd = evr_file_fd_get_fd;
+    f->wait_for_data = evr_file_select;
+    f->pending = evr_file_fd_pending;
     f->read = evr_file_fd_read;
     f->write = evr_file_fd_write;
     f->close = evr_file_fd_close;
@@ -48,6 +51,33 @@ void evr_file_bind_fd(struct evr_file *f, int fd){
 
 int evr_file_fd_get_fd(struct evr_file *f){
     return evr_file_get_fd(f);
+}
+
+int evr_file_select(struct evr_file *f, int timeout){
+    fd_set active_fd_set;
+    int fd = f->get_fd(f);
+    if(fd < 0){
+        return evr_error;
+    }
+    FD_ZERO(&active_fd_set);
+    FD_SET(fd, &active_fd_set);
+    struct timeval tv;
+    if(timeout > 0){
+        tv.tv_sec = timeout;
+        tv.tv_usec = 0;
+    }
+    int sres = select(fd + 1, &active_fd_set, NULL, NULL, timeout > 0 ? &tv : NULL);
+    if(sres < 0){
+        return evr_error;
+    }
+    if(sres == 0){
+        return evr_end;
+    }
+    return evr_ok;
+}
+
+size_t evr_file_fd_pending(struct evr_file *f){
+    return 0;
 }
 
 ssize_t evr_file_fd_read(struct evr_file *f, void *buf, size_t count){

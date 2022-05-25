@@ -1,6 +1,3 @@
-* migrate tcp sockets to tls
-remove the unencrypted tcp ports and only allow tls secured tcp
-connections.
 * add authentication
 think of some kind of authentication for the network sockets and
 implement it.
