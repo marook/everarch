@@ -109,9 +109,31 @@ void test_evr_time(){
 
 #undef assert_invalid_syntaxt
 
+void test_split_n(){
+    char *s = strdup("a:bb:ccc");
+    assert(s);
+    const size_t fragments_len = 4;
+    char *fragments[fragments_len];
+    assert(is_ok(evr_split_n(fragments, 3, s, ':')));
+    assert(is_str_eq(fragments[0], "a"));
+    assert(is_str_eq(fragments[1], "bb"));
+    assert(is_str_eq(fragments[2], "ccc"));
+    free(s);
+    s = strdup("a:bb:ccc");
+    assert(is_err(evr_split_n(fragments, 4, s, ':')));
+    free(s);
+    s = strdup("a:bb:ccc");
+    assert(is_err(evr_split_n(fragments, 2, s, ':')));
+    free(s);
+    s = strdup("a:bb:ccc");
+    assert(is_err(evr_split_n(fragments, 0, s, ':')));
+    free(s);
+}
+
 int main(){
     run_test(test_evr_trim);
     run_test(test_buf_pos_checksums);
     run_test(test_evr_time);
+    run_test(test_split_n);
     return 0;
 }

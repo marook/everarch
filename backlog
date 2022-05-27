@@ -1,6 +1,3 @@
-* add authentication
-think of some kind of authentication for the network sockets and
-implement it.
 * make accepted gpg keys for verfification configurable
 right now the blob signature verification accepts all valid gpg
 keys. we only want to accept certain gpg keys which are probably our
@@ -54,6 +51,9 @@ index-seed must be provided by transformation.
 right now there are some keywords in attr-query language like for
 example 'ref'. think about future keywords and reserve them so nobody
 must rewrite queries in the future.
+* make attr-index host and port configurabel in evr.el
+right now it's hard coded in two places. first where the connection is
+opened. second where the auth token is looked up.
 * ---- v0.1 boundary ----
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
@@ -148,6 +148,9 @@ regarding to it. also the chunk size should not grow over 1MB.
 
 there should also be a function for writing linked lists to a file
 descriptor using writev.
+
+** TODO struct evr_auth_token_cfg should use the linked list
+** TODO struct evr_cert_cfg should use the linked list
 * use writev instead of buf copying
 writev can write mutliple buffers in one system call. this may reduce
 the amout of memory being copied before a write call. there are

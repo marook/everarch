@@ -11,6 +11,7 @@ bin_PROGRAMS = \
 
 check_PROGRAMS = \
 	attr-index-db-test \
+	auth-test \
 	basics-test \
 	claims-test \
 	concurrent-glacier-test \
@@ -27,6 +28,7 @@ check_PROGRAMS = \
 
 TESTS = \
 	attr-index-db-test \
+	auth-test \
 	basics-test \
 	claims-test \
 	configp-test \
@@ -63,6 +65,13 @@ attr_index_db_test_SOURCES = \
 	subprocess.c
 attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
+
+auth_test_SOURCES = \
+	assert.c \
+	auth.c \
+	auth-test.c \
+	basics.c \
+	logger.c
 
 basics_test_SOURCES = \
 	assert.c \
@@ -108,6 +117,7 @@ evr_attr_index_SOURCES = \
 	attr-query-lexer.l \
 	attr-query-parser.y \
 	attr-query-sql.c \
+	auth.c \
 	basics.c \
 	claims.c \
 	configurations.c \
@@ -129,6 +139,7 @@ evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_SOURCES = \
+	auth.c \
 	basics.c \
 	claims.c \
 	configp.c \
@@ -145,6 +156,7 @@ evr_SOURCES = \
 evr_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
 
 evr_glacier_storage_SOURCES = \
+	auth.c \
 	basics.c \
 	concurrent-glacier.c \
 	configurations.c \
@@ -164,6 +176,7 @@ evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(SSL_LIBS)
 
 evr_tls_test_SOURCES = \
 	assert.c \
+	basics.c \
 	dyn-mem.c \
 	evr-tls.c \
 	evr-tls-test.c \

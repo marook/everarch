@@ -45,6 +45,10 @@ fwpid=$!
 ( evr watch --flags-filter 1 --last-modified-after 0 > claims-watch.actual.log ) &
 cwpid=$!
 
+# test unauthorized request has no measurable impact on storage
+echo 'Test unauthorized access...'
+echo 'unauthorized value' | evr --auth-token "localhost:${glacier_storage_port}:00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff" put && exit 1 || true
+
 sleep 1
 
 kill "${ewpid}"

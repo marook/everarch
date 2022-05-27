@@ -41,6 +41,7 @@
 #include "configp.h"
 #include "handover.h"
 #include "evr-tls.h"
+#include "auth.h"
 
 const char *argp_program_version = "evr-glacier-cli " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
@@ -68,11 +69,13 @@ static char args_doc[] = "CMD";
 #define arg_ssl_cert 258
 #define arg_blobs_sort_order 259
 #define arg_two_way 260
+#define arg_auth_token 261
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
     {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of the server. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
+    {"auth-token", arg_auth_token, "HOST:PORT:TOKEN", 0, "A hostname, port and authorization token which is presented to the server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"flags", 'f', "F", 0, "Use the given flags when put a blob to evr-glacier-storage."},
     {"flags-filter", 'f', "F", 0, "Only watch blobs which have set at least the given flag bits."},
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
@@ -97,6 +100,7 @@ struct cli_cfg {
     int cmd;
     char *storage_host;
     char *storage_port;
+    struct evr_auth_token_cfg *auth_tokens;
     struct evr_cert_cfg *ssl_certs;
     char *key;
     char *file;
@@ -157,6 +161,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case arg_storage_port:
         evr_replace_str(cfg->storage_port, arg);
+        break;
+    case arg_auth_token:
+        if(evr_parse_and_push_auth_token(&cfg->auth_tokens, arg) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
         break;
     case arg_ssl_cert:
         if(evr_parse_and_push_cert(&cfg->ssl_certs, arg) != evr_ok){
@@ -309,6 +319,7 @@ int main(int argc, char **argv){
     cfg.cmd = cli_cmd_none;
     cfg.storage_host = strdup(evr_glacier_storage_host);
     cfg.storage_port = strdup(to_string(evr_glacier_storage_port));
+    cfg.auth_tokens = NULL;
     cfg.ssl_certs = NULL;
     cfg.key = NULL;
     cfg.file = NULL;
@@ -382,10 +393,13 @@ int main(int argc, char **argv){
             free(*it);
         }
     }
+    evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
     evr_tls_free();
     return ret;
 }
+
+int evr_connect_to_storage(struct evr_file *f, struct cli_cfg *cfg, char *host, char *port);
 
 int evr_cli_get(struct cli_cfg *cfg){
     int result = evr_error;
@@ -395,8 +409,7 @@ int evr_cli_get(struct cli_cfg *cfg){
         goto fail;
     }
     struct evr_file c;
-    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto fail;
     }
     struct evr_resp_header resp;
@@ -440,8 +453,7 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
         goto out;
     }
     struct evr_file c;
-    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out;
     }
     evr_blob_ref blob_ref;
@@ -521,8 +533,7 @@ int evr_cli_put(struct cli_cfg *cfg){
         goto out_with_free_blob;
     }
     struct evr_file c;
-    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out_with_free_blob;
     }
     if(evr_stat_and_put(&c, key, cfg->flags, blob) != evr_ok){
@@ -581,8 +592,7 @@ int evr_cli_sign_put(struct cli_cfg *cfg){
         goto out_with_free_signed_buf;
     }
     struct evr_file c;
-    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out_with_free_signed_buf;
     }
     if(evr_stat_and_put(&c, key, cfg->flags, &signed_cs) != evr_ok){
@@ -625,8 +635,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
         goto out;
     }
     struct evr_file c;
-    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out;
     }
     evr_blob_ref bref;
@@ -724,8 +733,7 @@ int evr_cli_post_file(struct cli_cfg *cfg){
         }
     }
     struct post_file_ctx ctx;
-    if(evr_tls_connect_once(&ctx.c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&ctx.c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out_with_close_f;
     }
     ctx.slices = alloc_dynamic_array(100 * sizeof(struct evr_file_slice));
@@ -848,8 +856,7 @@ int evr_cli_watch_blobs(struct cli_cfg *cfg){
     f.flags_filter = cfg->flags;
     f.last_modified_after = cfg->last_modified_after;
     struct evr_file c;
-    if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to evr-glacier-storage server");
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out;
     }
     if(evr_req_cmd_watch_blobs(&c, &f) != evr_ok){
@@ -950,13 +957,11 @@ int evr_cli_sync(struct cli_cfg *cfg) {
     const size_t sync_thrd_count = 4;
     thrd_t sync_thrds[sync_thrd_count];
     struct evr_file src_c;
-    if(evr_tls_connect_once(&src_c, cfg->src_storage_host, cfg->src_storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to source evr-glacier-storage server");
+    if(evr_connect_to_storage(&src_c, cfg, cfg->src_storage_host, cfg->src_storage_port) != evr_ok){
         goto out;
     }
     struct evr_file dst_c;
-    if(evr_tls_connect_once(&dst_c, cfg->dst_storage_host, cfg->dst_storage_port, cfg->ssl_certs) != evr_ok){
-        log_error("Failed to connect to destination evr-glacier-storage-server");
+    if(evr_connect_to_storage(&dst_c, cfg, cfg->dst_storage_host, cfg->dst_storage_port) != evr_ok){
         goto out_with_close_src_c;
     }
     struct evr_blob_filter f;
@@ -1156,16 +1161,14 @@ int blob_sync_worker(void *context){
 #endif
             }
             if(c_src.get_fd(&c_src) == -1){
-                // TODO reuse SSL_CTX from outside worker
-                if(evr_tls_connect_once(&c_src, ctx->cfg->src_storage_host, ctx->cfg->src_storage_port, ctx->cfg->ssl_certs) != evr_ok){
-                    log_error("Failed to connect to source evr-glacier-storage server");
+                // TODO reuse SSL_CTX and auth-token from outside worker
+                if(evr_connect_to_storage(&c_src, ctx->cfg, ctx->cfg->src_storage_host, ctx->cfg->src_storage_port) != evr_ok){
                     goto continue_with_retry;
                 }
             }
             if(c_dst.get_fd(&c_dst) == -1){
-                // TODO reuse SSL_CTX from outside worker
-                if(evr_tls_connect_once(&c_dst, ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port, ctx->cfg->ssl_certs) != evr_ok){
-                    log_error("Failed to connect to destination evr-glacier-storage server");
+                // TODO reuse SSL_CTX and auth-token from outside worker
+                if(evr_connect_to_storage(&c_dst, ctx->cfg, ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port) != evr_ok){
                     goto continue_with_retry;
                 }
             }
@@ -1252,4 +1255,20 @@ int blob_sync_worker(void *context){
  out:
     log_debug("blob_sync_worker ending with status %d", ret);
     return ret;
+}
+
+int evr_connect_to_storage(struct evr_file *c, struct cli_cfg *cfg, char *host, char *port){
+    struct evr_auth_token_cfg *t_cfg;
+    if(evr_find_auth_token(&t_cfg, cfg->auth_tokens, host, port) != evr_ok){
+        log_error("No auth token found for server %s:%s", host, port);
+        return evr_error;
+    }
+    if(evr_tls_connect_once(c, host, port, cfg->ssl_certs) != evr_ok){
+        log_error("Failed to connect to evr-glacier-storage server %s:%s", host, port);
+        return evr_error;
+    }
+    if(evr_write_auth_token(c, t_cfg->token) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
 }

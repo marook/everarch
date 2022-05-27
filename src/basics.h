@@ -219,3 +219,9 @@ void evr_time_to_iso8601(char *s, size_t sn, const evr_time *t);
     } while(0)
 
 #endif
+
+/**
+ * evr_split_n will separate s into fragments by replacing sep in s
+ * with '\0' and return pointers to each fragment.
+ */
+int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep);

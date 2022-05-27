@@ -23,18 +23,27 @@
 
 #include <stddef.h>
 
+#include "auth.h"
+
 /**
  * evr_glacier_storage_cfg aggregates configuration options
  * for the evr-glacier-storage application.
  *
  * All pointers within this structure must be freed using
  * free_evr_glacier_storage_cfg function.
+ *
+ * Here are some places you might need to touch if you modify struct:
+ * 1) evr_free_glacier_storage_cfg(…)
+ * 2) create_temp_evr_glacier_storage_cfg(…) in configuration-testutil.c
+ * 3) clone_config(…) in glacier-test.c
  */
 struct evr_glacier_storage_cfg {
     char *host;
     char *port;
     char *ssl_cert_path;
     char *ssl_key_path;
+    int auth_token_set;
+    evr_auth_token auth_token;
     
     /**
      * max_bucket_size is the maximum size of one bucket in bytes.

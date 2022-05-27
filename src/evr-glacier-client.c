@@ -28,6 +28,19 @@
 #include "logger.h"
 #include "signatures.h"
 
+int evr_write_auth_token(struct evr_file *f, evr_auth_token t){
+    char buf[sizeof(uint8_t) + sizeof(evr_auth_token)];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    int auth_type = evr_auth_type_token;
+    evr_push_as(&bp, &auth_type, uint8_t);
+    evr_push_n(&bp, t, sizeof(evr_auth_token));
+    if(write_n(f, buf, sizeof(buf)) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
 xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key){
     xmlDocPtr doc = NULL;
     struct evr_resp_header resp;

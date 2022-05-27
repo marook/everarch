@@ -132,3 +132,29 @@ void evr_time_to_iso8601(char *s, size_t s_size, const evr_time *t){
     *p++ = '.';
     sprintf(p, "%0" to_string(evr_second_fraction_digits) "dZ", ms);
 }
+
+int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep){
+    if(fragments_len == 0){
+        return evr_error;
+    }
+    const size_t s_size = strlen(s) + 1;
+    char *s_end = &s[s_size];
+    int fi = 0;
+    fragments[fi++] = s;
+    for(char *cs = s; cs != s_end; ++cs){
+        if(*cs == sep){
+            if(fi >= fragments_len){
+                log_debug("Expected %lu fragments separated by '%c' for separation but got more", fragments_len, sep);
+                return evr_error;
+            }
+            *cs = '\0';
+            fragments[fi] = cs + 1;
+            ++fi;
+        }
+    }
+    if(fi != fragments_len){
+        log_debug("Expected %lu fragments separated by '%c' for separation but got less", fragments_len, sep);
+        return evr_error;
+    }
+    return evr_ok;
+}

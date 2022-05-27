@@ -45,10 +45,12 @@
 #include "configp.h"
 #include "evr-tls.h"
 
-const char *argp_program_version = "evr-glacier-storage " VERSION;
+#define program_name "evr-glacier-storage"
+
+const char *argp_program_version = program_name " " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
-static char doc[] = "evr-glacier-storage is a content addressable storage server.";
+static char doc[] = program_name " is a content addressable storage server.";
 
 static char args_doc[] = "";
 
@@ -59,12 +61,14 @@ static char args_doc[] = "";
 #define arg_host 256
 #define arg_ssl_cert_path 257
 #define arg_ssl_key_path 258
+#define arg_auth_token 259
 
 static struct argp_option options[] = {
     {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
     {"port", 'p', "PORT", 0, "The tcp port at which the glacier storage server will listen. The default port is " to_string(evr_glacier_storage_port) "."},
     {"cert", arg_ssl_cert_path, "FILE", 0, "The path to the pem file which contains the public SSL certificate. Default path is " default_ssl_cert_path "."},
     {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
+    {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
     // TODO max-bucket-size
     {"bucket-dir-path", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted."},
     {0},
@@ -89,6 +93,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case arg_ssl_key_path:
         evr_replace_str(cfg->ssl_key_path, arg);
+        break;
+    case arg_auth_token:
+        if(evr_parse_auth_token(cfg->auth_token, arg) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->auth_token_set = 1;
         break;
     }
     return 0;
@@ -121,7 +132,7 @@ struct evr_list_blobs_ctx {
     struct evr_modified_blob blobs[evr_list_blobs_blobs_len];
 };
 
-void evr_load_glacier_storage_cfg(int argc, char **argv);
+int evr_load_glacier_storage_cfg(int argc, char **argv);
 
 void handle_sigterm(int signum);
 int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg);
@@ -147,7 +158,9 @@ int main(int argc, char **argv){
     int ret = evr_error;
     evr_log_app = "g";
     evr_tls_init();
-    evr_load_glacier_storage_cfg(argc, argv);
+    if(evr_load_glacier_storage_cfg(argc, argv) != evr_ok){
+        goto out_with_tls_free;
+    }
     ssl_ctx = evr_create_ssl_server_ctx(cfg->ssl_cert_path, cfg->ssl_key_path);
     if(!ssl_ctx){
         log_error("Unable to configure SSL context");
@@ -190,24 +203,28 @@ int main(int argc, char **argv){
  out_with_free_configuration:
     // TODO we should wait for the worker threads to be finished before freeing config or maybe free config by OS when program ends?
     evr_free_glacier_storage_cfg(cfg);
+ out_with_tls_free:
     evr_tls_free();
     return ret;
 }
 
-void evr_load_glacier_storage_cfg(int argc, char **argv){
+int evr_load_glacier_storage_cfg(int argc, char **argv){
     cfg = malloc(sizeof(struct evr_glacier_storage_cfg));
     if(!cfg){
         evr_panic("Unable to allocate memory for configuration");
-        return;
+        return evr_error;
     }
     cfg->host = strdup(default_host);
     cfg->port = strdup(to_string(evr_glacier_storage_port));
     cfg->ssl_cert_path = strdup(default_ssl_cert_path);
     cfg->ssl_key_path = strdup(default_ssl_key_path);
+    cfg->auth_token_set = 0;
+    memset(cfg->auth_token, 0, sizeof(cfg->auth_token));
     cfg->max_bucket_size = 1024 << 20;
     cfg->bucket_dir_path = strdup("~/var/everarch/glacier");
     if(!cfg->host || !cfg->port || !cfg->bucket_dir_path){
         evr_panic("Unable to allocate memory for configuration");
+        return evr_error;
     }
     struct configp configp = {
         options, parse_opt, args_doc, doc
@@ -220,14 +237,19 @@ void evr_load_glacier_storage_cfg(int argc, char **argv){
     };
     if(configp_parse(&configp, config_paths, cfg) != 0){
         evr_panic("Unable to parse config files");
-        return;
+        return evr_error;
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, cfg);
     evr_single_expand_property(cfg->bucket_dir_path, panic);
-    return;
+    if(cfg->auth_token_set == 0){
+        log_error("Setting an auth-token is mandatory. Call " program_name " --help for details how to set the auth-token.");
+        return evr_error;
+    }
+    return evr_ok;
  panic:
     evr_panic("Unable to expand configuration values");
+    return evr_error;
 }
 
 void handle_sigterm(int signum){
@@ -303,16 +325,19 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
     return ret;
 }
 
+int evr_authenticate_client(struct evr_file *c);
+
 int evr_connection_worker(void *context){
     int result = evr_error;
     struct evr_connection ctx = *(struct evr_connection*)context;
     free(context);
-    log_debug("Started worker %d", ctx.socket.get_fd(&ctx.socket));
+    const int worker = ctx.socket.get_fd(&ctx.socket);
+    log_debug("Started worker %d", worker);
+    if(evr_authenticate_client(&ctx.socket) != evr_ok){
+        goto end;
+    }
     struct evr_glacier_read_ctx *rctx = NULL;
-    // TODO i guess buffer is never used for storing responses. why do
-    // we make sure it fits evr_resp_header_n_size
-    const size_t buffer_size = max(evr_cmd_header_n_size, evr_resp_header_n_size);
-    char buffer[buffer_size];
+    char buffer[evr_cmd_header_n_size];
     struct evr_cmd_header cmd;
     while(running){
         const int header_result = read_n(&ctx.socket, buffer, evr_cmd_header_n_size);
@@ -391,9 +416,7 @@ int evr_connection_worker(void *context){
         }
     }
     result = evr_ok;
-    int worker;
  end:
-    worker = ctx.socket.get_fd(&ctx.socket);
     if(ctx.socket.close(&ctx.socket) != 0){
         evr_panic("Unable to close socket of worker %d", worker);
         result = evr_error;
@@ -405,6 +428,29 @@ int evr_connection_worker(void *context){
     }
     log_debug("Ended worker %d with result %d", worker, result);
     return result;
+}
+
+int evr_authenticate_client(struct evr_file *c){
+    char buf[sizeof(uint8_t) + sizeof(evr_auth_token)];
+    if(read_n(c, buf, sizeof(buf)) != evr_ok){
+        return evr_error;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    int auth_type;
+    evr_pull_as(&bp, &auth_type, uint8_t);
+    if(auth_type != evr_auth_type_token){
+        log_debug("Client tried to authenticate using unknown authentication type %d", auth_type);
+        return evr_error;
+    }
+    evr_auth_token token;
+    evr_pull_n(&bp, token, sizeof(evr_auth_token));
+    if(memcmp(cfg->auth_token, token, sizeof(evr_auth_token)) != 0){
+        log_debug("Client presented wrong auth token");
+        return evr_error;
+    }
+    log_debug("Client successfully authenticated");
+    return evr_ok;
 }
 
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){

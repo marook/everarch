@@ -60,6 +60,7 @@ evr-attr-index and prints the results into a new buffer."
     (process-send-string
      con
      (concat
+      "a token " (cdr (assoc-string "localhost:2362" evr-attr-index-authentication-tokens)) "\n"
       (mapconcat
        (lambda (args)
          (apply 'concat args))
@@ -70,6 +71,11 @@ evr-attr-index and prints the results into a new buffer."
             `("where " ,query)))
        " ")
       "\nexit\n"))))
+
+(defvar evr-attr-index-authentication-tokens
+  ()
+  "Assoc list of authentication tokens. Keys are HOST:PORT
+  strings. Values are authentication tokens.")
 
 (defvar evr-attr-index-results-mode-map
   (let ((map (make-keymap)))

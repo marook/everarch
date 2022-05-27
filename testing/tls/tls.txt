@@ -1,0 +1,7 @@
+The tls directory contains TLS public/private key pairs which must
+only be used for unit and integration test.
+
+If you need to create your own key pair you can use the following
+command:
+
+$ openssl req -newkey rsa:4096 -x509 -sha512 -nodes -out my-cert.pem -keyout my-key.pem

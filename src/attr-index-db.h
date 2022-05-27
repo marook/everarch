@@ -39,6 +39,7 @@
 #include <netinet/in.h>
 
 #include "claims.h"
+#include "auth.h"
 
 /**
  * evr_reindex_interval is the baseline for the interval in evr_time
@@ -52,9 +53,13 @@ struct evr_attr_index_cfg {
     char *port;
     char *ssl_cert_path;
     char *ssl_key_path;
+    int auth_token_set;
+    evr_auth_token auth_token;
     struct evr_cert_cfg *ssl_certs;
     char *storage_host;
     char *storage_port;
+    int storage_auth_token_set;
+    evr_auth_token storage_auth_token;
 };
 
 void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg);

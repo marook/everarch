@@ -45,6 +45,8 @@ struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(){
     config->port = strdup(to_string(evr_glacier_storage_port));
     config->ssl_cert_path = strdup("../testing/tls/glacier-cert.pem");
     config->ssl_key_path = strdup("../testing/tls/glacier-key.pem");
+    config->auth_token_set = 1;
+    memset(config->auth_token, 7, sizeof(config->auth_token));
     config->max_bucket_size = 10<<20;
     config->bucket_dir_path = new_temp_dir_path();
     log_info("Using %s as bucket dir", config->bucket_dir_path);

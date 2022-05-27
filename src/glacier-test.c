@@ -257,6 +257,8 @@ struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *con
     clone->port = clone_string(config->port);
     clone->ssl_cert_path = clone_string(config->ssl_cert_path);
     clone->ssl_key_path = clone_string(config->ssl_key_path);
+    clone->auth_token_set = config->auth_token_set;
+    memcpy(clone->auth_token, config->auth_token, sizeof(clone->auth_token));
     clone->max_bucket_size = config->max_bucket_size;
     clone->bucket_dir_path = clone_string(config->bucket_dir_path);
     return clone;

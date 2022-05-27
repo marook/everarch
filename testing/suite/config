@@ -9,15 +9,18 @@ glacier_storage_port=2461
 glacier_storage_bucket_dir=storage
 glacier_storage_pid=
 glacier_storage_cert_path="${script_dir}/../tls/glacier-cert.pem"
+glacier_storage_auth_token='ac78ca737213680040b3c6420f04d6ede163e3a15fef022d281af87f31e25179'
 
 secondary_glacier_storage_port=2561
 secondary_glacier_storage_bucket_dir=secondary-storage
 secondary_glacier_storage_pid=
+secondary_glacier_storage_auth_token='ee3e9ad7a89ef1745f54f91689207d27d1b976a2791dca30ce74aef5c251e40f'
 
 attr_index_port=2462
 attr_index_state_dir=attr-index
 attr_index_pid=
 attr_index_cert_path="${script_dir}/../tls/attr-index-cert.pem"
+attr_index_auth_token='7c0c40cb392ceeb42097988f21ed968f3590f25ae3deca8632e4a905cd340cbe'
 
 if [ -e "${script_dir}/config.local" ]
 then
@@ -34,7 +37,9 @@ write_evr_conf() {
     cat > evr.conf <<EOF
 storage-port=${glacier_storage_port}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
+auth-token=localhost:${glacier_storage_port}:${glacier_storage_auth_token}
 ssl-cert=localhost:${secondary_glacier_storage_port}:${glacier_storage_cert_path}
+auth-token=localhost:${secondary_glacier_storage_port}:${secondary_glacier_storage_auth_token}
 EOF
 }
 
@@ -42,7 +47,7 @@ start_glacier_storage() {
     rm -rf -- "${glacier_storage_bucket_dir}"
     mkdir -- "${glacier_storage_bucket_dir}"
     echo "Starting evr-glacier-storage…"
-    evr-glacier-storage --port "${glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --bucket-dir-path "${glacier_storage_bucket_dir}" &
+    evr-glacier-storage --port "${glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --auth-token "${glacier_storage_auth_token}" --bucket-dir-path "${glacier_storage_bucket_dir}" &
     glacier_storage_pid=$!
 }
 
@@ -54,7 +59,7 @@ start_secondary_glacier_storage() {
     rm -rf -- "${secondary_glacier_storage_bucket_dir}"
     mkdir -- "${secondary_glacier_storage_bucket_dir}"
     echo "Starting secondary evr-glacier-storage…"
-    evr-glacier-storage --port "${secondary_glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --bucket-dir-path "${secondary_glacier_storage_bucket_dir}" &
+    evr-glacier-storage --port "${secondary_glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --auth-token "${secondary_glacier_storage_auth_token}" --bucket-dir-path "${secondary_glacier_storage_bucket_dir}" &
     secondary_glacier_storage_pid=$!
 }
 
@@ -66,7 +71,7 @@ start_attr_index() {
     rm -rf -- "${attr_index_state_dir}"
     mkdir -- "${attr_index_state_dir}"
     echo "Starting evr-attr-index…"
-    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" --cert "${attr_index_cert_path}" --key "${script_dir}/../tls/attr-index-key.pem" --ssl-cert "localhost:${glacier_storage_port}:${glacier_storage_cert_path}" &
+    evr-attr-index --port "${attr_index_port}" --storage-port "${glacier_storage_port}" --storage-auth-token "${glacier_storage_auth_token}" --cert "${attr_index_cert_path}" --key "${script_dir}/../tls/attr-index-key.pem" --auth-token "${attr_index_auth_token}" --ssl-cert "localhost:${glacier_storage_port}:${glacier_storage_cert_path}" &
     attr_index_pid=$!
 }
 
@@ -80,6 +85,7 @@ wait_for_attr_index() {
 query_attr_index() {
     query="$1"
     socat ${socat_opts} "openssl:localhost:${attr_index_port},cafile=${attr_index_cert_path}" stdio <<EOF
+a token ${attr_index_auth_token}
 ${query}
 exit
 EOF

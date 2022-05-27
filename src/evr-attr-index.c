@@ -41,10 +41,12 @@
 #include "handover.h"
 #include "evr-tls.h"
 
-const char *argp_program_version = "evr-attr-index " VERSION;
+#define program_name "evr-attr-index"
+
+const char *argp_program_version = " " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
-static char doc[] = "evr-attr-index provides an index over a evr-glacier-storage server.";
+static char doc[] = program_name " provides an index over a evr-glacier-storage server.";
 
 static char args_doc[] = "";
 
@@ -59,6 +61,8 @@ static char args_doc[] = "";
 #define arg_ssl_cert_path 259
 #define arg_ssl_key_path 260
 #define arg_ssl_cert 261
+#define arg_storage_auth_token 262
+#define arg_auth_token 263
 
 static struct argp_option options[] = {
     {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
@@ -66,8 +70,10 @@ static struct argp_option options[] = {
     {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_glacier_attr_index_port) "."},
     {"cert", arg_ssl_cert_path, "FILE", 0, "The path to the pem file which contains the public SSL certificate. Default path is " default_ssl_cert_path "."},
     {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
+    {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
+    {"storage-auth-token", arg_storage_auth_token, "TOKEN", 0, "An authorization token which is presented to the storage server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of remote servers. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
     {0},
 };
@@ -98,11 +104,25 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     case arg_storage_port:
         evr_replace_str(cfg->storage_port, arg);
         break;
+    case arg_storage_auth_token:
+        if(evr_parse_auth_token(cfg->storage_auth_token, arg) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->storage_auth_token_set = 1;
+        break;
     case arg_ssl_cert:
         if(evr_parse_and_push_cert(&cfg->ssl_certs, arg) != evr_ok){
             usage(state);
             return ARGP_ERR_UNKNOWN;
         }
+        break;
+    case arg_auth_token:
+        if(evr_parse_auth_token(cfg->auth_token, arg) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->auth_token_set = 1;
         break;
     }
     return 0;
@@ -118,6 +138,7 @@ cnd_t stop_signal;
 
 struct evr_connection {
     struct evr_file socket;
+    int authenticated;
 };
 
 /**
@@ -156,7 +177,7 @@ struct evr_search_ctx {
     int parse_res;
 };
 
-void evr_load_attr_index_cfg(int argc, char **argv);
+int evr_load_attr_index_cfg(int argc, char **argv);
 
 void handle_sigterm(int signum);
 #define evr_init_attr_spec_handover_ctx(ctx) evr_init_handover_ctx(&(ctx)->handover)
@@ -174,6 +195,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
 int evr_attr_index_tcp_server();
 int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
+int evr_work_authenticate_cmd(struct evr_connection *ctx, char *query);
 int evr_work_search_cmd(struct evr_connection *ctx, char *query);
 int evr_respond_search_status(void *context, int parse_res, char *parse_errer);
 int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
@@ -188,7 +210,9 @@ int main(int argc, char **argv){
     int ret = evr_error;
     evr_log_app = "i";
     evr_tls_init();
-    evr_load_attr_index_cfg(argc, argv);
+    if(evr_load_attr_index_cfg(argc, argv) != evr_ok){
+        goto out_with_free_tls;
+    }
     ssl_server_ctx = evr_create_ssl_server_ctx(cfg->ssl_cert_path, cfg->ssl_key_path);
     if(!ssl_server_ctx){
         log_error("Unable to configure SSL context");
@@ -318,29 +342,34 @@ int main(int argc, char **argv){
     SSL_CTX_free(ssl_server_ctx);
  out_with_free_cfg:
     evr_free_attr_index_cfg(cfg);
+ out_with_free_tls:
     evr_tls_free();
     return ret;
 }
 
-void evr_load_attr_index_cfg(int argc, char **argv){
+int evr_load_attr_index_cfg(int argc, char **argv){
     cfg = malloc(sizeof(struct evr_attr_index_cfg));
     if(!cfg){
         evr_panic("Unable to allocate memory for configuration.");
-        return;
+        return evr_error;
     }
     cfg->state_dir_path = strdup(default_state_dir_path);
     cfg->host = strdup(default_host);
     cfg->port = strdup(to_string(evr_glacier_attr_index_port));
     cfg->ssl_cert_path = strdup(default_ssl_cert_path);
     cfg->ssl_key_path = strdup(default_ssl_key_path);
+    cfg->auth_token_set = 0;
     cfg->storage_host = strdup(evr_glacier_storage_host);
     cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
+    cfg->storage_auth_token_set = 0;
     cfg->ssl_certs = NULL;
     if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
         evr_panic("Unable to allocate memory for configuration.");
+        return evr_error;
     }
     if(evr_push_cert(&cfg->ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         evr_panic("Unable to configure SSL certs");
+        return evr_error;
     }
     struct configp configp = {
         options, parse_opt, args_doc, doc
@@ -353,14 +382,23 @@ void evr_load_attr_index_cfg(int argc, char **argv){
     };
     if(configp_parse(&configp, config_paths, cfg) != 0){
         evr_panic("Unable to parse config files");
-        return;
+        return evr_error;
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, cfg);
     evr_single_expand_property(cfg->state_dir_path, panic);
-    return;
+    if(cfg->auth_token_set == 0){
+        log_error("Setting an auth-token is mandatory. Call " program_name " --help for details how to set the auth-token.");
+        return evr_error;
+    }
+    if(cfg->storage_auth_token_set == 0){
+        log_error("Setting a storage-auth-token is mandatory. Call " program_name " --help for details how to set the storage-auth-token.");
+        return evr_error;
+    }
+    return evr_ok;
  panic:
     evr_panic("Unable to expand configuration values");
+    return evr_error;
 }
 
 void handle_sigterm(int signum){
@@ -409,6 +447,9 @@ int evr_watch_index_claims_worker(void *arg){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_ssl_ctx;
     }
+    if(evr_write_auth_token(&cw, cfg->storage_auth_token) != evr_ok){
+        goto out_with_close_cw;
+    }
     struct evr_blob_filter filter;
     filter.sort_order = evr_cmd_watch_sort_order_last_modified;
     filter.flags_filter = evr_blob_flag_index_rule_claim;
@@ -450,6 +491,9 @@ int evr_watch_index_claims_worker(void *arg){
         if(cs.get_fd(&cs) == -1){
             if(evr_tls_connect(&cs, cfg->storage_host, cfg->storage_port, ssl_ctx) != evr_ok){
                 log_error("Failed to connect to evr-glacier-storage server");
+                goto out_with_free_latest_spec;
+            }
+            if(evr_write_auth_token(&cs, cfg->storage_auth_token) != evr_ok){
                 goto out_with_free_latest_spec;
             }
         }
@@ -636,6 +680,9 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_free_db;
     }
+    if(evr_write_auth_token(&cw, cfg->storage_auth_token) != evr_ok){
+        goto out_with_close_cw;
+    }
     xsltStylesheetPtr style = evr_fetch_stylesheet(&cw, spec->transformation_blob_ref);
     if(!style){
         goto out_with_close_cw;
@@ -714,6 +761,9 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
     if(c->get_fd(c) == -1){
         if(evr_tls_connect_once(c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
             log_error("Failed to connect to evr-glacier-storage server");
+            goto out;
+        }
+        if(evr_write_auth_token(c, cfg->storage_auth_token) != evr_ok){
             goto out;
         }
     }
@@ -830,6 +880,9 @@ int evr_index_sync_worker(void *arg){
                 log_error("Failed to connect to evr-glacier-storage server");
                 goto out_with_free;
             }
+            if(evr_write_auth_token(&cw, cfg->storage_auth_token) != evr_ok){
+                goto out_with_free;
+            }
             if(evr_prepare_attr_index_db(db) != evr_ok){
                 goto out_with_free;
             }
@@ -942,6 +995,13 @@ xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
             log_error("Failed to connect to evr-glacier-storage server");
             return NULL;
         }
+        if(evr_write_auth_token(c, cfg->storage_auth_token) != evr_ok){
+            if(c->close(c) != 0){
+                evr_panic("Unable to close connection");
+            }
+            evr_file_bind_fd(c, -1);
+            return NULL;
+        }
     }
     return evr_fetch_signed_xml(c, claim_set_ref);
 }
@@ -981,6 +1041,7 @@ int evr_attr_index_tcp_server(){
                     if(!ctx){
                         goto loop;
                     }
+                    ctx->authenticated = 0;
                     if(evr_tls_accept(&ctx->socket, s, ssl_server_ctx) != evr_ok){
                         goto out_with_free_ctx;
                     }
@@ -1076,11 +1137,16 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
         *args = '\0';
         ++args;
     }
-    if(strcmp(cmd, "s") == 0){
-        return evr_work_search_cmd(ctx, args);
+    if(strcmp(cmd, "a") == 0){
+        return evr_work_authenticate_cmd(ctx, args);
     }
-    if(strcmp(cmd, "c") == 0){
-        return evr_list_claims_for_seed(ctx, args);
+    if(ctx->authenticated) {
+       if(strcmp(cmd, "s") == 0){
+           return evr_work_search_cmd(ctx, args);
+       }
+       if(strcmp(cmd, "c") == 0){
+           return evr_list_claims_for_seed(ctx, args);
+       }
     }
     if(strcmp(cmd, "exit") == 0){
         return evr_end;
@@ -1093,6 +1159,31 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
     }
     return evr_respond_message_end(ctx);
 }
+
+int evr_work_authenticate_cmd(struct evr_connection *ctx, char *args_str){
+    const size_t args_len = 2;
+    char *args[args_len];
+    if(evr_split_n(args, args_len, args_str, ' ') != evr_ok){
+        // no logging of actual arguments to prevent accidential leak
+        // of credentials.
+        log_debug("Illegal authenticate arguments syntax");
+        return evr_error;
+    }
+    if(strcmp(args[0], "token") != 0){
+        log_debug("Unknown authentication method requested");
+        return evr_error;
+    }
+    evr_auth_token client_token;
+    if(evr_parse_auth_token(client_token, args[1]) != evr_ok){
+        return evr_error;
+    }
+    if(memcmp(cfg->auth_token, client_token, sizeof(evr_auth_token)) != 0){
+        log_debug("Client provided invalid authentication token");
+        return evr_error;
+    }
+    ctx->authenticated = 1;
+    return evr_ok;
+}    
 
 int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     int ret = evr_error;
@@ -1255,8 +1346,9 @@ int evr_respond_help(struct evr_connection *ctx){
         "These commands are defined.\n"
         "exit - closes the conneciton\n"
         "help - shows this help message\n"
-        "s QUERY - searches for claims matching the given query.\n"
-        "c REF - lists all claims referencing the given seed claim.\n"
+        "a TOKEN - authenticates with given token.\n"
+        "s QUERY - searches for claims matching the given query. Requires authentication.\n"
+        "c REF - lists all claims referencing the given seed claim. Requires authentication.\n"
         ;
     if(write_n(&ctx->socket, help, sizeof(help)) != evr_ok){
         goto out;
@@ -1299,6 +1391,9 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
     if(evr_tls_connect_once(&c, cfg->storage_host, cfg->storage_port, cfg->ssl_certs) != evr_ok){
         log_error("Failed to connect to evr-glacier-storage server");
         goto out_with_close_f;
+    }
+    if(evr_write_auth_token(&c, cfg->storage_auth_token) != evr_ok){
+        goto out_with_close_c;
     }
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(&c, ref, &resp) != evr_ok){

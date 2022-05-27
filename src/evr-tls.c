@@ -49,43 +49,15 @@ void evr_tls_free(){
 }
 
 int evr_parse_and_push_cert(struct evr_cert_cfg **cfg, char *cert_spec){
-#define state_host 1
-#define state_port 2
-#define state_cert_path 3
-    const size_t cert_spec_size = strlen(cert_spec) + 1;
-    char buf[cert_spec_size];
-    char *b = buf;
-    char *cs_end = &cert_spec[cert_spec_size];
-    char *host = buf;
-    char *port = NULL;
-    char *cert_path = NULL;
-    int state = state_host;
-    for(char *cs = cert_spec; cs != cs_end; ++cs){
-        if(*cs == ':'){
-            *b++ = '\0';
-            switch(state++){
-            default:
-                evr_panic("Unknown state %d reached when parsing cert", state);
-                return evr_error;
-            case state_host:
-                port = b;
-                break;
-            case state_port:
-                cert_path = b;
-                break;
-            }
-        } else {
-            *b++ = *cs;
-        }
-    }
-    if(state != state_cert_path){
+    char buf[strlen(cert_spec) + 1];
+    memcpy(buf, cert_spec, sizeof(buf));
+    const size_t fragments_len = 3;
+    char *fragments[fragments_len];
+    if(evr_split_n(fragments, fragments_len, buf, ':') != evr_ok){
         log_debug("Cert spec with illegal syntax detected: %s", cert_spec);
         return evr_error;
     }
-    return evr_push_cert(cfg, host, port, cert_path);
-#undef state_cert_path
-#undef state_port
-#undef state_host
+    return evr_push_cert(cfg, fragments[0], fragments[1], fragments[2]);
 }
 
 int evr_push_cert(struct evr_cert_cfg **cfg, char *host, char *port, char *cert_path){
