@@ -32,6 +32,8 @@ archive.
 
 @menu
 * Overview::   Explains what everarch is about.
+* Storing Data:: How is everarch storing data?
+* The Everarch Applications:: Lists the applications bundled with everarch.
 * Claims::     Details about the central data structure in everarch.
 * evr-attr-index::  How indexing and finding claims works.
 * Query Language::  Explains the claim query language.
@@ -56,8 +58,8 @@ store your data in a way that allows you to easily adopt new data
 structures without the need to migrate the existing data. 20 years of
 migration will rot your data away.
 @item
-detect corrupt or externally modified data and restore it with a
-partial backup
+detect corrupt or externally modified data and restore it with
+multiple partial backups
 @end itemize
 
 @noindent
@@ -67,6 +69,8 @@ What everarch is not:
 @item
 a database which handles inserts every few milliseconds over a long
 amount of time very well
+@item
+a multi user database which isolates each user's data
 @end itemize
 
 @noindent
@@ -74,6 +78,26 @@ everarch is right now in a pre alpha state. It's not intended to be
 used for your production data yet. Check out the backlog file to see
 what we are heading for in the v0.1 release.
 
+@node Storing Data
+@chapter Storing Data
+The central term when it comes to storing data in everarch is
+'claim'. You can think of claims as statements like 'roses are red'
+coded in XML so computers can interpret them easily.
+
+@example
+<thing-color xmlns="https://my.domain/my-claims" thing="rose" color="red">
+  Lately I was wandering through the garden and observed that roses are
+  actually red.
+</thing-color>
+@end example
+
+Everarch is storing these claims and can index them for finding them
+later.
+
+@c TODO describe term 'blob'
+
+@node The Everarch Applications
+@chapter The Everarch Applications
 The core everarch applications are the evr-glacier-storage server, the
 evr-attr-index server and a command line interface evr.
 
@@ -94,12 +118,12 @@ evr-attr-index server and a command line interface evr.
            | get / put                         | search index
 
   -----------------------               -----------------
-  |       evr           |               |    netcat     |
+  |       evr           |               |    socat      |
   -----------------------               -----------------
 @end example
 
-The evr-glacier-storage server stores claims and blob data in the
-bucket files. Claims are actually also stored as blobs but have some
+The evr-glacier-storage server stores claims and blob data in bucket
+files. Claims are actually also stored as blobs but have some
 additional attributes.
 
 We assume every blob has a unique reference which is derived from the
@@ -258,10 +282,34 @@ be used to update existing claims:
 
 @node Query Language
 @chapter Query Language
+The evr-attr-index server can be queried for seed claims which match a
+certain criteria.
 
-TODO
+You can either use the emacs evr.el module to perform searches or
+connect to the evr-attr-index server using a TLS aware client like socat.
 
-@c TODO at <timestamp>
+A complete search expression is made up of three optional parts:
+@itemize
+@item
+An attribute selector which declares the attributes that are reported
+for the matching seed claims.
+@item
+Conditions which must be fulfilled for each found seed claims.
+@item
+General search constraints like the effective time which should be used for the query and more.
+@end itemize
+
+A complete search query can look like this:
+
+@example
+select * where my-key=my-value && other-key=other-value at 2022-04-01T12:01:02.123000Z
+@end example
+
+The query above will find every seed claim which has the mattching
+keys and values. The search is executed as if it was the first of
+April in 2022. Every attribute of the found seed claims will be
+reported.
+
 @c TODO offset 0 limit 100
 
 @node Index
