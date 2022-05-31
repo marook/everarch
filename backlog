@@ -118,6 +118,17 @@ locked for more than 1sec (configured right now).
 
 a SQLITE_LOCKED error should be indicated as 'resource temporary not
 available' to the client.
+* evr-glacier-storage should notify systemd when ready
+the systemd service type notify uses a notification approach provided
+by libsystemd-daemon.so so the service can tell systemd it's
+ready. this notifications should be performed after
+evr-glacier-storage is listening on the socket for incomming
+connections.
+
+the configure.ac scripts should detect if systemd support is
+available. maybe it the libsystemd-daemos.so or something is
+present. if it is not found evr-glacier-storage must be compiled
+without any systemd dependency.
 * add quic support
 in order to get faster connection building and encryption.
 
