@@ -2,6 +2,26 @@
 the commands evr get and evr get-file must validate if the calculated
 hash matches the claim ref for each retrieved blob. evr must fail with
 an error code unequal 0 if the hashes don't match.
+* evr-attr-index must fail if it can't connect to evr-glacier-storage
+right now evr-attr-index keeps running if it can't connect to a
+evr-glacier-storage server. there is also no retry or something.
+
+#+BEGIN_SRC
+$ evr-attr-index
+2022-05-31T20:46:45 iD Parsing config file /home/marook/.config/everarch/attr-index.conf
+2022-05-31T20:46:45 iD Started watch index claims worker
+2022-05-31T20:46:45 iD Use SSL cert /home/marook/.local/etc/everarch/glacier-cert.pem for localhost:2361
+2022-05-31T20:46:45 iD Started build index worker
+2022-05-31T20:46:45 iD Started index sync worker
+2022-05-31T20:46:45 iI Listening on localhost:2362
+2022-05-31T20:46:45 iE Unable to connect to localhost:2361
+2022-05-31T20:46:45 iE Failed to connect to evr-glacier-storage server
+2022-05-31T20:46:45 iD Ended watch index claims worker with result 1
+#+END_SRC
+
+for now evr-attr-index must fail if the watchers can't connect. that
+should make the service more stable in combination with systemd's
+automatic restarts.
 * check glacier index.db and bucket file consistency on startup
 the end pointer (which is the first 4 bytes of each bucket) of the
 last written bucket should be stored in the index.db. also on startup
