@@ -1,0 +1,26 @@
+# evr-glacier-storage user service for system.
+#
+# Copy this file to ~/.config/systemd/user and enable and start the
+# service:
+#
+# $ systemd --user enable evr-glacier-storage.service
+# $ systemd --user start evr-glacier-storage.service
+
+[Unit]
+Description=evr-glacier-storage - The everarch storage server
+Documentation=info:evr
+StartLimitIntervalSec=60
+StartLimitBurst=4
+
+[Service]
+ExecStart=/usr/local/bin/evr-glacier-storage
+Restart=on-failure
+RestartSec=1
+
+# Hardening
+SystemCallArchitectures=native
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
