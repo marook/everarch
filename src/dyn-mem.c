@@ -180,3 +180,39 @@ int evr_chunk_setify(struct chunk_set *cs, char *buf, size_t size){
  out:
     return ret;
 }
+
+struct evr_llbuf *evr_init_llbuf(struct evr_buf_pos *bp, size_t data_size){
+    char *buf = malloc(sizeof(struct evr_buf_pos) + data_size);
+    if(!buf){
+        return NULL;
+    }
+    evr_init_buf_pos(bp, buf);
+    struct evr_llbuf *llb;
+    evr_map_struct(bp, llb);
+    llb->next = NULL;
+    llb->data = bp->pos;
+    return llb;
+}
+
+int evr_llbuf_push(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_size){
+    struct evr_llbuf *old = *llb;
+    *llb = evr_init_llbuf(bp, data_size);
+    if(!*llb){
+        *llb = old;
+        return evr_error;
+    }
+    (*llb)->next = old;
+    return evr_ok;
+}
+
+void evr_free_llbuf_chain(struct evr_llbuf *llb, void (*free_item)(void *item)){
+    struct evr_llbuf *l;
+    while(llb){
+        if(free_item){
+            free_item(llb->data);
+        }
+        l = llb->next;
+        free(llb);
+        llb = l;
+    }
+}

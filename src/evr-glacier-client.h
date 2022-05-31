@@ -40,12 +40,13 @@
 #include "glacier-cmd.h"
 #include "files.h"
 #include "auth.h"
+#include "signatures.h"
 
 int evr_write_auth_token(struct evr_file *f, evr_auth_token t);
 
 xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key);
 
-xmlDocPtr evr_fetch_signed_xml(struct evr_file *f, evr_blob_ref key);
+xmlDocPtr evr_fetch_signed_xml(struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key);
 
 xsltStylesheetPtr evr_fetch_stylesheet(struct evr_file *f, evr_blob_ref ref);
 

@@ -26,7 +26,6 @@
 #include "basics.h"
 #include "errors.h"
 #include "logger.h"
-#include "signatures.h"
 
 int evr_write_auth_token(struct evr_file *f, evr_auth_token t){
     char buf[sizeof(uint8_t) + sizeof(evr_auth_token)];
@@ -69,7 +68,7 @@ xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key){
     return doc;
 }
 
-xmlDocPtr evr_fetch_signed_xml(struct evr_file *f, evr_blob_ref key){
+xmlDocPtr evr_fetch_signed_xml(struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key){
     xmlDocPtr doc = NULL;
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(f, key, &resp) != evr_ok){
@@ -91,7 +90,7 @@ xmlDocPtr evr_fetch_signed_xml(struct evr_file *f, evr_blob_ref key){
     struct dynamic_array *claim = NULL;
     // first buf byte is blob flags which we ignore
     const size_t flags_size = 1;
-    if(evr_verify(&claim, &buf[flags_size], resp.body_size - flags_size) != evr_ok){
+    if(evr_verify(ctx, &claim, &buf[flags_size], resp.body_size - flags_size) != evr_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, key);
         log_error("Failed to verify claim with ref %s", fmt_key);

@@ -105,4 +105,24 @@ void evr_free_chunk_set(struct chunk_set *cs);
  */
 int evr_chunk_setify(struct chunk_set *cs, char *buf, size_t size);
 
+/**
+ * evr_llbuf is the everarch linked list buffer structure.
+ */
+struct evr_llbuf {
+    struct evr_llbuf *next;
+    void *data;
+};
+
+struct evr_llbuf *evr_init_llbuf(struct evr_buf_pos *bp, size_t data_size);
+
+int evr_llbuf_push(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_size);
+
+/**
+ * evr_free_llbuf_chain frees all linked struct evr_llbuf items.
+ *
+ * free_item may be provided to free data referenced by item before
+ * item itself freed. May be NULL if no such operation is necessary.
+ */
+void evr_free_llbuf_chain(struct evr_llbuf *llb, void (*free_item)(void *item));
+
 #endif

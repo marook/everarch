@@ -158,3 +158,7 @@ int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep){
     }
     return evr_ok;
 }
+
+int evr_strpcmp(char **l, char **r){
+    return strcmp(*l, *r);
+}

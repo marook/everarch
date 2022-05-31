@@ -39,6 +39,7 @@
 #include "subprocess.h"
 #include "files.h"
 #include "evr-tls.h"
+#include "signatures.h"
 
 void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
     if(!cfg){
@@ -60,6 +61,10 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
         }
     }
     evr_free_cert_chain(cfg->ssl_certs);
+    evr_free_llbuf_chain(cfg->accepted_gpg_fprs, NULL);
+    if(cfg->verify_ctx){
+        evr_free_verify_ctx(cfg->verify_ctx);
+    }
     free(cfg);
 }
 

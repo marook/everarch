@@ -1,6 +1,8 @@
 /config.local
 
 evr.conf
+glacier-storage.conf
+attr-index.conf
 storage
 secondary-storage
 attr-index

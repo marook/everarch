@@ -107,6 +107,26 @@ void test_allocate_chunk_set(){
     evr_free_chunk_set(cs);
 }
 
+void test_llbuf(){
+    evr_free_llbuf_chain(NULL, NULL);
+    struct evr_llbuf *llb = NULL;
+    struct evr_buf_pos bp;
+    int v = 42;
+    assert(is_ok(evr_llbuf_push(&llb, &bp, sizeof(int))));
+    evr_push_as(&bp, &v, int);
+    assert(llb);
+    assert(llb->next == NULL);
+    assert(*(int*)llb->data == 42);
+    struct evr_llbuf *first_llb = llb;
+    v = 123;
+    assert(is_ok(evr_llbuf_push(&llb, &bp, sizeof(int))));
+    evr_push_as(&bp, &v, int);
+    assert(llb);
+    assert(llb->next == first_llb);
+    assert(*(int*)llb->data == 123);
+    evr_free_llbuf_chain(llb, NULL);
+}
+
 int main(){
     run_test(test_fill_dynamic_array);
     run_test(test_rtrim_empty_array);
@@ -115,5 +135,6 @@ int main(){
     run_test(test_grow_dynamic_array_at_least_null);
     run_test(test_dynamic_array_remove);
     run_test(test_allocate_chunk_set);
+    run_test(test_llbuf);
     return 0;
 }

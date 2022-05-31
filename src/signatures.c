@@ -23,30 +23,43 @@
 
 #include "signatures.h"
 #include "errors.h"
-
-int evr_signatures_build_ctx(gpgme_ctx_t *ctx);
-int evr_signatures_read_data(struct dynamic_array **dest, gpgme_data_t d, size_t dest_size_hint);
+#include "logger.h"
 
 void evr_init_signatures(){
     gpgme_check_version(NULL);
 }
 
-int evr_sign(struct dynamic_array **dest, const char *s){
+int evr_signatures_build_ctx(gpgme_ctx_t *ctx);
+
+int evr_signatures_read_data(struct dynamic_array **dest, gpgme_data_t d, size_t dest_size_hint);
+
+int evr_sign(char *signing_key_fpr, struct dynamic_array **dest, const char *s){
     int ret = evr_error;
-    gpgme_ctx_t ctx;
-    if(evr_signatures_build_ctx(&ctx) != evr_ok){
+    gpgme_ctx_t gpg_ctx;
+    if(evr_signatures_build_ctx(&gpg_ctx) != evr_ok){
         goto out;
+    }
+    if(signing_key_fpr){
+        gpgme_key_t key;
+        if(gpgme_get_key(gpg_ctx, signing_key_fpr, &key, 0) != GPG_ERR_NO_ERROR){
+            goto out_with_release_gpg_ctx;
+        }
+        if(gpgme_signers_add(gpg_ctx, key) != GPG_ERR_NO_ERROR){
+            gpgme_key_release(key);
+            goto out_with_release_gpg_ctx;
+        }
+        gpgme_key_release(key);
     }
     size_t s_len = strlen(s);
     gpgme_data_t in;
     if(gpgme_data_new_from_mem(&in, s, s_len, 0) != GPG_ERR_NO_ERROR){
-        goto out_with_release_ctx;
+        goto out_with_release_gpg_ctx;
     }
     gpgme_data_t out;
     if(gpgme_data_new(&out) != GPG_ERR_NO_ERROR){
         goto out_with_release_in;
     }
-    if(gpgme_op_sign(ctx, in, out, GPGME_SIG_MODE_CLEAR) != GPG_ERR_NO_ERROR){
+    if(gpgme_op_sign(gpg_ctx, in, out, GPGME_SIG_MODE_CLEAR) != GPG_ERR_NO_ERROR){
         goto out_with_release_out;
     }
     if(evr_signatures_read_data(dest, out, s_len + 6 * 1024) != evr_ok){
@@ -57,28 +70,77 @@ int evr_sign(struct dynamic_array **dest, const char *s){
     gpgme_data_release(out);
  out_with_release_in:
     gpgme_data_release(in);
- out_with_release_ctx:
-    gpgme_release(ctx);
+ out_with_release_gpg_ctx:
+    gpgme_release(gpg_ctx);
  out:
     return ret;
 }
 
-int evr_verify(struct dynamic_array **dest, const char *s, size_t s_maxlen){
+struct evr_verify_ctx *evr_build_verify_ctx(struct evr_llbuf *accepted_gpg_fprs){
+    size_t fprs_len = 0;
+    for(struct evr_llbuf *p = accepted_gpg_fprs; p; p = p->next){
+        ++fprs_len;
+    }
+    char *fprs[fprs_len];
+    char **f = fprs;
+    for(struct evr_llbuf *p = accepted_gpg_fprs; p; p = p->next){
+        *f++ = p->data;
+    }
+    return evr_init_verify_ctx(fprs, fprs_len);
+}
+
+struct evr_verify_ctx* evr_init_verify_ctx(char **accepted_fprs, size_t accepted_fprs_len){
+    size_t accepted_fprs_size_sum = 0;
+    char **accepted_fprs_end = &accepted_fprs[accepted_fprs_len];
+    for(char **fprs = accepted_fprs; fprs != accepted_fprs_end; ++fprs){
+        accepted_fprs_size_sum += strlen(*fprs) + 1;
+    }
+    char *buf = malloc(sizeof(struct evr_verify_ctx) + accepted_fprs_len * sizeof(char*) + accepted_fprs_size_sum);
+    if(!buf){
+        return NULL;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_verify_ctx *ctx;
+    evr_map_struct(&bp, ctx);
+    ctx->accepted_fprs = (char**)bp.pos;
+    ctx->accepted_fprs_len = accepted_fprs_len;
+    evr_inc_buf_pos(&bp, accepted_fprs_len * sizeof(char*));
+    char **ctx_fpr = ctx->accepted_fprs;
+    for(char **fprs = accepted_fprs; fprs != accepted_fprs_end; ++fprs){
+        *ctx_fpr++ = bp.pos;
+        size_t fpr_size = strlen(*fprs) + 1;
+        evr_push_n(&bp, *fprs, fpr_size);
+    }
+    qsort(ctx->accepted_fprs, ctx->accepted_fprs_len, sizeof(*ctx->accepted_fprs), (int (*)(const void *l, const void *r))evr_strpcmp);
+    return ctx;
+}
+
+int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s);
+
+int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen){
     int ret = evr_error;
-    gpgme_ctx_t ctx;
-    if(evr_signatures_build_ctx(&ctx) != evr_ok){
+    gpgme_ctx_t gpg_ctx;
+    if(evr_signatures_build_ctx(&gpg_ctx) != evr_ok){
         goto out;
     }
     size_t s_len = strnlen(s, s_maxlen);
     gpgme_data_t in;
     if(gpgme_data_new_from_mem(&in, s, s_len, 0) != GPG_ERR_NO_ERROR){
-        goto out_with_release_ctx;
+        goto out_with_release_gpg_ctx;
     }
     gpgme_data_t out;
     if(gpgme_data_new(&out) != GPG_ERR_NO_ERROR){
         goto out_with_release_in;
     }
-    if(gpgme_op_verify(ctx, in, NULL, out) != GPG_ERR_NO_ERROR){
+    if(gpgme_op_verify(gpg_ctx, in, NULL, out) != GPG_ERR_NO_ERROR){
+        goto out_with_release_out;
+    }
+    gpgme_verify_result_t res = gpgme_op_verify_result(gpg_ctx);
+    if(res == NULL){
+        goto out_with_release_out;
+    }
+    if(evr_is_signature_accepted(ctx, res->signatures) != evr_ok){
         goto out_with_release_out;
     }
     if(evr_signatures_read_data(dest, out, s_len) != evr_ok){
@@ -89,10 +151,25 @@ int evr_verify(struct dynamic_array **dest, const char *s, size_t s_maxlen){
     gpgme_data_release(out);
  out_with_release_in:
     gpgme_data_release(in);
- out_with_release_ctx:
-    gpgme_release(ctx);
+ out_with_release_gpg_ctx:
+    gpgme_release(gpg_ctx);
  out:
     return ret;
+}
+
+int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s){
+    for(; s; s = s->next){
+        if((s->summary & GPGME_SIGSUM_VALID) == 0){
+            log_debug("Invalid signature of key with fingerprint %s found", s->fpr);
+            continue;
+        }
+        if(bsearch(&s->fpr, ctx->accepted_fprs, ctx->accepted_fprs_len, sizeof(*ctx->accepted_fprs), (int (*)(const void *l, const void *r))evr_strpcmp) == NULL){
+            log_debug("Valid but not accepted signature of key with fingerprint %s found", s->fpr);
+            continue;
+        }
+        return evr_ok;
+    }
+    return evr_error;
 }
 
 int evr_signatures_build_ctx(gpgme_ctx_t *ctx){

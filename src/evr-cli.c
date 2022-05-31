@@ -70,6 +70,8 @@ static char args_doc[] = "CMD";
 #define arg_blobs_sort_order 259
 #define arg_two_way 260
 #define arg_auth_token 261
+#define arg_accepted_gpg_key 262
+#define arg_signing_gpg_key 263
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
@@ -83,6 +85,8 @@ static struct argp_option options[] = {
     {"seed", 's', "REF", 0, "Makes the created claim reference another claim as seed."},
     {"blobs-sort-order", arg_blobs_sort_order, "ORDER", 0, "Prints watched blobs in this order. Possible values are '" sort_order_last_modified_key "' and '" sort_order_blob_ref_key "'. The sort-order '" sort_order_last_modified_key "' will continue to emit changed blobs as they change live. Other sort orders will end the connection after all relevant blob refs have been emitted. Default is '" sort_order_last_modified_key "'."},
     {"two-way", arg_two_way, NULL, 0, "Synchronizes also from destination server to source server instead of just from source to destination server."},
+    {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
+    {"signing-gpg-key", arg_signing_gpg_key, "FINGERPRINT", 0, "Fingerprint of the GPG key which is used for signing claims. You can call 'gpg --list-secret-keys' to see your known keys."},
     {0}
 };
 
@@ -120,6 +124,21 @@ struct cli_cfg {
     char *src_storage_port;
     char *dst_storage_host;
     char *dst_storage_port;
+
+    /**
+     * accepted_gpg_fprs contains the accepted gpg fingerprints for
+     * signed claims.
+     *
+     * The llbuf data points to a fingerprint string.
+     *
+     * This field is only filled during the initialization of the
+     * application. During runtime verify_ctx should be used.
+     */
+    struct evr_llbuf *accepted_gpg_fprs;
+
+    struct evr_verify_ctx *verify_ctx;
+
+    char *signing_gpg_fpr;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*usage)(const struct argp_state *state)){
@@ -186,6 +205,19 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case arg_two_way:
         cfg->two_way = 1;
+        break;
+    case arg_accepted_gpg_key: {
+        const size_t arg_size = strlen(arg) + 1;
+        struct evr_buf_pos bp;
+        if(evr_llbuf_push(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        evr_push_n(&bp, arg, arg_size);
+        break;
+    }
+    case arg_signing_gpg_key:
+        evr_replace_str(cfg->signing_gpg_fpr, arg);
         break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
@@ -335,6 +367,9 @@ int main(int argc, char **argv){
     cfg.src_storage_port = NULL;
     cfg.dst_storage_host = NULL;
     cfg.dst_storage_port = NULL;
+    cfg.accepted_gpg_fprs = NULL;
+    cfg.verify_ctx = NULL;
+    cfg.signing_gpg_fpr = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -350,6 +385,12 @@ int main(int argc, char **argv){
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, &cfg);
+    cfg.verify_ctx = evr_build_verify_ctx(cfg.accepted_gpg_fprs);
+    if(!cfg.verify_ctx){
+        goto out_with_free_cfg;
+    }
+    evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
+    cfg.accepted_gpg_fprs = NULL;
     switch(cfg.cmd){
     case cli_cmd_get:
         ret = evr_cli_get(&cfg);
@@ -385,6 +426,7 @@ int main(int argc, char **argv){
         cfg.src_storage_port,
         cfg.dst_storage_host,
         cfg.dst_storage_port,
+        cfg.signing_gpg_fpr,
     };
     void **tbfree_end = &tbfree[sizeof(tbfree) / sizeof(void*)];
  out_with_free_cfg:
@@ -395,6 +437,10 @@ int main(int argc, char **argv){
     }
     evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
+    evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
+    if(cfg.verify_ctx){
+        evr_free_verify_ctx(cfg.verify_ctx);
+    }
     evr_tls_free();
     return ret;
 }
@@ -459,7 +505,7 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
     evr_blob_ref blob_ref;
     int claim_index;
     evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
-    xmlDocPtr doc = evr_fetch_signed_xml(&c, blob_ref);
+    xmlDocPtr doc = evr_fetch_signed_xml(cfg->verify_ctx, &c, blob_ref);
     if(!doc){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
@@ -576,7 +622,7 @@ int evr_cli_sign_put(struct cli_cfg *cfg){
     }
     raw_buf->data[raw_buf->size_used] = '\0';
     struct dynamic_array *signed_buf = NULL;
-    if(evr_sign(&signed_buf, raw_buf->data) != evr_ok){
+    if(evr_sign(cfg->signing_gpg_fpr, &signed_buf, raw_buf->data) != evr_ok){
         goto out_with_free_signed_buf;
     }
     if(signed_buf->size_used > evr_max_blob_data_size){
@@ -641,7 +687,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
     evr_blob_ref bref;
     int claim;
     evr_split_claim_ref(bref, &claim, cref);
-    xmlDocPtr doc = evr_fetch_signed_xml(&c, bref);
+    xmlDocPtr doc = evr_fetch_signed_xml(cfg->verify_ctx, &c, bref);
     if(!doc){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
@@ -772,7 +818,7 @@ int evr_cli_post_file(struct cli_cfg *cfg){
         goto out_with_free_claim_set;
     }
     struct dynamic_array *sc = NULL;
-    if(evr_sign(&sc, (char*)cs.out->content) != evr_ok){
+    if(evr_sign(cfg->signing_gpg_fpr, &sc, (char*)cs.out->content) != evr_ok){
         log_error("Failed to sign file claim");
         goto out_with_free_claim_set;
     }

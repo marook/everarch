@@ -63,6 +63,7 @@ static char args_doc[] = "";
 #define arg_ssl_cert 261
 #define arg_storage_auth_token 262
 #define arg_auth_token 263
+#define arg_gpg_key 264
 
 static struct argp_option options[] = {
     {"state-dir-path", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
@@ -75,6 +76,7 @@ static struct argp_option options[] = {
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
     {"storage-auth-token", arg_storage_auth_token, "TOKEN", 0, "An authorization token which is presented to the storage server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of remote servers. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
+    {"accepted-gpg-key", arg_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
     {0},
 };
 
@@ -124,6 +126,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         }
         cfg->auth_token_set = 1;
         break;
+    case arg_gpg_key: {
+        const size_t arg_size = strlen(arg) + 1;
+        struct evr_buf_pos bp;
+        if(evr_llbuf_push(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        evr_push_n(&bp, arg, arg_size);
+        break;
+    }
     }
     return 0;
 }
@@ -359,16 +371,20 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     cfg->ssl_cert_path = strdup(default_ssl_cert_path);
     cfg->ssl_key_path = strdup(default_ssl_key_path);
     cfg->auth_token_set = 0;
+    cfg->ssl_certs = NULL;
     cfg->storage_host = strdup(evr_glacier_storage_host);
     cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
     cfg->storage_auth_token_set = 0;
-    cfg->ssl_certs = NULL;
+    cfg->accepted_gpg_fprs = NULL;
+    cfg->verify_ctx = NULL;
     if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
         evr_panic("Unable to allocate memory for configuration.");
+        // TODO free memory allocated in this function even if program terminates after returning evr_error here
         return evr_error;
     }
     if(evr_push_cert(&cfg->ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         evr_panic("Unable to configure SSL certs");
+        // TODO free memory allocated in this function even if program terminates after returning evr_error here
         return evr_error;
     }
     struct configp configp = {
@@ -382,6 +398,7 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     };
     if(configp_parse(&configp, config_paths, cfg) != 0){
         evr_panic("Unable to parse config files");
+        // TODO free memory allocated in this function even if program terminates after returning evr_error here
         return evr_error;
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
@@ -389,15 +406,30 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     evr_single_expand_property(cfg->state_dir_path, panic);
     if(cfg->auth_token_set == 0){
         log_error("Setting an auth-token is mandatory. Call " program_name " --help for details how to set the auth-token.");
+        // TODO free memory allocated in this function even if program terminates after returning evr_error here
         return evr_error;
     }
     if(cfg->storage_auth_token_set == 0){
         log_error("Setting a storage-auth-token is mandatory. Call " program_name " --help for details how to set the storage-auth-token.");
+        // TODO free memory allocated in this function even if program terminates after returning evr_error here
         return evr_error;
     }
+    if(!cfg->accepted_gpg_fprs){
+        log_error("Accepting at least one GPG fingerprint as accepted is mandatory. Otherwise nothing can be indexed. Call " program_name " --help for details how to accept GPG fingerprints.");
+        return evr_error;
+    }
+    cfg->verify_ctx = evr_build_verify_ctx(cfg->accepted_gpg_fprs);
+    if(!cfg->verify_ctx){
+        log_error("Unable to build gpg verification context.");
+        // TODO free memory allocated in this function even if program terminates after returning evr_error here
+        return evr_error;
+    }
+    evr_free_llbuf_chain(cfg->accepted_gpg_fprs, NULL);
+    cfg->accepted_gpg_fprs = NULL;
     return evr_ok;
  panic:
     evr_panic("Unable to expand configuration values");
+    // TODO free memory allocated in this function even if program terminates after returning evr_error here
     return evr_error;
 }
 
@@ -497,7 +529,7 @@ int evr_watch_index_claims_worker(void *arg){
                 goto out_with_free_latest_spec;
             }
         }
-        xmlDocPtr claim_doc = evr_fetch_signed_xml(&cs, body.key);
+        xmlDocPtr claim_doc = evr_fetch_signed_xml(cfg->verify_ctx, &cs, body.key);
         if(!claim_doc){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
@@ -767,7 +799,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
             goto out;
         }
     }
-    xmlDocPtr claim_set = evr_fetch_signed_xml(c, claim_set_ref);
+    xmlDocPtr claim_set = evr_fetch_signed_xml(cfg->verify_ctx, c, claim_set_ref);
     if(!claim_set){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
@@ -886,7 +918,7 @@ int evr_index_sync_worker(void *arg){
             if(evr_prepare_attr_index_db(db) != evr_ok){
                 goto out_with_free;
             }
-            xmlDocPtr cs_doc = evr_fetch_signed_xml(&cw, index_ref);
+            xmlDocPtr cs_doc = evr_fetch_signed_xml(cfg->verify_ctx, &cw, index_ref);
             if(!cs_doc){
                 evr_blob_ref_str fmt_key;
                 evr_fmt_blob_ref(fmt_key, index_ref);
@@ -1003,7 +1035,7 @@ xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
             return NULL;
         }
     }
-    return evr_fetch_signed_xml(c, claim_set_ref);
+    return evr_fetch_signed_xml(cfg->verify_ctx, c, claim_set_ref);
 }
 
 int evr_attr_index_tcp_server(){

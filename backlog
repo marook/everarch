@@ -1,11 +1,7 @@
-* make accepted gpg keys for verfification configurable
-right now the blob signature verification accepts all valid gpg
-keys. we only want to accept certain gpg keys which are probably our
-own.
-
-also the gpg public keys should be stored in the storage as
-blobs. that way they should never be lost. the configuration should
-reference the gpg keys sha3-224 hashes.
+* evr get commands must validate retrieved hashes
+the commands evr get and evr get-file must validate if the calculated
+hash matches the claim ref for each retrieved blob. evr must fail with
+an error code unequal 0 if the hashes don't match.
 * check glacier index.db and bucket file consistency on startup
 the end pointer (which is the first 4 bytes of each bucket) of the
 last written bucket should be stored in the index.db. also on startup
@@ -29,15 +25,18 @@ case conversion support the [[https://github.com/sqlite/sqlite/tree/master/ext/i
 
 test if this extension is part of the sqlite3 debian packaging. load
 it gracefully. log info if it can't be loaded and continue.
+* add claim-ref type in attr-spec's attr-def
+add a new type which tells the attr-index to expect a reference to a
+claim as value. attr-index should check if the value is parseable
+using evr_parse_claim_ref(…).
+* make attr-index host and port configurabel in evr.el
+right now it's hard coded in two places. first where the connection is
+opened. second where the auth token is looked up.
 * auto generate ssl cert and key if they don't exists
 use something like:
 #+BEGIN_SRC
 openssl req -newkey rsa:4096 -x509 -sha512 -nodes -out attr-index-cert.pem -keyout attr-index-key.pem
 #+END_SRC
-* add claim-ref type in attr-spec's attr-def
-add a new type which tells the attr-index to expect a reference to a
-claim as value. attr-index should check if the value is parseable
-using evr_parse_claim_ref(…).
 * add documentation on how to write attr-specs
 ** describe how attr is the central claim
 ** describe archive claim
@@ -51,9 +50,6 @@ index-seed must be provided by transformation.
 right now there are some keywords in attr-query language like for
 example 'ref'. think about future keywords and reserve them so nobody
 must rewrite queries in the future.
-* make attr-index host and port configurabel in evr.el
-right now it's hard coded in two places. first where the connection is
-opened. second where the auth token is looked up.
 * ---- v0.1 boundary ----
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
@@ -131,7 +127,8 @@ unfortunately. there are [[https://www.openssl.org/blog/blog/2021/12/03/starting
 support.
 * replace struct chunk_set with linked list
 dny-mem.h should provide one growable random access data structure and
-one growable linked list data structure.
+one growable linked list data structure. the growable linked list data
+structure is implemented in struct evr_llbuf.
 
 especially struct dynamic_array is not very well fitted for growing
 because of the evr_chunk_set_max_chunks limitation.

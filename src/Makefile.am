@@ -230,7 +230,9 @@ rollsum_test_SOURCES = \
 
 signatures_test_SOURCES = \
 	assert.c \
+	basics.c \
 	dyn-mem.c \
+	logger.c \
 	signatures.c \
 	signatures-test.c
 signatures_test_LDADD = $(GPGME_LIBS)

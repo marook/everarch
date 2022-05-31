@@ -60,6 +60,19 @@ struct evr_attr_index_cfg {
     char *storage_port;
     int storage_auth_token_set;
     evr_auth_token storage_auth_token;
+
+    /**
+     * accepted_gpg_fprs contains the accepted gpg fingerprints for
+     * signed claims.
+     *
+     * The llbuf data points to a fingerprint string.
+     *
+     * This field is only filled during the initialization of the
+     * application. During runtime verify_ctx should be used.
+     */
+    struct evr_llbuf *accepted_gpg_fprs;
+
+    struct evr_verify_ctx *verify_ctx;
 };
 
 void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg);

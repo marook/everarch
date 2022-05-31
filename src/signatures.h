@@ -38,12 +38,29 @@ void evr_init_signatures();
  * *dest may point to NULL. The struct dynamic_array will be allocated
  * in that case.
  */
-int evr_sign(struct dynamic_array **dest, const char *s);
+int evr_sign(char *signing_key_fpr, struct dynamic_array **dest, const char *s);
+
+struct evr_verify_ctx {
+    /**
+     * accepted_fprs is the list of accepted gpg fingerprints for
+     * validation.
+     *
+     * The list of fingerprints is sorted by strcmp.
+     */
+    char **accepted_fprs;
+    size_t accepted_fprs_len;
+};
+
+struct evr_verify_ctx *evr_build_verify_ctx(struct evr_llbuf *accepted_gpg_fprs);
+
+struct evr_verify_ctx* evr_init_verify_ctx(char **accepted_fprs, size_t accepted_fprs_len);
+
+#define evr_free_verify_ctx(ctx) free(ctx)
 
 /**
  * evr_verify will verify the signature attached to message s. Also it
  * will write the message without signature wrapping into dest.
  */
-int evr_verify(struct dynamic_array **dest, const char *s, size_t s_maxlen);
+int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen);
 
 #endif
