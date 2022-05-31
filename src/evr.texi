@@ -37,6 +37,7 @@ archive.
 * Claims::     Details about the central data structure in everarch.
 * evr-attr-index::  How indexing and finding claims works.
 * Query Language::  Explains the claim query language.
+* Backup:: How to backup everarch content.
 * Index::      Complete index.
 @end menu
 
@@ -311,6 +312,40 @@ April in 2022. Every attribute of the found seed claims will be
 reported.
 
 @c TODO offset 0 limit 100
+
+@node Backup
+@chapter Backup
+everarch should make backups quick and painless. This chapter lists
+the things you must not forget for a complete backup.
+
+everarch stores the user data in buckets managed by a
+evr-glacier-storage instance. The first step for a backup is to define
+a evr-glacier-storage configuration which stores the buckets an a
+backup medium.
+
+Start the evr-glacier-storage server which uses the backup medium. The
+blobs can be synchronized from your main evr-glacier-storage instance
+to the backup medium's evr-glacier-storage instance using the evr
+command line interface. The following example assumes you synchronize
+from your main instance running on port 2361 to your backup medium
+instance running on port 2461.
+
+@example
+$ evr sync localhost 2361 localhost 2461
+@end example
+
+everarch relies on some external resources which can't be stored as
+blobs. Don't forget to also backup them:
+
+@itemize
+@item
+Your GPG keys used for signing and validation must als be backed
+up. The GPG manpage describes how to back them up using the --export
+and --export-secret-keys.
+@item
+Optionally the everarch configuration files should also be backed
+up. Especially your SSL private key may otherwise not be recoverable.
+@end itemize
 
 @node Index
 @unnumbered Index
