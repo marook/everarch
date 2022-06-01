@@ -37,6 +37,11 @@ $ evr-attr-index
 for now evr-attr-index must fail if the watchers can't connect. that
 should make the service more stable in combination with systemd's
 automatic restarts.
+* supply custom error logger to xmlSetGenericErrorFunc
+libxml uses it's own error reporting right now which prints to stderr.
+
+it should be overwritten with by calling xmlSetGenericErrorFunc(…)
+with a custom error function which uses log_error to log errors.
 * check glacier index.db and bucket file consistency on startup
 the end pointer (which is the first 4 bytes of each bucket) of the
 last written bucket should be stored in the index.db. also on startup
