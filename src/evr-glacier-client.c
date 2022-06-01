@@ -26,6 +26,7 @@
 #include "basics.h"
 #include "errors.h"
 #include "logger.h"
+#include "claims.h"
 
 int evr_write_auth_token(struct evr_file *f, evr_auth_token t){
     char buf[sizeof(uint8_t) + sizeof(evr_auth_token)];
@@ -61,6 +62,7 @@ xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key){
     }
     // first buf byte is blob flags which we ignore
     const size_t flags_size = 1;
+    // TODO migrate to evr_parse_xml
     doc = xmlReadMemory(&buf[flags_size], resp.body_size - flags_size, NULL, "UTF-8", 0);
  out_with_free_buf:
     free(buf);
@@ -68,40 +70,44 @@ xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key){
     return doc;
 }
 
-xmlDocPtr evr_fetch_signed_xml(struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key){
-    xmlDocPtr doc = NULL;
+int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key){
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(f, key, &resp) != evr_ok){
-        goto out;
+        return evr_error;
     }
     if(resp.status_code != evr_status_code_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, key);
         log_error("Failed to read blob %s. Responded status code was 0x%02x", resp.status_code);
-        goto out;
+        return evr_error;
     }
     char *buf = malloc(resp.body_size);
     if(!buf){
-        goto out;
+        return evr_error;
     }
     if(read_n(f, buf, resp.body_size) != evr_ok){
-        goto out_with_free_buf;
+        free(buf);
+        return evr_error;
     }
     struct dynamic_array *claim = NULL;
     // first buf byte is blob flags which we ignore
     const size_t flags_size = 1;
-    if(evr_verify(ctx, &claim, &buf[flags_size], resp.body_size - flags_size) != evr_ok){
+    int verify_res = evr_verify(ctx, &claim, &buf[flags_size], resp.body_size - flags_size);
+    free(buf);
+    if(verify_res != evr_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, key);
         log_error("Failed to verify claim with ref %s", fmt_key);
-        goto out_with_free_buf;
+        return evr_error;
     }
-    doc = xmlReadMemory(claim->data, claim->size_used, NULL, "UTF-8", 0);
+    int parse_res = evr_parse_xml(doc, claim->data, claim->size_used);
     free(claim);
- out_with_free_buf:
-    free(buf);
- out:
-    return doc;
+    if(parse_res == evr_user_data_invalid){
+        return evr_user_data_invalid;
+    } else if(parse_res != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
 }
 
 xsltStylesheetPtr evr_fetch_stylesheet(struct evr_file *f, evr_blob_ref ref){

@@ -505,8 +505,8 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
     evr_blob_ref blob_ref;
     int claim_index;
     evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
-    xmlDocPtr doc = evr_fetch_signed_xml(cfg->verify_ctx, &c, blob_ref);
-    if(!doc){
+    xmlDocPtr doc = NULL;
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref) != evr_ok){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
     }
@@ -687,8 +687,8 @@ int evr_cli_get_file(struct cli_cfg *cfg){
     evr_blob_ref bref;
     int claim;
     evr_split_claim_ref(bref, &claim, cref);
-    xmlDocPtr doc = evr_fetch_signed_xml(cfg->verify_ctx, &c, bref);
-    if(!doc){
+    xmlDocPtr doc = NULL;
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, bref) != evr_ok){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
     }

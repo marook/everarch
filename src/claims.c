@@ -139,8 +139,23 @@ int evr_free_claim_set(struct evr_claim_set *cs){
     return evr_ok;
 }
 
-xmlDocPtr evr_parse_claim_set(const char *buf, size_t buf_size){
-    return xmlReadMemory(buf, buf_size, NULL, "UTF-8", 0);
+int evr_parse_xml(xmlDocPtr *doc, const char *buf, size_t buf_size){
+    if(buf_size == 0){
+        return evr_user_data_invalid;
+    }
+    xmlDocPtr _doc = xmlReadMemory(buf, buf_size, NULL, "UTF-8", 0);
+    if(_doc){
+        *doc = _doc;
+        return evr_ok;
+    }
+    xmlErrorPtr err = xmlGetLastError();
+    if(!err){
+        return evr_error;
+    }
+    if(err->code >= XML_ERR_DOCUMENT_START && err->code < XML_IO_UNKNOWN){
+        return evr_user_data_invalid;
+    }
+    return evr_error;
 }
 
 xmlNode *evr_get_root_claim_set(xmlDocPtr doc){

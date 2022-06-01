@@ -24,5 +24,6 @@
 #define evr_not_found 2
 #define evr_temporary_occupied 3
 #define evr_end 4
+#define evr_user_data_invalid 5
 
 #endif

@@ -127,15 +127,24 @@ int evr_finalize_claim_set(struct evr_claim_set *cs);
 int evr_free_claim_set(struct evr_claim_set *cs);
 
 /**
- * evr_parse_claim_set parses a claim set document from the given
- * buffer.
+ * evr_parse_xml parses a claim set document from the given buffer.
+ *
+ * Returns evr_ok if the XML could be parsed. Returns
+ * evr_user_data_invalid if the buffer contains syntactically invalid
+ * XML. Otherwise returns evr_error.
+ *
+ * *doc is only set on evr_ok return value. *doc is unequal NULL on
+ * evr_ok return value.
  *
  * Usually you want to do the following (except you add error handling
  * of course):
  *
  * xmlInitParser(); // just once at startup
  * …
- * doc = evr_parse_claim_set(…)
+ * xmlDocPtr doc = NULL;
+ * if(evr_parse_xml(&doc, …) != evr_ok){
+ *   return evr_error;
+ * }
  * evr_time created;
  * evr_parse_created(&created, xmlDocGetRootElement(doc));
  * for(cn = evr_first_claim(); cn; cn = evr_next_claim(cn)){
@@ -151,7 +160,7 @@ int evr_free_claim_set(struct evr_claim_set *cs);
  * …
  * xmlCleanupParser(); // just before exit once
  */
-xmlDocPtr evr_parse_claim_set(const char *buf, size_t buf_size);
+int evr_parse_xml(xmlDocPtr *doc, const char *buf, size_t buf_size);
 
 xmlNode *evr_get_root_claim_set(xmlDocPtr doc);
 

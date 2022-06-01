@@ -529,8 +529,14 @@ int evr_watch_index_claims_worker(void *arg){
                 goto out_with_free_latest_spec;
             }
         }
-        xmlDocPtr claim_doc = evr_fetch_signed_xml(cfg->verify_ctx, &cs, body.key);
-        if(!claim_doc){
+        xmlDocPtr claim_doc = NULL;
+        int fetch_res = evr_fetch_signed_xml(&claim_doc, cfg->verify_ctx, &cs, body.key);
+        if(fetch_res == evr_user_data_invalid){
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, body.key);
+            log_error("Index claim with blob key %s has invalid XML syntax. Ignoring this claim.", fmt_key);
+            continue;
+        } else if(fetch_res != evr_ok){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
             log_error("Index claim not fetchable for blob key %s", fmt_key);
@@ -799,8 +805,15 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
             goto out;
         }
     }
-    xmlDocPtr claim_set = evr_fetch_signed_xml(cfg->verify_ctx, c, claim_set_ref);
-    if(!claim_set){
+    xmlDocPtr claim_set = NULL;
+    int fetch_res = evr_fetch_signed_xml(&claim_set, cfg->verify_ctx, c, claim_set_ref);
+    if(fetch_res == evr_user_data_invalid){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("Claim set with blob key %s has invalid XML syntax. Ignoring it.", ref_str);
+        ret = evr_ok;
+        goto out;
+    } else if(fetch_res != evr_ok){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
         log_error("Claim set not fetchable for blob key %s", ref_str);
@@ -918,8 +931,18 @@ int evr_index_sync_worker(void *arg){
             if(evr_prepare_attr_index_db(db) != evr_ok){
                 goto out_with_free;
             }
-            xmlDocPtr cs_doc = evr_fetch_signed_xml(cfg->verify_ctx, &cw, index_ref);
-            if(!cs_doc){
+            xmlDocPtr cs_doc = NULL;
+            int fetch_res = evr_fetch_signed_xml(&cs_doc, cfg->verify_ctx, &cw, index_ref);
+            if(fetch_res == evr_user_data_invalid){
+                // this situation is somehow theoretical. it would
+                // mean that when initially building the index db the
+                // blob contained valid XML but now does no
+                // longer.
+                evr_blob_ref_str ref_str;
+                evr_fmt_blob_ref(ref_str, index_ref);
+                log_error("Index claim with blob key %s has invalid XML syntax.", ref_str);
+                goto out_with_free;
+            } else if(fetch_res != evr_ok){
                 evr_blob_ref_str fmt_key;
                 evr_fmt_blob_ref(fmt_key, index_ref);
                 log_error("Index claim not fetchable for blob key %s", fmt_key);
@@ -1035,7 +1058,11 @@ xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
             return NULL;
         }
     }
-    return evr_fetch_signed_xml(cfg->verify_ctx, c, claim_set_ref);
+    xmlDocPtr doc = NULL;
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, c, claim_set_ref) != evr_ok){
+        return NULL;
+    }
+    return doc;
 }
 
 int evr_attr_index_tcp_server(){

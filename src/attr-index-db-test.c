@@ -617,8 +617,8 @@ xsltStylesheetPtr create_attr_mapping_stylesheet(){
 }
 
 xmlDocPtr create_xml_doc(char *content){
-    xmlDocPtr doc = evr_parse_claim_set(content, strlen(content));
-    assert_msg(doc, "Failed to parse XML document: %s", content);
+    xmlDocPtr doc = NULL;
+    assert_msg(is_ok(evr_parse_xml(&doc, content, strlen(content))), "Failed to parse XML document: %s", content);
     return doc;
 }
 

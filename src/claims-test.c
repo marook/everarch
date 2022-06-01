@@ -22,6 +22,7 @@
 #include "claims.h"
 #include "test.h"
 #include "keys.h"
+#include "errors.h"
 
 evr_time t0 = 0;
 
@@ -139,7 +140,8 @@ void test_parse_file_claim_claim_set(){
         "<file xmlns=\"https://evr.ma300k.de/something-which-will-never-ever-exist\"></file>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     evr_time created;
     xmlNode *csn = evr_get_root_claim_set(doc);
@@ -181,7 +183,8 @@ void test_parse_attr_claim_with_claim_seed(){
         "</attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -222,7 +225,8 @@ void test_parse_attr_claim_with_self_ref(){
         "<attr></attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -244,7 +248,8 @@ void test_parse_attr_claim_with_index_seed(){
         "<attr index-seed=\"1024\"></attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -267,7 +272,8 @@ void test_parse_two_attr_claims(){
         "<attr></attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -301,7 +307,8 @@ void test_parse_attr_spec_claim(){
         "</attr-spec>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -336,7 +343,8 @@ void test_parse_attr_spec_claim_error_unknown_transformation_type(){
         "</attr-spec>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -357,7 +365,8 @@ void test_parse_attr_spec_claim_error_unknown_attr_factory_type(){
         "</attr-spec>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -376,7 +385,8 @@ void test_nth_claim(){
         "<attr id=\"second\"></attr>"
         "</claim-set>\n";
     size_t buf_size = strlen(buf);
-    xmlDocPtr doc = evr_parse_claim_set(buf, buf_size);
+    xmlDocPtr doc = NULL;
+    assert(is_ok(evr_parse_xml(&doc, buf, buf_size)));
     assert(doc);
     xmlNode *csn = evr_get_root_claim_set(doc);
     assert(csn);
@@ -393,6 +403,22 @@ void test_nth_claim(){
     xmlNode *third = evr_nth_claim(csn, 2);
     assert(third == NULL);
     xmlFreeDoc(doc);
+}
+
+void test_parse_xml_user_data_invalid(){
+    char *docs[] = {
+        "",
+        " ",
+        "peng",
+        "<",
+        "<a>",
+        NULL,
+    };
+    xmlDocPtr doc = NULL;
+    for(char **it = docs; *it; ++it){
+        assert_msg(evr_parse_xml(&doc, *it, strlen(*it)) == evr_user_data_invalid, "Expected evr_user_data_invalid for doc: %s", *it);
+        assert(doc == NULL);
+    }
 }
 
 int main(){
@@ -412,6 +438,7 @@ int main(){
     run_test(test_parse_attr_spec_claim_error_unknown_transformation_type);
     run_test(test_parse_attr_spec_claim_error_unknown_attr_factory_type);
     run_test(test_nth_claim);
+    run_test(test_parse_xml_user_data_invalid);
     xmlCleanupParser();
     return 0;
 }

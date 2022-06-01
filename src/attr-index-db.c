@@ -789,8 +789,7 @@ int evr_append_attr_factory_claims_worker(void *context){
         fail_reason = "attr-factory failed with exit code unequal 0.";
         goto out_with_log_buf_and_stderr;
     }
-    ctx->built_doc = evr_parse_claim_set(buf->data, buf->size_used);
-    if(!ctx->built_doc){
+    if(evr_parse_xml(&ctx->built_doc, buf->data, buf->size_used) != evr_ok){
         log_error("Output from attr-factory %s for claim-set %s not parseable as XML.", attr_factory_str, claim_set_ref_str);
         fail_reason = "attr-factory output not parseable as claim-set XML.";
         goto out_with_log_buf_and_stderr;

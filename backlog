@@ -1,17 +1,3 @@
-* evr-attr-index sync worker should ignore syntactically invalid claims
-syntactically invalid claims abort the index sync worker right
-now. they should not. just log them and index on.
-
-#+BEGIN_SRC
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: 2022-05-31T21:32:27 iD Sending get sha3-224-4e3895d11e733482d77c2756ff94acb6c41b476bf9e84c353b77f020 command to server
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: 2022-05-31T21:32:27 iD Storage responded with status code 0x20 and body size 20742
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: Entity: line 3: parser error : Couldn't find end of Start Tag m line 2
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: ^
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: Entity: line 3: parser error : EndTag: '</' not found
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: ^
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: 2022-05-31T21:32:27 iE Claim set not fetchable for blob key sha3-224-4e3895d11e733482d77c2756ff94acb6c41b476bf9e84c353b77f020
-Mai 31 21:32:27 pc60684 evr-attr-index[356195]: 2022-05-31T21:32:27 iD Ended index sync worker with result 1
-#+END_SRC
 * graceful stop of evr-glacier-storage when stopped as systemd service
 right now stopping an evr-glacier-storage server via systemd just
 terminates the evr-glacier-storage service. that way not even the lock
