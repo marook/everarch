@@ -11,7 +11,6 @@ PKG_PROG_PKG_CONFIG
 AC_DEFINE(_DEFAULT_SOURCE, 1, This macro can be defined to ensure that the "default" definitions are provided.)
 AC_DEFINE(_POSIX_C_SOURCE, 200809L, We want to use for example strnlen)
 AC_DEFINE(_GNU_SOURCE, 1, We use for example fcntl's F_GETSIG)
-AC_DEFINE(EVR_LOG_DEBUG, , Turns on log message output on level debug)
 
 AC_ARG_ENABLE(
   [futile-claim-set-tracking],
@@ -23,6 +22,12 @@ AC_ARG_ENABLE(
   [profile-sql-statements],
   [AS_HELP_STRING([--enable-profile-sql-statements], [Enables debug level logging of SQL statement step execution times. These log statements start with the message "sqlite statement duration". You can use the sqlite-prof.py script in this repository to aggregate the results.])],
   [AC_DEFINE([EVR_PROFILE_SQLITE_STMTS], [1], [Enables sqlite statement profiling.])],
+)
+
+AC_ARG_ENABLE(
+  [log-debug],
+  [AS_HELP_STRING([--enable-log-debug], [Enables debug level logging.])],
+  [AC_DEFINE([EVR_LOG_DEBUG], [1], [Turns on log message output on level debug.])],
 )
 
 if test x$prefix = xNONE ; then
