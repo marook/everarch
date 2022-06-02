@@ -1,3 +1,7 @@
+* fix evr-glacier-storage libgcrypt initialization
+#+BEGIN_SRC
+evr-glacier-storage[226199]: Libgcrypt warning: missing initialization - please fix the application
+#+END_SRC
 * change evr cli's sync arguments
 right now it assumes 'src_host src_port dst_host dst_port'. in the
 future it should be 'src_host:src_port' and 'dst_host:dst_port'.
