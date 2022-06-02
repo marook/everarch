@@ -277,6 +277,7 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
     const char *sql[] = {
         "create table attr_def (key text primary key not null, type integer not null)",
         "create table attr (seed blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
+        "create index attr_seed_key on attr (seed, key)",
         "create table claim (ref blob primary key not null, seed blob not null)",
         "create table claim_archive (seed blob primary key not null, valid_until integer not null)",
         "create table state (key integer primary key, value integer not null)",

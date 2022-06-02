@@ -13,9 +13,16 @@ AC_DEFINE(_POSIX_C_SOURCE, 200809L, We want to use for example strnlen)
 AC_DEFINE(_GNU_SOURCE, 1, We use for example fcntl's F_GETSIG)
 AC_DEFINE(EVR_LOG_DEBUG, , Turns on log message output on level debug)
 
-AC_ARG_ENABLE([futile-claim-set-tracking],
-              [AS_HELP_STRING([--enable-futile-claim-set-tracking], [Enables tracking of claim-sets without any effect to the attr-index. Helpful for finding custom claims which are missing in the transformation.])],
-              [AC_DEFINE([EVR_FUTILE_CLAIM_SET_TRACKING], [1], [Enables futile claim set tracking.])],
+AC_ARG_ENABLE(
+  [futile-claim-set-tracking],
+  [AS_HELP_STRING([--enable-futile-claim-set-tracking], [Enables tracking of claim-sets without any effect to the attr-index. Helpful for finding custom claims which are missing in the transformation.])],
+  [AC_DEFINE([EVR_FUTILE_CLAIM_SET_TRACKING], [1], [Enables futile claim set tracking.])],
+)
+
+AC_ARG_ENABLE(
+  [profile-sql-statements],
+  [AS_HELP_STRING([--enable-profile-sql-statements], [Enables debug level logging of SQL statement step execution times. These log statements start with the message "sqlite statement duration". You can use the sqlite-prof.py script in this repository to aggregate the results.])],
+  [AC_DEFINE([EVR_PROFILE_SQLITE_STMTS], [1], [Enables sqlite statement profiling.])],
 )
 
 if test x$prefix = xNONE ; then
