@@ -1,3 +1,17 @@
+* change evr cli's sync arguments
+right now it assumes 'src_host src_port dst_host dst_port'. in the
+future it should be 'src_host:src_port' and 'dst_host:dst_port'.
+* evr-attr-index should ignore invalid attr-index specs
+right now the indexer stops if an invalid attr-index spec is
+discovered:
+
+#+BEGIN_SRC
+Jun 02 10:08:01 pc60684 evr-attr-index[1465214]: 2022-06-02T10:08:01 iE Failed to parse XSLT stylesheet from blob with ref sha3-224-2540e45925ae64439eceab1ef41a161274db5f6bca8ff08aea58d1e6
+Jun 02 10:08:01 pc60684 evr-attr-index[1465214]: 2022-06-02T10:08:01 iE Failed building attr index for sha3-224-82c4e4de95cf92b2cfcdea0f72dcc0c6ec5fbcba1feae3f27d8836fa
+Jun 02 10:08:01 pc60684 evr-attr-index[1465214]: 2022-06-02T10:08:01 iD Ended build index worker with result 1
+#+END_SRC
+
+it should ignore and log the broken index spec.
 * graceful stop of evr-glacier-storage when stopped as systemd service
 right now stopping an evr-glacier-storage server via systemd just
 terminates the evr-glacier-storage service. that way not even the lock
