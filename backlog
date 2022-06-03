@@ -1,7 +1,3 @@
-* fix evr-glacier-storage libgcrypt initialization :bug:
-#+BEGIN_SRC
-evr-glacier-storage[226199]: Libgcrypt warning: missing initialization - please fix the application
-#+END_SRC
 * fix evr-glacier-storage key unique constraint error :bug:
 #+BEGIN_SRC
 Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE Failed to step statement: UNIQUE constraint failed: blob_position.key
