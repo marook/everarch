@@ -605,6 +605,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
         log_error("Can't fsync blob data for key %s in glacier directory %s.");
+        goto fail;
     }
     size_t blob_offset = ctx->current_bucket_pos + header_buf_size;
     ctx->current_bucket_pos += header_buf_size + blob->size;
@@ -620,6 +621,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
         log_error("Can't fsync bucket end pointer for key %s in glacier directory %s.");
+        goto fail;
     }
     if(sqlite3_bind_blob(ctx->insert_blob_stmt, 1, blob->key, sizeof(blob->key), SQLITE_TRANSIENT) != SQLITE_OK){
         goto fail_with_insert_reset;
@@ -640,8 +642,10 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         goto fail_with_insert_reset;
     }
     if(evr_step_stmt(ctx->db, ctx->insert_blob_stmt) != SQLITE_DONE){
+        evr_blob_ref_str fmt_key;
+        evr_fmt_blob_ref(fmt_key, blob->key);
         const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
-        log_error("glacier storage %s failed to store blob index: %s", ctx->config->bucket_dir_path, sqlite_error_msg);
+        log_error("glacier storage %s failed to store blob with key %s to index with offset %lu and size %lu: %s", ctx->config->bucket_dir_path, fmt_key, blob_offset, blob->size, sqlite_error_msg);
         goto fail_with_insert_reset;
     }
 #ifdef EVR_LOG_DEBUG

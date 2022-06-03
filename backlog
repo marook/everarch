@@ -1,8 +1,3 @@
-* fix evr-glacier-storage key unique constraint error :bug:
-#+BEGIN_SRC
-Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE Failed to step statement: UNIQUE constraint failed: blob_position.key
-Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE glacier storage /home/marook/var/everarch/glacier failed to store blob index: UNIQUE constraint failed: blob_position.key
-#+END_SRC
 * change evr cli's sync arguments
 right now it assumes 'src_host src_port dst_host dst_port'. in the
 future it should be 'src_host:src_port' and 'dst_host:dst_port'.
@@ -277,3 +272,45 @@ discarded.
 it's important to be sensible about the discarded data at the end of
 the file. maybe there should be an 'autorepair' flag in the
 configuration.
+* fix evr-glacier-storage key unique constraint error :bug:
+#+BEGIN_SRC
+Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE Failed to step statement: UNIQUE constraint failed: blob_position.key
+Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE glacier storage /home/marook/var/everarch/glacier failed to store blob index: UNIQUE constraint failed: blob_position.key
+#+END_SRC
+
+the last appended blob before the error is in bucket 4 at offset
+724056316 and has a size of 2269 bytes.
+
+bucket 4's bucket end pointer (which is at offset 0) points has the
+value 2b28 41d9 which should be the offset 724058585.
+
+so in theory the blob after the last indexed blob should start
+at 724058585
+
+every blob header has 224/8 + 1 + 8 + 4 + 1 = 42 bytes. so the header
+of the last written blob starts at 724056316 - 42 = 724056274
+
+the last written blob header has the following values:
+ref: 227f8e7147be5606849c52a5fd2e0c6330f2580fb7454765eab195ba
+flags: 1
+t: 0000 0181 29c0 7016 = 1654262886422
+size: 0000 08dd = 2269
+
+the ref 227f8e7147be5606849c52a5fd2e0c6330f2580fb7454765eab195ba is
+already stored in the sqlite db with the following values:
+flags: 1
+bucket index: 4
+blob offset: 724056316
+Blob size: 2269
+last modified: 1654262886422
+
+the blob with the duplicate ref ends at offset 724056316 + 2269 =
+724058585 which is exactly the offset of the bucket end pointer at
+offset 0.
+
+that is very weird… how come that the last blob in bucket 4 is ref
+227f8e7147be5606849c52a5fd2e0c6330f2580fb7454765eab195ba which is also
+in the index?
+
+now the outcome for now: extended logging so we have more details next
+time.
