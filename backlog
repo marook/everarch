@@ -1,22 +1,3 @@
-* fix segfault in evr_persister_worker :bug:
-sometimes after importing a few GB of data a segmentation fault occurs
-in evr-glacier-storage.
-
-gdb output:
-#+BEGIN_SRC
-Program terminated with signal SIGSEGV, Segmentation fault.
-#0  0x000055da3fc65237 in evr_persister_worker (context=<optimized out>) at concurrent-glacier.c:210
-210	                w(wctx, wd, task->blob->key, task->blob->flags, task->last_modified);
-[Current thread is 1 (Thread 0x7fe82b420700 (LWP 3036876))]
-(gdb) bt
-#0  0x000055da3fc65237 in evr_persister_worker (context=<optimized out>) at concurrent-glacier.c:210
-#1  0x00007fe82b762f5a in start_thread (arg=<optimized out>) at pthread_create.c:474
-#2  0x00007fe82b692def in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95
-(gdb) p task
-$3 = (struct evr_persister_task *) 0x7fe829c1cdd0
-(gdb) p task->blob
-$4 = (struct evr_writing_blob *) 0x2
-#+END_SRC
 * fix evr-glacier-storage libgcrypt initialization :bug:
 #+BEGIN_SRC
 evr-glacier-storage[226199]: Libgcrypt warning: missing initialization - please fix the application

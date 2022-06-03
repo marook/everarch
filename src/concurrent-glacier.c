@@ -170,69 +170,75 @@ int evr_persister_queue_task(struct evr_persister_task *task){
     return evr_error;
 }
 
-int evr_persister_process_task(struct evr_persister_task *task);
-
 int evr_persister_worker(void *context){
     log_debug("evr_persister_worker starting");
-    int result = evr_ok;
+    int result = evr_error;
     if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
         result = evr_error;
-        goto end_with_unlock;
+        goto out;
     }
-    atomic_thread_fence(memory_order_seq_cst);
+    struct evr_persister_task *task;
+    evr_blob_ref task_key;
+    int task_flags;
+    evr_time task_last_modified;
     while(evr_persister.working){
         while(evr_persister.working) {
-            struct evr_persister_task *task;
             if(evr_persister.writing == evr_persister.reading){
                 break;
             } else {
                 task = *evr_persister.reading;
                 evr_persister.reading = evr_persister_ctx_step(evr_persister.reading);
             }
-            atomic_thread_fence(memory_order_seq_cst);
             if(mtx_unlock(&evr_persister.worker_lock) != thrd_success){
-                result = evr_error;
-                goto end_with_unlock;
+                evr_panic("Unable to unlock evr_persister_worker worker_lock");
+                goto out;
             }
-            if(evr_persister_process_task(task) != evr_ok){
-                result = evr_error;
-                goto end_without_unlock;
+            int task_res = evr_glacier_append_blob(evr_persister.write_ctx, task->blob, &task->last_modified);
+            task->result = task_res;
+            if(task_res == evr_ok){
+                memcpy(task_key, task->blob->key, evr_blob_ref_size);
+                task_flags = task->blob->flags;
+                task_last_modified = task->last_modified;
             }
-            if(mtx_lock(&evr_persister.watchers_lock) != thrd_success){
-                goto end_without_unlock;
+            if(mtx_unlock(&task->done) != thrd_success){
+                evr_panic("Unable to unlock task done lock");
+                goto out;
             }
-            for(int wd = 0; wd < evr_persister_watchers_len; ++wd){
-                evr_persister_watcher w = evr_persister.watchers[wd];
-                if(!w){
-                    continue;
+            if(task_res == evr_ok){
+                if(mtx_lock(&evr_persister.watchers_lock) != thrd_success){
+                    goto out;
                 }
-                void *wctx = evr_persister.watchers_ctx[wd];
-                w(wctx, wd, task->blob->key, task->blob->flags, task->last_modified);
-            }
-            if(mtx_unlock(&evr_persister.watchers_lock) != thrd_success){
-                evr_panic("Failed to unlock evr_persister.watchers_lock after fire watchers");
-                return evr_error;
+                for(int wd = 0; wd < evr_persister_watchers_len; ++wd){
+                    evr_persister_watcher w = evr_persister.watchers[wd];
+                    if(!w){
+                        continue;
+                    }
+                    void *wctx = evr_persister.watchers_ctx[wd];
+                    w(wctx, wd, task_key, task_flags, task_last_modified);
+                }
+                if(mtx_unlock(&evr_persister.watchers_lock) != thrd_success){
+                    evr_panic("Failed to unlock evr_persister.watchers_lock after fire watchers");
+                    goto out;
+                }
             }
             if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
-                result = evr_error;
-                goto end_without_unlock;
+                goto out;
             }
-            atomic_thread_fence(memory_order_seq_cst);
         }
         if(!evr_persister.working){
             break;
         }
         if(cnd_wait(&evr_persister.has_tasks, &evr_persister.worker_lock) != thrd_success){
-            result = evr_error;
-            goto end_with_unlock;
+            goto out_with_unlock_worker_lock;
         }
     }
- end_with_unlock:
-    atomic_thread_fence(memory_order_seq_cst);
+    result = evr_ok;
+ out_with_unlock_worker_lock:
     if(mtx_unlock(&evr_persister.worker_lock) != thrd_success){
+        evr_panic("Unable to unlock evr_persister_worker worker_lock");
         result = evr_error;
     }
- end_without_unlock:
+ out:
     log_debug("evr_persister_worker ending with result %d", result);
     return result;
 }
@@ -243,21 +249,6 @@ inline struct evr_persister_task** evr_persister_ctx_step(struct evr_persister_t
         p = evr_persister.tasks;
     }
     return p;
-}
-
-int evr_persister_process_task(struct evr_persister_task *task){
-    int result = evr_ok;
-    if(evr_glacier_append_blob(evr_persister.write_ctx, task->blob, &task->last_modified) != evr_ok){
-        result = evr_error;
-        goto end;
-    }
- end:
-    task->result = result;
-    if(mtx_unlock(&task->done) != thrd_success){
-        return evr_error;
-    } else {
-        return evr_ok;
-    }
 }
 
 int evr_persister_wait_for_task(struct evr_persister_task *task){
