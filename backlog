@@ -1,6 +1,30 @@
-* fix evr-glacier-storage libgcrypt initialization
+* fix segfault in evr_persister_worker :bug:
+sometimes after importing a few GB of data a segmentation fault occurs
+in evr-glacier-storage.
+
+gdb output:
+#+BEGIN_SRC
+Program terminated with signal SIGSEGV, Segmentation fault.
+#0  0x000055da3fc65237 in evr_persister_worker (context=<optimized out>) at concurrent-glacier.c:210
+210	                w(wctx, wd, task->blob->key, task->blob->flags, task->last_modified);
+[Current thread is 1 (Thread 0x7fe82b420700 (LWP 3036876))]
+(gdb) bt
+#0  0x000055da3fc65237 in evr_persister_worker (context=<optimized out>) at concurrent-glacier.c:210
+#1  0x00007fe82b762f5a in start_thread (arg=<optimized out>) at pthread_create.c:474
+#2  0x00007fe82b692def in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95
+(gdb) p task
+$3 = (struct evr_persister_task *) 0x7fe829c1cdd0
+(gdb) p task->blob
+$4 = (struct evr_writing_blob *) 0x2
+#+END_SRC
+* fix evr-glacier-storage libgcrypt initialization :bug:
 #+BEGIN_SRC
 evr-glacier-storage[226199]: Libgcrypt warning: missing initialization - please fix the application
+#+END_SRC
+* fix evr-glacier-storage key unique constraint error :bug:
+#+BEGIN_SRC
+Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE Failed to step statement: UNIQUE constraint failed: blob_position.key
+Jun 03 15:04:55 pc60684 evr-glacier-storage[3560975]: 2022-06-03T15:04:55 gE glacier storage /home/marook/var/everarch/glacier failed to store blob index: UNIQUE constraint failed: blob_position.key
 #+END_SRC
 * change evr cli's sync arguments
 right now it assumes 'src_host src_port dst_host dst_port'. in the
@@ -75,6 +99,20 @@ evr-glacier-storage should check if the index.db and the first bucket
 exist on startup. if the first bucket exists but the index.db does not
 it should recreate the index.db by scanning through all existing
 buckets.
+
+drop fsyncs when writing index.db also with this change.
+* parallel evr-attr-index claim-set preparation
+indexing a claim-set can be splitted into two phases. a first phase
+which fetches the claim-set XML, then applies the attr factories and
+XSLT stylesheet on it. then a second phase which persists the attr and
+archive claims into the index.
+
+the first phase should be executed in parallel.
+
+the solution might involve a ring buffer which n slots. each slot
+holds one to be prepared claim-set. the slots in the ring buffer have
+the states queued and prepared. there are n threads which fetch the
+next queued slot and prepare it.
 * add i18n support in attr query contains operator
 right now sqlite is used for comparing values when using the attr
 query contains (~) operator in a case insensitive way. the lower case
