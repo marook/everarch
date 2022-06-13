@@ -296,3 +296,17 @@ in the index?
 
 now the outcome for now: extended logging so we have more details next
 time.
+
+it happend again :(
+
+#+BEGIN_SRC
+Jun 13 11:20:09 pc60684 evr-glacier-storage[166987]: 2022-06-13T11:20:09 gE Failed to step statement: UNIQUE constraint failed: blob_position.key
+Jun 13 11:20:09 pc60684 evr-glacier-storage[166987]: 2022-06-13T11:20:09 gE glacier storage /home/marook/var/everarch/glacier failed to store blob with key sha3-224-b00f007bbbf4023b9c9ceea7debf23e6fd64bf794b04a532e9729305 to index with offset 628726583 and size 19496: UNIQUE constraint failed: blob_position.key
+#+END_SRC
+
+key sha3-224-b00f007bbbf4023b9c9ceea7debf23e6fd64bf794b04a532e9729305
+offset 628726583
+size 19496
+
+Failed original blob is in bucket 00006.blob. bucket's end pointer
+points to 678420428. bucket's file size is 678420428 bytes.

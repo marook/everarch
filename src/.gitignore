@@ -2,6 +2,7 @@
 /evr-attr-index
 /evr
 /evr-glacier-storage
+/evr-glacier-tool
 
 # generate code
 /attr_index_db_test-attr-query-lexer.c

@@ -7,7 +7,8 @@ info_TEXINFOS = evr.texi
 bin_PROGRAMS = \
 	evr-attr-index \
 	evr \
-	evr-glacier-storage
+	evr-glacier-storage \
+	evr-glacier-tool
 
 check_PROGRAMS = \
 	attr-index-db-test \
@@ -173,6 +174,18 @@ evr_glacier_storage_SOURCES = \
 	logger.c \
 	server.c
 evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(SSL_LIBS)
+
+evr_glacier_tool_SOURCES = \
+	basics.c \
+	configp.c \
+	db.c \
+	dyn-mem.c \
+	evr-glacier-tool.c \
+	files.c \
+	glacier.c \
+	keys.c \
+	logger.c
+evr_glacier_tool_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 evr_tls_test_SOURCES = \
 	assert.c \

@@ -264,6 +264,8 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
     return ret;
 }
 
+int evr_read_bucket_end_offset(size_t *end_offset, int f);
+
 struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_storage_cfg *config){
     struct evr_glacier_write_ctx *ctx = (struct evr_glacier_write_ctx*)malloc(sizeof(struct evr_glacier_write_ctx));
     if(!ctx){
@@ -332,16 +334,9 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
         if(lseek(ctx->current_bucket_f, 0, SEEK_SET) != 0){
             goto fail_with_open_bucket;
         }
-        uint32_t current_bucket_pos;
-        // TODO switch to read_n
-        ssize_t bytes_read = read(ctx->current_bucket_f, &current_bucket_pos, sizeof(current_bucket_pos));
-        int read_errno = errno;
-        if(bytes_read != sizeof(current_bucket_pos)){
-            const char *error = bytes_read == -1 ? strerror(read_errno) : "Short read";
-            log_error("Failed to read bucket end pointer within glacier directory %s: %s", ctx->config->bucket_dir_path, error);
+        if(evr_read_bucket_end_offset(&ctx->current_bucket_pos, ctx->current_bucket_f) != evr_ok){
             goto fail_with_open_bucket;
         }
-        ctx->current_bucket_pos = be32toh(current_bucket_pos);
         off_t end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
         if(end_offset == -1){
             goto fail_with_open_bucket;
@@ -704,4 +699,69 @@ int evr_quick_check_glacier(struct evr_glacier_storage_cfg *config){
     }
  out:
     return ret;
+}
+
+int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, size_t end_offset), int (*visit_blob)(void *ctx, struct evr_glacier_bucket_blob_stat *stat), void *ctx){
+    int ret = evr_error;
+    int f = open(bucket_path, O_RDONLY);
+    if(f < 0){
+        return ret;
+    }
+    const size_t header_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t);
+    char buf[header_size];
+    size_t end_offset;
+    if(evr_read_bucket_end_offset(&end_offset, f) != evr_ok){
+        goto out_with_close_f;
+    }
+    if(visit_bucket(ctx, end_offset) != evr_ok){
+        goto out_with_close_f;
+    }
+    struct evr_file fd;
+    evr_file_bind_fd(&fd, f);
+    struct evr_glacier_bucket_blob_stat stat;
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    size_t f_pos = sizeof(uint32_t);
+    while(1){
+        stat.offset = f_pos;
+        int header_read_res = read_n(&fd, buf, header_size);
+        if(header_read_res == evr_end){
+            break;
+        }
+        if(header_read_res != evr_ok){
+            goto out_with_close_f;
+        }
+        evr_reset_buf_pos(&bp);
+        evr_pull_n(&bp, stat.ref, evr_blob_ref_size);
+        evr_pull_as(&bp, &stat.flags, uint8_t);
+        evr_pull_map(&bp, &stat.last_modified, uint64_t, be64toh);
+        evr_pull_map(&bp, &stat.size, uint32_t, be32toh);
+        evr_pull_as(&bp, &stat.checksum, uint8_t);
+        f_pos += header_size + stat.size;
+        if(visit_blob(ctx, &stat) != evr_ok){
+            goto out_with_close_f;
+        }
+        if(lseek(f, f_pos, SEEK_SET) == -1){
+            goto out_with_close_f;
+        }
+    }
+    ret = evr_ok;
+ out_with_close_f:
+    if(close(f) != 0){
+        evr_panic("Unable to close bucket file");
+        ret = evr_error;
+    }
+    return ret;
+}
+
+int evr_read_bucket_end_offset(size_t *end_offset, int f){
+    uint32_t buf;
+    struct evr_file fd;
+    evr_file_bind_fd(&fd, f);
+    if(read_n(&fd, (char*)&buf, sizeof(buf)) != evr_ok){
+        log_error("Failed to read bucket end offset");
+        return evr_error;
+    }
+    *end_offset = be32toh(buf);
+    return evr_ok;
 }

@@ -191,4 +191,15 @@ int evr_glacier_rm_watcher(struct evr_glacier_write_ctx *ctx, int wd);
  */
 int evr_quick_check_glacier(struct evr_glacier_storage_cfg *config);
 
+struct evr_glacier_bucket_blob_stat {
+    evr_blob_ref ref;
+    int flags;
+    evr_time last_modified;
+    size_t offset;
+    size_t size;
+    unsigned char checksum;
+};
+
+int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, size_t end_offset), int (*visit_blob)(void *ctx, struct evr_glacier_bucket_blob_stat *stat), void *ctx);
+
 #endif

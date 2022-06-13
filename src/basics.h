@@ -193,6 +193,8 @@ int evr_pull_8bit_checksum(struct evr_buf_pos *bp);
  */
 typedef uint64_t evr_time;
 
+#define evr_time_fmt "%lu"
+
 void evr_now(evr_time *t);
 
 #define evr_time_from_timespec(t, ts)                           \
