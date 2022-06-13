@@ -43,14 +43,16 @@
 #include "evr-tls.h"
 #include "auth.h"
 
-const char *argp_program_version = "evr-glacier-cli " VERSION;
+#define program_name "evr"
+
+const char *argp_program_version = program_name " " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
 #define sort_order_last_modified_key "last-modified"
 #define sort_order_blob_ref_key "blob-ref"
 
 static char doc[] =
-    "evr-glacier-cli is a command line client for interacting with evr-glacier-storage servers.\n\n"
+    program_name " is a command line client for interacting with evr-glacier-storage servers.\n\n"
     "Possible commands are get, put, sign-put, post-file or watch.\n\n"
     "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout\n\n"
     "The get-claim command expects the key of the to be fetched claim as second argument. The claim will be written to stdout\n\n"
@@ -385,12 +387,7 @@ int main(int argc, char **argv){
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
-    char *config_paths[] = {
-        "evr.conf",
-        "~/.config/everarch/evr.conf",
-        "/etc/everarch/evr.conf",
-        NULL,
-    };
+    char *config_paths[] = evr_program_config_paths();
     struct configp configp = { options, parse_opt, args_doc, doc };
     if(configp_parse(&configp, config_paths, &cfg) != 0){
         goto out_with_free_cfg;
@@ -427,6 +424,7 @@ int main(int argc, char **argv){
         break;
     case cli_cmd_sync:
         ret = evr_cli_sync(&cfg);
+        break;
     }
     void *tbfree[] = {
         cfg.storage_host,

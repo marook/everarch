@@ -391,12 +391,7 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     struct configp configp = {
         options, parse_opt, args_doc, doc
     };
-    char *config_paths[] = {
-        "attr-index.conf",
-        "~/.config/everarch/attr-index.conf",
-        "/etc/everarch/attr-index.conf",
-        NULL,
-    };
+    char *config_paths[] = evr_program_config_paths();
     if(configp_parse(&configp, config_paths, cfg) != 0){
         evr_panic("Unable to parse config files");
         // TODO free memory allocated in this function even if program terminates after returning evr_error here

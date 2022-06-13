@@ -227,3 +227,10 @@ void evr_time_to_iso8601(char *s, size_t sn, const evr_time *t);
 int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep);
 
 int evr_strpcmp(char **l, char **r);
+
+#define evr_program_config_paths() {                \
+        program_name ".conf",                       \
+        "~/.config/everarch/" program_name ".conf", \
+        "/etc/everarch/" program_name ".conf",      \
+        NULL,                                       \
+}

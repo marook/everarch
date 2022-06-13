@@ -232,12 +232,7 @@ int evr_load_glacier_storage_cfg(int argc, char **argv){
     struct configp configp = {
         options, parse_opt, args_doc, doc
     };
-    char *config_paths[] = {
-        "glacier-storage.conf",
-        "~/.config/everarch/glacier-storage.conf",
-        "/etc/everarch/glacier-storage.conf",
-        NULL,
-    };
+    char *config_paths[] = evr_program_config_paths();
     if(configp_parse(&configp, config_paths, cfg) != 0){
         evr_panic("Unable to parse config files");
         return evr_error;
