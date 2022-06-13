@@ -9,21 +9,6 @@ Jun 02 10:08:01 pc60684 evr-attr-index[1465214]: 2022-06-02T10:08:01 iD Ended bu
 #+END_SRC
 
 it should ignore and log the broken index spec.
-* graceful stop of evr-glacier-storage when stopped as systemd service
-right now stopping an evr-glacier-storage server via systemd just
-terminates the evr-glacier-storage service. that way not even the lock
-file is removed.
-
-the systemd journal contains the following lines when stopping:
-
-#+BEGIN_SRC
-Mai 31 20:46:40 pc60684 evr-glacier-storage[182609]: 2022-05-31T20:46:39 gD Worker 8 watch context reported status 0
-Mai 31 20:46:40 pc60684 evr-glacier-storage[182609]: 2022-05-31T20:46:39 gD Worker 8 watch ends with status 4
-Mai 31 20:46:40 pc60684 evr-glacier-storage[182609]: 2022-05-31T20:46:39 gD Ended worker 8 with result 1
-Mai 31 20:46:40 pc60684 systemd[3317]: Stopping evr-glacier-storage - The everarch storage server...
-Mai 31 20:46:40 pc60684 systemd[3317]: evr-glacier-storage.service: Succeeded.
-Mai 31 20:46:40 pc60684 systemd[3317]: Stopped evr-glacier-storage - The everarch storage server.
-#+END_SRC
 * evr get commands must validate retrieved hashes
 the commands evr get and evr get-file must validate if the calculated
 hash matches the claim ref for each retrieved blob. evr must fail with

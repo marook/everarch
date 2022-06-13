@@ -244,6 +244,7 @@ int main(int argc, char **argv){
         memset(&action, 0, sizeof(action));
         action.sa_handler = handle_sigterm;
         sigaction(SIGINT, &action, NULL);
+        sigaction(SIGTERM, &action, NULL);
         signal(SIGPIPE, SIG_IGN);
     }
     if(sqlite3_config(SQLITE_CONFIG_MULTITHREAD) != SQLITE_OK){
