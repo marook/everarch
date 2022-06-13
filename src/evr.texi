@@ -331,7 +331,7 @@ from your main instance running on port 2361 to your backup medium
 instance running on port 2461.
 
 @example
-$ evr sync localhost 2361 localhost 2461
+$ evr sync localhost:2361 localhost:2461
 @end example
 
 everarch relies on some external resources which can't be stored as

@@ -19,7 +19,7 @@ ref_b=`echo b | evr put --storage-port "${secondary_glacier_storage_port}"`
 echo "ref_a is ${ref_a}"
 echo "ref_b is ${ref_b}"
 
-evr sync localhost ${secondary_glacier_storage_port} localhost ${glacier_storage_port}
+evr sync "localhost:${secondary_glacier_storage_port}" "localhost:${glacier_storage_port}"
 
 # after sync ref_a and ref_b should be in storage
 evr get ${ref_a} > /dev/null

@@ -59,7 +59,7 @@ static char doc[] =
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
     "The post-file command expects one optional file name argument for upload to the evr-glacier-storage. File will be read from stdin if no file name argument is given.\n\n"
     "The watch command prints modified blob keys.\n\n"
-    "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST SRC_PORT DST_HOST DST_PORT after the sync argument."
+    "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST:SRC_PORT DST_HOST:DST_PORT after the sync argument."
     ;
 
 static char args_doc[] = "CMD";
@@ -140,6 +140,8 @@ struct cli_cfg {
 
     char *signing_gpg_fpr;
 };
+
+int evr_replace_host_port(char **host, char **port, char *host_port_expr);
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*usage)(const struct argp_state *state)){
     struct cli_cfg *cfg = (struct cli_cfg*)state->input;
@@ -260,7 +262,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 evr_replace_str(cfg->file, arg);
                 break;
             case cli_cmd_sync:
-                evr_replace_str(cfg->src_storage_host, arg);
+                if(evr_replace_host_port(&cfg->src_storage_host, &cfg->src_storage_port, arg) != evr_ok){
+                    usage(state);
+                    return ARGP_ERR_UNKNOWN;
+                }
                 break;
             }
             break;
@@ -270,27 +275,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 usage(state);
                 return ARGP_ERR_UNKNOWN;
             case cli_cmd_sync:
-                evr_replace_str(cfg->src_storage_port, arg);
-                break;
-            }
-            break;
-        case 3:
-            switch(cfg->cmd){
-            default:
-                usage(state);
-                return ARGP_ERR_UNKNOWN;
-            case cli_cmd_sync:
-                evr_replace_str(cfg->dst_storage_host, arg);
-                break;
-            }
-            break;
-        case 4:
-            switch(cfg->cmd){
-            default:
-                usage(state);
-                return ARGP_ERR_UNKNOWN;
-            case cli_cmd_sync:
-                evr_replace_str(cfg->dst_storage_port, arg);
+                if(evr_replace_host_port(&cfg->dst_storage_host, &cfg->dst_storage_port, arg) != evr_ok){
+                    usage(state);
+                    return ARGP_ERR_UNKNOWN;
+                }
                 break;
             }
             break;
@@ -311,7 +299,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
             }
             break;
         case cli_cmd_sync:
-            if(state->arg_num < 5){
+            if(state->arg_num < 3){
                 usage(state);
                 return ARGP_ERR_UNKNOWN;
             }
@@ -325,6 +313,30 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     }
     return 0;
+}
+
+int evr_replace_host_port(char **host, char **port, char *host_port_expr){
+    const size_t fragments_len = 2;
+    char *fragments[fragments_len];
+    if(evr_split_n(fragments, fragments_len, host_port_expr, ':') != evr_ok){
+        log_error("Expected colon separated host and port expression but got: %s", host_port_expr);
+        return evr_error;
+    }
+    if(*host){
+        free(*host);
+    }
+    *host = strdup(fragments[0]);
+    if(!*host){
+        return evr_error;
+    }
+    if(*port){
+        free(*port);
+    }
+    *port = strdup(fragments[1]);
+    if(!*port){
+        return evr_error;
+    }
+    return evr_ok;
 }
 
 static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){

@@ -1,6 +1,3 @@
-* change evr cli's sync arguments
-right now it assumes 'src_host src_port dst_host dst_port'. in the
-future it should be 'src_host:src_port' and 'dst_host:dst_port'.
 * evr-attr-index should ignore invalid attr-index specs
 right now the indexer stops if an invalid attr-index spec is
 discovered:
