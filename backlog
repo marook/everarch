@@ -1,3 +1,18 @@
+* segfault in evr-glacier-storage's evr_free_glacier_read_ctx :bug:
+#+BEGIN_SRC
+Program terminated with signal SIGSEGV, Segmentation fault.
+#0  0x00005645153fbbac in evr_free_glacier_read_ctx (ctx=0x15500) at glacier.c:103
+103	    if(sqlite3_finalize(ctx->list_blobs_stmt_order_blob_ref) != SQLITE_OK){
+[Current thread is 1 (Thread 0x7f8272ffd700 (LWP 3537887))]
+(gdb) bt
+#0  0x00005645153fbbac in evr_free_glacier_read_ctx (ctx=0x15500) at glacier.c:103
+#1  0x00005645153fa7a6 in evr_connection_worker (context=<optimized out>) at evr-glacier-storage.c:423
+#2  0x00007f828bba3f5a in start_thread (arg=<optimized out>) at pthread_create.c:474
+#3  0x00007f828bad3def in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95
+#+END_SRC
+
+the segfault happend when connecting to the glacier server using a
+python api and immediately closing the socket again.
 * evr-attr-index should ignore invalid attr-index specs
 right now the indexer stops if an invalid attr-index spec is
 discovered:
@@ -33,6 +48,9 @@ $ evr-attr-index
 for now evr-attr-index must fail if the watchers can't connect. that
 should make the service more stable in combination with systemd's
 automatic restarts.
+* create tasks for make creating claims simple in emacs
+right now one would have to write a claim-set XML document and post it
+manually via the shell.
 * supply custom error logger to xmlSetGenericErrorFunc
 libxml uses it's own error reporting right now which prints to stderr.
 
