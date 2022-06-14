@@ -42,14 +42,14 @@ ssl-cert=localhost:${secondary_glacier_storage_port}:${glacier_storage_cert_path
 auth-token=localhost:${secondary_glacier_storage_port}:${secondary_glacier_storage_auth_token}
 EOF
     append_accepted_gpg_keys >> evr.conf
-    cat > glacier-storage.conf <<EOF
+    cat > evr-glacier-storage.conf <<EOF
 port=${glacier_storage_port}
 cert=${glacier_storage_cert_path}
 key=${script_dir}/../tls/glacier-key.pem
 auth-token=${glacier_storage_auth_token}
 bucket-dir-path=${glacier_storage_bucket_dir}
 EOF
-    cat > attr-index.conf <<EOF
+    cat > evr-attr-index.conf <<EOF
 state-dir-path=${attr_index_state_dir}
 port=${attr_index_port}
 storage-port=${glacier_storage_port}
@@ -59,7 +59,7 @@ key=${script_dir}/../tls/attr-index-key.pem
 auth-token=${attr_index_auth_token}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
 EOF
-    append_accepted_gpg_keys >> attr-index.conf
+    append_accepted_gpg_keys >> evr-attr-index.conf
 }
 
 append_accepted_gpg_keys() {
