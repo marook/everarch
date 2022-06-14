@@ -490,6 +490,8 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         log_debug("Client and server blob keys did not match");
         goto out_free_blob;
     }
+    // TODO final check here if blob is already in store to reduce
+    // duplicate blobs
     struct evr_persister_task task;
     wblob.flags = flags;
     wblob.size = blob_size;

@@ -250,6 +250,28 @@ void test_evr_glacier_write_big_blob(){
     free_glacier_ctx(ctx);
 }
 
+void test_evr_glacier_write_blob_twice(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
+    assert(ctx);
+    char *chunks[] = {
+        "hello",
+    };
+    struct evr_writing_blob wb;
+    memset(wb.key, 1, evr_blob_ref_size);
+    wb.flags = 0;
+    wb.size = strlen(chunks[0]);
+    wb.chunks = chunks;
+    evr_time last_modified = 6;
+    assert(is_ok(evr_glacier_append_blob(ctx, &wb, &last_modified)));
+    last_modified = 12;
+    // duplicate inserts of same blob must be treated as success. they
+    // can happend with a small propability if multiple clients put
+    // the same blob in parallel.
+    assert(is_ok(evr_glacier_append_blob(ctx, &wb, &last_modified)));
+    free_glacier_ctx(ctx);
+}
+
 struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *config){
     struct evr_glacier_storage_cfg *clone = (struct evr_glacier_storage_cfg*)malloc(sizeof(struct evr_glacier_storage_cfg));
     assert(clone);
@@ -295,6 +317,7 @@ int main(){
     run_test(test_evr_glacier_create_context_twice_fails);
     run_test(test_evr_glacier_write_smal_blobs);
     run_test(test_evr_glacier_write_big_blob);
+    run_test(test_evr_glacier_write_blob_twice);
     run_test(test_evr_free_glacier_read_ctx_with_null_ctx);
     run_test(test_evr_free_glacier_write_ctx_with_null_ctx);
     return 0;

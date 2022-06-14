@@ -637,11 +637,19 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         goto fail_with_insert_reset;
     }
     if(evr_step_stmt(ctx->db, ctx->insert_blob_stmt) != SQLITE_DONE){
+        int sql_error = sqlite3_extended_errcode(ctx->db);
+        if(sql_error != SQLITE_CONSTRAINT_PRIMARYKEY){
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, blob->key);
+            const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
+            log_error("glacier storage %s failed to store blob with key %s to index with offset %lu and size %lu: %s", ctx->config->bucket_dir_path, fmt_key, blob_offset, blob->size, sqlite_error_msg);
+            goto fail_with_insert_reset;
+        }
+#ifdef EVR_LOG_DEBUG
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
-        const char *sqlite_error_msg = sqlite3_errmsg(ctx->db);
-        log_error("glacier storage %s failed to store blob with key %s to index with offset %lu and size %lu: %s", ctx->config->bucket_dir_path, fmt_key, blob_offset, blob->size, sqlite_error_msg);
-        goto fail_with_insert_reset;
+        log_debug("Detected blob with key %s got inserted more than one time into buckets", fmt_key);
+#endif
     }
 #ifdef EVR_LOG_DEBUG
     {
@@ -653,7 +661,10 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     ret = evr_ok;
  fail_with_insert_reset:
     if(sqlite3_reset(ctx->insert_blob_stmt) != SQLITE_OK){
-        return evr_error;
+        int sql_error = sqlite3_extended_errcode(ctx->db);
+        if(sql_error != SQLITE_CONSTRAINT_PRIMARYKEY){
+            ret = evr_error;
+        }
     }
  fail:
     return ret;
