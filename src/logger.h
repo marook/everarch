@@ -53,7 +53,9 @@ extern char *evr_log_app;
 #define evr_log_level_panic "P"
 
 #ifdef EVR_LOG_DEBUG
-#  define EVR_LOG_INFO
+#  ifndef EVR_LOG_INFO
+#    define EVR_LOG_INFO 1
+#  endif
 #  define log_debug(args...) evr_log(evr_log_level_debug, args)
 #else
 #  define log_debug(args...)

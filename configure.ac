@@ -25,6 +25,7 @@ AC_ARG_ENABLE(
   [AC_DEFINE([EVR_PROFILE_SQLITE_STMTS], [1], [Enables sqlite statement profiling.])],
 )
 
+AC_DEFINE([EVR_LOG_INFO], [1], [Turns on log message output on level info.])
 AC_ARG_ENABLE(
   [log-debug],
   [AS_HELP_STRING([--enable-log-debug], [Enables debug level logging.])],
