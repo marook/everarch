@@ -10,6 +10,44 @@ trap stop_everarch_servers EXIT
 start_glacier_storage
 wait_for_glacier_storage
 
+# upload a broken XSLT attr-spec and make sure that the server does
+# not crash but ignore it.
+echo "Uploading broken XSLT attr-spec…"
+broken_xslt_ref=`echo 'computer, index data!' | evr put`
+evr -f 3 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-01-01T00:00:00.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <attr-def k="title" type="str"/>
+    <transformation type="xslt" blob="${broken_xslt_ref}"/>
+  </attr-spec>
+</claim-set>
+EOF
+
+# upload a invalid XSLT attr-spec and make sure that the server does
+# not crash but ignore it.
+echo "Uploading invalid XSLT attr-spec…"
+invalid_xslt_ref=`echo '<xml></xml>' | evr put`
+evr -f 3 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-02-01T00:00:00.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <attr-def k="title" type="str"/>
+    <transformation type="xslt" blob="${invalid_xslt_ref}"/>
+  </attr-spec>
+</claim-set>
+EOF
+
 echo "Uploading basic attr-spec…"
 basic_xslt_ref=`evr put < basic.xslt`
 evr -f 3 sign-put <<EOF

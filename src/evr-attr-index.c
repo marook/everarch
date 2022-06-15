@@ -649,7 +649,16 @@ int evr_build_index_worker(void *arg){
             log_info("Start building attr index for %s", fmt_key);
         }
 #endif
-        if(evr_bootstrap_db(claim_key, claim) != evr_ok){
+        int bootstrap_res = evr_bootstrap_db(claim_key, claim);
+        if(bootstrap_res == evr_user_data_invalid){
+#ifdef EVR_LOG_INFO
+            evr_blob_ref_str fmt_key;
+            evr_fmt_blob_ref(fmt_key, claim_key);
+            log_info("Ignoring attr index for %s because of user data errors", fmt_key);
+#endif
+            continue;
+        }
+        if(bootstrap_res != evr_ok){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, claim_key);
             log_error("Failed building attr index for %s", fmt_key);
@@ -717,8 +726,13 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     if(evr_write_auth_token(&cw, cfg->storage_auth_token) != evr_ok){
         goto out_with_close_cw;
     }
-    xsltStylesheetPtr style = evr_fetch_stylesheet(&cw, spec->transformation_blob_ref);
-    if(!style){
+    xsltStylesheetPtr style = NULL;
+    int style_res = evr_fetch_stylesheet(&style, &cw, spec->transformation_blob_ref);
+    if(style_res == evr_user_data_invalid){
+        ret = evr_user_data_invalid;
+        goto out_with_close_cw;
+    }
+    if(style_res != evr_ok){
         goto out_with_close_cw;
     }
     sqlite3_int64 last_indexed_claim_ts;
@@ -957,8 +971,7 @@ int evr_index_sync_worker(void *arg){
             if(!spec){
                 goto out_with_free;
             }
-            style = evr_fetch_stylesheet(&cw, spec->transformation_blob_ref);
-            if(!style){
+            if(evr_fetch_stylesheet(&style, &cw, spec->transformation_blob_ref) != evr_ok){
                 goto out_with_free;
             }
             sqlite3_int64 last_indexed_claim_ts;

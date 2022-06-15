@@ -41,8 +41,8 @@ int evr_write_auth_token(struct evr_file *f, evr_auth_token t){
     return evr_ok;
 }
 
-xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key){
-    xmlDocPtr doc = NULL;
+int evr_fetch_xml(xmlDocPtr *doc, struct evr_file *f, evr_blob_ref key){
+    int ret = evr_error;
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(f, key, &resp) != evr_ok){
         goto out;
@@ -63,11 +63,16 @@ xmlDocPtr evr_fetch_xml(struct evr_file *f, evr_blob_ref key){
     // first buf byte is blob flags which we ignore
     const size_t flags_size = 1;
     // TODO migrate to evr_parse_xml
-    doc = xmlReadMemory(&buf[flags_size], resp.body_size - flags_size, NULL, "UTF-8", 0);
+    *doc = xmlReadMemory(&buf[flags_size], resp.body_size - flags_size, NULL, "UTF-8", 0);
+    if(!*doc){
+        ret = evr_user_data_invalid;
+        goto out_with_free_buf;
+    }
+    ret = evr_ok;
  out_with_free_buf:
     free(buf);
  out:
-    return doc;
+    return ret;
 }
 
 int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key){
@@ -110,16 +115,21 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
     return evr_ok;
 }
 
-xsltStylesheetPtr evr_fetch_stylesheet(struct evr_file *f, evr_blob_ref ref){
-    xsltStylesheetPtr style = NULL;
-    xmlDocPtr style_doc = evr_fetch_xml(f, ref);
-    if(!style_doc){
+int evr_fetch_stylesheet(xsltStylesheetPtr *style, struct evr_file *f, evr_blob_ref ref){
+    int ret = evr_error;
+    xmlDocPtr style_doc = NULL;
+    int xml_res = evr_fetch_xml(&style_doc, f, ref);
+    if(xml_res == evr_user_data_invalid){
+        ret = evr_user_data_invalid;
+        goto out;
+    }
+    if(xml_res != evr_ok){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, ref);
         log_error("Failed to fetch attr spec's stylesheet with ref %s", ref_str);
         goto out;
     }
-    style = xsltParseStylesheetDoc(style_doc);
+    *style = xsltParseStylesheetDoc(style_doc);
     if(!style){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, ref);
@@ -127,10 +137,12 @@ xsltStylesheetPtr evr_fetch_stylesheet(struct evr_file *f, evr_blob_ref ref){
         // style_doc is freed by xsltFreeStylesheet(style) on
         // successful style parsing.
         xmlFreeDoc(style_doc);
+        ret = evr_user_data_invalid;
         goto out;
     }
+    ret = evr_ok;
  out:
-    return style;
+    return ret;
 }
 
 int evr_req_cmd_stat_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_header *resp){
