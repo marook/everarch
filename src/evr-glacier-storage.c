@@ -332,7 +332,7 @@ int evr_connection_worker(void *context){
     const int worker = ctx.socket.get_fd(&ctx.socket);
     log_debug("Started worker %d", worker);
     if(evr_authenticate_client(&ctx.socket) != evr_ok){
-        goto end;
+        goto out_with_close_socket;
     }
     struct evr_glacier_read_ctx *rctx = NULL;
     char buffer[evr_cmd_header_n_size];
@@ -342,12 +342,12 @@ int evr_connection_worker(void *context){
         if(header_result == evr_end){
             log_debug("Worker %d ends because of remote termination", ctx.socket.get_fd(&ctx.socket));
             result = evr_ok;
-            goto end;
+            goto out_with_free_rctx;
         } else if (header_result != evr_ok){
-            goto end;
+            goto out_with_free_rctx;
         }
         if(evr_parse_cmd_header(&cmd, buffer) != evr_ok){
-            goto end;
+            goto out_with_free_rctx;
         }
         log_debug("Worker %d retrieved cmd 0x%02x with body size %d", ctx.socket.get_fd(&ctx.socket), cmd.type, cmd.body_size);
         switch(cmd.type){
@@ -356,16 +356,16 @@ int evr_connection_worker(void *context){
             log_error("Worker %d retieved unknown cmd 0x%02x", ctx.socket.get_fd(&ctx.socket), cmd.type);
             // TODO respond evr_status_code_unknown_cmd
             result = evr_ok;
-            goto end;
+            goto out_with_free_rctx;
         case evr_cmd_type_get_blob: {
             size_t body_size = evr_blob_ref_size;
             if(cmd.body_size != body_size){
-                goto end;
+                goto out_with_free_rctx;
             }
             evr_blob_ref key;
             const int body_result = read_n(&ctx.socket, (char*)&key, body_size);
             if(body_result != evr_ok){
-                goto end;
+                goto out_with_free_rctx;
             }
 #ifdef EVR_LOG_DEBUG
             {
@@ -375,7 +375,7 @@ int evr_connection_worker(void *context){
             }
 #endif
             if(evr_ensure_worker_rctx_exists(&rctx, &ctx) != evr_ok){
-                goto end;
+                goto out_with_free_rctx;
             }
             int read_res = evr_glacier_read_blob(rctx, key, send_get_response, pipe_data, &ctx.socket);
 #ifdef EVR_LOG_DEBUG
@@ -387,42 +387,43 @@ int evr_connection_worker(void *context){
 #endif
             if(read_res != evr_ok && read_res != evr_not_found){
                 // TODO should we send a server error here?
-                goto end;
+                goto out_with_free_rctx;
             }
             break;
         }
         case evr_cmd_type_put_blob:
             if(evr_work_put_blob(&ctx, &cmd) != evr_ok){
-                goto end;
+                goto out_with_free_rctx;
             }
             break;
         case evr_cmd_type_stat_blob:
             if(evr_work_stat_blob(&ctx, &cmd, &rctx) != evr_ok){
-                goto end;
+                goto out_with_free_rctx;
             }
             break;
         case evr_cmd_type_watch_blobs:
             if(evr_work_watch_blobs(&ctx, &cmd, &rctx) != evr_ok){
-                goto end;
+                goto out_with_free_rctx;
             } else {
                 // evr_work_watch_blobs must close connection on end
                 // to indicate no more blobs to client.
                 result = evr_ok;
-                goto end;
+                goto out_with_free_rctx;
             }
             break;
         }
     }
     result = evr_ok;
- end:
-    if(ctx.socket.close(&ctx.socket) != 0){
-        evr_panic("Unable to close socket of worker %d", worker);
-        result = evr_error;
-    }
+ out_with_free_rctx:
     if(rctx){
         if(evr_free_glacier_read_ctx(rctx) != evr_ok){
             result = evr_error;
         }
+    }
+ out_with_close_socket:
+    if(ctx.socket.close(&ctx.socket) != 0){
+        evr_panic("Unable to close socket of worker %d", worker);
+        result = evr_error;
     }
     log_debug("Ended worker %d with result %d", worker, result);
     return result;
