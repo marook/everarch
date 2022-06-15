@@ -367,7 +367,7 @@ int main(int argc, char **argv){
     int ret = 1;
     evr_tls_init();
     evr_log_fd = STDERR_FILENO;
-    evr_log_app = "c";
+    evr_log_app = "e";
     struct cli_cfg cfg;
     cfg.cmd = cli_cmd_none;
     cfg.storage_host = strdup(evr_glacier_storage_host);
