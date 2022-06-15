@@ -33,7 +33,15 @@ test_file_put_pop "big"
 
 # it should use custom title if -t arg present
 ref=`evr post-file -t 'my file name' 'files/hello.txt' | sed 's/\(sha3-.*\)-[a-z0-9]\{4\}/\1/'`
+
 claim=`evr get ${ref}`
+if [[ "${claim}" != *"my file name"* ]]
+then
+    echo "Claim should have used title 'my file name': ${claim}" >&2
+    exit 1
+fi
+
+claim=`evr get-verify ${ref}`
 if [[ "${claim}" != *"my file name"* ]]
 then
     echo "Claim should have used title 'my file name': ${claim}" >&2

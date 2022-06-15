@@ -54,8 +54,9 @@ const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 static char doc[] =
     program_name " is a command line client for interacting with evr-glacier-storage servers.\n\n"
     "Possible commands are get, put, sign-put, post-file or watch.\n\n"
-    "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout\n\n"
-    "The get-claim command expects the key of the to be fetched claim as second argument. The claim will be written to stdout\n\n"
+    "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout.\n\n"
+    "The get-verify command expects the key of the to be fetched claim-set blob as second argument. The claim-set XML will be written to stdout.\n\n"
+    "The get-claim command expects the key of the to be fetched claim as second argument. The claim will be written to stdout.\n\n"
     "The put command retrieves a blob via stdin and sends it to the evr-glacier-storage.\n\n"
     "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
@@ -101,6 +102,7 @@ static struct argp_option options[] = {
 #define cli_cmd_post_file 6
 #define cli_cmd_watch_blobs 7
 #define cli_cmd_sync 8
+#define cli_cmd_get_verify 9
 
 struct cli_cfg {
     int cmd;
@@ -231,6 +233,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         case 0:
             if(strcmp("get", arg) == 0){
                 cfg->cmd = cli_cmd_get;
+            } else if(strcmp("get-verify", arg) == 0){
+                cfg->cmd = cli_cmd_get_verify;
             } else if(strcmp("get-claim", arg) == 0){
                 cfg->cmd = cli_cmd_get_claim;
             } else if(strcmp("put", arg) == 0){
@@ -256,6 +260,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 usage(state);
                 return ARGP_ERR_UNKNOWN;
             case cli_cmd_get:
+            case cli_cmd_get_verify:
             case cli_cmd_get_claim:
             case cli_cmd_get_file:
                 evr_replace_str(cfg->key, arg);
@@ -293,6 +298,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
             usage (state);
             return ARGP_ERR_UNKNOWN;
         case cli_cmd_get:
+        case cli_cmd_get_verify:
         case cli_cmd_get_claim:
         case cli_cmd_get_file:
             if(state->arg_num < 2){
@@ -346,6 +352,7 @@ static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
 }
 
 int evr_cli_get(struct cli_cfg *cfg);
+int evr_cli_get_verify(struct cli_cfg *cfg);
 int evr_cli_get_claim(struct cli_cfg *cfg);
 int evr_cli_put(struct cli_cfg *cfg);
 int evr_cli_sign_put(struct cli_cfg *cfg);
@@ -403,6 +410,9 @@ int main(int argc, char **argv){
     switch(cfg.cmd){
     case cli_cmd_get:
         ret = evr_cli_get(&cfg);
+        break;
+    case cli_cmd_get_verify:
+        ret = evr_cli_get_verify(&cfg);
         break;
     case cli_cmd_get_claim:
         ret = evr_cli_get_claim(&cfg);
@@ -497,6 +507,51 @@ int evr_cli_get(struct cli_cfg *cfg){
     }
  fail:
     return result;
+}
+
+int evr_cli_get_verify(struct cli_cfg *cfg){
+    int ret = evr_error;
+    evr_init_signatures();
+    xmlInitParser();
+    evr_blob_ref blob_ref;
+    if(evr_parse_blob_ref(blob_ref, cfg->key) != evr_ok){
+        log_error("Invalid key format");
+        goto out;
+    }
+    struct evr_file c;
+    if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
+        goto out;
+    }
+    xmlDocPtr doc = NULL;
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref) != evr_ok){
+        log_error("No validly signed XML found for ref %s", cfg->key);
+        goto out_with_close_c;
+    }
+    char *doc_str = NULL;
+    int doc_str_size;
+    xmlDocDumpMemoryEnc(doc, (xmlChar**)&doc_str, &doc_str_size, "UTF-8");
+    if(!doc_str){
+        log_error("Failed to format output doc");
+        goto out_with_free_doc;
+    }
+    struct evr_file stdout;
+    evr_file_bind_fd(&stdout, STDOUT_FILENO);
+    if(write_n(&stdout, doc_str, doc_str_size) != evr_ok){
+        goto out_with_free_doc_str;
+    }
+    ret = evr_ok;
+ out_with_free_doc_str:
+    xmlFree(doc_str);
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out_with_close_c:
+    if(c.close(&c) != 0){
+        evr_panic("Unable to close storage connection");
+        ret = evr_error;
+    }
+ out:
+    xmlCleanupParser();
+    return ret;
 }
 
 int evr_cli_get_claim(struct cli_cfg *cfg){
