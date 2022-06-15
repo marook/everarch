@@ -3,7 +3,8 @@ ulimit -c unlimited
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-PATH="../../../src:${PATH}"
+PATH="${script_dir}/../../src:${PATH}"
+export PYTHONPATH="${script_dir}/../../python:${PYTHONPATH}"
 
 glacier_storage_port=2461
 glacier_storage_bucket_dir=storage

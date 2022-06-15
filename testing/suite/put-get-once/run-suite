@@ -29,6 +29,9 @@ then
 fi
 echo 'another one' | evr put --flags 1
 
+echo "${PYTHONPATH}"
+./evr-py-test.py "${ref}"
+
 ( evr watch > late-watch.actual.log ) &
 lwpid=$!
 

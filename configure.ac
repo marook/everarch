@@ -7,6 +7,7 @@ AC_PROG_CC
 AC_PROG_LEX
 AC_PROG_YACC
 PKG_PROG_PKG_CONFIG
+AM_PATH_PYTHON([3.0])
 
 AC_DEFINE(_DEFAULT_SOURCE, 1, This macro can be defined to ensure that the "default" definitions are provided.)
 AC_DEFINE(_POSIX_C_SOURCE, 200809L, We want to use for example strnlen)
@@ -71,6 +72,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
     Makefile
     src/Makefile
+    python/Makefile
 ])
 
 AC_OUTPUT
