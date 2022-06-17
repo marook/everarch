@@ -18,10 +18,6 @@ $ evr-attr-index
 for now evr-attr-index must fail if the watchers can't connect. that
 should make the service more stable in combination with systemd's
 automatic restarts.
-* add claim-set create interactive function to evr.el
-the function should create an empty claim-set template. the buffer
-with the empty claim-set template should have a minor mode attached
-with a keybinding for saving the claim-set.
 * add append claim from template to claim-set interactive function
 select a claim template from some helm list. render the template at
 point.

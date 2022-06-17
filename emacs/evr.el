@@ -89,7 +89,7 @@ evr-attr-index and prints the results into a new buffer."
     (define-key map "g" 'evr-attr-index-search-from-buffer)
     (define-key map "x" 'evr-follow-claim-ref-xml)
     (define-key map "\C-m" 'evr-follow-claim-ref-search)
-    (define-key map "c" 'evr-follow-claim-ref-contents)
+    (define-key map "c" 'evr-compose-claim-set-for-seed)
     (define-key map "f" 'evr-follow-claim-ref-contents)
     map)
   "Local keymap for evr-attr-index-results-mode buffers.")
@@ -239,6 +239,13 @@ in a new buffer."
   (interactive)
   (evr-attr-index-search (concat "ref=" (evr--get-claim-ref))))
 
+(defun evr-compose-claim-set-for-seed ()
+  (interactive)
+  (let ((seed-ref (evr--get-seed-ref))
+        (claim-set-buf (evr-compose-claim-set)))
+    (with-current-buffer claim-set-buf
+      (setq-local evr-seed-ref seed-ref))))
+
 (defun evr-follow-claim-ref-contents ()
   "Follows the claim ref at point.
 
@@ -358,6 +365,67 @@ Returns t if the claim-set was successfully saved."
       ))
   t)
 
+(defcustom evr-default-claim-set-xmlns-list
+  '(
+    (nil "https://evr.ma300k.de/claims/")
+    ("dc" "http://purl.org/dc/terms/")
+    )
+  "List of default xml namespace declarations which are added to
+composed claim-sets."
+  :group 'evr)
+
+(defun evr-claim-set-mode (&optional arg)
+  "This minor mode makes a buffer an everarch sourced claim-set.
+
+Saving this buffer will put the claim-set into evr and close the
+buffer afterwards."
+  (interactive (list (or current-prefix-arg 'toggle)))
+  (let ((enable
+         (if (eq arg 'toggle)
+             (not evr-file-claim-mode)
+           (> (prefix-numeric-value arg) 0))))
+    (if enable
+        (evr-enable-claim-set-mode)
+      (evr-disable-claim-set-mode))))
+
+(defun evr-enable-claim-set-mode ()
+  (add-hook 'write-contents-functions 'evr-save-claim-set nil t))
+
+(defun evr-disable-claim-set-mode ()
+  (remove-hook 'write-contents-finctions 'evr-save-claim-set t))
+
+;;;###autoload
+;; (evr-compose-claim-set)
+(defun evr-compose-claim-set ()
+  "Creates a new buffer with a template claim-set for everarch."
+  (interactive)
+  (let ((buf (generate-new-buffer "claim-set")) cursor-pos)
+        (switch-to-buffer buf)
+        (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set")
+        (mapc
+         (lambda (xmlns)
+           (seq-let (abbrev ns) xmlns
+             (insert "\n    xmlns")
+             (if abbrev
+                 (progn
+                   (insert ":")
+                   (insert abbrev)))
+             (insert "=\"")
+             (insert ns)
+             (insert "\"")
+             ))
+         evr-default-claim-set-xmlns-list)
+        (if (>= (length evr-default-claim-set-xmlns-list) 0)
+            (insert "\n    "))
+        (insert ">\n  ")
+        (setq cursor-pos (point))
+        (insert "\n</claim-set>")
+        (goto-char cursor-pos)
+        (nxml-mode)
+        (evr-claim-set-mode t)
+        buf
+        ))
+
 (defcustom evr-claim-set-saved-hook nil
   "Run after `evr-save-claim-set' saved a claim set.
 
@@ -376,14 +444,18 @@ The claim set's ref is passed as argument.
 (defun evr-save-claim-set ()
   "Saves the current buffer as claim set into everarch.
 
+Adds the current date and time as created attribute to the
+claim-set if not present.
+
 Returns t if the claim-set was successfully saved."
   (interactive)
   (let ((claim-set-buffer-name (buffer-name)))
+    (evr-insert-claim-set-created-attr)
     (message "Saving evr claim set...")
     (let ((proc (make-process
                  :name (concat "evr sign-put " claim-set-buffer-name)
                  :buffer (get-buffer-create "*evr put claim-set errors*")
-                 :command `("evr" "sign-put")
+                 :command `("evr" "sign-put" "--flags" "1")
                  :filter
                  (lambda (proc out)
                    (with-current-buffer claim-set-buffer-name
@@ -393,7 +465,8 @@ Returns t if the claim-set was successfully saved."
                         (lambda (hook)
                           (funcall hook claim-set-ref))
                         evr-claim-set-saved-hook)
-                       (message "Wrote claim-set %s" claim-set-ref)))
+                       (message "Wrote claim-set %s" claim-set-ref)
+                       (kill-buffer claim-set-buffer-name)))
                    nil)
                  :stderr (get-buffer-create "*evr put claim-set errors*")
                  )))
@@ -401,3 +474,23 @@ Returns t if the claim-set was successfully saved."
       (process-send-eof proc)
       ))
   t)
+
+(defun evr-insert-claim-set-created-attr ()
+  (goto-char (point-min))
+  (unless (re-search-forward "<claim-set[ >\n\t]" nil t)
+    (error "No claim-set element found."))
+  ;; TODO lookup dc namespace abbrev in evr-default-claim-set-xmlns-list
+  (let ((claim-set-attr-point (point))
+        (claim-set-attr-end-point (re-search-forward ">" nil t))
+        dc-created-point)
+    (goto-char claim-set-attr-point)
+    (setq dc-created-point (re-search-forward "dc:created[ =\n\t]" nil t))
+    (when (or
+           (not dc-created-point)
+           (< claim-set-attr-end-point dc-created-point))
+      (goto-char claim-set-attr-point)
+      (backward-char 1)
+      (insert " dc:created=\"")
+      (insert (format-time-string "%FT%T.%3N000Z" nil "UTC0"))
+      (insert "\""))
+    ))
