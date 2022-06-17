@@ -18,9 +18,13 @@ $ evr-attr-index
 for now evr-attr-index must fail if the watchers can't connect. that
 should make the service more stable in combination with systemd's
 automatic restarts.
-* create tasks for make creating claims simple in emacs
-right now one would have to write a claim-set XML document and post it
-manually via the shell.
+* add claim-set create interactive function to evr.el
+the function should create an empty claim-set template. the buffer
+with the empty claim-set template should have a minor mode attached
+with a keybinding for saving the claim-set.
+* add append claim from template to claim-set interactive function
+select a claim template from some helm list. render the template at
+point.
 * supply custom error logger to xmlSetGenericErrorFunc
 libxml uses it's own error reporting right now which prints to stderr.
 
