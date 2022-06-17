@@ -735,7 +735,7 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     size_t f_pos = sizeof(uint32_t);
     while(1){
         stat.offset = f_pos;
-        int header_read_res = read_n(&fd, buf, header_size);
+        int header_read_res = read_n(&fd, buf, header_size, NULL, NULL);
         if(header_read_res == evr_end){
             break;
         }
@@ -769,7 +769,7 @@ int evr_read_bucket_end_offset(size_t *end_offset, int f){
     uint32_t buf;
     struct evr_file fd;
     evr_file_bind_fd(&fd, f);
-    if(read_n(&fd, (char*)&buf, sizeof(buf)) != evr_ok){
+    if(read_n(&fd, (char*)&buf, sizeof(buf), NULL, NULL) != evr_ok){
         log_error("Failed to read bucket end offset");
         return evr_error;
     }

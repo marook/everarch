@@ -18,12 +18,12 @@
 
 #include "keys.h"
 
-#include <gcrypt.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "errors.h"
 #include "dyn-mem.h"
+#include "logger.h"
 
 void evr_fmt_blob_ref(char *dest, const evr_blob_ref key) {
     char *p = dest;
@@ -68,26 +68,49 @@ int evr_parse_blob_ref(evr_blob_ref key, const char *fmt_key){
 
 int evr_calc_blob_ref(evr_blob_ref key, size_t size, char **chunks){
     int result = evr_error;
-    gcry_md_hd_t hash_ctx;
-    if(gcry_md_open(&hash_ctx, GCRY_MD_SHA3_224, 0) != GPG_ERR_NO_ERROR){
-        goto md_open_fail;
+    gcry_md_hd_t hd;
+    if(evr_blob_ref_open(&hd) != evr_ok){
+        goto out;
     }
     size_t bytes_remaining = size;
     char **chunks_end = chunks + size / evr_chunk_size + 1;
     for(char **c = chunks; c != chunks_end; c++){
         char *current_chunk = *c;
         size_t current_chunk_size = bytes_remaining < evr_chunk_size ? bytes_remaining : evr_chunk_size;
-        gcry_md_write(hash_ctx, current_chunk, current_chunk_size);
+        gcry_md_write(hd, current_chunk, current_chunk_size);
         bytes_remaining -= current_chunk_size;
     }
-    gcry_md_final(hash_ctx);
-    unsigned char *digest = gcry_md_read(hash_ctx, 0);
-    memcpy(key, digest, evr_blob_ref_size);
+    evr_blob_ref_final(key, hd);
     result = evr_ok;
-    gcry_md_close(hash_ctx);
- md_open_fail:
+    evr_blob_ref_close(hd);
+ out:
     return result;
-    
+}
+
+int evr_blob_ref_write_se(void *_hd, char *buf, size_t size){
+    evr_blob_ref_hd hd = _hd;
+    evr_blob_ref_write(hd, buf, size);
+    return evr_ok;
+}
+
+void evr_blob_ref_final(evr_blob_ref ref, gcry_md_hd_t hd){
+    gcry_md_final(hd);
+    unsigned char *digest = gcry_md_read(hd, 0);
+    memcpy(ref, digest, evr_blob_ref_size);
+}
+
+int evr_blob_ref_hd_match(evr_blob_ref_hd hd, evr_blob_ref expected_ref){
+    evr_blob_ref actual_ref;
+    evr_blob_ref_final(actual_ref, hd);
+    if(memcmp(expected_ref, actual_ref, evr_blob_ref_size) != 0){
+        evr_blob_ref_str expected_ref_str;
+        evr_fmt_blob_ref(expected_ref_str, expected_ref);
+        evr_blob_ref_str actual_ref_str;
+        evr_fmt_blob_ref(actual_ref_str, actual_ref);
+        log_error("Expected blob ref %s did not match actual blob ref %s calculated from blob's data", expected_ref_str, actual_ref_str);
+        return evr_error;
+    }
+    return evr_ok;
 }
 
 void evr_build_claim_ref(evr_claim_ref cref, evr_blob_ref bref, int claim){

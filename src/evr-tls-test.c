@@ -67,7 +67,7 @@ int server_worker(void *context){
     assert(is_ok(evr_tls_accept(&c, s, ssl_ctx)));
     char buf[strlen(test_payload_a)];
     log_debug("tls server reading");
-    assert(is_ok(read_n(&c, buf, strlen(test_payload_a))));
+    assert(is_ok(read_n(&c, buf, strlen(test_payload_a), NULL, NULL)));
     assert(memcmp(buf, test_payload_a, strlen(test_payload_a)) == 0);
     log_debug("tls server writing");
     assert(is_ok(write_n(&c, test_payload_b, strlen(test_payload_b))));
@@ -93,7 +93,7 @@ int client_worker(void *context){
     assert(is_ok(write_n(&c, test_payload_a, strlen(test_payload_a))));
     log_debug("tls client reading");
     char buf[strlen(test_payload_b)];
-    assert(is_ok(read_n(&c, buf, strlen(test_payload_b))));
+    assert(is_ok(read_n(&c, buf, strlen(test_payload_b), NULL, NULL)));
     assert(memcmp(buf, test_payload_b, strlen(test_payload_b)) == 0);
     log_debug("tls client closing");
     assert(c.close(&c) == 0);

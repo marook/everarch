@@ -84,7 +84,11 @@ int evr_file_select(struct evr_file *f, int timeout);
 
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size);
 
-int read_n(struct evr_file *f, char *buffer, size_t bytes);
+/**
+ * side_effect will be called with the read data chunk by chunk. If
+ * side_effect is NULL it is ignored.
+ */
+int read_n(struct evr_file *f, char *buffer, size_t bytes, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
 /**
  * Returns evr_ok if bytes got written. Returns evr_end if f signals
@@ -97,14 +101,17 @@ int write_chunk_set(struct evr_file *f, const struct chunk_set *cs);
 /**
  * pipe_n will pipe n bytes from src to dest.
  *
+ * side_effect will be called with the piped data chunk by chunk. If
+ * side_effect is NULL it is ignored.
+ *
  * Returns evr_ok if bytes got piped. Returns evr_end if dest signals
  * an EPIPE on write. Returns evr_error on errors.
  */
-int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n);
+int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
 int dump_n(struct evr_file *f, size_t bytes);
 
-struct chunk_set *read_into_chunks(struct evr_file *f, size_t size);
+struct chunk_set *read_into_chunks(struct evr_file *f, size_t size, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
 int append_into_chunk_set(struct chunk_set *cs, int f);
 

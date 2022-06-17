@@ -488,14 +488,9 @@ int evr_cli_get(struct cli_cfg *cfg){
     } else if(resp.status_code != evr_status_code_ok){
         goto out_with_close_c;
     }
-    // read flags but don't use them
-    char buf[1];
-    if(read_n(&c, buf, sizeof(buf)) != evr_ok){
-        goto out_with_close_c;
-    }
     struct evr_file stdout;
     evr_file_bind_fd(&stdout, STDOUT_FILENO);
-    int pipe_res = pipe_n(&stdout, &c, resp.body_size - 1);
+    int pipe_res = evr_pipe_cmd_get_resp_blob(&stdout, &c, resp.body_size, key);
     if(pipe_res != evr_ok && pipe_res != evr_end){
         goto out_with_close_c;
     }
@@ -779,7 +774,8 @@ int evr_cli_get_file(struct cli_cfg *cfg){
     xmlNode *slice = evr_find_next_element(fbody->children, "slice");
     evr_blob_ref sref;
     struct evr_resp_header resp;
-    char buf[1];
+    struct evr_file stdout;
+    evr_file_bind_fd(&stdout, STDOUT_FILENO);
     while(1){
         if(!slice){
             break;
@@ -805,13 +801,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
             log_error("Failed to fetch file slice blob with ref %s. Response status code was 0x%02x.", fmt_key, resp.status_code);
             goto out_with_free_doc;
         }
-        // read flags but don't use them
-        if(read_n(&c, buf, 1) != evr_ok){
-            goto out_with_free_doc;
-        }
-        struct evr_file stdout;
-        evr_file_bind_fd(&stdout, STDOUT_FILENO);
-        int pipe_res = pipe_n(&stdout, &c, resp.body_size - 1);
+        int pipe_res = evr_pipe_cmd_get_resp_blob(&stdout, &c, resp.body_size, sref);
         if(pipe_res == evr_end){
             break;
         }
@@ -1302,7 +1292,7 @@ int blob_sync_worker(void *context){
                 goto continue_with_retry;
             }
             char buf[sizeof(uint8_t)];
-            if(read_n(cg, buf, sizeof(buf)) != evr_ok){
+            if(read_n(cg, buf, sizeof(buf), NULL, NULL) != evr_ok){
                 goto continue_with_retry;
             }
             struct evr_buf_pos bp;
@@ -1316,7 +1306,10 @@ int blob_sync_worker(void *context){
             if(evr_write_cmd_put_blob(cp, ref, flags, blob_size) != evr_ok){
                 goto continue_with_retry;
             }
-            if(pipe_n(cp, cg, blob_size) != evr_ok){
+            // here we don't need to validate if the piped blob data
+            // matches the blob's ref hash because the receiving
+            // evr-glacier-storage server also performes this check.
+            if(pipe_n(cp, cg, blob_size, NULL, NULL) != evr_ok){
                 goto continue_with_retry;
             }
             if(evr_read_resp_header(cp, &put_resp) != evr_ok){

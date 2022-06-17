@@ -117,7 +117,7 @@ int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
     }
 }
 
-int read_n(struct evr_file *f, char *buffer, size_t bytes){
+int read_n(struct evr_file *f, char *buffer, size_t bytes, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx){
     size_t remaining = bytes;
     while(remaining > 0){
         size_t nbytes = f->read(f, buffer, remaining);
@@ -126,6 +126,9 @@ int read_n(struct evr_file *f, char *buffer, size_t bytes){
         }
         if(nbytes == 0){
             return evr_end;
+        }
+        if(side_effect && side_effect(ctx, buffer, nbytes) != evr_ok){
+            return evr_error;
         }
         buffer += nbytes;
         remaining -= nbytes;
@@ -164,12 +167,15 @@ int write_chunk_set(struct evr_file *f, const struct chunk_set *cs){
     return evr_ok;
 }
 
-int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n){
+int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx){
     char buffer[4096];
     size_t remaining = n;
     while(remaining > 0){
         ssize_t bytes_read = src->read(src, buffer, min(remaining, sizeof(buffer)));
         if(bytes_read <= 0){
+            return evr_error;
+        }
+        if(side_effect && side_effect(ctx, buffer, bytes_read) != evr_ok){
             return evr_error;
         }
         remaining -= bytes_read;
@@ -199,7 +205,7 @@ int dump_n(struct evr_file *f, size_t bytes){
     return evr_ok;
 }
 
-struct chunk_set *read_into_chunks(struct evr_file *f, size_t size){
+struct chunk_set *read_into_chunks(struct evr_file *f, size_t size, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx){
     size_t chunks_len = ceil_div(size, evr_chunk_size);
     struct chunk_set *cs = evr_allocate_chunk_set(chunks_len);
     if(!cs){
@@ -208,7 +214,7 @@ struct chunk_set *read_into_chunks(struct evr_file *f, size_t size){
     size_t remaining = size;
     for(int i = 0; i < chunks_len; ++i){
         size_t chunk_read_size = min(remaining, evr_chunk_size);
-        if(read_n(f, cs->chunks[i], chunk_read_size) != evr_ok){
+        if(read_n(f, cs->chunks[i], chunk_read_size, side_effect, ctx) != evr_ok){
             goto out_free_cs;
         }
         remaining -= chunk_read_size;

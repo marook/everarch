@@ -1480,13 +1480,22 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
     }
     // ignore one byte containing the flags
     char buf[1];
-    if(read_n(&c, buf, sizeof(buf)) != evr_ok){
+    if(read_n(&c, buf, sizeof(buf), NULL, NULL) != evr_ok){
         goto out_with_close_c;
     }
-    if(pipe_n(&f, &c, resp.body_size - sizeof(buf)) != evr_ok){
+    evr_blob_ref_hd hd;
+    if(evr_blob_ref_open(&hd) != evr_ok){
         goto out_with_close_c;
+    }
+    if(pipe_n(&f, &c, resp.body_size - sizeof(buf), evr_blob_ref_write_se, hd) != evr_ok){
+        goto out_with_close_hd;
+    }
+    if(evr_blob_ref_hd_match(hd, ref) != evr_ok){
+        goto out_with_close_hd;
     }
     ret = evr_ok;
+ out_with_close_hd:
+    evr_blob_ref_close(hd);
  out_with_close_c:
     if(c.close(&c) != 0){
         evr_panic("Unable to close storage connection.");

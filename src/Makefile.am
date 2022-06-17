@@ -210,7 +210,8 @@ glacier_cmd_test_SOURCES = \
 	assert.c \
 	glacier-cmd.c \
 	glacier-cmd-test.c \
-	keys.c
+	keys.c \
+	logger.c
 glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
 
 glacier_test_SOURCES = \

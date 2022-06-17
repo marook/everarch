@@ -46,7 +46,7 @@ void test_cat_subprocess(){
     char buf[msg_len + 1];
     struct evr_file sp_stdout;
     evr_file_bind_fd(&sp_stdout, sp.stdout);
-    assert(is_ok(read_n(&sp_stdout, buf, msg_len)));
+    assert(is_ok(read_n(&sp_stdout, buf, msg_len, NULL, NULL)));
     buf[sizeof(buf) - 1] = '\0';
     assert(is_str_eq(msg, buf));
     assert(close(sp.stdout) == 0);

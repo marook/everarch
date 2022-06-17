@@ -58,6 +58,10 @@ int evr_req_cmd_get_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_h
 
 int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key);
 
+int evr_read_cmd_get_resp_blob(char **blob, struct evr_file *c, size_t resp_body_size, evr_blob_ref expected_ref);
+
+int evr_pipe_cmd_get_resp_blob(struct evr_file *dst, struct evr_file *src, size_t resp_body_size, evr_blob_ref expected_ref);
+
 int evr_write_cmd_put_blob(struct evr_file *f, evr_blob_ref key, int flags, size_t blob_size);
 
 int evr_req_cmd_watch_blobs(struct evr_file *f, struct evr_blob_filter *filter);

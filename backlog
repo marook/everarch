@@ -1,7 +1,3 @@
-* evr get commands must validate retrieved hashes
-the commands evr get and evr get-file must validate if the calculated
-hash matches the claim ref for each retrieved blob. evr must fail with
-an error code unequal 0 if the hashes don't match.
 * evr-attr-index must fail if it can't connect to evr-glacier-storage
 right now evr-attr-index keeps running if it can't connect to a
 evr-glacier-storage server. there is also no retry or something.

@@ -338,7 +338,7 @@ int evr_connection_worker(void *context){
     char buffer[evr_cmd_header_n_size];
     struct evr_cmd_header cmd;
     while(running){
-        const int header_result = read_n(&ctx.socket, buffer, evr_cmd_header_n_size);
+        const int header_result = read_n(&ctx.socket, buffer, evr_cmd_header_n_size, NULL, NULL);
         if(header_result == evr_end){
             log_debug("Worker %d ends because of remote termination", ctx.socket.get_fd(&ctx.socket));
             result = evr_ok;
@@ -363,7 +363,7 @@ int evr_connection_worker(void *context){
                 goto out_with_free_rctx;
             }
             evr_blob_ref key;
-            const int body_result = read_n(&ctx.socket, (char*)&key, body_size);
+            const int body_result = read_n(&ctx.socket, (char*)&key, body_size, NULL, NULL);
             if(body_result != evr_ok){
                 goto out_with_free_rctx;
             }
@@ -431,7 +431,7 @@ int evr_connection_worker(void *context){
 
 int evr_authenticate_client(struct evr_file *c){
     char buf[sizeof(uint8_t) + sizeof(evr_auth_token)];
-    if(read_n(c, buf, sizeof(buf)) != evr_ok){
+    if(read_n(c, buf, sizeof(buf), NULL, NULL) != evr_ok){
         return evr_error;
     }
     struct evr_buf_pos bp;
@@ -463,11 +463,11 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         goto out;
     }
     struct evr_writing_blob wblob;
-    if(read_n(&ctx->socket, (char*)&wblob.key, evr_blob_ref_size) != evr_ok){
+    if(read_n(&ctx->socket, (char*)&wblob.key, evr_blob_ref_size, NULL, NULL) != evr_ok){
         goto out;
     }
     uint8_t flags;
-    if(read_n(&ctx->socket, (char*)&flags, sizeof(flags)) != evr_ok){
+    if(read_n(&ctx->socket, (char*)&flags, sizeof(flags), NULL, NULL) != evr_ok){
         goto out;
     }
 #ifdef EVR_LOG_DEBUG
@@ -477,18 +477,15 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
         log_debug("Worker %d retrieved cmd put %s with flags 0x%02x and %d bytes blob", ctx->socket.get_fd(&ctx->socket), fmt_key, flags, blob_size);
     }
 #endif
-    struct chunk_set *blob = read_into_chunks(&ctx->socket, blob_size);
-    if(!blob){
+    evr_blob_ref_hd hd;
+    if(evr_blob_ref_open(&hd) != evr_ok){
         goto out;
     }
-    evr_blob_ref calced_key;
-    if(evr_calc_blob_ref(calced_key, blob_size, blob->chunks) != evr_ok){
-        goto out_free_blob;
+    struct chunk_set *blob = read_into_chunks(&ctx->socket, blob_size, evr_blob_ref_write_se, hd);
+    if(!blob){
+        goto out_with_close_hd;
     }
-    if(memcmp(wblob.key, calced_key, 0)){
-        // TODO indicate to the client that the key does not
-        // match the blob's hash
-        log_debug("Client and server blob keys did not match");
+    if(evr_blob_ref_hd_match(hd, wblob.key) != evr_ok){
         goto out_free_blob;
     }
     // TODO final check here if blob is already in store to reduce
@@ -526,6 +523,8 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     }
  out_free_blob:
     evr_free_chunk_set(blob);
+ out_with_close_hd:
+    evr_blob_ref_close(hd);
  out:
     return ret;
 }
@@ -536,7 +535,7 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
         goto out;
     }
     evr_blob_ref key;
-    if(read_n(&ctx->socket, (char*)&key, evr_blob_ref_size) != evr_ok){
+    if(read_n(&ctx->socket, (char*)&key, evr_blob_ref_size, NULL, NULL) != evr_ok){
         goto out;
     }
 #ifdef EVR_LOG_DEBUG
@@ -612,7 +611,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         goto out;
     }
     char buf[max(max(evr_blob_filter_n_size, evr_resp_header_n_size), evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t))];
-    if(read_n(&ctx->socket, buf, evr_blob_filter_n_size) != evr_ok){
+    if(read_n(&ctx->socket, buf, evr_blob_filter_n_size, NULL, NULL) != evr_ok){
         goto out;
     }
     struct evr_blob_filter f;

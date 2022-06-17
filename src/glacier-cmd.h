@@ -131,7 +131,8 @@ struct evr_stat_blob_resp {
     size_t blob_size;
 };
 
-#define evr_stat_blob_resp_n_size (sizeof(uint8_t) + sizeof(uint32_t))
+#define evr_blob_flags_n_size sizeof(uint8_t)
+#define evr_stat_blob_resp_n_size (evr_blob_flags_n_size + sizeof(uint32_t))
 
 int evr_parse_stat_blob_resp(struct evr_stat_blob_resp *resp, char *buf);
 int evr_format_stat_blob_resp(char *buf, const struct evr_stat_blob_resp *resp);
@@ -153,7 +154,7 @@ struct evr_watch_blobs_body {
     int flags;
 };
 
-#define evr_watch_blobs_body_n_size (evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t))
+#define evr_watch_blobs_body_n_size (evr_blob_ref_size + sizeof(uint64_t) + evr_blob_flags_n_size)
 
 int evr_parse_watch_blobs_body(struct evr_watch_blobs_body *body, char *buf);
 

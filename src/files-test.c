@@ -49,7 +49,7 @@ void test_read_into_chunks_with_small_file(){
     assert(fd >= 0);
     struct evr_file f;
     evr_file_bind_fd(&f, fd);
-    struct chunk_set *cs = read_into_chunks(&f, 2);
+    struct chunk_set *cs = read_into_chunks(&f, 2, NULL, NULL);
     assert(f.close(&f) == 0);
     assert(cs);
     assert(cs->chunks_len == 1);

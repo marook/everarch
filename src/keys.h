@@ -34,6 +34,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <gcrypt.h>
 
 #define evr_blob_ref_bit_size 224
 #define evr_blob_ref_size (evr_blob_ref_bit_size / 8)
@@ -74,6 +75,34 @@ int evr_parse_blob_ref(evr_blob_ref key, const char *fmt_key);
 
 // TODO change API from size+chunks to evr_chunk_set which now contains size_used
 int evr_calc_blob_ref(evr_blob_ref key, size_t size, char **chunks);
+
+/**
+ * evr_blob_ref_hd is always a pointer to something.
+ */
+typedef gcry_md_hd_t evr_blob_ref_hd;
+
+// TODO rename to evr_open_blob_ref_hd
+#define evr_blob_ref_open(hd) \
+    ((gcry_md_open(hd, GCRY_MD_SHA3_224, 0) != GPG_ERR_NO_ERROR) ? evr_error : evr_ok)
+
+// TODO rename to evr_write_blob_ref_hd
+#define evr_blob_ref_write gcry_md_write
+
+// TODO rename to evr_write_se_blob_ref_hd
+int evr_blob_ref_write_se(void *hd, char *buf, size_t size);
+
+// TODO rename to evr_finalize_blob_ref_hd
+/**
+ * evr_blob_ref_final finalizes the hash digest and writes the hash
+ * into ref.
+ */
+void evr_blob_ref_final(evr_blob_ref ref, evr_blob_ref_hd hd);
+
+// TODO rename to evr_match_blob_ref_hd
+int evr_blob_ref_hd_match(evr_blob_ref_hd hd, evr_blob_ref expected_ref);
+
+// TODO rename to evr_close_blob_ref_hd
+#define evr_blob_ref_close gcry_md_close
 
 void evr_build_claim_ref(evr_claim_ref cref, evr_blob_ref bref, int claim);
 

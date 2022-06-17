@@ -53,17 +53,12 @@ int evr_fetch_xml(xmlDocPtr *doc, struct evr_file *f, evr_blob_ref key){
         log_error("Failed to read blob %s. Responded status code was 0x%02x", resp.status_code);
         goto out;
     }
-    char *buf = malloc(resp.body_size + 1);
-    if(!buf){
+    char *buf = NULL;
+    if(evr_read_cmd_get_resp_blob(&buf, f, resp.body_size, key) != evr_ok){
         goto out;
     }
-    if(read_n(f, buf, resp.body_size) != evr_ok){
-        goto out_with_free_buf;
-    }
-    // first buf byte is blob flags which we ignore
-    const size_t flags_size = 1;
     // TODO migrate to evr_parse_xml
-    *doc = xmlReadMemory(&buf[flags_size], resp.body_size - flags_size, NULL, "UTF-8", 0);
+    *doc = xmlReadMemory(buf, resp.body_size - evr_blob_flags_n_size, NULL, "UTF-8", 0);
     if(!*doc){
         ret = evr_user_data_invalid;
         goto out_with_free_buf;
@@ -86,18 +81,12 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
         log_error("Failed to read blob %s. Responded status code was 0x%02x", resp.status_code);
         return evr_error;
     }
-    char *buf = malloc(resp.body_size);
-    if(!buf){
-        return evr_error;
-    }
-    if(read_n(f, buf, resp.body_size) != evr_ok){
-        free(buf);
+    char *buf = NULL;
+    if(evr_read_cmd_get_resp_blob(&buf, f, resp.body_size, key) != evr_ok){
         return evr_error;
     }
     struct dynamic_array *claim = NULL;
-    // first buf byte is blob flags which we ignore
-    const size_t flags_size = 1;
-    int verify_res = evr_verify(ctx, &claim, &buf[flags_size], resp.body_size - flags_size);
+    int verify_res = evr_verify(ctx, &claim, buf, resp.body_size - evr_blob_flags_n_size);
     free(buf);
     if(verify_res != evr_ok){
         evr_blob_ref_str fmt_key;
@@ -220,6 +209,80 @@ int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key){
     return ret;
 }
 
+int evr_read_cmd_get_resp_blob(char **blob, struct evr_file *c, size_t resp_body_size, evr_blob_ref expected_ref){
+    int ret = evr_error;
+    // read flags but ignore them
+    char flags_buf[evr_blob_flags_n_size];
+    if(resp_body_size < sizeof(flags_buf) || resp_body_size > evr_max_blob_data_size + sizeof(flags_buf)){
+        goto out;
+    }
+    if(read_n(c, flags_buf, sizeof(flags_buf), NULL, NULL) != evr_ok){
+        goto out;
+    }
+    size_t blob_size = resp_body_size - sizeof(flags_buf);
+    char *buf = malloc(blob_size);
+    if(!buf){
+        goto out;
+    }
+    evr_blob_ref_hd hd;
+    if(evr_blob_ref_open(&hd) != evr_ok){
+        goto out_with_free_buf;
+    }
+    if(read_n(c, buf, blob_size, evr_blob_ref_write_se, hd) != evr_ok){
+        goto out_with_close_hd;
+    }
+    if(evr_blob_ref_hd_match(hd, expected_ref) != evr_ok){
+        goto out_with_close_hd;
+    }
+    evr_blob_ref_close(hd);
+    *blob = buf;
+    ret = evr_ok;
+    return ret;
+ out_with_close_hd:
+    evr_blob_ref_close(hd);
+ out_with_free_buf:
+    free(buf);
+ out:
+    return ret;
+}
+
+int evr_pipe_cmd_get_resp_blob(struct evr_file *dst, struct evr_file *src, size_t resp_body_size, evr_blob_ref expected_ref){
+    int ret = evr_error;
+    char flags_buf[evr_blob_flags_n_size];
+    if(resp_body_size < sizeof(flags_buf)){
+        goto out;
+    }
+    // read flags but don't use them
+    int read_res = read_n(src, flags_buf, sizeof(flags_buf), NULL, NULL);
+    if(read_res == evr_end){
+        ret = evr_end;
+        goto out;
+    }
+    if(read_res != evr_ok){
+        goto out;
+    }
+    evr_blob_ref_hd hd;
+    if(evr_blob_ref_open(&hd) != evr_ok){
+        goto out;
+    }
+    int pipe_res = pipe_n(dst, src, resp_body_size - 1, evr_blob_ref_write_se, hd);
+    if(pipe_res == evr_end){
+        ret = evr_end;
+        goto out_with_close_hd;
+    }
+    if(pipe_res != evr_ok){
+        goto out_with_close_hd;
+    }
+    if(evr_blob_ref_hd_match(hd, expected_ref) != evr_ok){
+        goto out_with_close_hd;
+    }
+    ret = evr_ok;
+ out_with_close_hd:
+    evr_blob_ref_close(hd);
+ out:
+    return ret;
+}
+
 int evr_write_cmd_put_blob(struct evr_file *f, evr_blob_ref key, int flags, size_t blob_size){
     const size_t body_size = evr_blob_ref_size + sizeof(uint8_t);
     char buf[evr_cmd_header_n_size + body_size];
@@ -287,7 +350,7 @@ int evr_write_cmd_watch_blobs(struct evr_file *f, struct evr_blob_filter *filter
 int evr_read_resp_header(struct evr_file *f, struct evr_resp_header *resp){
     int ret = evr_error;
     char buf[evr_resp_header_n_size];
-    if(read_n(f, buf, evr_resp_header_n_size) != evr_ok){
+    if(read_n(f, buf, evr_resp_header_n_size, NULL, NULL) != evr_ok){
         goto out;
     }
     if(evr_parse_resp_header(resp, buf) != evr_ok){
@@ -301,7 +364,7 @@ int evr_read_resp_header(struct evr_file *f, struct evr_resp_header *resp){
 
 int evr_read_watch_blobs_body(struct evr_file *f, struct evr_watch_blobs_body *body){
     char buf[evr_watch_blobs_body_n_size];
-    int read_res = read_n(f, buf, evr_watch_blobs_body_n_size);
+    int read_res = read_n(f, buf, evr_watch_blobs_body_n_size, NULL, NULL);
     if(read_res == evr_end){
         return evr_end;
     }
