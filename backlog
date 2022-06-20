@@ -18,9 +18,6 @@ $ evr-attr-index
 for now evr-attr-index must fail if the watchers can't connect. that
 should make the service more stable in combination with systemd's
 automatic restarts.
-* add append claim from template to claim-set interactive function
-select a claim template from some helm list. render the template at
-point.
 * supply custom error logger to xmlSetGenericErrorFunc
 libxml uses it's own error reporting right now which prints to stderr.
 

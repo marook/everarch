@@ -69,11 +69,14 @@ PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9])
 PKG_CHECK_MODULES([XSLT], [libxslt >= 1.1])
 PKG_CHECK_MODULES([SSL], [libssl >= 1.1 libcrypto >= 1.1])
 
+AM_PATH_LISPDIR()
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
     Makefile
     src/Makefile
     python/Makefile
+    emacs/Makefile
 ])
 
 AC_OUTPUT

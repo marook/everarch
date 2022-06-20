@@ -16,6 +16,10 @@
 ;; You should have received a copy of the GNU Affero General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+(require 'helm)
+(require 'templar)
+(require 'subr-x)
+
 (setq evr--claim-ref-pattern "sha[0-9]+-224-\\([0-9a-z]\\)\\{56\\}-\\([0-9a-f]\\)\\{4\\}")
 
 ;;;###autoload
@@ -275,22 +279,20 @@ points to a file claim."
         (message "No idea how to follow the claim in buffer %s" (buffer-name)))
       )))
 
-(defun evr-file-claim-mode (&optional arg)
+(define-minor-mode evr-file-claim-mode
   "This minor mode makes a buffer an everarch sourced file."
-  (interactive (list (or current-prefix-arg 'toggle)))
-  (let ((enable
-         (if (eq arg 'toggle)
-             (not evr-file-claim-mode)
-           (> (prefix-numeric-value arg) 0))))
-    (if enable
-        (evr-enable-file-claim-mode)
-      (evr-disable-file-claim-mode))))
+  :init-value nil
+  :group 'evr
+  :lighter " evr-file-claim"
+  (if evr-file-claim-mode
+      (evr--enable-file-claim-mode)
+    (evr--disable-file-claim-mode)))
 
-(defun evr-enable-file-claim-mode ()
+(defun evr--enable-file-claim-mode ()
   (add-hook 'write-contents-functions 'evr-save-file nil t))
 
-(defun evr-disable-file-claim-mode ()
-  (remove-hook 'write-contents-finctions 'evr-save-file t))
+(defun evr--disable-file-claim-mode ()
+  (remove-hook 'write-contents-functions 'evr-save-file t))
 
 (defcustom evr-seed-file-claim-saved-hook nil
   "Run after `evr-save-file' saved a seed file claim.
@@ -374,25 +376,87 @@ Returns t if the claim-set was successfully saved."
 composed claim-sets."
   :group 'evr)
 
-(defun evr-claim-set-mode (&optional arg)
+(defun evr-put-seed-attr ()
+  "evr-put-seed-attr returns a seed attribute like
+  seed=\"sha3-224-…\" at point if the (usually buffer local)
+  variable evr-seed-ref is defined.
+
+This function is expected to be used with templar templates."
+  (lambda (vars)
+    (if (boundp 'evr-seed-ref)
+        (concat
+         " seed=\""
+         evr-seed-ref
+         "\"")
+      "")))
+
+(defvar
+  evr-claim-templates
+  `(
+    ("attr"
+     (
+      (;; vars
+       ("key" ,(templar-ask-for-value "my-key"))
+       ("value" ,(templar-ask-for-value "some value"))
+       )
+      (;; template
+       "<attr" ,(evr-put-seed-attr) ">
+  <a op=\"=\" k=\"" ,(templar-put-var "key" 'identity) "\" v=\"" ,(templar-put-var "value" 'identity) "\"/>
+</attr>"
+       )
+      )
+     )
+    )
+  "evr-claim-templates references all templar templates which
+produce claims.
+
+Every template is a list of two items: (name template-spec)
+
+name is the human readable name of the template.
+
+template-spec is a list of two items: (var-specs template)
+
+var-specs is a list of variables. Each variable is (name resover).")
+
+(defun evr-insert-claim ()
+  (interactive)
+  (helm
+   :sources
+   (helm-build-sync-source
+       "evr claims"
+     :candidates evr-claim-templates
+     :action
+     `(
+       ("Insert" . ,(lambda (template) (evr--insert-claim-at-point (car template))))
+       ))))
+
+(defun evr--insert-claim-at-point (template)
+  (let ((claim-start-point (point))
+        claim-end-point)
+    (templar-insert-at-point template)
+    (indent-region claim-start-point (point))))
+
+(define-minor-mode evr-claim-set-mode
   "This minor mode makes a buffer an everarch sourced claim-set.
 
 Saving this buffer will put the claim-set into evr and close the
 buffer afterwards."
-  (interactive (list (or current-prefix-arg 'toggle)))
-  (let ((enable
-         (if (eq arg 'toggle)
-             (not evr-file-claim-mode)
-           (> (prefix-numeric-value arg) 0))))
-    (if enable
-        (evr-enable-claim-set-mode)
-      (evr-disable-claim-set-mode))))
+  :init-value nil
+  :group 'evr
+  :lighter " evr-claim-set"
+  :keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-x w") 'evr-insert-claim)
+    map)
+  (if evr-claim-set-mode
+      (evr--enable-claim-set-mode)
+    (evr--disable-claim-set-mode)))
 
-(defun evr-enable-claim-set-mode ()
+(defun evr--enable-claim-set-mode ()
   (add-hook 'write-contents-functions 'evr-save-claim-set nil t))
 
-(defun evr-disable-claim-set-mode ()
-  (remove-hook 'write-contents-finctions 'evr-save-claim-set t))
+(defun evr--disable-claim-set-mode ()
+  (remove-hook 'write-contents-functions 'evr-save-claim-set t))
 
 ;;;###autoload
 ;; (evr-compose-claim-set)
@@ -494,3 +558,5 @@ Returns t if the claim-set was successfully saved."
       (insert (format-time-string "%FT%T.%3N000Z" nil "UTC0"))
       (insert "\""))
     ))
+
+(provide 'evr)
