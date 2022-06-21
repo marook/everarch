@@ -9,6 +9,8 @@
 [Unit]
 Description=evr-attr-index - The everarch attribute index server
 Documentation=info:evr
+Requires=evr-glacier-storage.service
+After=evr-glacier-storage.service
 StartLimitIntervalSec=60
 StartLimitBurst=4
 

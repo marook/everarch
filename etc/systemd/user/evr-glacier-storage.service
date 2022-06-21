@@ -13,6 +13,10 @@ StartLimitIntervalSec=60
 StartLimitBurst=4
 
 [Service]
+# TODO make evr-glacier-storage a forking service. otherwise the startup
+# dependency between evr-attr-index and evr-glacier-storage is not
+honoured. see https://unix.stackexchange.com/a/391050/147637 for
+# details.
 ExecStart=/usr/local/bin/evr-glacier-storage
 Restart=on-failure
 RestartSec=1
