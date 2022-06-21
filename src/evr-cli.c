@@ -366,6 +366,7 @@ int evr_cli_sync(struct cli_cfg *cfg);
 int main(int argc, char **argv){
     int ret = 1;
     evr_tls_init();
+    gcry_check_version(EVR_GCRY_MIN_VERSION);
     evr_log_fd = STDERR_FILENO;
     evr_log_app = "e";
     struct cli_cfg cfg;

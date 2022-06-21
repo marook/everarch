@@ -159,7 +159,7 @@ int main(int argc, char **argv){
     int ret = evr_error;
     evr_log_app = "g";
     evr_tls_init();
-    gcry_check_version("1.8.0");
+    gcry_check_version(EVR_GCRY_MIN_VERSION);
     if(evr_load_glacier_storage_cfg(argc, argv) != evr_ok){
         goto out_with_tls_free;
     }

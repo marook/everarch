@@ -222,6 +222,7 @@ int main(int argc, char **argv){
     int ret = evr_error;
     evr_log_app = "i";
     evr_tls_init();
+    gcry_check_version(EVR_GCRY_MIN_VERSION);
     if(evr_load_attr_index_cfg(argc, argv) != evr_ok){
         goto out_with_free_tls;
     }
