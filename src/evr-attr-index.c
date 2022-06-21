@@ -462,6 +462,13 @@ int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx){
     return ret;
 }
 
+#define evr_worker_ended(name, ret)                             \
+    if(ret == evr_ok){                                          \
+        log_debug("Ended " name " worker with result %d", ret); \
+    } else {                                                    \
+        evr_panic("Ended " name " worker with result %d", ret); \
+    }                                                           \
+
 int evr_watch_index_claims_worker(void *arg){
     int ret = evr_error;
     evr_init_xml_error_logging();
@@ -619,7 +626,7 @@ int evr_watch_index_claims_worker(void *arg){
  out_with_free_ssl_ctx:
     SSL_CTX_free(ssl_ctx);
  out:
-    log_debug("Ended watch index claims worker with result %d", ret);
+    evr_worker_ended("watch index claims", ret);
     return ret;
 }
 
@@ -695,7 +702,7 @@ int evr_build_index_worker(void *arg){
     }
     ret = evr_ok;
  out:
-    log_debug("Ended build index worker with result %d", ret);
+    evr_worker_ended("build index", ret);
     return ret;
 }
 
@@ -1051,7 +1058,7 @@ int evr_index_sync_worker(void *arg){
         }
     }
  out:
-    log_debug("Ended index sync worker with result %d", ret);
+    evr_worker_ended("index sync", ret);
     return ret;
 }
 
