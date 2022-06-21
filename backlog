@@ -1,11 +1,3 @@
-* repair out of sync bucket end pointer and file end offset :beprep:
-the whole bucket should be scanned with validation of each key and
-blob. if the file probably ends with one corrupt blob it should be
-discarded.
-
-it's important to be sensible about the discarded data at the end of
-the file. maybe there should be an 'autorepair' flag in the
-configuration.
 * check glacier index.db and bucket file consistency on startup
 the end pointer (which is the first 4 bytes of each bucket) of the
 last written bucket should be stored in the index.db. also on startup
