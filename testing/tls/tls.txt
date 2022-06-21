@@ -5,3 +5,11 @@ If you need to create your own key pair you can use the following
 command:
 
 $ openssl req -newkey rsa:4096 -x509 -sha512 -nodes -out my-cert.pem -keyout my-key.pem
+
+Add the option '-days 17800' for generating insecure certificates for
+integration testing.
+
+You can analyze the contents of an existing certificate using the
+following command:
+
+$ openssl x509 -text -noout -in attr-index-cert.pem
