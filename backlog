@@ -1,28 +1,11 @@
-* evr-attr-index must fail if it can't connect to evr-glacier-storage
-right now evr-attr-index keeps running if it can't connect to a
-evr-glacier-storage server. there is also no retry or something.
+* repair out of sync bucket end pointer and file end offset :beprep:
+the whole bucket should be scanned with validation of each key and
+blob. if the file probably ends with one corrupt blob it should be
+discarded.
 
-#+BEGIN_SRC
-$ evr-attr-index
-2022-05-31T20:46:45 iD Parsing config file /home/marook/.config/everarch/attr-index.conf
-2022-05-31T20:46:45 iD Started watch index claims worker
-2022-05-31T20:46:45 iD Use SSL cert /home/marook/.local/etc/everarch/glacier-cert.pem for localhost:2361
-2022-05-31T20:46:45 iD Started build index worker
-2022-05-31T20:46:45 iD Started index sync worker
-2022-05-31T20:46:45 iI Listening on localhost:2362
-2022-05-31T20:46:45 iE Unable to connect to localhost:2361
-2022-05-31T20:46:45 iE Failed to connect to evr-glacier-storage server
-2022-05-31T20:46:45 iD Ended watch index claims worker with result 1
-#+END_SRC
-
-for now evr-attr-index must fail if the watchers can't connect. that
-should make the service more stable in combination with systemd's
-automatic restarts.
-* supply custom error logger to xmlSetGenericErrorFunc
-libxml uses it's own error reporting right now which prints to stderr.
-
-it should be overwritten with by calling xmlSetGenericErrorFunc(…)
-with a custom error function which uses log_error to log errors.
+it's important to be sensible about the discarded data at the end of
+the file. maybe there should be an 'autorepair' flag in the
+configuration.
 * check glacier index.db and bucket file consistency on startup
 the end pointer (which is the first 4 bytes of each bucket) of the
 last written bucket should be stored in the index.db. also on startup
@@ -40,18 +23,6 @@ it should recreate the index.db by scanning through all existing
 buckets.
 
 drop fsyncs when writing index.db also with this change.
-* parallel evr-attr-index claim-set preparation
-indexing a claim-set can be splitted into two phases. a first phase
-which fetches the claim-set XML, then applies the attr factories and
-XSLT stylesheet on it. then a second phase which persists the attr and
-archive claims into the index.
-
-the first phase should be executed in parallel.
-
-the solution might involve a ring buffer which n slots. each slot
-holds one to be prepared claim-set. the slots in the ring buffer have
-the states queued and prepared. there are n threads which fetch the
-next queued slot and prepare it.
 * add i18n support in attr query contains operator
 right now sqlite is used for comparing values when using the attr
 query contains (~) operator in a case insensitive way. the lower case
@@ -68,10 +39,7 @@ using evr_parse_claim_ref(…).
 right now it's hard coded in two places. first where the connection is
 opened. second where the auth token is looked up.
 * auto generate ssl cert and key if they don't exists
-use something like:
-#+BEGIN_SRC
-openssl req -newkey rsa:4096 -x509 -sha512 -nodes -out attr-index-cert.pem -keyout attr-index-key.pem
-#+END_SRC
+use some command like written in tls.txt
 * add documentation on how to write attr-specs
 ** describe how attr is the central claim
 ** describe archive claim
@@ -81,6 +49,10 @@ transformation.
 
 index-seed must be provided by transformation.
 ** describe how seed and index-seed must be handled in transformations
+* create bucket directory if not existing :bdircre:
+* implement an evr-glacier-storage blob put/get benchmark
+should connect via network socket. send lots of blobs. request lots of
+blobs. count blobs per second. maybe different blob sizes etc.
 * reserve keywords in attr-query language
 right now there are some keywords in attr-query language like for
 example 'ref'. think about future keywords and reserve them so nobody
@@ -89,6 +61,69 @@ must rewrite queries in the future.
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
 perkeep stuff.
+* evaluate http libraries for C
+the evaluation should decide if the evr-web-server is implemented in C
+, node.js or maybe deno.
+* report ref and some attributes specified by key in attr querries
+the query might be something like: select title where tag=todo
+* sort attr-query results by last modified timestamp
+right now found claims are sorted by their creation date desc. further
+sort orders should be able to be specified using a order by query
+expression.
+
+examples:
+#+BEGIN_SRC
+tag=todo order by last-modified
+tag=todo order by last-modified desc
+tag=todo order by last-modified asc
+tag=todo order by created
+tag=todo order by created desc
+tag=todo order by created asc
+#+END_SRC
+* allow attr query args in quotes
+#+BEGIN_SRC
+'the key'='the value'
+"the key"="the value"
+#+END_SRC
+* introduce evr-web-server
+should bind to port 443 and respond some hello world as a demo.
+* search seed claims endpoint for evr-web-server
+GET /seeds?tag=todo
+POST /seeds with query in post body?
+
+responds found seed claims as JSON:
+
+#+BEGIN_SRC
+[
+  {
+    "ref": "sha3-224-…",
+    "attr": {
+      "tag": ["todo"]
+    }
+  }
+]
+#+END_SRC
+* introduce evr-web-explorer
+HTML/CSS/JS application which allows exploring seed claims. should use the evr-web-server API for retrieving 
+* evr-web-explorer should show seed claims
+query /seeds evr-web-server endpoint and show the seeds as some kind
+of list.
+* parallel evr-attr-index claim-set preparation
+indexing a claim-set can be splitted into two phases. a first phase
+which fetches the claim-set XML, then applies the attr factories and
+XSLT stylesheet on it. then a second phase which persists the attr and
+archive claims into the index.
+
+the first phase should be executed in parallel.
+
+the solution might involve a ring buffer which n slots. each slot
+holds one to be prepared claim-set. the slots in the ring buffer have
+the states queued and prepared. there are n threads which fetch the
+next queued slot and prepare it.
+* ---- v0.2 boundary ----
+everything above will be part of the second major release of everarch.
+
+the vision of the second release is: let's go web
 * add has key operator to attr query language
 extend the attr query language to support searching for claims which
 have a certain key.
@@ -107,20 +142,6 @@ tag=todo && some-key=*
 mapping the first example to sql would be quite easy because we could
 do "c.seed not in (…)". but how to map the braces part i'm not sure
 yet.
-* sort attr-query results by last modified timestamp
-right now found claims are sorted by their creation date desc. further
-sort orders should be able to be specified using a order by query
-expression.
-
-examples:
-#+BEGIN_SRC
-tag=todo order by last-modified
-tag=todo order by last-modified desc
-tag=todo order by last-modified asc
-tag=todo order by created
-tag=todo order by created desc
-tag=todo order by created asc
-#+END_SRC
 * sort attr-query results by a certain attr key
 right now found claims are sortable by their creation and last
 modification date. with this task sorting by a certain attr should be
@@ -141,18 +162,10 @@ the open question is how to define what the match functions are
 actually doing. for example which mime types are treated as
 image. this should not be coded into everarch. it would be nice to be
 able to define them somehow in blobs.
-* report ref and some attributes specified by key in attr querries
-the query might be something like: select title where tag=todo
 * make boolean and operator '&&' optional in attr query language
 #+BEGIN_SRC
 (tag=todo || tag=backlog) tag=howto
 #+END_SRC
-* gracefully handle sqlite database is locked in evr-glacier-storage
-sqlite's step function will exit with SQLITE_LOCKED if a table is
-locked for more than 1sec (configured right now).
-
-a SQLITE_LOCKED error should be indicated as 'resource temporary not
-available' to the client.
 * evr-glacier-storage should notify systemd when ready
 the systemd service type notify uses a notification approach provided
 by libsystemd-daemon.so so the service can tell systemd it's
@@ -214,28 +227,20 @@ a new transformation could look like this:
 
 the transformation would point to an executable elf binary, shell or
 python script.
-* allow attr query args in quotes
-#+BEGIN_SRC
-'the key'='the value'
-"the key"="the value"
-#+END_SRC
 * get rid of double _ in defines
 as they are not intended for userspace. mentioned by pitrp.
+* gracefully handle sqlite database is locked in evr-glacier-storage
+sqlite's step function will exit with SQLITE_LOCKED if a table is
+locked for more than 1sec (configured right now).
+
+a SQLITE_LOCKED error should be indicated as 'resource temporary not
+available' to the client.
+
+i guess the basis for this task is no longer existent because we
+switched to sqlite's WAL mode.
 * analyze and maybe replace own queues with lib io_uring
 inter thread communitcation queues have been implemented in struct
 evr_work_watch_ctx and struct evr_persister_ctx.
 
 for the sake of using well tested code we should check migrating our
 own queues to lib io_uring. mentioned by pitrp.
-* implement an evr-glacier-storage blob put/get benchmark
-should connect via network socket. send lots of blobs. request lots of
-blobs. count blobs per second. maybe different blob sizes etc.
-* create bucket directory if not existing :bdircre:
-* repair out of sync bucket end pointer and file end offset :beprep:
-the whole bucket should be scanned with validation of each key and
-blob. if the file probably ends with one corrupt blob it should be
-discarded.
-
-it's important to be sensible about the discarded data at the end of
-the file. maybe there should be an 'autorepair' flag in the
-configuration.
