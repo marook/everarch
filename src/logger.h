@@ -71,6 +71,11 @@ extern char *evr_log_app;
 
 void evr_log(const char *level, const char *fmt, ...);
 
+/**
+ * evr_log_xml_error is compatible to libxml's error logging.
+ */
+void evr_log_xml_error(void *ctx, const char *msg, ...);
+
 #define evr_panic(args...)                      \
     {                                           \
         evr_log(evr_log_level_panic, args);     \

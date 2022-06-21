@@ -38,6 +38,12 @@
 #include "basics.h"
 #include "keys.h"
 
+/**
+ * evr_init_xml_error_logging initializes the libxml error
+ * logging. Must be called once per thread.
+ */
+void evr_init_xml_error_logging();
+
 struct evr_claim_set {
     /**
      * out contains the serialized claim set after

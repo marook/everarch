@@ -30,7 +30,34 @@ char *evr_log_app = "";
 
 const char *log_date_format = "%Y-%m-%dT%H:%M:%S";
 
+void evr_log_va(const char *level, const char *fmt, va_list args);
+
 void evr_log(const char *level, const char *fmt, ...){
+    va_list args;
+    va_start(args, fmt);
+    evr_log_va(level, fmt, args);
+    va_end(args);
+}
+
+void evr_log_xml_error(void *ctx, const char *msg, ...){
+    const size_t msg_len = strlen(msg);
+    if(msg_len == 0){
+        return;
+    }
+    char fmt[msg_len + 1];
+    if(msg[msg_len - 1] == '\n'){
+        memcpy(fmt, msg, msg_len - 1);
+        fmt[msg_len - 1] = '\0';
+    } else {
+        memcpy(fmt, msg, msg_len + 1);
+    }
+    va_list args;
+    va_start(args, msg);
+    evr_log_va(evr_log_level_error, fmt, args);
+    va_end(args);
+}
+
+void evr_log_va(const char *level, const char *fmt, va_list args){
     time_t t;
     time(&t);
     const size_t app_len = strlen(evr_log_app);
@@ -53,8 +80,5 @@ void evr_log(const char *level, const char *fmt, ...){
     p += fmt_len;
     *p++ = '\n';
     *p++ = '\0';
-    va_list args;
-    va_start(args, fmt);
     vdprintf(evr_log_fd, log_fmt, args);
-    va_end(args);
 }

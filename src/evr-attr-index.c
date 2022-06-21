@@ -464,6 +464,7 @@ int evr_free_attr_spec_handover_ctx(struct evr_attr_spec_handover_ctx *ctx){
 
 int evr_watch_index_claims_worker(void *arg){
     int ret = evr_error;
+    evr_init_xml_error_logging();
     struct evr_attr_spec_handover_ctx *ctx = arg;
     log_debug("Started watch index claims worker");
     SSL_CTX *ssl_ctx = evr_create_ssl_client_ctx(cfg->storage_host, cfg->storage_port, cfg->ssl_certs);
@@ -624,6 +625,7 @@ int evr_watch_index_claims_worker(void *arg){
 
 int evr_build_index_worker(void *arg){
     int ret = evr_error;
+    evr_init_xml_error_logging();
     void **evr_build_index_worker_ctx = arg;
     struct evr_attr_spec_handover_ctx *sctx = evr_build_index_worker_ctx[0];
     struct evr_index_handover_ctx *ictx = evr_build_index_worker_ctx[1];
@@ -849,6 +851,7 @@ xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref);
 
 int evr_index_sync_worker(void *arg){
     int ret = evr_error;
+    evr_init_xml_error_logging();
     struct evr_index_handover_ctx *ctx = arg;
     log_debug("Started index sync worker");
     int wait_res = evr_wait_for_handover_occupied(&ctx->handover);

@@ -22,6 +22,10 @@
 #include "errors.h"
 #include "logger.h"
 
+void evr_init_xml_error_logging(){
+    xmlSetGenericErrorFunc(NULL, evr_log_xml_error);
+}
+
 const char *evr_claim_encoding = "utf-8";
 const char *evr_iso_8601_timestamp = "%FT%TZ";
 const char *evr_claims_ns = "https://evr.ma300k.de/claims/";

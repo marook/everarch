@@ -367,6 +367,7 @@ int main(int argc, char **argv){
     int ret = 1;
     evr_tls_init();
     gcry_check_version(EVR_GCRY_MIN_VERSION);
+    evr_init_xml_error_logging();
     evr_log_fd = STDERR_FILENO;
     evr_log_app = "e";
     struct cli_cfg cfg;
@@ -1231,6 +1232,7 @@ int evr_cli_sync(struct cli_cfg *cfg) {
 
 int blob_sync_worker(void *context){
     int ret = evr_error;
+    evr_init_xml_error_logging();
     struct evr_blob_sync_handover *ctx = context;
     struct evr_file c_src;
     evr_file_bind_fd(&c_src, -1);
