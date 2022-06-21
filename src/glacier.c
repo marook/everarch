@@ -40,6 +40,7 @@ const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size +
 const char *glacier_dir_lock_file_path = "/lock";
 const char *glacier_dir_index_db_path = "/index.db";
 const size_t evr_read_buffer_size = 1*1024*1024;
+#define evr_bucket_file_name_fmt "%05lx.blob"
 
 void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_size, const char *bucket_dir_path, const char* path_suffix);
 
@@ -342,9 +343,7 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
             goto fail_with_open_bucket;
         }
         if(ctx->current_bucket_pos != end_offset){
-            // TODO :beprep: repair file
-            log_error("Bucket end pointer (%d) and file end offset (%ld) don't match in glacier directory %s.", ctx->current_bucket_pos, end_offset, ctx->config->bucket_dir_path);
-            goto fail_with_open_bucket;
+            log_info("Bucket " evr_bucket_file_name_fmt "'s end pointer (%d) and file end offset (%ld) don't match in glacier directory %s. It looks like evr-glacier-storage terminated while writing a blob not gracefully.", ctx->current_bucket_index, ctx->current_bucket_pos, end_offset, ctx->config->bucket_dir_path);
         }
     }
     return ctx;
@@ -442,7 +441,7 @@ int evr_open_bucket(const struct evr_glacier_storage_cfg *config, unsigned long 
         memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
         char *s = bucket_path + bucket_dir_path_len;
         *s++ = '/';
-        if(snprintf(s, end - bucket_path, "%05lx.blob", bucket_index) < 0){
+        if(snprintf(s, end - bucket_path, evr_bucket_file_name_fmt, bucket_index) < 0){
             return 1;
         }
         *end = '\0';

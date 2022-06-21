@@ -19,6 +19,8 @@
 #include "config.h"
 
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "assert.h"
 #include "configuration-testutil.h"
@@ -312,6 +314,44 @@ void test_evr_free_glacier_write_ctx_with_null_ctx(){
     evr_free_glacier_write_ctx(NULL);
 }
 
+void test_open_bucket_with_extra_data_at_end(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    // open for the first time
+    struct evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(clone_config(config));
+    assert(write_ctx);
+    char *chunks[] = {
+        "hello",
+    };
+    struct evr_writing_blob wb;
+    memset(wb.key, 1, evr_blob_ref_size);
+    wb.flags = 0;
+    wb.size = strlen(chunks[0]);
+    wb.chunks = chunks;
+    evr_time last_modified = 6;
+    assert(is_ok(evr_glacier_append_blob(write_ctx, &wb, &last_modified)));
+    free_glacier_ctx(write_ctx);
+    // append a few bytes to the first bucket
+    {
+        const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
+        const char bucket_file_name[] = "/00001.blob";
+        const size_t bucket_file_name_len = strlen(bucket_file_name);
+        char bucket_path[bucket_dir_path_len + bucket_file_name_len + 1];
+        memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
+        memcpy(&bucket_path[bucket_dir_path_len], bucket_file_name, bucket_file_name_len);
+        bucket_path[bucket_dir_path_len + bucket_file_name_len] = '\0';
+        int f = open(bucket_path, O_RDWR);
+        assert(f >= 0);
+        lseek(f, 0, SEEK_END);
+        assert(write(f, "x", 2) > 0);
+        assert(close(f) == 0);
+    }
+    // open for the second time
+    write_ctx = evr_create_glacier_write_ctx(clone_config(config));
+    assert(write_ctx);
+    free_glacier_ctx(write_ctx);
+    evr_free_glacier_storage_cfg(config);
+}
+
 int main(){
     run_test(test_evr_glacier_open_same_empty_glacier_twice);
     run_test(test_evr_glacier_create_context_twice_fails);
@@ -320,5 +360,6 @@ int main(){
     run_test(test_evr_glacier_write_blob_twice);
     run_test(test_evr_free_glacier_read_ctx_with_null_ctx);
     run_test(test_evr_free_glacier_write_ctx_with_null_ctx);
+    run_test(test_open_bucket_with_extra_data_at_end);
     return 0;
 }
