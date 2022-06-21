@@ -1,13 +1,3 @@
-* check glacier index.db and bucket file consistency on startup
-the end pointer (which is the first 4 bytes of each bucket) of the
-last written bucket should be stored in the index.db. also on startup
-of evr-glacier-storage the end pointer from the last bucket and the
-end pointer stored in the index.db should be
-compared. evr-glacier-storage should panic if the end pointers don't
-match.
-
-this change should allow us to disable synchronization of the sqlite
-index.db just like it is already done for the attr-index sqlite db.
 * add evr-glacier-storage index.db recovery
 evr-glacier-storage should check if the index.db and the first bucket
 exist on startup. if the first bucket exists but the index.db does not

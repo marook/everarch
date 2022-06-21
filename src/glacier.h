@@ -140,6 +140,9 @@ struct evr_glacier_write_ctx {
     size_t current_bucket_pos;
     sqlite3 *db;
     sqlite3_stmt *insert_blob_stmt;
+    sqlite3_stmt *insert_bucket_stmt;
+    sqlite3_stmt *update_bucket_end_offset_stmt;
+    sqlite3_stmt *find_bucket_end_offset_stmt;
 };
 
 /**

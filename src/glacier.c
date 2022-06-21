@@ -281,6 +281,9 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
     ctx->current_bucket_pos = 0;
     ctx->db = NULL;
     ctx->insert_blob_stmt = NULL;
+    ctx->insert_bucket_stmt = NULL;
+    ctx->update_bucket_end_offset_stmt = NULL;
+    ctx->find_bucket_end_offset_stmt = NULL;
     {
         // this block trims trailing '/' from bucket_dir_path
         size_t len = strlen(config->bucket_dir_path);
@@ -302,7 +305,7 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
             goto fail_free;
         }
         int lock_f = open(glacier_file_path, O_CREAT | O_EXCL, 0600);
-        if(lock_f == -1){
+        if(lock_f < 0){
             if(EEXIST == errno){
                 log_error("glacier storage lock file %s already exists", glacier_file_path);
                 goto fail_free;
@@ -310,7 +313,10 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
             log_error("glacier storage could not create lock file %s", glacier_file_path);
             goto fail_free;
         }
-        close(lock_f);
+        if(close(lock_f) != 0){
+            evr_panic("Unable to close lock file");
+            goto fail_free;
+        }
     }
     if(evr_open_index_db(config, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, &(ctx->db))){
         goto fail_with_db;
@@ -318,7 +324,16 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
     if(evr_create_index_db(ctx)){
         goto fail_with_db;
     }
-    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size, last_modified) values (?, ?, ?, ?, ?, ?)", &(ctx->insert_blob_stmt))){
+    if(evr_prepare_stmt(ctx->db, "insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size, last_modified) values (?, ?, ?, ?, ?, ?)", &ctx->insert_blob_stmt) != evr_ok){
+        goto fail_with_db;
+    }
+    if(evr_prepare_stmt(ctx->db, "insert into bucket (bucket_index) values (?)", &ctx->insert_bucket_stmt) != evr_ok){
+        goto fail_with_db;
+    }
+    if(evr_prepare_stmt(ctx->db, "update bucket set end_offset = ? where bucket_index = ?", &ctx->update_bucket_end_offset_stmt) != evr_ok){
+        goto fail_with_db;
+    }
+    if(evr_prepare_stmt(ctx->db, "select end_offset from bucket where bucket_index = ?", &ctx->find_bucket_end_offset_stmt) != evr_ok){
         goto fail_with_db;
     }
     if(move_to_last_bucket(ctx)){
@@ -338,18 +353,43 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
         if(evr_read_bucket_end_offset(&ctx->current_bucket_pos, ctx->current_bucket_f) != evr_ok){
             goto fail_with_open_bucket;
         }
-        off_t end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
-        if(end_offset == -1){
+        int bucket_end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
+        if(bucket_end_offset == -1){
             goto fail_with_open_bucket;
         }
-        if(ctx->current_bucket_pos != end_offset){
-            log_info("Bucket " evr_bucket_file_name_fmt "'s end pointer (%d) and file end offset (%ld) don't match in glacier directory %s. It looks like evr-glacier-storage terminated while writing a blob not gracefully.", ctx->current_bucket_index, ctx->current_bucket_pos, end_offset, ctx->config->bucket_dir_path);
+        if(sqlite3_bind_int(ctx->find_bucket_end_offset_stmt, 1, ctx->current_bucket_index) != SQLITE_OK){
+            goto fail_with_reset_find_bucket_end_offset_stmt;
+        }
+        if(evr_step_stmt(ctx->db, ctx->find_bucket_end_offset_stmt) != SQLITE_ROW){
+            // TODO buckets and index db inconsistent!
+            log_error("Unable to lookup end offset for bucket " evr_bucket_file_name_fmt " in index db.", ctx->current_bucket_index);
+            goto fail_with_reset_find_bucket_end_offset_stmt;
+        }
+        int db_end_offset = sqlite3_column_int(ctx->find_bucket_end_offset_stmt, 0);
+        if(db_end_offset != bucket_end_offset){
+            // TODO buckets and index db inconsistent!
+            log_error("End offset from bucket " evr_bucket_file_name_fmt " was %d and did not match end offset %d from index db", ctx->current_bucket_index, bucket_end_offset, db_end_offset);
+            goto fail_with_reset_find_bucket_end_offset_stmt;
+        }
+        if(ctx->current_bucket_pos != bucket_end_offset){
+            log_info("Bucket " evr_bucket_file_name_fmt "'s end pointer (%d) and file end offset (%ld) don't match in glacier directory %s. It looks like evr-glacier-storage terminated not gracafully while writing a blob.", ctx->current_bucket_index, ctx->current_bucket_pos, bucket_end_offset, ctx->config->bucket_dir_path);
         }
     }
+    if(sqlite3_reset(ctx->find_bucket_end_offset_stmt) != SQLITE_OK){
+        evr_panic("Unable to reset find_bucket_end_offset_stmt");
+        goto fail_with_open_bucket;
+    }
     return ctx;
+ fail_with_reset_find_bucket_end_offset_stmt:
+    if(sqlite3_reset(ctx->find_bucket_end_offset_stmt) != SQLITE_OK){
+        evr_panic("Unable to reset find_bucket_end_offset_stmt");
+    }
  fail_with_open_bucket:
     close(ctx->current_bucket_f);
  fail_with_db:
+    sqlite3_finalize(ctx->find_bucket_end_offset_stmt);
+    sqlite3_finalize(ctx->update_bucket_end_offset_stmt);
+    sqlite3_finalize(ctx->insert_bucket_stmt);
     sqlite3_finalize(ctx->insert_blob_stmt);
     sqlite3_close(ctx->db);
     unlink_lock_file(ctx);
@@ -359,29 +399,36 @@ struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_st
     return NULL;
 }
 
+// evr bucket header contains the end offset (uint32_t).
+#define evr_bucket_header_size 4
+
 int evr_create_index_db(struct evr_glacier_write_ctx *ctx){
-    // the following structure_sql creates the structure of the sqlite
-    // index db used to quickly lookup blob positions. the db
-    // containst the following tables and columns:
-    //
-    // blob_position
-    // - key is the blob's key including type and key data.
-    // - bucket_index is the index of the bucket file which is part of
-    //   the bucket file's file name.
-    // - bucket_blob_offset is the offset within the bucket file at
-    //   which the blob data begins.
-    // - blob_size is the size of the blob in bytes
-    // - last_modified last modified timestamp in unix epoch format.
-    const char *structure_sql =
-        "create table if not exists blob_position "
-        "(key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null, last_modified integer not null)";
+    char *sql[] = {
+        // the following structure_sql creates the structure of the
+        // sqlite index db used to quickly lookup blob positions. the
+        // db containst the following tables and columns:
+        //
+        // blob_position
+        // - key is the blob's key including type and key data.
+        // - bucket_index is the index of the bucket file which is part
+        //   of the bucket file's file name.
+        // - bucket_blob_offset is the offset within the bucket file at
+        //   which the blob data begins.
+        // - blob_size is the size of the blob in bytes
+        // - last_modified last modified timestamp in unix epoch format.
+        "create table if not exists blob_position (key blob primary key not null, flags integer not null, bucket_index integer not null, bucket_blob_offset integer not null, blob_size integer not null, last_modified integer not null)",
+        "create table if not exists bucket (bucket_index integer primary key not null, end_offset integer not null default " to_string(evr_bucket_header_size)  ")",
+        NULL,
+    };
     char *error;
-    if(sqlite3_exec(ctx->db, structure_sql, NULL, NULL, &error) != SQLITE_OK){
-        log_error("Failed to create index db structure for glacier %s: %s", ctx->config->bucket_dir_path, error);
-        sqlite3_free(error);
-        return 1;
+    for(char **s = sql; *s; ++s){
+        if(sqlite3_exec(ctx->db, *s, NULL, NULL, &error) != SQLITE_OK){
+            log_error("Failed to create index db structure using \"%s\"for glacier %s: %s", *s, ctx->config->bucket_dir_path, error);
+            sqlite3_free(error);
+            return evr_error;
+        }
     }
-    return 0;
+    return evr_ok;
 }
 
 int move_to_last_bucket(struct evr_glacier_write_ctx *ctx){
@@ -425,9 +472,9 @@ int move_to_last_bucket(struct evr_glacier_write_ctx *ctx){
 int open_current_bucket(struct evr_glacier_write_ctx *ctx) {
     ctx->current_bucket_f = evr_open_bucket(ctx->config, ctx->current_bucket_index, O_RDWR | O_CREAT);
     if(ctx->current_bucket_f == -1){
-        return 1;
+        return evr_error;
     }
-    return 0;
+    return evr_ok;
 }
 
 int evr_open_bucket(const struct evr_glacier_storage_cfg *config, unsigned long bucket_index, int open_flags){
@@ -459,6 +506,15 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
     }
     int ret = 1;
     if(close_current_bucket(ctx)){
+        goto end;
+    }
+    if(sqlite3_finalize(ctx->find_bucket_end_offset_stmt) != SQLITE_OK){
+        goto end;
+    }
+    if(sqlite3_finalize(ctx->update_bucket_end_offset_stmt) != SQLITE_OK){
+        goto end;
+    }
+    if(sqlite3_finalize(ctx->insert_bucket_stmt) != SQLITE_OK){
         goto end;
     }
     if(sqlite3_finalize(ctx->insert_blob_stmt) != SQLITE_OK){
@@ -606,15 +662,16 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     if(lseek(ctx->current_bucket_f, 0, SEEK_SET) == -1){
         goto fail;
     }
-    uint32_t last_bucket_pos = htobe32(ctx->current_bucket_pos);
-    if(write_n(&current_bucket_f, &last_bucket_pos, sizeof(last_bucket_pos)) != evr_ok){
-        log_error("Can't write bucket end pointer in glacier directory %s", ctx->config->bucket_dir_path);
+    const uint32_t end_offset = ctx->current_bucket_pos;
+    const uint32_t end_offset_be = htobe32(end_offset);
+    if(write_n(&current_bucket_f, &end_offset_be, evr_bucket_header_size) != evr_ok){
+        log_error("Can't write bucket end offset in glacier directory %s", ctx->config->bucket_dir_path);
         goto fail;
     }
     if(fdatasync(ctx->current_bucket_f) != 0){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
-        log_error("Can't fsync bucket end pointer for key %s in glacier directory %s.");
+        log_error("Can't fsync bucket end offset for key %s in glacier directory %s.");
         goto fail;
     }
     if(sqlite3_bind_blob(ctx->insert_blob_stmt, 1, blob->key, sizeof(blob->key), SQLITE_TRANSIENT) != SQLITE_OK){
@@ -650,6 +707,15 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
         log_debug("Detected blob with key %s got inserted more than one time into buckets", fmt_key);
 #endif
     }
+    if(sqlite3_bind_int(ctx->update_bucket_end_offset_stmt, 1, end_offset) != SQLITE_OK){
+        goto out_with_reset_update_bucket_end_offset_stmt;
+    }
+    if(sqlite3_bind_int(ctx->update_bucket_end_offset_stmt, 2, ctx->current_bucket_index) != SQLITE_OK){
+        goto out_with_reset_update_bucket_end_offset_stmt;
+    }
+    if(evr_step_stmt(ctx->db, ctx->update_bucket_end_offset_stmt) != SQLITE_DONE){
+        goto out_with_reset_update_bucket_end_offset_stmt;
+    }
 #ifdef EVR_LOG_DEBUG
     {
         evr_blob_ref_str fmt_key;
@@ -658,10 +724,16 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
     }
 #endif
     ret = evr_ok;
+ out_with_reset_update_bucket_end_offset_stmt:
+    if(sqlite3_reset(ctx->update_bucket_end_offset_stmt) != SQLITE_OK){
+        evr_panic("Unable to reset update_bucket_end_offset_stmt");
+        ret = evr_error;
+    }
  fail_with_insert_reset:
     if(sqlite3_reset(ctx->insert_blob_stmt) != SQLITE_OK){
         int sql_error = sqlite3_extended_errcode(ctx->db);
         if(sql_error != SQLITE_CONSTRAINT_PRIMARYKEY){
+            evr_panic("Unable to reset insert_blob_stmt");
             ret = evr_error;
         }
     }
@@ -670,31 +742,47 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_
 }
 
 int create_next_bucket(struct evr_glacier_write_ctx *ctx){
-    if(close_current_bucket(ctx)){
-        return 1;
+    int ret = evr_error;
+    if(close_current_bucket(ctx) != evr_ok){
+        evr_panic("Unable to close current bucket");
+        goto out;
     }
     ctx->current_bucket_index++;
     if(open_current_bucket(ctx)){
-        return 1;
+        ctx->current_bucket_index--;
+        goto out;
     }
     ctx->current_bucket_pos = sizeof(uint32_t);
-    uint32_t pos = htobe32(ctx->current_bucket_pos);
+    uint32_t end_offset = htobe32(ctx->current_bucket_pos);
     // TODO switch to write_n
-    if(write(ctx->current_bucket_f, &pos, sizeof(pos)) != sizeof(pos)){
-        log_error("Empty bucket file %05lx could not be created in glacier directory %s", ctx->current_bucket_index, ctx->config->bucket_dir_path);
-        return 1;
+    if(write(ctx->current_bucket_f, &end_offset, evr_bucket_header_size) != evr_bucket_header_size){
+        evr_panic("Empty bucket file %05lx could not be created in glacier directory %s", ctx->current_bucket_index, ctx->config->bucket_dir_path);
+        goto out;
     }
-    return 0;
+    if(sqlite3_bind_int(ctx->insert_bucket_stmt, 1, ctx->current_bucket_index) != SQLITE_OK){
+        goto out_with_reset_insert_bucket_stmt;
+    }
+    if(evr_step_stmt(ctx->db, ctx->insert_bucket_stmt) != SQLITE_DONE){
+        goto out_with_reset_insert_bucket_stmt;
+    }
+    ret = evr_ok;
+ out_with_reset_insert_bucket_stmt:
+    if(sqlite3_reset(ctx->insert_bucket_stmt) != SQLITE_OK){
+        evr_panic("Unable to reset insert_bucket_stmt");
+        ret = evr_error;
+    }
+ out:
+    return ret;
 }
 
 int close_current_bucket(struct evr_glacier_write_ctx *ctx){
     if(ctx->current_bucket_f != -1){
-        if(close(ctx->current_bucket_f) == -1){
-            return 1;
+        if(close(ctx->current_bucket_f) != 0){
+            return evr_error;
         }
         ctx->current_bucket_f = -1;
     }
-    return 0;
+    return evr_ok;
 }
 
 int evr_quick_check_glacier(struct evr_glacier_storage_cfg *config){

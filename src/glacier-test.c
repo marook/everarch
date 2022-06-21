@@ -346,9 +346,8 @@ void test_open_bucket_with_extra_data_at_end(){
         assert(close(f) == 0);
     }
     // open for the second time
-    write_ctx = evr_create_glacier_write_ctx(clone_config(config));
-    assert(write_ctx);
-    free_glacier_ctx(write_ctx);
+    write_ctx = evr_create_glacier_write_ctx(config);
+    assert(write_ctx == NULL);
     evr_free_glacier_storage_cfg(config);
 }
 
