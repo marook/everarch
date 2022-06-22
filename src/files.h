@@ -109,7 +109,7 @@ int write_chunk_set(struct evr_file *f, const struct chunk_set *cs);
  */
 int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
-int dump_n(struct evr_file *f, size_t bytes);
+int dump_n(struct evr_file *f, size_t bytes, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
 struct chunk_set *read_into_chunks(struct evr_file *f, size_t size, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 

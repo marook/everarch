@@ -26,4 +26,10 @@
 #define evr_end 4
 #define evr_user_data_invalid 5
 
+/**
+ * evr_index_db_corrupt indicates that the evr-glacier-storage
+ * index.db is corrupt.
+ */
+#define evr_glacier_index_db_corrupt 100
+
 #endif

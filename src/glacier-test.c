@@ -46,7 +46,8 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
     for(int i = 0; i < 2; i++){
         log_info("Round %d…", i);
         struct evr_glacier_storage_cfg *round_config = clone_config(config);
-        struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(round_config);
+        struct evr_glacier_write_ctx *ctx;
+        assert(is_ok(evr_create_glacier_write_ctx(&ctx, round_config)));
         assert(ctx);
         assert(ctx->current_bucket_index == 1);
         assert(ctx->current_bucket_f >= 0);
@@ -58,9 +59,11 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
 
 void test_evr_glacier_create_context_twice_fails(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
-    struct evr_glacier_write_ctx *ctx1 = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx1;
+    assert(is_ok(evr_create_glacier_write_ctx(&ctx1, config)));
     assert(ctx1);
-    struct evr_glacier_write_ctx *ctx2 = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx2 = NULL;
+    assert(is_err(evr_create_glacier_write_ctx(&ctx2, config)));
     assert(ctx2 == NULL);
     free_glacier_ctx(ctx1);
 }
@@ -74,7 +77,8 @@ void visit_blobs(struct evr_glacier_read_ctx *ctx, struct evr_blob_filter *filte
 
 void test_evr_glacier_write_smal_blobs(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
-    struct evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *write_ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, config)));
     assert(write_ctx);
     evr_blob_ref first_key;
     assert(is_ok(evr_parse_blob_ref(first_key, "sha3-224-20000000000000000000000000000000000000000000000000000000")));
@@ -221,7 +225,8 @@ int store_into_void(void *arg, const char *data, size_t data_len){
 
 void test_evr_glacier_write_big_blob(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
-    struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&ctx, config)));
     assert(ctx);
     {
         log_info("Write a blob");
@@ -252,25 +257,19 @@ void test_evr_glacier_write_big_blob(){
     free_glacier_ctx(ctx);
 }
 
+void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *blob_str, int last_modified);
+
 void test_evr_glacier_write_blob_twice(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
-    struct evr_glacier_write_ctx *ctx = evr_create_glacier_write_ctx(config);
+    struct evr_glacier_write_ctx *ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&ctx, config)));
     assert(ctx);
-    char *chunks[] = {
-        "hello",
-    };
-    struct evr_writing_blob wb;
-    memset(wb.key, 1, evr_blob_ref_size);
-    wb.flags = 0;
-    wb.size = strlen(chunks[0]);
-    wb.chunks = chunks;
-    evr_time last_modified = 6;
-    assert(is_ok(evr_glacier_append_blob(ctx, &wb, &last_modified)));
-    last_modified = 12;
+    evr_blob_ref ref;
+    write_one_blob(ctx, ref, "hello", 6);
     // duplicate inserts of same blob must be treated as success. they
     // can happend with a small propability if multiple clients put
     // the same blob in parallel.
-    assert(is_ok(evr_glacier_append_blob(ctx, &wb, &last_modified)));
+    write_one_blob(ctx, ref, "hello", 12);
     free_glacier_ctx(ctx);
 }
 
@@ -317,18 +316,11 @@ void test_evr_free_glacier_write_ctx_with_null_ctx(){
 void test_open_bucket_with_extra_data_at_end(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     // open for the first time
-    struct evr_glacier_write_ctx *write_ctx = evr_create_glacier_write_ctx(clone_config(config));
+    struct evr_glacier_write_ctx *write_ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, clone_config(config))));
     assert(write_ctx);
-    char *chunks[] = {
-        "hello",
-    };
-    struct evr_writing_blob wb;
-    memset(wb.key, 1, evr_blob_ref_size);
-    wb.flags = 0;
-    wb.size = strlen(chunks[0]);
-    wb.chunks = chunks;
-    evr_time last_modified = 6;
-    assert(is_ok(evr_glacier_append_blob(write_ctx, &wb, &last_modified)));
+    evr_blob_ref first_ref;
+    write_one_blob(write_ctx, first_ref, "first", 0);
     free_glacier_ctx(write_ctx);
     // append a few bytes to the first bucket
     {
@@ -346,9 +338,72 @@ void test_open_bucket_with_extra_data_at_end(){
         assert(close(f) == 0);
     }
     // open for the second time
-    write_ctx = evr_create_glacier_write_ctx(config);
-    assert(write_ctx == NULL);
+    write_ctx = NULL;
+    assert(is_ok(evr_quick_check_glacier(config)));
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, clone_config(config))));
+    assert(write_ctx);
+    evr_blob_ref second_ref;
+    write_one_blob(write_ctx, second_ref, "second", 0);
+    free_glacier_ctx(write_ctx);
+    // stat first and second ref
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, first_ref, &stat)));
+    assert(stat.flags == 0);
+    assert(stat.blob_size == strlen("first"));
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, second_ref, &stat)));
+    assert(stat.flags == 0);
+    assert(stat.blob_size == strlen("second"));
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
     evr_free_glacier_storage_cfg(config);
+}
+
+void test_reindex_glacier(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    // open for the first time
+    struct evr_glacier_write_ctx *write_ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, clone_config(config))));
+    assert(write_ctx);
+    evr_blob_ref ref;
+    write_one_blob(write_ctx, ref, "hello", 0);
+    free_glacier_ctx(write_ctx);
+    // delete index
+    {
+        const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
+        const char index_file_name[] = "/index.db";
+        const size_t index_file_name_len = strlen(index_file_name);
+        char index_db_path[bucket_dir_path_len + index_file_name_len + 1];
+        memcpy(index_db_path, config->bucket_dir_path, bucket_dir_path_len);
+        memcpy(&index_db_path[bucket_dir_path_len], index_file_name, index_file_name_len);
+        index_db_path[bucket_dir_path_len + index_file_name_len] = '\0';
+        assert(unlink(index_db_path) == 0);
+    }
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    // test if ref is in glacier
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, ref, &stat)));
+    assert(stat.flags == 0);
+    assert(stat.blob_size == strlen("hello"));
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    evr_free_glacier_storage_cfg(config);
+}
+
+void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *blob_str, int last_modified){
+    char *chunks[] = {
+        blob_str,
+    };
+    struct evr_writing_blob wb;
+    wb.flags = 0;
+    wb.chunks = chunks;
+    wb.size = strlen(chunks[0]);
+    assert(is_ok(evr_calc_blob_ref(ref, wb.size, chunks)));
+    memcpy(wb.key, ref, evr_blob_ref_size);
+    evr_time lm = last_modified;
+    assert(is_ok(evr_glacier_append_blob(ctx, &wb, &lm)));
 }
 
 int main(){
@@ -360,5 +415,6 @@ int main(){
     run_test(test_evr_free_glacier_read_ctx_with_null_ctx);
     run_test(test_evr_free_glacier_write_ctx_with_null_ctx);
     run_test(test_open_bucket_with_extra_data_at_end);
+    run_test(test_reindex_glacier);
     return 0;
 }

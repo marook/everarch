@@ -63,8 +63,7 @@ int evr_persister_start(struct evr_glacier_storage_cfg *config){
     for(size_t i = 0; i < evr_persister_watchers_len; ++i){
         evr_persister.watchers[i] = NULL;
     }
-    evr_persister.write_ctx = evr_create_glacier_write_ctx(config);
-    if(!evr_persister.write_ctx){
+    if(evr_create_glacier_write_ctx(&evr_persister.write_ctx, config) != evr_ok){
         goto out_with_free_watchers_lock;
     }
     atomic_thread_fence(memory_order_release);

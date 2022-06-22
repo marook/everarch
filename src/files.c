@@ -189,7 +189,7 @@ int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n, int (*side_eff
     return evr_ok;
 }
 
-int dump_n(struct evr_file *f, size_t bytes){
+int dump_n(struct evr_file *f, size_t bytes, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx){
     char buf[min(bytes, 4096)];
     size_t remaining = bytes;
     while(remaining > 0){
@@ -199,6 +199,9 @@ int dump_n(struct evr_file *f, size_t bytes){
         }
         if(nbytes == 0){
             return evr_end;
+        }
+        if(side_effect && side_effect(ctx, buf, nbytes) != evr_ok){
+            return evr_error;
         }
         remaining -= nbytes;
     }

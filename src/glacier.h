@@ -151,9 +151,9 @@ struct evr_glacier_write_ctx {
  * config must not be modifier or freed until
  * evr_free_glacier_write_ctx is called with the returned context.
  *
- * The returned context must be freed using evr_free_glacier_write_ctx.
+ * The created context must be freed using evr_free_glacier_write_ctx.
  */
-struct evr_glacier_write_ctx *evr_create_glacier_write_ctx(struct evr_glacier_storage_cfg *config);
+int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **ctx, struct evr_glacier_storage_cfg *config);
 
 int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx);
 
@@ -170,7 +170,7 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx);
  * last_modified is set to the blob's last modified timestamp after
  * the function returns.
  */
-int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, const struct evr_writing_blob *blob, evr_time *last_modified);
+int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writing_blob *blob, evr_time *last_modified);
 
 /**
  * evr_glacier_add_watcher registers a callback which fires after a
@@ -201,6 +201,7 @@ struct evr_glacier_bucket_blob_stat {
     size_t offset;
     size_t size;
     unsigned char checksum;
+    int checksum_valid;
 };
 
 int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, size_t end_offset), int (*visit_blob)(void *ctx, struct evr_glacier_bucket_blob_stat *stat), void *ctx);
