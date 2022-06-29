@@ -111,6 +111,8 @@ int pipe_n(struct evr_file *dest, struct evr_file *src, size_t n, int (*side_eff
 
 int dump_n(struct evr_file *f, size_t bytes, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
+int visited_bytes_counter_se(void *ctx, char *buf, size_t size);
+
 struct chunk_set *read_into_chunks(struct evr_file *f, size_t size, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx);
 
 int append_into_chunk_set(struct chunk_set *cs, int f);

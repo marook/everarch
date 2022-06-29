@@ -32,6 +32,21 @@
 #include "keys.h"
 #include "basics.h"
 
+/**
+ * evr bucket header contains the end offset (uint32_t).
+ */
+#define evr_bucket_header_size 4
+
+#define evr_bucket_blob_header_size (evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t))
+
+/**
+ * evr_bucket_end_offset_corrupt is a special bucket end offset which
+ * indicates that the end offset must not be trusted because blobs in
+ * the bucket are corrupt. Having a corrupt end offset prohibits
+ * appending further blobs to this bucket.
+ */
+#define evr_bucket_end_offset_corrupt 0
+
 extern const size_t evr_max_chunks_per_blob;
 
 struct evr_writing_blob {

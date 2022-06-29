@@ -87,6 +87,7 @@ struct evr_glacier_read_ctx *evr_create_glacier_read_ctx(struct evr_glacier_stor
     }
     return ctx;
  fail_with_db:
+    // TODO check sqlite3_* return values and panic if necessary
     sqlite3_finalize(ctx->list_blobs_stmt_order_blob_ref);
     sqlite3_finalize(ctx->list_blobs_stmt_order_last_modified);
     sqlite3_finalize(ctx->find_blob_stmt);
@@ -152,7 +153,10 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     int step_result = evr_step_stmt(ctx->db, ctx->find_blob_stmt);
     if(step_result == SQLITE_DONE){
         ret = evr_not_found;
-        if(status(arg, 0, 0, 0) != evr_ok){
+        int status_res = status(arg, 0, 0, 0);
+        if(status_res == evr_end){
+            ret = evr_end;
+        } else if(status_res != evr_ok){
             ret = evr_error;
         }
         goto end_with_find_reset;
@@ -171,7 +175,11 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     if(lseek(bucket_f, bucket_blob_offset, SEEK_SET) == -1){
         goto end_with_open_bucket;
     }
-    if(status(arg, 1, flags, blob_size) != evr_ok){
+    int status_res = status(arg, 1, flags, blob_size);
+    if(status_res == evr_end){
+        ret = evr_end;
+        goto end_with_open_bucket;
+    } else if(status_res != evr_ok){
         ret = evr_error;
         goto end_with_open_bucket;
     }
@@ -265,7 +273,8 @@ int evr_glacier_list_blobs(struct evr_glacier_read_ctx *ctx, int (*visit)(void *
     return ret;
 }
 
-int evr_read_bucket_end_offset(size_t *end_offset, int f);
+int evr_read_bucket_end_offset(int f, size_t *end_offset);
+int evr_write_bucket_end_offset(int f, size_t end_offset);
 
 int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct evr_glacier_storage_cfg *config){
     int ret = evr_error;
@@ -349,11 +358,14 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
         if(open_current_bucket(ctx)){
             goto fail_with_db;
         }
-        if(lseek(ctx->current_bucket_f, 0, SEEK_SET) != 0){
+        if(evr_read_bucket_end_offset(ctx->current_bucket_f, &ctx->current_bucket_pos) != evr_ok){
             goto fail_with_open_bucket;
         }
-        if(evr_read_bucket_end_offset(&ctx->current_bucket_pos, ctx->current_bucket_f) != evr_ok){
-            goto fail_with_open_bucket;
+        if(ctx->current_bucket_pos == evr_bucket_end_offset_corrupt){
+            log_debug("Skipping bucket " evr_bucket_file_name_fmt " because end offset indicates corrupt bucket end", ctx->current_bucket_index);
+            if(create_next_bucket(ctx)){
+                goto fail_with_open_bucket;
+            }
         }
     }
     ret = evr_ok;
@@ -375,9 +387,6 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
  fail:
     return ret;
 }
-
-// evr bucket header contains the end offset (uint32_t).
-#define evr_bucket_header_size 4
 
 int evr_create_index_db(struct evr_glacier_write_ctx *ctx){
     char *sql[] = {
@@ -551,6 +560,9 @@ int evr_open_index_db(struct evr_glacier_storage_cfg *config, int sqliteFlags, s
     if(sqlite3_exec(_db, "pragma journal_mode=WAL", NULL, NULL, NULL) != SQLITE_OK){
         goto out_with_close_db;
     }
+    if(sqlite3_exec(_db, "pragma synchronous=off", NULL, NULL, NULL) != SQLITE_OK){
+        goto out_with_close_db;
+    }
     *db = _db;
     ret = evr_ok;
  out:
@@ -605,10 +617,8 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
     int ret = evr_error;
     evr_now(last_modified);
     uint64_t t64 = (uint64_t)*last_modified;
-    const size_t blob_size_size = 4;
-    const size_t header_buf_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + blob_size_size + sizeof(uint8_t);
-    char header_buf[header_buf_size];
-    const size_t disk_size = header_buf_size + blob->size;
+    char header_buf[evr_bucket_blob_header_size];
+    const size_t disk_size = evr_bucket_blob_header_size + blob->size;
     if(disk_size > ctx->config->max_bucket_size){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
@@ -632,7 +642,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
     evr_push_8bit_checksum(&bp);
     struct evr_file current_bucket_f;
     evr_file_bind_fd(&current_bucket_f, ctx->current_bucket_f);
-    if(write_n(&current_bucket_f, header_buf, header_buf_size) != evr_ok){
+    if(write_n(&current_bucket_f, header_buf, evr_bucket_blob_header_size) != evr_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
         log_error("Can't write blob header for key %s in glacier directory %s.", fmt_key, ctx->config->bucket_dir_path);
@@ -660,21 +670,10 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
         log_error("Can't fsync blob data for key %s in glacier directory %s.");
         goto fail;
     }
-    size_t blob_offset = ctx->current_bucket_pos + header_buf_size;
-    ctx->current_bucket_pos += header_buf_size + blob->size;
-    if(lseek(ctx->current_bucket_f, 0, SEEK_SET) == -1){
-        goto fail;
-    }
-    const uint32_t end_offset = ctx->current_bucket_pos;
-    const uint32_t end_offset_be = htobe32(end_offset);
-    if(write_n(&current_bucket_f, &end_offset_be, evr_bucket_header_size) != evr_ok){
-        log_error("Can't write bucket end offset in glacier directory %s", ctx->config->bucket_dir_path);
-        goto fail;
-    }
-    if(fdatasync(ctx->current_bucket_f) != 0){
-        evr_blob_ref_str fmt_key;
-        evr_fmt_blob_ref(fmt_key, blob->key);
-        log_error("Can't fsync bucket end offset for key %s in glacier directory %s.");
+    size_t blob_offset = ctx->current_bucket_pos + evr_bucket_blob_header_size;
+    ctx->current_bucket_pos += evr_bucket_blob_header_size + blob->size;
+    const size_t end_offset = ctx->current_bucket_pos;
+    if(evr_write_bucket_end_offset(ctx->current_bucket_f, ctx->current_bucket_pos) != evr_ok){
         goto fail;
     }
     if(evr_glacier_add_blob_to_index(ctx, blob->key, blob->flags, blob_offset, blob->size, *last_modified) != evr_ok){
@@ -764,11 +763,8 @@ int create_next_bucket(struct evr_glacier_write_ctx *ctx){
         ctx->current_bucket_index--;
         goto out;
     }
-    ctx->current_bucket_pos = sizeof(uint32_t);
-    uint32_t end_offset = htobe32(ctx->current_bucket_pos);
-    // TODO switch to write_n
-    if(write(ctx->current_bucket_f, &end_offset, evr_bucket_header_size) != evr_bucket_header_size){
-        evr_panic("Empty bucket file %05lx could not be created in glacier directory %s", ctx->current_bucket_index, ctx->config->bucket_dir_path);
+    ctx->current_bucket_pos = evr_bucket_header_size;
+    if(evr_write_bucket_end_offset(ctx->current_bucket_f, ctx->current_bucket_pos) != evr_ok){
         goto out;
     }
     if(sqlite3_bind_int(ctx->insert_bucket_stmt, 1, ctx->current_bucket_index) != SQLITE_OK){
@@ -832,6 +828,8 @@ int evr_quick_check_glacier(struct evr_glacier_storage_cfg *config){
     }
 }
 
+int evr_glacier_check_random_blobs(struct evr_glacier_write_ctx *ctx);
+
 int evr_glacier_check_index_db(struct evr_glacier_write_ctx *ctx){
     int ret = evr_error;
     int bucket_end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
@@ -846,6 +844,7 @@ int evr_glacier_check_index_db(struct evr_glacier_write_ctx *ctx){
         // no end offset for the current bucket was found in the
         // index.db. that means the index.db is empty and must be
         // populated again.
+        log_error("Missing bucket end offset in index.db for bucket " evr_bucket_file_name_fmt, ctx->current_bucket_index);
         ret = evr_glacier_index_db_corrupt;
         goto out_with_reset_find_bucket_end_offset_stmt;
     } else if(find_offset_res == SQLITE_ROW){
@@ -866,7 +865,13 @@ int evr_glacier_check_index_db(struct evr_glacier_write_ctx *ctx){
     if(ctx->current_bucket_pos != bucket_end_offset){
         log_info("Bucket " evr_bucket_file_name_fmt "'s end pointer (%d) and file end offset (%ld) don't match in glacier directory %s. It looks like evr-glacier-storage terminated not gracafully while writing a blob.", ctx->current_bucket_index, ctx->current_bucket_pos, bucket_end_offset, ctx->config->bucket_dir_path);
     }
-    // TODO check for every bucket in index if last_blob + blob_size matches end offset
+    int blobs_check_res = evr_glacier_check_random_blobs(ctx);
+    if(blobs_check_res == evr_glacier_index_db_corrupt){
+        ret = evr_glacier_index_db_corrupt;
+        goto out_with_reset_find_bucket_end_offset_stmt;
+    } else if(blobs_check_res != evr_ok){
+        goto out_with_reset_find_bucket_end_offset_stmt;
+    }
     ret = evr_ok;
  out_with_reset_find_bucket_end_offset_stmt:
     if(sqlite3_reset(ctx->find_bucket_end_offset_stmt) != SQLITE_OK){
@@ -875,6 +880,118 @@ int evr_glacier_check_index_db(struct evr_glacier_write_ctx *ctx){
     }
  out:
     return ret;
+}
+
+struct evr_glacier_blob_check_ctx {
+    evr_blob_ref ref;
+    int flags;
+    size_t blob_size;
+    int ret;
+    evr_blob_ref_hd blob_hd;
+};
+
+int evr_glacier_blob_check_status(void *ctx, int exists, int flags, size_t blob_size);
+
+int evr_glacier_blob_check_data(void *ctx, const char *data, size_t data_size);
+
+int evr_glacier_check_random_blobs(struct evr_glacier_write_ctx *wctx){
+    int ret = evr_error;
+    struct evr_glacier_read_ctx *rctx = evr_create_glacier_read_ctx(wctx->config);
+    if(!rctx){
+        goto out;
+    }
+    sqlite3_stmt *find_blobs_stmt;
+    if(evr_prepare_stmt(wctx->db, "select key, flags, blob_size from blob_position", &find_blobs_stmt) != evr_ok){
+        goto out_with_free_rctx;
+    }
+    struct evr_glacier_blob_check_ctx bctx;
+    for(int i = 0; i < 1024; ++i){
+        int step_res = evr_step_stmt(wctx->db, find_blobs_stmt);
+        if(step_res == SQLITE_DONE){
+            break;
+        } else if(step_res != SQLITE_ROW){
+            goto out_with_finalize_find_blobs_stmt;
+        }
+        int ref_col_size = sqlite3_column_bytes(find_blobs_stmt, 0);
+        if(ref_col_size != evr_blob_ref_size){
+            ret = evr_glacier_index_db_corrupt;
+            goto out_with_finalize_find_blobs_stmt;
+        }
+        const void *sqref = sqlite3_column_blob(find_blobs_stmt, 0);
+        memcpy(bctx.ref, sqref, evr_blob_ref_size);
+        bctx.flags = sqlite3_column_int(find_blobs_stmt, 1);
+        bctx.blob_size = sqlite3_column_int(find_blobs_stmt, 2);
+#ifdef EVR_LOG_DEBUG
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, bctx.ref);
+        log_debug("Checking blob %s", ref_str);
+#endif
+        bctx.ret = evr_error;
+        if(evr_blob_ref_open(&bctx.blob_hd) != evr_ok){
+            goto out_with_finalize_find_blobs_stmt;
+        }
+        if(evr_glacier_read_blob(rctx, bctx.ref, evr_glacier_blob_check_status, evr_glacier_blob_check_data, &bctx) != evr_ok){
+            evr_blob_ref_close(bctx.blob_hd);
+            goto out_with_finalize_find_blobs_stmt;
+        }
+        if(bctx.ret == evr_glacier_index_db_corrupt){
+            ret = evr_glacier_index_db_corrupt;
+            evr_blob_ref_close(bctx.blob_hd);
+            goto out_with_finalize_find_blobs_stmt;
+        } else if(bctx.ret != evr_ok){
+            evr_blob_ref_close(bctx.blob_hd);
+            goto out_with_finalize_find_blobs_stmt;
+        }
+        if(evr_blob_ref_hd_match(bctx.blob_hd, bctx.ref) != evr_ok){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, bctx.ref);
+            log_error("Blob hash does not match ref for blob with ref %s", ref_str);
+            ret = evr_glacier_index_db_corrupt;
+            evr_blob_ref_close(bctx.blob_hd);
+            goto out_with_finalize_find_blobs_stmt;
+        }
+        evr_blob_ref_close(bctx.blob_hd);
+    }
+    ret = evr_ok;
+ out_with_finalize_find_blobs_stmt:
+    if(sqlite3_finalize(find_blobs_stmt) != SQLITE_OK){
+        evr_panic("Unable to finalize find_blobs_stmt.");
+        ret = evr_error;
+    }
+ out_with_free_rctx:
+    if(evr_free_glacier_read_ctx(rctx) != evr_ok){
+        evr_panic("Unable to close glacier read context for random blobs check.");
+        ret = evr_error;
+    }
+ out:
+    return ret;
+}
+
+int evr_glacier_blob_check_status(void *ctx, int exists, int flags, size_t blob_size){
+    struct evr_glacier_blob_check_ctx *bctx = ctx;
+    if(!exists){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, bctx->ref);
+        log_error("Blob with ref %s no longer exists", ref_str);
+        goto corrupt;
+    }
+    if(flags != bctx->flags || blob_size != bctx->blob_size){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, bctx->ref);
+        log_error("Metadata for lob with ref %s no longer matches. Flags %d <=> %d. Blob size %lu <=> %lu", ref_str, flags, bctx->flags, (unsigned long)blob_size, (unsigned long)bctx->blob_size);
+        goto corrupt;
+    }
+    bctx->ret = evr_ok;
+    return evr_ok;
+ corrupt:
+    bctx->ret = evr_glacier_index_db_corrupt;
+    return evr_end;
+}
+
+int evr_glacier_blob_check_data(void *ctx, const char *data, size_t data_size){
+    struct evr_glacier_blob_check_ctx *bctx = ctx;
+    evr_blob_ref_write(bctx->blob_hd, data, data_size);
+    return evr_ok;
 }
 
 int evr_glacier_reindex(struct evr_glacier_write_ctx *ctx);
@@ -923,52 +1040,70 @@ int evr_glacier_reindex(struct evr_glacier_write_ctx *ctx){
     return evr_ok;
 }
 
-int evr_glacier_reindex_visit_bucket(void *context, size_t end_offset);
-
 int evr_glacier_reindex_visit_blob(void *context, struct evr_glacier_bucket_blob_stat *stat);
 
 int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *bucket_file_name){
+    int ret = evr_error;
     struct evr_glacier_write_ctx *ctx = context;
     log_debug("Reindexing bucket %s", bucket_file_name);
-    ctx->current_bucket_index = bucket_index;
-    if(open_current_bucket(ctx) != evr_ok){
-        return evr_error;
-    }
     const size_t bucket_dir_path_len = strlen(ctx->config->bucket_dir_path);
     const char sep[] = "/";
     const size_t bucket_file_name_len = strlen(bucket_file_name);
     char bucket_path[bucket_dir_path_len + sizeof(sep)-1 + bucket_file_name_len + 1];
+    ctx->current_bucket_index = bucket_index;
+    if(open_current_bucket(ctx) != evr_ok){
+        goto out;
+    }
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, bucket_path);
     evr_push_n(&bp, ctx->config->bucket_dir_path, bucket_dir_path_len);
     evr_push_n(&bp, sep, sizeof(sep) - 1);
     evr_push_n(&bp, bucket_file_name, bucket_file_name_len);
     evr_push_eos(&bp);
-    int walk_res = evr_glacier_walk_bucket(bucket_path, evr_glacier_reindex_visit_bucket, evr_glacier_reindex_visit_blob, ctx);
+    int walk_res = evr_glacier_walk_bucket(bucket_path, NULL, evr_glacier_reindex_visit_blob, ctx);
+    int end_offset;
     if(walk_res == evr_end){
-        return evr_ok;
+        log_info("Mark bucket " evr_bucket_file_name_fmt " with corrupt end offset", bucket_index);
+        end_offset = evr_bucket_end_offset_corrupt;
+        goto out_with_write_end_offset;
     } else if(walk_res != evr_ok){
-        return evr_error;
+        goto out;
     }
-    return evr_ok;
-}
-
-int evr_glacier_reindex_visit_bucket(void *context, size_t end_offset){
-    struct evr_glacier_write_ctx *ctx = context;
-    int ret = evr_error;
+    end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
+    if(end_offset == -1){
+        goto out;
+    }
+ out_with_write_end_offset:
+    if(evr_write_bucket_end_offset(ctx->current_bucket_f, end_offset) != evr_ok){
+        goto out;
+    }
     if(sqlite3_bind_int(ctx->insert_bucket_stmt, 1, ctx->current_bucket_index) != SQLITE_OK){
-        goto out_with_reset_stmt;
+        goto out_with_reset_insert_stmt;
     }
     if(evr_step_stmt(ctx->db, ctx->insert_bucket_stmt) != SQLITE_DONE){
-        goto out_with_reset_stmt;
+        goto out_with_reset_insert_stmt;
     }
-    // TODO update bucket end pointer
+    if(sqlite3_bind_int(ctx->update_bucket_end_offset_stmt, 1, end_offset) != SQLITE_OK){
+        goto out_with_reset_update_stmt;
+    }
+    if(sqlite3_bind_int(ctx->update_bucket_end_offset_stmt, 2, ctx->current_bucket_index) != SQLITE_OK){
+        goto out_with_reset_update_stmt;
+    }
+    if(evr_step_stmt(ctx->db, ctx->update_bucket_end_offset_stmt) != SQLITE_DONE){
+        goto out_with_reset_update_stmt;
+    }
     ret = evr_ok;
- out_with_reset_stmt:
+ out_with_reset_update_stmt:
+    if(sqlite3_reset(ctx->update_bucket_end_offset_stmt) != SQLITE_OK){
+        evr_panic("Unable to reset update_bucket_end_offset_stmt");
+        ret = evr_error;
+    }
+ out_with_reset_insert_stmt:
     if(sqlite3_reset(ctx->insert_bucket_stmt) != SQLITE_OK){
         evr_panic("Unable to reset insert_bucket_stmt");
         ret = evr_error;
     }
+ out:
     return ret;
 }
 
@@ -1025,16 +1160,18 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     const size_t header_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t);
     char buf[header_size];
     size_t end_offset;
-    if(evr_read_bucket_end_offset(&end_offset, f) != evr_ok){
+    if(evr_read_bucket_end_offset(f, &end_offset) != evr_ok){
         goto out_with_close_f;
     }
-    int visit_res = visit_bucket(ctx, end_offset);
-    if(visit_res == evr_end){
-        ret = evr_end;
-        goto out_with_close_f;
-    }
-    if(visit_res != evr_ok){
-        goto out_with_close_f;
+    if(visit_bucket){
+        int visit_res = visit_bucket(ctx, end_offset);
+        if(visit_res == evr_end){
+            ret = evr_end;
+            goto out_with_close_f;
+        }
+        if(visit_res != evr_ok){
+            goto out_with_close_f;
+        }
     }
     struct evr_file fd;
     evr_file_bind_fd(&fd, f);
@@ -1044,9 +1181,15 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     size_t f_pos = sizeof(uint32_t);
     while(1){
         stat.offset = f_pos + header_size;
-        int header_read_res = read_n(&fd, buf, header_size, NULL, NULL);
+        size_t visited_bytes = 0;
+        int header_read_res = read_n(&fd, buf, header_size, visited_bytes_counter_se, &visited_bytes);
         if(header_read_res == evr_end){
-            break;
+            if(visited_bytes == 0){
+                break;
+            } else {
+                ret = evr_end;
+                goto out_with_close_f;
+            }
         }
         if(header_read_res != evr_ok){
             goto out_with_close_f;
@@ -1060,7 +1203,7 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
         evr_inc_buf_pos(&bp, -1);
         stat.checksum_valid = evr_pull_8bit_checksum(&bp);
         f_pos += header_size + stat.size;
-        visit_res = visit_blob(ctx, &stat);
+        int visit_res = visit_blob(ctx, &stat);
         if(visit_res == evr_end){
             ret = evr_end;
             goto out_with_close_f;
@@ -1080,14 +1223,35 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     return ret;
 }
 
-int evr_read_bucket_end_offset(size_t *end_offset, int f){
+int evr_read_bucket_end_offset(int f, size_t *end_offset){
     uint32_t buf;
     struct evr_file fd;
     evr_file_bind_fd(&fd, f);
+    if(lseek(f, 0, SEEK_SET) != 0){
+        return evr_error;
+    }
     if(read_n(&fd, (char*)&buf, sizeof(buf), NULL, NULL) != evr_ok){
         log_error("Failed to read bucket end offset");
         return evr_error;
     }
     *end_offset = be32toh(buf);
+    return evr_ok;
+}
+
+int evr_write_bucket_end_offset(int f, size_t end_offset){
+    uint32_t buf = htobe32(end_offset);
+    struct evr_file fd;
+    evr_file_bind_fd(&fd, f);
+    if(lseek(f, 0, SEEK_SET) != 0){
+        return evr_error;
+    }
+    if(write_n(&fd, &buf, evr_bucket_header_size) != evr_ok){
+        log_error("Can't write bucket end offset");
+        return evr_error;
+    }
+    if(fdatasync(f) != 0){
+        log_error("Can't fsync bucket end offset");
+        return evr_error;
+    }
     return evr_ok;
 }

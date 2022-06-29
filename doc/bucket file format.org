@@ -9,6 +9,10 @@ are store in big endian (most significant byte first).
 |                   |        | closed file this should be the end of the   |
 |                   |        | file. The field is used to identify         |
 |                   |        | incomplete written blobs.                   |
+|                   |        |                                             |
+|                   |        | An end pointer value 0 indicates that the   |
+|                   |        | bucket contains corrupt blobs which make it |
+|                   |        | impossible to detect a correct end pointer. |
 |-------------------+--------+---------------------------------------------|
 | blob              |        |                                             |
 | - key algorithm   | uint8  | Identifies the type of hash algorithm used. |

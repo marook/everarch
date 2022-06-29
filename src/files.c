@@ -208,6 +208,12 @@ int dump_n(struct evr_file *f, size_t bytes, int (*side_effect)(void *ctx, char 
     return evr_ok;
 }
 
+int visited_bytes_counter_se(void *ctx, char *buf, size_t size){
+    size_t *visited_bytes = ctx;
+    *visited_bytes += size;
+    return evr_ok;
+}
+
 struct chunk_set *read_into_chunks(struct evr_file *f, size_t size, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx){
     size_t chunks_len = ceil_div(size, evr_chunk_size);
     struct chunk_set *cs = evr_allocate_chunk_set(chunks_len);

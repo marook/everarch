@@ -78,7 +78,7 @@ void visit_blobs(struct evr_glacier_read_ctx *ctx, struct evr_blob_filter *filte
 void test_evr_glacier_write_smal_blobs(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *write_ctx;
-    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, config)));
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, clone_config(config))));
     assert(write_ctx);
     evr_blob_ref first_key;
     assert(is_ok(evr_parse_blob_ref(first_key, "sha3-224-20000000000000000000000000000000000000000000000000000000")));
@@ -181,8 +181,22 @@ void test_evr_glacier_write_smal_blobs(){
         assert(memcmp(visited_keys[0], second_key, evr_blob_ref_size) == 0);
         assert(memcmp(visited_keys[1], first_key, evr_blob_ref_size) == 0);
     }
-    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
     free_glacier_ctx(write_ctx);
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    log_info("Quick check");
+    assert(is_ok(evr_quick_check_glacier(config)));
+    read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    {
+        log_info("Read the written blob");
+        status_mock_ret = evr_ok;
+        status_mock_expected_exists = 0;
+        status_mock_expected_flags = 0;
+        status_mock_expected_blob_size = 0;
+        assert(evr_glacier_read_blob(read_ctx, first_key, status_mock, store_into_void, NULL) == evr_not_found);
+    }
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    evr_free_glacier_storage_cfg(config);
 }
 
 int blob_visitor(void *context, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob);
@@ -333,7 +347,7 @@ void test_open_bucket_with_extra_data_at_end(){
         bucket_path[bucket_dir_path_len + bucket_file_name_len] = '\0';
         int f = open(bucket_path, O_RDWR);
         assert(f >= 0);
-        lseek(f, 0, SEEK_END);
+        assert(lseek(f, 0, SEEK_END) != -1);
         assert(write(f, "x", 2) > 0);
         assert(close(f) == 0);
     }
@@ -359,26 +373,21 @@ void test_open_bucket_with_extra_data_at_end(){
     evr_free_glacier_storage_cfg(config);
 }
 
+void build_test_glacier(struct evr_glacier_storage_cfg *config, evr_blob_ref first, evr_blob_ref second);
+
+void delete_glacier_index(struct evr_glacier_storage_cfg *config);
+
+#define first_blob_data_str "first blob"
+
+size_t read_bucket_end_offset(struct evr_glacier_storage_cfg *config);
+
 void test_reindex_glacier(){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
-    // open for the first time
-    struct evr_glacier_write_ctx *write_ctx;
-    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, clone_config(config))));
-    assert(write_ctx);
     evr_blob_ref ref;
-    write_one_blob(write_ctx, ref, "hello", 0);
-    free_glacier_ctx(write_ctx);
-    // delete index
-    {
-        const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
-        const char index_file_name[] = "/index.db";
-        const size_t index_file_name_len = strlen(index_file_name);
-        char index_db_path[bucket_dir_path_len + index_file_name_len + 1];
-        memcpy(index_db_path, config->bucket_dir_path, bucket_dir_path_len);
-        memcpy(&index_db_path[bucket_dir_path_len], index_file_name, index_file_name_len);
-        index_db_path[bucket_dir_path_len + index_file_name_len] = '\0';
-        assert(unlink(index_db_path) == 0);
-    }
+    evr_blob_ref second;
+    build_test_glacier(config, ref, second);
+    size_t original_end_offset = read_bucket_end_offset(config);
+    delete_glacier_index(config);
     // quick check should reindex
     assert(is_ok(evr_quick_check_glacier(config)));
     // test if ref is in glacier
@@ -387,9 +396,193 @@ void test_reindex_glacier(){
     struct evr_glacier_blob_stat stat;
     assert(is_ok(evr_glacier_stat_blob(read_ctx, ref, &stat)));
     assert(stat.flags == 0);
-    assert(stat.blob_size == strlen("hello"));
+    assert(stat.blob_size == strlen(first_blob_data_str));
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    assert(read_bucket_end_offset(config) == original_end_offset);
+    evr_free_glacier_storage_cfg(config);
+}
+
+void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t offset);
+
+void test_reindex_glacier_first_blob_header_corrupt(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    evr_blob_ref first;
+    evr_blob_ref second;
+    build_test_glacier(config, first, second);
+    delete_glacier_index(config);
+    corrupt_bucket_at_offset(config, evr_bucket_header_size + evr_bucket_blob_header_size / 2);
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    // after reindex first and second should no longer be in index
+    // because if first blob's content size can't be read reliabely
+    // the rest of the bucket is also discarded.
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(evr_glacier_stat_blob(read_ctx, first, &stat) == evr_not_found);
+    assert(evr_glacier_stat_blob(read_ctx, second, &stat) == evr_not_found);
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    assert(read_bucket_end_offset(config) == evr_bucket_end_offset_corrupt);
+    evr_free_glacier_storage_cfg(config);
+}
+
+void test_reindex_glacier_first_blob_data_corrupt(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    evr_blob_ref first;
+    evr_blob_ref second;
+    build_test_glacier(config, first, second);
+    size_t original_end_offset = read_bucket_end_offset(config);
+    delete_glacier_index(config);
+    corrupt_bucket_at_offset(config, evr_bucket_header_size + evr_bucket_blob_header_size + strlen(first_blob_data_str) / 2);
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    // after reindex first should no longer be in index because the
+    // blob data won't match the sha3-224 hash in the blob's
+    // header. reindexing must continue with second blob.
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(evr_glacier_stat_blob(read_ctx, first, &stat) == evr_not_found);
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, second, &stat)));
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    assert(read_bucket_end_offset(config) == original_end_offset);
+    evr_free_glacier_storage_cfg(config);
+}
+
+void test_reindex_glacier_second_blob_header_corrupt(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    evr_blob_ref first;
+    evr_blob_ref second;
+    build_test_glacier(config, first, second);
+    delete_glacier_index(config);
+    corrupt_bucket_at_offset(config, evr_bucket_header_size + evr_bucket_blob_header_size + strlen(first_blob_data_str) + evr_bucket_header_size / 2);
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    // after reindex first should still be in index because only data
+    // after second is discarded.
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, first, &stat)));
+    assert(evr_glacier_stat_blob(read_ctx, second, &stat) == evr_not_found);
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    assert(read_bucket_end_offset(config) == evr_bucket_end_offset_corrupt);
+    evr_free_glacier_storage_cfg(config);
+}
+
+void test_reindex_glacier_end_offset_corrupt(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    evr_blob_ref first;
+    evr_blob_ref second;
+    build_test_glacier(config, first, second);
+    size_t original_end_offset = read_bucket_end_offset(config);
+    delete_glacier_index(config);
+    corrupt_bucket_at_offset(config, evr_bucket_header_size / 2);
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    // after reindex first should still be in index because only data
+    // after second is discarded.
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, first, &stat)));
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, second, &stat)));
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    // end offset should have been restored
+    assert(read_bucket_end_offset(config) == original_end_offset);
+    evr_free_glacier_storage_cfg(config);
+}
+
+void test_reindex_and_append_glacier_with_corrupt_bucket_end(){
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    evr_blob_ref first;
+    evr_blob_ref second;
+    build_test_glacier(config, first, second);
+    delete_glacier_index(config);
+    corrupt_bucket_at_offset(config, evr_bucket_header_size + evr_bucket_blob_header_size + strlen(first_blob_data_str) + evr_bucket_header_size / 2);
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    // after reindex first should still be in index because only data
+    // after second is discarded.
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, first, &stat)));
+    assert(evr_glacier_stat_blob(read_ctx, second, &stat) == evr_not_found);
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    assert(read_bucket_end_offset(config) == evr_bucket_end_offset_corrupt);
+    evr_blob_ref appended_ref;
+    struct evr_glacier_write_ctx *write_ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, config)));
+    assert(write_ctx);
+    write_one_blob(write_ctx, appended_ref, "appended after reindex", 0);
+    assert(is_ok(evr_free_glacier_write_ctx(write_ctx)));
+    delete_glacier_index(config);
+    // quick check should reindex
+    assert(is_ok(evr_quick_check_glacier(config)));
+    read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, first, &stat)));
+    assert(evr_glacier_stat_blob(read_ctx, second, &stat) == evr_not_found);
+    assert(is_ok(evr_glacier_stat_blob(read_ctx, appended_ref, &stat)));
     assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
     evr_free_glacier_storage_cfg(config);
+}
+
+void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t offset){
+    const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
+    const char bucket_file_name[] = "/00001.blob";
+    const size_t bucket_file_name_len = strlen(bucket_file_name);
+    char bucket_path[bucket_dir_path_len + bucket_file_name_len + 1];
+    memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
+    memcpy(&bucket_path[bucket_dir_path_len], bucket_file_name, bucket_file_name_len);
+    bucket_path[bucket_dir_path_len + bucket_file_name_len] = '\0';
+    int f = open(bucket_path, O_RDWR);
+    assert(f >= 0);
+    assert(lseek(f, offset, SEEK_SET) != -1);
+    char buf[1];
+    assert(read(f, buf, sizeof(buf)) == sizeof(buf));
+    assert(lseek(f, offset, SEEK_SET) != -1);
+    buf[0] = buf[0] + 1;
+    assert(write(f, buf, sizeof(buf)) == sizeof(buf));
+    assert(close(f) == 0);
+}
+
+size_t read_bucket_end_offset(struct evr_glacier_storage_cfg *config){
+    const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
+    const char bucket_file_name[] = "/00001.blob";
+    const size_t bucket_file_name_len = strlen(bucket_file_name);
+    char bucket_path[bucket_dir_path_len + bucket_file_name_len + 1];
+    memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
+    memcpy(&bucket_path[bucket_dir_path_len], bucket_file_name, bucket_file_name_len);
+    bucket_path[bucket_dir_path_len + bucket_file_name_len] = '\0';
+    int f = open(bucket_path, O_RDONLY);
+    assert(f >= 0);
+    assert(lseek(f, 0, SEEK_SET) != -1);
+    uint32_t end_offset;
+    assert(read(f, (char*)&end_offset, sizeof(end_offset)) == sizeof(end_offset));
+    assert(close(f) == 0);
+    return be32toh(end_offset);
+}
+
+void build_test_glacier(struct evr_glacier_storage_cfg *config, evr_blob_ref first, evr_blob_ref second){
+    struct evr_glacier_write_ctx *write_ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, config)));
+    assert(write_ctx);
+    write_one_blob(write_ctx, first, first_blob_data_str, 0);
+    write_one_blob(write_ctx, second, "second blob", 0);
+    assert(is_ok(evr_free_glacier_write_ctx(write_ctx)));
+}
+
+void delete_glacier_index(struct evr_glacier_storage_cfg *config){
+    const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
+    const char index_file_name[] = "/index.db";
+    const size_t index_file_name_len = strlen(index_file_name);
+    char index_db_path[bucket_dir_path_len + index_file_name_len + 1];
+    memcpy(index_db_path, config->bucket_dir_path, bucket_dir_path_len);
+    memcpy(&index_db_path[bucket_dir_path_len], index_file_name, index_file_name_len);
+    index_db_path[bucket_dir_path_len + index_file_name_len] = '\0';
+    assert(unlink(index_db_path) == 0);
 }
 
 void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *blob_str, int last_modified){
@@ -416,5 +609,10 @@ int main(){
     run_test(test_evr_free_glacier_write_ctx_with_null_ctx);
     run_test(test_open_bucket_with_extra_data_at_end);
     run_test(test_reindex_glacier);
+    run_test(test_reindex_glacier_first_blob_header_corrupt);
+    run_test(test_reindex_glacier_first_blob_data_corrupt);
+    run_test(test_reindex_glacier_second_blob_header_corrupt);
+    run_test(test_reindex_glacier_end_offset_corrupt);
+    run_test(test_reindex_and_append_glacier_with_corrupt_bucket_end);
     return 0;
 }
