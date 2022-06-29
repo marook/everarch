@@ -13,8 +13,12 @@ using evr_parse_claim_ref(…).
 * make attr-index host and port configurabel in evr.el
 right now it's hard coded in two places. first where the connection is
 opened. second where the auth token is looked up.
+* create bucket directory if not existing :bdircre:
 * auto generate ssl cert and key if they don't exists
 use some command like written in tls.txt
+* add handling of too small bucket files
+a bucket file which is smaller than the bucket file header of 4 bytes
+should be recreated.
 * add documentation on how to write attr-specs
 ** describe how attr is the central claim
 ** describe archive claim
@@ -24,7 +28,6 @@ transformation.
 
 index-seed must be provided by transformation.
 ** describe how seed and index-seed must be handled in transformations
-* create bucket directory if not existing :bdircre:
 * implement an evr-glacier-storage blob put/get benchmark
 should connect via network socket. send lots of blobs. request lots of
 blobs. count blobs per second. maybe different blob sizes etc.
