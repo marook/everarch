@@ -54,7 +54,7 @@ int evr_create_index_db(struct evr_glacier_write_ctx *ctx);
 
 int move_to_last_bucket(struct evr_glacier_write_ctx *ctx);
 
-int open_current_bucket(struct evr_glacier_write_ctx *ctx);
+int open_current_bucket(struct evr_glacier_write_ctx *ctx, int create);
 
 int evr_open_bucket(const struct evr_glacier_storage_cfg *config, unsigned long bucket_index, int open_flags);
 
@@ -355,7 +355,7 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
             goto fail_with_db;
         }
     } else {
-        if(open_current_bucket(ctx)){
+        if(open_current_bucket(ctx, 0)){
             goto fail_with_db;
         }
         if(evr_read_bucket_end_offset(ctx->current_bucket_f, &ctx->current_bucket_pos) != evr_ok){
@@ -456,7 +456,7 @@ int evr_walk_buckets(struct evr_glacier_write_ctx *wctx, int (*visit)(void *ctx,
         char file_name[file_name_size];
         memcpy(file_name, d->d_name, file_name_size);
         char *end = file_name;
-        for(; isdigit(*end); end++){}
+        for(; isxdigit(*end); end++){}
         if(strcmp(end, ".blob") != 0){
             continue;
         }
@@ -479,8 +479,9 @@ int evr_walk_buckets(struct evr_glacier_write_ctx *wctx, int (*visit)(void *ctx,
     return ret;
 }
 
-int open_current_bucket(struct evr_glacier_write_ctx *ctx) {
-    ctx->current_bucket_f = evr_open_bucket(ctx->config, ctx->current_bucket_index, O_RDWR | O_CREAT);
+int open_current_bucket(struct evr_glacier_write_ctx *ctx, int create) {
+    int open_flags = O_RDWR | (create ? (O_CREAT | O_EXCL) : 0);
+    ctx->current_bucket_f = evr_open_bucket(ctx->config, ctx->current_bucket_index, open_flags);
     if(ctx->current_bucket_f == -1){
         return evr_error;
     }
@@ -619,10 +620,10 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
     uint64_t t64 = (uint64_t)*last_modified;
     char header_buf[evr_bucket_blob_header_size];
     const size_t disk_size = evr_bucket_blob_header_size + blob->size;
-    if(disk_size > ctx->config->max_bucket_size){
+    if(disk_size + evr_bucket_header_size > ctx->config->max_bucket_size){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
-        log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld", fmt_key, ctx->config->bucket_dir_path, disk_size, ctx->config->max_bucket_size);
+        log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld", fmt_key, ctx->config->bucket_dir_path, disk_size + evr_bucket_header_size, ctx->config->max_bucket_size);
         goto fail;
     }
     if(ctx->current_bucket_pos + disk_size > ctx->config->max_bucket_size){
@@ -759,7 +760,7 @@ int create_next_bucket(struct evr_glacier_write_ctx *ctx){
         goto out;
     }
     ctx->current_bucket_index++;
-    if(open_current_bucket(ctx)){
+    if(open_current_bucket(ctx, 1)){
         ctx->current_bucket_index--;
         goto out;
     }
@@ -771,6 +772,7 @@ int create_next_bucket(struct evr_glacier_write_ctx *ctx){
         goto out_with_reset_insert_bucket_stmt;
     }
     if(evr_step_stmt(ctx->db, ctx->insert_bucket_stmt) != SQLITE_DONE){
+        log_error("Unable to insert bucket " evr_bucket_file_name_fmt " metadata in index.db", ctx->current_bucket_index);
         goto out_with_reset_insert_bucket_stmt;
     }
     ret = evr_ok;
@@ -1051,7 +1053,7 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
     const size_t bucket_file_name_len = strlen(bucket_file_name);
     char bucket_path[bucket_dir_path_len + sizeof(sep)-1 + bucket_file_name_len + 1];
     ctx->current_bucket_index = bucket_index;
-    if(open_current_bucket(ctx) != evr_ok){
+    if(open_current_bucket(ctx, 0) != evr_ok){
         goto out;
     }
     struct evr_buf_pos bp;

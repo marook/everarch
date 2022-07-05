@@ -529,6 +529,33 @@ void test_reindex_and_append_glacier_with_corrupt_bucket_end(){
     evr_free_glacier_storage_cfg(config);
 }
 
+void test_many_small_buckets(){
+    const int blob_count = 256;
+    struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
+    const int max_data_size = 8;
+    config->max_bucket_size = evr_bucket_header_size + evr_bucket_blob_header_size + max_data_size;
+    struct evr_glacier_write_ctx *write_ctx;
+    assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, config)));
+    assert(write_ctx);
+    evr_blob_ref refs[blob_count];
+    char data_buf[max_data_size + 1];
+    for(int i = 0; i < blob_count; ++i){
+        assert(snprintf(data_buf, sizeof(data_buf), "%d", i) >= 0);
+        write_one_blob(write_ctx, refs[i], data_buf, 0);
+    }
+    assert(is_ok(evr_free_glacier_write_ctx(write_ctx)));
+    delete_glacier_index(config);
+    assert(is_ok(evr_quick_check_glacier(config)));
+    struct evr_glacier_read_ctx *read_ctx = evr_create_glacier_read_ctx(config);
+    assert(read_ctx);
+    struct evr_glacier_blob_stat stat;
+    for(int i = 0; i < blob_count; ++i){
+        assert(is_ok(evr_glacier_stat_blob(read_ctx, refs[i], &stat)));
+    }
+    assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));
+    evr_free_glacier_storage_cfg(config);
+}
+
 void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t offset){
     const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
     const char bucket_file_name[] = "/00001.blob";
@@ -614,5 +641,6 @@ int main(){
     run_test(test_reindex_glacier_second_blob_header_corrupt);
     run_test(test_reindex_glacier_end_offset_corrupt);
     run_test(test_reindex_and_append_glacier_with_corrupt_bucket_end);
+    run_test(test_many_small_buckets);
     return 0;
 }
