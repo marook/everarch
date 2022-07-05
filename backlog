@@ -1,3 +1,10 @@
+* rename bucket file extension to .evb
+* add magic number to evr bucket
+"EVB" / 0x455642
+* profile blob insert durations
+measure how long parts of the blob insert in the evr-glacier-storage
+take up. parts could be writing the blob to bucket, fsynsc and adding
+the blob to index.
 * add i18n support in attr query contains operator
 right now sqlite is used for comparing values when using the attr
 query contains (~) operator in a case insensitive way. the lower case
