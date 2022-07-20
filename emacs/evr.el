@@ -421,6 +421,9 @@ template-spec is a list of two items: (var-specs template)
 var-specs is a list of variables. Each variable is (name resover).")
 
 (defun evr-insert-claim ()
+  "evr-insert-claim inserts a claim from a list of templates.
+
+Templates are defined in ‘evr-claim-templates’ variable."
   (interactive)
   (helm
    :sources
@@ -435,18 +438,22 @@ var-specs is a list of variables. Each variable is (name resover).")
 (defun evr--insert-claim-at-point (template)
   (apply 'indent-region (templar-insert-at-point template)))
 
+(defvar evr-claim-set-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-x w") 'evr-insert-claim)
+    map))
+
 (define-minor-mode evr-claim-set-mode
   "This minor mode makes a buffer an everarch sourced claim-set.
 
 Saving this buffer will put the claim-set into evr and close the
-buffer afterwards."
+buffer afterwards.
+
+\\{evr-claim-set-mode-map}"
   :init-value nil
   :group 'evr
   :lighter " evr-claim-set"
-  :keymap
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-x w") 'evr-insert-claim)
-    map)
+  :keymap evr-claim-set-mode-map
   (if evr-claim-set-mode
       (evr--enable-claim-set-mode)
     (evr--disable-claim-set-mode)))
