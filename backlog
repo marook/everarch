@@ -1,3 +1,11 @@
+* document keybindings in evr-attr-index-results-mode
+so that emacs users who type ? in the mode know what can be done here.
+* document keybinding in evr-file-claim-mode
+so that emacs users who type C-h m in the mode know what cna be done
+here.
+* list claims for seed from evr-attr-index-results-mode
+add a shortcut to list all claims which got the same seed as under
+point.
 * rename bucket file extension to .evb
 * add magic number to evr bucket
 "EVB" / 0x455642
@@ -5,6 +13,9 @@
 measure how long parts of the blob insert in the evr-glacier-storage
 take up. parts could be writing the blob to bucket, fsynsc and adding
 the blob to index.
+* open bucket file descriptor constant for uninitialized
+glacier opens bucket files in a lazy way. the value for identifiying a
+not yet opened bucket file should be a constant instead of just -1.
 * add i18n support in attr query contains operator
 right now sqlite is used for comparing values when using the attr
 query contains (~) operator in a case insensitive way. the lower case
@@ -162,13 +173,11 @@ the configure.ac scripts should detect if systemd support is
 available. maybe it the libsystemd-daemos.so or something is
 present. if it is not found evr-glacier-storage must be compiled
 without any systemd dependency.
-* add quic support
-in order to get faster connection building and encryption.
-
-the most interesting quic library to use right now would be [[https://github.com/microsoft/msquic][msquic]]
-because it depends just on OpenSSL. OpenSSL with downstream patches
-unfortunately. there are [[https://www.openssl.org/blog/blog/2021/12/03/starting-the-quic-design/][plans by the OpenSSL team]] to add quic
-support.
+* user PRI macros in format strings for integers
+right now many places use for example %d or %ld for printing integers
+with defined sizes like int64_t. the PRI* macros from [[https://cplusplus.com/reference/cinttypes/][inttypes.h]]
+should be used instead. this should guarantee compatibility for other
+platforms.
 * replace struct chunk_set with linked list
 dny-mem.h should provide one growable random access data structure and
 one growable linked list data structure. the growable linked list data
@@ -192,11 +201,13 @@ descriptor using writev.
 
 ** TODO struct evr_auth_token_cfg should use the linked list
 ** TODO struct evr_cert_cfg should use the linked list
-* use writev instead of buf copying
-writev can write mutliple buffers in one system call. this may reduce
-the amout of memory being copied before a write call. there are
-probably some places in glacier.c and the networking code which can
-benefit from writev.
+* add quic support
+in order to get faster connection building and encryption.
+
+the most interesting quic library to use right now would be [[https://github.com/microsoft/msquic][msquic]]
+because it depends just on OpenSSL. OpenSSL with downstream patches
+unfortunately. there are [[https://www.openssl.org/blog/blog/2021/12/03/starting-the-quic-design/][plans by the OpenSSL team]] to add quic
+support.
 * introduce scripted transformations
 attr specs should also support scripts which perform the claim
 transformations instead of just xslt stylesheets.
@@ -212,6 +223,11 @@ a new transformation could look like this:
 
 the transformation would point to an executable elf binary, shell or
 python script.
+* use writev instead of buf copying
+writev can write mutliple buffers in one system call. this may reduce
+the amout of memory being copied before a write call. there are
+probably some places in glacier.c and the networking code which can
+benefit from writev.
 * get rid of double _ in defines
 as they are not intended for userspace. mentioned by pitrp.
 * gracefully handle sqlite database is locked in evr-glacier-storage
