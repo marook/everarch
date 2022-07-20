@@ -134,7 +134,9 @@ evr-attr-index and prints the results into a new buffer."
   ))
 
 (defun evr-attr-index-results-mode ()
-  "Mode for browsing evr-attr-index search results."
+  "Mode for browsing evr-attr-index search results.
+
+`\\{evr-attr-index-results-mode-map}`"
   (kill-all-local-variables)
   (use-local-map evr-attr-index-results-mode-map)
   (setq major-mode 'evr-attr-index-results-mode

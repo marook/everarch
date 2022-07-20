@@ -1,5 +1,3 @@
-* document keybindings in evr-attr-index-results-mode
-so that emacs users who type ? in the mode know what can be done here.
 * document keybinding in evr-file-claim-mode
 so that emacs users who type C-h m in the mode know what cna be done
 here.
