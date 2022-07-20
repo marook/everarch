@@ -53,7 +53,7 @@ var-specs is a list of variables. Each variable is (name resover).")
        :action
        `(
          ("Insert" . ,(lambda (x)
-                        (templar-insert-at-point (car x))))
+                        (apply 'indent-region (templar-insert-at-point (car x)))))
          ))))
 
 ;; (templar--find-templates-for-point)
@@ -72,11 +72,23 @@ var-specs is a list of variables. Each variable is (name resover).")
 ;;;###autoload
 (defun templar-insert-at-point (template-spec)
   "templar-insert-at-point renders and inserts the given
-template-spec at point."
-  (seq-let (var-specs template) template-spec
-    (insert
-     (let ((vars (templar--resolve-var-specs var-specs)))
-       (templar--render vars template)))))
+template-spec at point.
+
+Returns a list with the start and end point of the inserted
+template in the current buffer."
+  (let ((claim-start-point (point))
+        claim-end-point)
+    (seq-let (var-specs template) template-spec
+      (let ((vars (append (templar--resolve-var-specs var-specs) '(("templar-offset" . 0))))
+            templar-point)
+        (seq-let (out-vars rendition) (templar--render vars template)
+          (insert rendition)
+          (setq claim-end-point (point))
+          (setq templar-point (assoc-string "templar-point" out-vars))
+          (when templar-point
+            (goto-char (+ claim-start-point (cdr templar-point))))
+          (list claim-start-point claim-end-point)
+          )))))
 
 (defun templar--resolve-var-specs (var-specs)
   (mapcar
@@ -88,16 +100,27 @@ template-spec at point."
 (defun templar--render (vars template)
   (cond
    ((stringp template)
-    template)
+    (add-to-list
+     'vars
+     `("templar-offset" . ,(+ (cdr (assoc-string "templar-offset" vars)) (length template))))
+    (list vars template))
    ((functionp template)
-    (templar--render vars (funcall template vars)))
+    (apply 'templar--render
+           (or (funcall template vars)
+               (list vars ()))))
    ((listp template)
-    (apply
-     'concat
-     (mapcar
-      (lambda (token)
-        (templar--render vars token))
-      template)))
+    (let ((vars vars))
+      (let ((rendition
+            (apply
+             'concat
+             (mapcar
+              (lambda (token)
+                (seq-let (out-vars part-rendition)
+                    (templar--render vars token)
+                  (setq vars out-vars)
+                  part-rendition))
+              template))))
+        (list vars rendition))))
    (t
     (error "Unknown template: %s" template))))
 
@@ -112,19 +135,51 @@ template-spec at point."
           nil
         t))))
 
+(defun templar-dump-vars ()
+  """templar-dump-vars dumps all current variables into the
+rendered template. Mostly used for debugging as the output format
+may change in the future.
+"""
+(lambda (vars)
+  (list
+   vars
+   (apply
+    'concat
+    (mapcar
+     (lambda (var)
+       (concat
+        (car var)
+        " . "
+        (format "%s" (cdr var))
+        "\n")
+       ) vars)))))
+
 (defun templar-put-var (key modifier)
+  """templar-put-var expects a first string argument which points
+to a templar variable. The second argument is a modifier function
+which is applied to the variable value before it is inserted. Use
+'identity function if no modification is required.
+"""
   (lambda (vars)
     (let ((var (assoc-string key vars)))
       (if var
-          (funcall modifier (cdr var))
+          (list vars (funcall modifier (cdr var)))
         (error "No templar variable with name '%s' exists" key)))))
+
+(defun templar-place-point ()
+  (lambda (vars)
+    (list
+     (add-to-list
+      'vars
+      `("templar-point" . ,(cdr (assoc-string "templar-offset" vars))))
+     nil)))
 
 (defun templar-if (key predicate body)
   (lambda (vars)
     (let ((var (assoc-string key vars)))
       (if var
           (if (funcall predicate (cdr var))
-              body)
+              (list vars body))
         (error "No templar variable with name '%s' exists" key)))))
 
 (provide 'templar)

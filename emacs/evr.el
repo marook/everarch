@@ -431,10 +431,7 @@ var-specs is a list of variables. Each variable is (name resover).")
        ))))
 
 (defun evr--insert-claim-at-point (template)
-  (let ((claim-start-point (point))
-        claim-end-point)
-    (templar-insert-at-point template)
-    (indent-region claim-start-point (point))))
+  (apply 'indent-region (templar-insert-at-point template)))
 
 (define-minor-mode evr-claim-set-mode
   "This minor mode makes a buffer an everarch sourced claim-set.
