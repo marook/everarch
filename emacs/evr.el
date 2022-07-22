@@ -38,43 +38,17 @@ evr-attr-index and prints the results into a new buffer."
 
 (defun evr-attr-index-search-from-buffer ()
   (interactive)
-  (let ((ro inhibit-read-only))
-    (goto-char (point-min))
-    (forward-line (1- 2))
-    (setq inhibit-read-only t)
-    (delete-region (point) (point-max))
-    (setq inhibit-read-only ro))
-  (let ((query (buffer-substring-no-properties
-                (point-min)
-                (progn
-                  (goto-char (point-min))
-                  (end-of-line)
-                  (point))))
-        (con (open-network-stream
-              "evr-attr-index-search"
-              (buffer-name)
-              "localhost" 2362
-              :type 'tls)))
-    (set-process-sentinel
-     con
-     (lambda (con event)
-       ;; prevent process status from being printed to the search
-       ;; results buffer
-       nil))
-    (process-send-string
-     con
-     (concat
-      "a token " (cdr (assoc-string "localhost:2362" evr-attr-index-authentication-tokens)) "\n"
-      (mapconcat
-       (lambda (args)
-         (apply 'concat args))
-       `(
-         ("s select *")
-         ,(if (string-empty-p query)
-              ()
-            `("where " ,query)))
-       " ")
-      "\nexit\n"))))
+  (let ((query (evr--truncate-query-buffer)))
+    (evr--query-attr-index
+     (mapconcat
+      (lambda (args)
+        (apply 'concat args))
+      `(
+        ("s select *")
+        ,(if (string-empty-p query)
+             ()
+           `("where " ,query)))
+      ""))))
 
 (defvar evr-attr-index-authentication-tokens
   ()
@@ -95,12 +69,14 @@ evr-attr-index and prints the results into a new buffer."
     (define-key map "\C-m" 'evr-follow-claim-ref-search)
     (define-key map "c" 'evr-compose-claim-set-for-seed)
     (define-key map "f" 'evr-follow-claim-ref-contents)
+    (define-key map "S" 'evr-follow-claim-seed)
     map)
   "Local keymap for evr-attr-index-results-mode buffers.")
 
 (defun evr-previous-claim-ref ()
   (interactive)
-  (re-search-backward evr--claim-ref-pattern nil t))
+  (when (re-search-backward evr--claim-ref-pattern nil t)
+    (evr-follow-claim-ref-xml)))
 
 (defun evr-next-claim-ref ()
   (interactive)
@@ -109,7 +85,10 @@ evr-attr-index and prints the results into a new buffer."
       (forward-char 1))
     (if (eq (re-search-forward evr--claim-ref-pattern nil t) nil)
         (goto-char point-before)
-      (re-search-backward evr--claim-ref-pattern))))
+      (progn
+        (re-search-backward evr--claim-ref-pattern)
+        (evr-follow-claim-ref-xml)
+        ))))
 
 (defface evr-claim-ref
   '((t (:inherit link)))
@@ -189,24 +168,26 @@ killed. Returns nil otherwise."
 
 Returns the buffer's name."
   (if (evr--remove-buffer claim-ref)
-      (let ((claim-ref-buffer (get-buffer-create claim-ref)))
-        (make-process
-         :name (concat "evr get-claim " claim-ref)
-         :buffer claim-ref
-         :command `("evr" "get-claim" ,claim-ref)
-         :sentinel
-         (lambda (process event)
-           (if (string= event "finished\n")
-               (with-current-buffer claim-ref-buffer
-                 (set-buffer-modified-p nil)
-                 (normal-mode)
-                 (setq-local evr-seed-ref seed-ref)
-                 (setq-local evr-claim-ref claim-ref)
-                 (if complete
-                     (funcall complete claim-ref))
-                 )))
-         :stderr (get-buffer-create "*evr get-claim errors*")
-         )
+      (let ((claim-ref-buffer (get-buffer-create claim-ref))
+            proc)
+        (setq proc (make-process
+                    :name (concat "evr get-claim " claim-ref)
+                    :buffer claim-ref
+                    :command `("evr" "get-claim" ,claim-ref)
+                    :sentinel
+                    (lambda (process event)
+                      (if (string= event "finished\n")
+                          (with-current-buffer claim-ref-buffer
+                            (set-buffer-modified-p nil)
+                            (normal-mode)
+                            (setq-local evr-seed-ref seed-ref)
+                            (setq-local evr-claim-ref claim-ref)
+                            (if complete
+                                (funcall complete claim-ref))
+                            )))
+                    :stderr (get-buffer-create "*evr get-claim errors*")
+                    ))
+        (set-process-filter proc 'evr--not-moving-filter)
         claim-ref)))
 
 (defun evr--follow-file-claim (claim-ref seed-ref buffer-name)
@@ -237,7 +218,7 @@ a new buffer."
   (interactive)
   (let ((buffer-name (evr--visit-claim-xml (evr--get-claim-ref) (evr--get-seed-ref))))
     (if buffer-name
-        (switch-to-buffer buffer-name))))
+        (display-buffer (get-buffer buffer-name) t) 1)))
 
 (defun evr-follow-claim-ref-search ()
   "Follows the claim ref at point and will show it's attributes
@@ -263,6 +244,114 @@ points to a file claim."
    (evr--get-seed-ref)
    (lambda (buffer-name)
      (evr-follow-claim buffer-name))))
+
+(defun evr-follow-claim-seed ()
+  "Follows the seed claim at point and shows all claims which
+point to this seed."
+  (interactive)
+  (evr-claims-for-seed-search (evr--get-seed-ref)))
+
+;;;###autoload
+(defun evr-claims-for-seed-search (seed)
+  "evr-claims-for-seed-search performs a search against the
+default evr-attr-index and prints all claims assigned to the
+given seed."
+  (interactive "sSeed: ")
+  (when (string-empty-p seed)
+    (error "Please supply a seed ref. They usually start with sha3-224-."))
+  (switch-to-buffer (generate-new-buffer (concat "seed " seed)))
+  (insert seed "\n")
+  (evr-claims-for-seed-mode)
+  (evr-claims-for-seed-search-from-buffer))
+
+(defun evr-claims-for-seed-search-from-buffer ()
+  (interactive)
+  (let ((seed-ref (evr--truncate-query-buffer)))
+    (evr--query-attr-index (concat "c " seed-ref))))
+
+(defun evr--truncate-query-buffer ()
+  "evr--truncate-query-buffer, removes everything but the query
+from the buffer, sets point to the place where dynamic content
+should be appended and returns the query string."
+  (let ((ro inhibit-read-only))
+    (goto-char (point-min))
+    (forward-line (1- 2))
+    (setq inhibit-read-only t)
+    (delete-region (point) (point-max))
+    (setq inhibit-read-only ro))
+  (buffer-substring-no-properties
+   (point-min)
+   (progn
+     (goto-char (point-min))
+     (end-of-line)
+     (point))))
+
+(defun evr--query-attr-index (cmd)
+  (let ((con (open-network-stream
+              "evr-attr-index-cmd"
+              (buffer-name)
+              "localhost" 2362
+              :type 'tls)))
+    (set-process-filter con 'evr--not-moving-filter)
+    (set-process-sentinel
+     con
+     (lambda (con event)
+       ;; prevent process status from being printed to the search
+       ;; results buffer
+       nil))
+    (process-send-string
+     con
+     (concat
+      "a token " (cdr (assoc-string "localhost:2362" evr-attr-index-authentication-tokens)) "\n"
+      cmd
+      "\nexit\n"))))
+
+(defun evr--not-moving-filter (proc string)
+  (when (buffer-live-p (process-buffer proc))
+    (with-current-buffer (process-buffer proc)
+      (save-excursion
+        (let ((ro inhibit-read-only))
+          (goto-char (process-mark proc))
+          (setq inhibit-read-only t)
+          (insert string)
+          (setq inhibit-read-only ro)
+          (set-marker (process-mark proc) (point)))))))
+
+(defvar evr-claims-for-seed-mode-map
+  (let ((map (make-keymap)))
+    (set-keymap-parent map special-mode-map)
+    (define-key map "p" 'evr-previous-claim-ref)
+    (define-key map " " 'evr-next-claim-ref)
+    (define-key map "n" 'evr-next-claim-ref)
+    (define-key map "C" 'kill-current-buffer)
+    (define-key map "r" 'isearch-backward)
+    (define-key map "s" 'isearch-forward)
+    (define-key map "g" 'evr-claims-for-seed-search-from-buffer)
+    (define-key map "x" 'evr-follow-claim-ref-xml)
+    (define-key map "c" 'evr-compose-claim-set-for-seed)
+    (define-key map "f" 'evr-follow-claim-ref-contents)
+    map)
+  "Local keymap for evr-claims-for-seed-mode buffers.")
+
+(defvar evr-claims-for-seed-font-lock-keywords
+  (list
+   (list evr--claim-ref-pattern '(0 evr-claim-ref-face))
+   ))
+
+(defun evr-claims-for-seed-mode ()
+  "Mode for browsing evr-attr-index claims for seed results.
+
+`\\{evr-claims-for-seed-mode-map}`"
+  (kill-all-local-variables)
+  (use-local-map evr-claims-for-seed-mode-map)
+  (setq major-mode 'evr-claims-for-seed-mode
+        mode-name "evr-claims-for-seed"
+        buffer-read-only t)
+  (setq-local tab-width 2)
+  (setq-local font-lock-defaults
+              '(evr-claims-for-seed-font-lock-keywords t nil nil beginning-of-line))
+  (font-lock-ensure)
+  (run-mode-hooks 'evr-claims-for-seed-mode-hook))
 
 (defun evr-follow-claim (claim-buffer)
   "Follows the root claim within the current buffer."

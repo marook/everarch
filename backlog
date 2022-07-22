@@ -1,9 +1,15 @@
-* list claims for seed from evr-attr-index-results-mode
-add a shortcut to list all claims which got the same seed as under
-point.
 * rename bucket file extension to .evb
 * add magic number to evr bucket
 "EVB" / 0x455642
+* put attr factory error logs into subdirectories
+the ~/var/everarch/attr-index/sha3-224-some-index directory is flooded
+with attr factory error logs if the factory is failing with many
+claims.
+
+the attr factory logs must be put into one ore more subdirectories.
+* make evr-attr-index continue next index building after restart
+if evr-attr-index is stopped having a live index and building the next
+one it will not resume building the next index on restart.
 * profile blob insert durations
 measure how long parts of the blob insert in the evr-glacier-storage
 take up. parts could be writing the blob to bucket, fsynsc and adding
