@@ -339,7 +339,7 @@ void test_open_bucket_with_extra_data_at_end(){
     // append a few bytes to the first bucket
     {
         const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
-        const char bucket_file_name[] = "/00001.blob";
+        const char bucket_file_name[] = "/00001.evb";
         const size_t bucket_file_name_len = strlen(bucket_file_name);
         char bucket_path[bucket_dir_path_len + bucket_file_name_len + 1];
         memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
@@ -558,7 +558,7 @@ void test_many_small_buckets(){
 
 void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t offset){
     const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
-    const char bucket_file_name[] = "/00001.blob";
+    const char bucket_file_name[] = "/00001.evb";
     const size_t bucket_file_name_len = strlen(bucket_file_name);
     char bucket_path[bucket_dir_path_len + bucket_file_name_len + 1];
     memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
@@ -577,7 +577,7 @@ void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t off
 
 size_t read_bucket_end_offset(struct evr_glacier_storage_cfg *config){
     const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
-    const char bucket_file_name[] = "/00001.blob";
+    const char bucket_file_name[] = "/00001.evb";
     const size_t bucket_file_name_len = strlen(bucket_file_name);
     char bucket_path[bucket_dir_path_len + bucket_file_name_len + 1];
     memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);

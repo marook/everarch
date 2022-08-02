@@ -1,4 +1,5 @@
-* rename bucket file extension to .evb
+* should we care about $XDG_CONFIG_HOME?
+for looking up ~/.config
 * add magic number to evr bucket
 "EVB" / 0x455642
 * put attr factory error logs into subdirectories

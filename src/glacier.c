@@ -40,7 +40,8 @@ const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size +
 const char *glacier_dir_lock_file_path = "/lock";
 const char *glacier_dir_index_db_path = "/index.db";
 const size_t evr_read_buffer_size = 1*1024*1024;
-#define evr_bucket_file_name_fmt "%05lx.blob"
+#define evr_bucket_file_ext "evb"
+#define evr_bucket_file_name_fmt "%05lx." evr_bucket_file_ext
 
 void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_size, const char *bucket_dir_path, const char* path_suffix);
 
@@ -457,7 +458,7 @@ int evr_walk_buckets(struct evr_glacier_write_ctx *wctx, int (*visit)(void *ctx,
         memcpy(file_name, d->d_name, file_name_size);
         char *end = file_name;
         for(; isxdigit(*end); end++){}
-        if(strcmp(end, ".blob") != 0){
+        if(strcmp(end, "." evr_bucket_file_ext) != 0){
             continue;
         }
         *end = '\0';
