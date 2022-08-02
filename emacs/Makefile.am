@@ -4,3 +4,6 @@ lisp_files = \
 
 lisp_LISP = $(lisp_files)
 EXTRA_DIST = $(lisp_files)
+
+TESTS = \
+	emacs-tests.sh

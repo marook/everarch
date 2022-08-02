@@ -100,9 +100,9 @@ template in the current buffer."
 (defun templar--render (vars template)
   (cond
    ((stringp template)
-    (add-to-list
-     'vars
-     `("templar-offset" . ,(+ (cdr (assoc-string "templar-offset" vars)) (length template))))
+    (push
+     `("templar-offset" . ,(+ (cdr (assoc-string "templar-offset" vars)) (length template)))
+     vars)
     (list vars template))
    ((functionp template)
     (apply 'templar--render
@@ -169,9 +169,9 @@ which is applied to the variable value before it is inserted. Use
 (defun templar-place-point ()
   (lambda (vars)
     (list
-     (add-to-list
-      'vars
-      `("templar-point" . ,(cdr (assoc-string "templar-offset" vars))))
+     (push
+      `("templar-point" . ,(cdr (assoc-string "templar-offset" vars)))
+      vars)
      nil)))
 
 (defun templar-if (key predicate body)
