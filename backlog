@@ -1,5 +1,3 @@
-* should we care about $XDG_CONFIG_HOME?
-for looking up ~/.config
 * add magic number to evr bucket
 "EVB" / 0x455642
 * put attr factory error logs into subdirectories
@@ -180,6 +178,8 @@ right now many places use for example %d or %ld for printing integers
 with defined sizes like int64_t. the PRI* macros from [[https://cplusplus.com/reference/cinttypes/][inttypes.h]]
 should be used instead. this should guarantee compatibility for other
 platforms.
+* use $XDG_CONFIG_HOME to lookup configuration directory
+XDG_* is defined by the [[https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html][basedir-spec]].
 * replace struct chunk_set with linked list
 dny-mem.h should provide one growable random access data structure and
 one growable linked list data structure. the growable linked list data
