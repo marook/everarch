@@ -106,6 +106,11 @@ struct evr_attr_index_db {
 #endif
     evr_blob_file_writer blob_file_writer;
     void *blob_file_writer_ctx;
+    /**
+     * claim_log_dir is the path to the root directory of per claim
+     * logs. Always ends with a slash.
+     */
+    char *claim_log_dir;
 };
 
 struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_cfg *cfg, char *name, evr_blob_file_writer blob_file_writer, void *blob_file_writer_ctx);

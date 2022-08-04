@@ -1,9 +1,3 @@
-* put attr factory error logs into subdirectories
-the ~/var/everarch/attr-index/sha3-224-some-index directory is flooded
-with attr factory error logs if the factory is failing with many
-claims.
-
-the attr factory logs must be put into one ore more subdirectories.
 * make evr-attr-index continue next index building after restart
 if evr-attr-index is stopped having a live index and building the next
 one it will not resume building the next index on restart.

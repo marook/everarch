@@ -80,13 +80,17 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_cfg *cfg,
     size_t state_dir_path_len = strlen(cfg->state_dir_path);
     size_t name_len = strlen(name);
     size_t dir_size = state_dir_path_len + slash_len + name_len + slash_len + 1;
-    struct evr_attr_index_db *db = malloc(sizeof(struct evr_attr_index_db) + dir_size);
-    if(!db){
+    const char claim_log_dir_name[] = "claim-logs/";
+    size_t claim_log_dir_size = (dir_size - 1) + sizeof(claim_log_dir_name);
+    char *buf = malloc(sizeof(struct evr_attr_index_db) + dir_size + claim_log_dir_size);
+    if(!buf){
         return NULL;
     }
-    db->dir = (char*)&db[1];
     struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, db->dir);
+    evr_init_buf_pos(&bp, buf);
+    struct evr_attr_index_db *db;
+    evr_map_struct(&bp, db);
+    db->dir = bp.pos;
     evr_push_n(&bp, cfg->state_dir_path, state_dir_path_len);
     if(state_dir_path_len > 0 && cfg->state_dir_path[state_dir_path_len - 1] != slash){
         evr_push_as(&bp, &slash, char);
@@ -95,28 +99,47 @@ struct evr_attr_index_db *evr_open_attr_index_db(struct evr_attr_index_cfg *cfg,
     evr_push_as(&bp, &slash, char);
     evr_push_eos(&bp);
     if(mkdir(db->dir, 0755)){
-        // there is a chance that the dir already exists an hopefully
-        // is not a file. if it is a file the sqlite open later will
-        // fail.
+        // there is a chance that the dir already exists and hopefully
+        // is not a file. if it is a file the claim log directory
+        // mkdir later will fail.
         if(errno != EEXIST){
             log_error("Failed to create attr-index-db directory %s", db->dir);
-            free(db);
-            return NULL;
+            goto fail_with_free_db;
+        }
+    }
+    db->claim_log_dir = bp.pos;
+    evr_push_n(&bp, db->dir, dir_size - 1);
+    evr_push_n(&bp, claim_log_dir_name, sizeof(claim_log_dir_name) - 1);
+    evr_push_eos(&bp);
+    if(mkdir(db->claim_log_dir, 0755)){
+        if(errno != EEXIST){
+            log_error("Failed to create attr-index-db claim logs directory %s", db->claim_log_dir);
+            goto fail_with_free_db;
         }
     }
     db->blob_file_writer = blob_file_writer;
     db->blob_file_writer_ctx = blob_file_writer_ctx;
     return evr_init_attr_index_db(db);
+ fail_with_free_db:
+    free(db);
+    return NULL;
 }
 
 struct evr_attr_index_db *evr_fork_attr_index_db(struct evr_attr_index_db *odb){
     size_t dir_size = strlen(odb->dir) + 1;
-    struct evr_attr_index_db *fdb = malloc(sizeof(struct evr_attr_index_db) + dir_size);
-    if(!fdb){
+    size_t claim_log_dir_size = strlen(odb->claim_log_dir) + 1;
+    char *buf = malloc(sizeof(struct evr_attr_index_db) + dir_size + claim_log_dir_size);
+    if(!buf){
         return NULL;
     }
-    fdb->dir = (char*)&fdb[1];
-    memcpy(fdb->dir, odb->dir, dir_size);
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_attr_index_db *fdb;
+    evr_map_struct(&bp, fdb);
+    fdb->dir = bp.pos;
+    evr_push_n(&bp, odb->dir, dir_size);
+    fdb->claim_log_dir = bp.pos;
+    evr_push_n(&bp, odb->claim_log_dir, claim_log_dir_size);
     fdb->blob_file_writer = odb->blob_file_writer;
     fdb->blob_file_writer_ctx = odb->blob_file_writer_ctx;
     return evr_init_attr_index_db(fdb);
@@ -903,19 +926,33 @@ void evr_log_failed_claim_set_doc(struct evr_attr_index_db *db, evr_blob_ref cla
 
 void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, char *claim_set_buf, int claim_set_buf_size, char *fail_reason){
 #define log_scope "Failed to log failed claim-set operation."
+    const int blob_ref_dir_len = 2;
     const char suffix[] = ".log";
-    const size_t dir_len = strlen(db->dir);
-    char log_path[dir_len + evr_blob_ref_str_size - 1 + sizeof(suffix)];
+    const size_t dir_len = strlen(db->claim_log_dir);
+    // TODO introduce subdirectory with first two claim set ref characters
+    char log_path[dir_len + blob_ref_dir_len + 1 + (evr_blob_ref_str_size - 1) + sizeof(suffix)];
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, log_path);
-    evr_push_n(&bp, db->dir, dir_len);
-    evr_fmt_blob_ref(bp.pos, claim_set_ref);
-    evr_inc_buf_pos(&bp, evr_blob_ref_str_size - 1);
+    evr_push_n(&bp, db->claim_log_dir, dir_len);
+    evr_blob_ref_str ref_str;
+    evr_fmt_blob_ref(ref_str, claim_set_ref);
+    evr_push_n(&bp, &ref_str[evr_blob_ref_str_size - blob_ref_dir_len - 1], blob_ref_dir_len);
+    evr_push_eos(&bp);
+    if(mkdir(log_path, 0755)){
+        if(errno != EEXIST){
+            log_error(log_scope " Failed to create attr-index-db claim log directory %s", log_path);
+            return;
+        }
+    }
+    evr_inc_buf_pos(&bp, -1); // undo the eos
+    const char slash = '/';
+    evr_push_as(&bp, &slash, char);
+    evr_push_n(&bp, ref_str, evr_blob_ref_str_size - 1);
     evr_push_n(&bp, suffix, sizeof(suffix));
     log_debug("Logging failed claim-set operation to %s: %s", log_path, fail_reason);
     int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
     if(fd < 0){
-        log_error(log_scope " Can't open claim-set log file: %s", strerror(errno));
+        log_error(log_scope " Can't open claim-set log file %s: %s", log_path, strerror(errno));
         return;
     }
     struct evr_file f;
@@ -935,8 +972,9 @@ void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref cla
     }
  out_with_close_f:
     if(f.close(&f) != 0){
-        log_error(log_scope " Can't close claim-set log file.");
+        evr_panic(log_scope " Can't close claim-set log file.");
     }
+#undef log_scope
 }
 
 int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_claim_ref seed, evr_claim_ref ref, struct evr_attr *attr, size_t attr_len);

@@ -589,7 +589,7 @@ void test_failed_transformation(){
     assert(is_err(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
     xmlFreeDoc(claim_set_doc);
     const size_t state_dir_path_len = strlen(cfg->state_dir_path);
-    const char log_path_suffix[] = "/ye-db/sha3-224-c0000000000000000000000000000000000000000000000000000000.log";
+    const char log_path_suffix[] = "/ye-db/claim-logs/00/sha3-224-c0000000000000000000000000000000000000000000000000000000.log";
     char log_path[state_dir_path_len + sizeof(log_path_suffix)];
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, log_path);
