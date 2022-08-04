@@ -146,6 +146,9 @@ int evr_glacier_stat_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     return ret;
 }
 
+int evr_validate_bucket_magic_number(int f);
+int evr_write_bucket_magic_number(int f);
+
 int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref key, int (*status)(void *arg, int exists, int flags, size_t blob_size), int (*on_data)(void *arg, const char *data, size_t data_size), void *arg){
     int ret = evr_error;
     if(sqlite3_bind_blob(ctx->find_blob_stmt, 1, key, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
@@ -172,6 +175,9 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
     int bucket_f = evr_open_bucket(ctx->config, bucket_index, O_RDONLY);
     if(bucket_f == -1){
         goto end_with_find_reset;
+    }
+    if(evr_validate_bucket_magic_number(bucket_f) != evr_ok){
+        goto end_with_open_bucket;
     }
     if(lseek(bucket_f, bucket_blob_offset, SEEK_SET) == -1){
         goto end_with_open_bucket;
@@ -358,6 +364,9 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
     } else {
         if(open_current_bucket(ctx, 0)){
             goto fail_with_db;
+        }
+        if(evr_validate_bucket_magic_number(ctx->current_bucket_f) != evr_ok){
+            goto fail_with_open_bucket;
         }
         if(evr_read_bucket_end_offset(ctx->current_bucket_f, &ctx->current_bucket_pos) != evr_ok){
             goto fail_with_open_bucket;
@@ -620,14 +629,17 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
     evr_now(last_modified);
     uint64_t t64 = (uint64_t)*last_modified;
     char header_buf[evr_bucket_blob_header_size];
-    const size_t disk_size = evr_bucket_blob_header_size + blob->size;
-    if(disk_size + evr_bucket_header_size > ctx->config->max_bucket_size){
+    const size_t blob_disk_size = evr_bucket_blob_header_size + blob->size;
+    // worst_disk_size is the smallest possible bucket size containing
+    // the given blob.
+    const size_t worst_disk_size = evr_bucket_header_size + blob_disk_size;
+    if(worst_disk_size > ctx->config->max_bucket_size){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
-        log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld", fmt_key, ctx->config->bucket_dir_path, disk_size + evr_bucket_header_size, ctx->config->max_bucket_size);
+        log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld", fmt_key, ctx->config->bucket_dir_path, worst_disk_size, ctx->config->max_bucket_size);
         goto fail;
     }
-    if(ctx->current_bucket_pos + disk_size > ctx->config->max_bucket_size){
+    if(ctx->current_bucket_pos + blob_disk_size > ctx->config->max_bucket_size){
         if(create_next_bucket(ctx)){
             goto fail;
         }
@@ -766,6 +778,9 @@ int create_next_bucket(struct evr_glacier_write_ctx *ctx){
         goto out;
     }
     ctx->current_bucket_pos = evr_bucket_header_size;
+    if(evr_write_bucket_magic_number(ctx->current_bucket_f) != evr_ok){
+        goto out;
+    }
     if(evr_write_bucket_end_offset(ctx->current_bucket_f, ctx->current_bucket_pos) != evr_ok){
         goto out;
     }
@@ -1057,6 +1072,10 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
     if(open_current_bucket(ctx, 0) != evr_ok){
         goto out;
     }
+    if(evr_validate_bucket_magic_number(ctx->current_bucket_f) != evr_ok){
+        log_error("Reindexing of bucket %s aborted because of invalid magic number. If you are sure the file is a bucket consider setting the first three bytes in the file to " evr_bucket_magic_number " and reindex again.", bucket_file_name);
+        goto out;
+    }
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, bucket_path);
     evr_push_n(&bp, ctx->config->bucket_dir_path, bucket_dir_path_len);
@@ -1181,7 +1200,7 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     struct evr_glacier_bucket_blob_stat stat;
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, buf);
-    size_t f_pos = sizeof(uint32_t);
+    size_t f_pos = evr_bucket_header_size;
     while(1){
         stat.offset = f_pos + header_size;
         size_t visited_bytes = 0;
@@ -1226,11 +1245,42 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     return ret;
 }
 
+int evr_validate_bucket_magic_number(int f){
+    char buf[strlen(evr_bucket_magic_number)];
+    struct evr_file fd;
+    evr_file_bind_fd(&fd, f);
+    if(lseek(f, 0, SEEK_SET) == -1){
+        return evr_error;
+    }
+    if(read_n(&fd, buf, sizeof(buf), NULL, NULL) != evr_ok){
+        log_error("Failed to read magic number");
+        return evr_error;
+    }
+    if(memcmp(buf, evr_bucket_magic_number, strlen(evr_bucket_magic_number)) != 0){
+        log_error("Invalid magic number detected in bucket file.");
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+int evr_write_bucket_magic_number(int f){
+    struct evr_file fd;
+    evr_file_bind_fd(&fd, f);
+    if(lseek(f, 0, SEEK_SET) == -1){
+        return evr_error;
+    }
+    if(write_n(&fd, evr_bucket_magic_number, strlen(evr_bucket_magic_number)) != evr_ok){
+        log_error("Can't write bucket magic number");
+        return evr_error;
+    }
+    return evr_ok;
+}
+
 int evr_read_bucket_end_offset(int f, size_t *end_offset){
     uint32_t buf;
     struct evr_file fd;
     evr_file_bind_fd(&fd, f);
-    if(lseek(f, 0, SEEK_SET) != 0){
+    if(lseek(f, strlen(evr_bucket_magic_number), SEEK_SET) == -1){
         return evr_error;
     }
     if(read_n(&fd, (char*)&buf, sizeof(buf), NULL, NULL) != evr_ok){
@@ -1245,10 +1295,10 @@ int evr_write_bucket_end_offset(int f, size_t end_offset){
     uint32_t buf = htobe32(end_offset);
     struct evr_file fd;
     evr_file_bind_fd(&fd, f);
-    if(lseek(f, 0, SEEK_SET) != 0){
+    if(lseek(f, strlen(evr_bucket_magic_number), SEEK_SET) == -1){
         return evr_error;
     }
-    if(write_n(&fd, &buf, evr_bucket_header_size) != evr_ok){
+    if(write_n(&fd, &buf, evr_bucket_end_offset_size) != evr_ok){
         log_error("Can't write bucket end offset");
         return evr_error;
     }

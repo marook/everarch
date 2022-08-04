@@ -1,32 +1,34 @@
 * Bucket File Format
 The following fields describe the format of bucket files. All values
 are store in big endian (most significant byte first).
-|-------------------+--------+---------------------------------------------|
-| field             | format | description                                 |
-|-------------------+--------+---------------------------------------------|
-| end pointer       | uint32 | Points to the file offset after the last    |
-|                   |        | completely written blob. In a successfully  |
-|                   |        | closed file this should be the end of the   |
-|                   |        | file. The field is used to identify         |
-|                   |        | incomplete written blobs.                   |
-|                   |        |                                             |
-|                   |        | An end pointer value 0 indicates that the   |
-|                   |        | bucket contains corrupt blobs which make it |
-|                   |        | impossible to detect a correct end pointer. |
-|-------------------+--------+---------------------------------------------|
-| blob              |        |                                             |
-| - key algorithm   | uint8  | Identifies the type of hash algorithm used. |
-|                   |        | known values are listed in the table below. |
-| - key length      | uint8  | The length of the following key in bytes.   |
-| - key             | uint8* | The actual key of the blob. The key is a    |
-|                   |        | blob content hash.                          |
-| - content length  | uint32 | The length of the blob's content in bytes.  |
-| - header checksum | uint8  | A sum of all header bytes with a ones'      |
-|                   |        | compliment applied to the sum.              |
-| - content         | void*  | The blob's content.                         |
-|                   |        |                                             |
-| next blob…        |        |                                             |
-|-------------------+--------+---------------------------------------------|
+|-------------------+---------+---------------------------------------------|
+| field             | format  | description                                 |
+|-------------------+---------+---------------------------------------------|
+| magic number      | 3 bytes | Must contain the ASCII characters "EVB".    |
+|-------------------+---------+---------------------------------------------|
+| end pointer       | uint32  | Points to the file offset after the last    |
+|                   |         | completely written blob. In a successfully  |
+|                   |         | closed file this should be the end of the   |
+|                   |         | file. The field is used to identify         |
+|                   |         | incomplete written blobs.                   |
+|                   |         |                                             |
+|                   |         | An end pointer value 0 indicates that the   |
+|                   |         | bucket contains corrupt blobs which make it |
+|                   |         | impossible to detect a correct end pointer. |
+|-------------------+---------+---------------------------------------------|
+| blob              |         |                                             |
+| - key algorithm   | uint8   | Identifies the type of hash algorithm used. |
+|                   |         | known values are listed in the table below. |
+| - key length      | uint8   | The length of the following key in bytes.   |
+| - key             | uint8*  | The actual key of the blob. The key is a    |
+|                   |         | blob content hash.                          |
+| - content length  | uint32  | The length of the blob's content in bytes.  |
+| - header checksum | uint8   | A sum of all header bytes with a ones'      |
+|                   |         | compliment applied to the sum.              |
+| - content         | void*   | The blob's content.                         |
+|                   |         |                                             |
+| next blob…        |         |                                             |
+|-------------------+---------+---------------------------------------------|
 * Hash Algorithms
 |--------+------+----------|
 | Name   |   ID | Key Size |

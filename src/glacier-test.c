@@ -51,7 +51,7 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
         assert(ctx);
         assert(ctx->current_bucket_index == 1);
         assert(ctx->current_bucket_f >= 0);
-        assert(ctx->current_bucket_pos == 4);
+        assert_msg(ctx->current_bucket_pos == evr_bucket_header_size, "But was %zu", ctx->current_bucket_pos);
         free_glacier_ctx(ctx);
     }
     evr_free_glacier_storage_cfg(config);
@@ -103,7 +103,7 @@ void test_evr_glacier_write_smal_blobs(){
         wb->size = data_len;
         assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &first_last_modified)));
         assert(write_ctx->current_bucket_index == 1);
-        assert_msg(write_ctx->current_bucket_pos == 57, "current_bucket_pos was %d", write_ctx->current_bucket_pos);
+        assert_msg(write_ctx->current_bucket_pos == evr_bucket_header_size + 53, "current_bucket_pos was %zu", write_ctx->current_bucket_pos);
         assert(first_last_modified > 1644937656);
         free(buffer);
     }
@@ -134,7 +134,7 @@ void test_evr_glacier_write_smal_blobs(){
         wb->size = data_len;
         assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &second_last_modified)));
         assert(write_ctx->current_bucket_index == 1);
-        assert_msg(write_ctx->current_bucket_pos == 102, "current_bucket_pos was %d", write_ctx->current_bucket_pos);
+        assert_msg(write_ctx->current_bucket_pos == evr_bucket_header_size + 98, "current_bucket_pos was %zu", write_ctx->current_bucket_pos);
         assert(second_last_modified > 1644937656);
         free(buffer);
     }
@@ -477,7 +477,7 @@ void test_reindex_glacier_end_offset_corrupt(){
     build_test_glacier(config, first, second);
     size_t original_end_offset = read_bucket_end_offset(config);
     delete_glacier_index(config);
-    corrupt_bucket_at_offset(config, evr_bucket_header_size / 2);
+    corrupt_bucket_at_offset(config, strlen(evr_bucket_magic_number) + evr_bucket_end_offset_size / 2);
     // quick check should reindex
     assert(is_ok(evr_quick_check_glacier(config)));
     // after reindex first should still be in index because only data
@@ -564,6 +564,7 @@ void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t off
     memcpy(bucket_path, config->bucket_dir_path, bucket_dir_path_len);
     memcpy(&bucket_path[bucket_dir_path_len], bucket_file_name, bucket_file_name_len);
     bucket_path[bucket_dir_path_len + bucket_file_name_len] = '\0';
+    log_debug("Corrupting bucket %s at offset %zu", bucket_path, offset);
     int f = open(bucket_path, O_RDWR);
     assert(f >= 0);
     assert(lseek(f, offset, SEEK_SET) != -1);
@@ -585,7 +586,7 @@ size_t read_bucket_end_offset(struct evr_glacier_storage_cfg *config){
     bucket_path[bucket_dir_path_len + bucket_file_name_len] = '\0';
     int f = open(bucket_path, O_RDONLY);
     assert(f >= 0);
-    assert(lseek(f, 0, SEEK_SET) != -1);
+    assert(lseek(f, strlen(evr_bucket_magic_number), SEEK_SET) != -1);
     uint32_t end_offset;
     assert(read(f, (char*)&end_offset, sizeof(end_offset)) == sizeof(end_offset));
     assert(close(f) == 0);

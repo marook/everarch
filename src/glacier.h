@@ -32,10 +32,18 @@
 #include "keys.h"
 #include "basics.h"
 
+#define evr_bucket_magic_number "EVB"
+
 /**
- * evr bucket header contains the end offset (uint32_t).
+ * The end offset is a uint32_t.
  */
-#define evr_bucket_header_size 4
+#define evr_bucket_end_offset_size 4
+
+/**
+ * evr_bucket_header_size must have the value
+ * (strlen(evr_bucket_magic_number) + evr_bucket_end_offset_size).
+ */
+#define evr_bucket_header_size 7
 
 #define evr_bucket_blob_header_size (evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t))
 
