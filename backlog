@@ -1,6 +1,34 @@
 * make evr-attr-index continue next index building after restart
 if evr-attr-index is stopped having a live index and building the next
 one it will not resume building the next index on restart.
+
+this is the log of the evr-attr-index run which got the request to
+start building a new index:
+#+BEGIN_SRC
+2022-08-05T09:16:53 iI Listening on localhost:2362
+2022-08-05T09:16:53 iI Checking index claim sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7 for attr-spec
+2022-08-05T09:16:53 iI Start building attr index for sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7
+2022-08-05T09:16:53 iI Finished building attr index for sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7
+2022-08-05T09:16:53 iI Index sync worker switches to index sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7
+2022-08-05T09:16:58 iI Checking index claim sha3-224-304bd5ab4123794797e31f43ac172b2c2a538a08aeddb0a1dbc23a0a for attr-spec
+2022-08-05T09:16:58 iI Start building attr index for sha3-224-304bd5ab4123794797e31f43ac172b2c2a538a08aeddb0a1dbc23a0a
+2022-08-05T09:17:02 iI Shutting down
+2022-08-05T09:17:02 iE attr-factory sha3-224-d849c84ecb4ff6433671d75073a3dc49271981fe8174daa4c27d9bfb for claim-set sha3-224-f15cf7221cc7ff92c759ccbf8a7ab985e3deb7663c020505ce396394 ended with exit code 256
+2022-08-05T09:17:02 iE attr-factory sha3-224-d849c84ecb4ff6433671d75073a3dc49271981fe8174daa4c27d9bfb failed with claim set sha3-224-f15cf7221cc7ff92c759ccbf8a7ab985e3deb7663c020505ce396394
+2022-08-05T09:17:02 iI Finished building attr index for sha3-224-304bd5ab4123794797e31f43ac172b2c2a538a08aeddb0a1dbc23a0a
+#+END_SRC
+
+this is the log from the evr-attr-index restart. why is it switching
+to sha3-224-c1… and not to sha3-224-30?
+#+BEGIN_SRC
+2022-08-05T09:17:06 iI Listening on localhost:2362
+2022-08-05T09:17:06 iI Checking index claim sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7 for attr-spec
+2022-08-05T09:17:06 iI Checking index claim sha3-224-304bd5ab4123794797e31f43ac172b2c2a538a08aeddb0a1dbc23a0a for attr-spec
+2022-08-05T09:17:06 iI Start building attr index for sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7
+2022-08-05T09:17:06 iI Finished building attr index for sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7
+2022-08-05T09:17:06 iI Index sync worker switches to index sha3-224-c1d580f6b4d54facbfff324280796fc0a79cec0f71fdff0a706bc8f7
+2022-08-05T09:17:10 iI Shutting down
+#+END_SRC
 * profile blob insert durations
 measure how long parts of the blob insert in the evr-glacier-storage
 take up. parts could be writing the blob to bucket, fsynsc and adding
