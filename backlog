@@ -1,7 +1,3 @@
-* profile blob insert durations
-measure how long parts of the blob insert in the evr-glacier-storage
-take up. parts could be writing the blob to bucket, fsynsc and adding
-the blob to index.
 * switch to mmap/msync for writing bucket files
 and measure the io performance compared to open and fsync.
 * open bucket file descriptor constant for uninitialized

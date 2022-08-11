@@ -25,6 +25,17 @@
 #include "logger.h"
 #include "errors.h"
 
+#ifdef EVR_PROFILE_SQLITE_STMTS
+#  include "profile.h"
+#  define evr_db_profile_block_enter(name) evr_profile_block_enter(name)
+#  define evr_db_profile_block_measure(name) evr_profile_block_measure(name)
+#  define evr_db_profile_block_log(name, fmt, args...) evr_profile_block_log(name, "db duration", fmt, args)
+#else
+#  define evr_db_profile_block_enter(name)
+#  define evr_db_profile_block_measure(name)
+#  define evr_db_profile_block_log(name, fmt)
+#endif
+
 int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
     log_debug("Prepare sqlite statement: %s", sql);
     if(sqlite3_prepare_v2(db, sql, -1, stmt, NULL) != SQLITE_OK){
@@ -38,26 +49,15 @@ int evr_prepare_stmt(sqlite3 *db, const char *sql, sqlite3_stmt **stmt){
 #define evr_stmt_log_msg_prefix "sqlite statement duration"
 
 int evr_step_stmt(sqlite3 *db, sqlite3_stmt *stmt){
-#ifdef EVR_PROFILE_SQLITE_STMTS
-    struct timespec t_start;
-    struct timespec t_end;
-    if(clock_gettime(CLOCK_MONOTONIC, &t_start) != 0){
-        evr_panic("Unable to measure evr_step_stmt step start time.");
-        return SQLITE_ERROR;
-    }
-#endif
+    evr_db_profile_block_enter(step_stmt);
     int ret = sqlite3_step(stmt);
+    evr_db_profile_block_measure(step_stmt);
 #ifdef EVR_PROFILE_SQLITE_STMTS
-    if(clock_gettime(CLOCK_MONOTONIC, &t_end) != 0){
-        evr_panic("Unable to measure evr_step_stmt step end time.");
-        return SQLITE_ERROR;
-    }
-    long dt = t_end.tv_nsec - t_start.tv_nsec + (t_end.tv_sec - t_start.tv_sec) * 1000000000l;
     const char *raw_sql = sqlite3_sql(stmt);
-    log_debug(evr_stmt_log_msg_prefix " raw %ldns: %s", dt, raw_sql);
+    evr_db_profile_block_log(step_stmt, " raw %s", raw_sql);
     char *exp_sql = sqlite3_expanded_sql(stmt);
     if(exp_sql){
-        log_debug(evr_stmt_log_msg_prefix " exp %ldns: %s", dt, exp_sql);
+        evr_db_profile_block_log(step_stmt, " exp %s", exp_sql);
         sqlite3_free(exp_sql);
     } else {
         evr_panic("Unable to get expanded sql for statement with raw sql: %s", raw_sql);

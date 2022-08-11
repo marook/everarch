@@ -6,12 +6,7 @@ allocate_ports
 write_evr_conf
 trap stop_everarch_servers EXIT
 
-rm -rf -- "${glacier_storage_bucket_dir}"
-mkdir -- "${glacier_storage_bucket_dir}"
-echo "Starting evr-glacier-storage…"
-evr-glacier-storage --port "${glacier_storage_port}" --cert "${glacier_storage_cert_path}" --key "${script_dir}/../tls/glacier-key.pem" --auth-token "${glacier_storage_auth_token}" --bucket-dir-path "${glacier_storage_bucket_dir}" > /dev/null &
-glacier_storage_pid=$!
-
+start_glacier_storage
 wait_for_glacier_storage
 
 # launch two watchers so there is more pressure on the thread

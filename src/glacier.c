@@ -35,6 +35,15 @@
 #include "db.h"
 #include "files.h"
 
+#ifdef EVR_PROFILE_GLACIER_STMTS
+#  include "profile.h"
+#  define evr_glacier_profile_block_enter(name) evr_profile_block_enter(name)
+#  define evr_glacier_profile_block_leave(name, fmt, args...) evr_profile_block_leave(name, "glacier duration", fmt, args)
+#else
+#  define evr_glacier_profile_block_enter(name)
+#  define evr_glacier_profile_block_leave(name, fmt)
+#endif
+
 // TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
 const char *glacier_dir_lock_file_path = "/lock";
@@ -639,6 +648,7 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
         log_error("Can't persist blob for key %s in glacier directory %s with %ld bytes which is bigger than max bucket size %ld", fmt_key, ctx->config->bucket_dir_path, worst_disk_size, ctx->config->max_bucket_size);
         goto fail;
     }
+    evr_glacier_profile_block_enter(blob_disk_write);
     if(ctx->current_bucket_pos + blob_disk_size > ctx->config->max_bucket_size){
         if(create_next_bucket(ctx)){
             goto fail;
@@ -678,18 +688,21 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
         bytes_written += chunk_bytes_len;
         c++;
     }
+    evr_glacier_profile_block_enter(blob_fsync);
     if(fdatasync(ctx->current_bucket_f) != 0){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, blob->key);
         log_error("Can't fsync blob data for key %s in glacier directory %s.");
         goto fail;
     }
+    evr_glacier_profile_block_leave(blob_fsync, "", NULL);
     size_t blob_offset = ctx->current_bucket_pos + evr_bucket_blob_header_size;
     ctx->current_bucket_pos += evr_bucket_blob_header_size + blob->size;
     const size_t end_offset = ctx->current_bucket_pos;
     if(evr_write_bucket_end_offset(ctx->current_bucket_f, ctx->current_bucket_pos) != evr_ok){
         goto fail;
     }
+    evr_glacier_profile_block_leave(blob_disk_write, "", NULL);
     if(evr_glacier_add_blob_to_index(ctx, blob->key, blob->flags, blob_offset, blob->size, *last_modified) != evr_ok){
         goto fail;
     }
@@ -1292,6 +1305,7 @@ int evr_read_bucket_end_offset(int f, size_t *end_offset){
 }
 
 int evr_write_bucket_end_offset(int f, size_t end_offset){
+    evr_glacier_profile_block_enter(write_bucket_end_offset);
     uint32_t buf = htobe32(end_offset);
     struct evr_file fd;
     evr_file_bind_fd(&fd, f);
@@ -1306,5 +1320,6 @@ int evr_write_bucket_end_offset(int f, size_t end_offset){
         log_error("Can't fsync bucket end offset");
         return evr_error;
     }
+    evr_glacier_profile_block_leave(write_bucket_end_offset, "", NULL);
     return evr_ok;
 }

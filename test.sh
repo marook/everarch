@@ -25,6 +25,7 @@ done
 
 echo ''
 echo 'Run integration tests…'
+echo -n '' > "${script_dir}/test.log"
 for test_suite in testing/suite/*
 do
     if [[ ! -d "${test_suite}" ]]
@@ -33,7 +34,18 @@ do
     fi
     test_name=`basename "${test_suite}"`
     echo "Run integration test ${test_name}…"
-    ( cd "${test_suite}" && ./run-suite )
+    test_error=0
+    ( cd "${test_suite}" && ./run-suite ) &>> "${script_dir}/test.log" || test_error=1
+    if [[ "${test_error}" == '1' ]]
+    then
+        tail "${script_dir}/test.log" >&2
+        echo "
+
+For complete failure details see ${script_dir}/test.log" >&2
+        exit 1
+    fi
 done
+
+"${script_dir}/etc/profile-aggregate/profile-aggregate.py" < "${script_dir}/test.log"
 
 echo SUCCESS

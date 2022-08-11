@@ -11,8 +11,9 @@ import re
 import sys
 
 # matches lines like:
-# 2022-06-02T15:35:42 iD sqlite statement duration exp 1822328ns: select rowid, val_str, valid_until, trunc from attr where seed = x'4fd0082672bdc4c4b6e63db7d9774ca07b0a69923c9609a3863182e00000' and key = 'charset' and valid_from <= 1654167365093 order by valid_from desc
-profile_pattern = re.compile('^[^ ]+ .D sqlite statement duration ([^ ]+) ([0-9]+)ns: (.*)$')
+# 2022-08-09T20:34:36 iD db duration step_stmt 89769ns raw insert into bucket (bucket_index) values (?)
+# 2022-08-09T20:34:36 D db duration step_stmt 89769ns exp insert into bucket (bucket_index) values (1)
+profile_pattern = re.compile('^[^ ]+ (?:.)?D db duration step_stmt ([0-9]+)ns ([^ ]+) (.*)$')
 
 raw_stmt_sum = {}
 exp_stmt_max = {}
@@ -21,8 +22,8 @@ for line in sys.stdin:
     m = profile_pattern.match(line.strip())
     if not m:
         continue
-    profile = m.group(1)
-    duration = int(m.group(2))
+    duration = int(m.group(1))
+    profile = m.group(2)
     sql = m.group(3)
     if profile == 'raw':
         c, s = raw_stmt_sum[sql] if sql in raw_stmt_sum else (0, 0)

@@ -26,6 +26,12 @@ AC_ARG_ENABLE(
   [AC_DEFINE([EVR_PROFILE_SQLITE_STMTS], [1], [Enables sqlite statement profiling.])],
 )
 
+AC_ARG_ENABLE(
+  [profile-glacier],
+  [AS_HELP_STRING([--enable-profile-glacier], [Enables debug level logging of glacier operation execution durations. These log statements start with the message "glacier operation duration".])],
+  [AC_DEFINE([EVR_PROFILE_GLACIER_STMTS], [1], [Enables glacier operation profiling.])],
+)
+
 AC_DEFINE([EVR_LOG_INFO], [1], [Turns on log message output on level info.])
 AC_ARG_ENABLE(
   [log-debug],
