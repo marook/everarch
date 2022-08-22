@@ -1,4 +1,5 @@
 \input texinfo
+@setfilename evr.info
 @settitle everarch
 
 @copying
