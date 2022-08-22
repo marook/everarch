@@ -41,7 +41,7 @@
 #  define evr_glacier_profile_block_leave(name, fmt, args...) evr_profile_block_leave(name, "glacier duration", fmt, args)
 #else
 #  define evr_glacier_profile_block_enter(name)
-#  define evr_glacier_profile_block_leave(name, fmt)
+#  define evr_glacier_profile_block_leave(name, fmt, args...)
 #endif
 
 // TODO convert every variable here into a define in order to save binary space
