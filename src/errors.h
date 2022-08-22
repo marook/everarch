@@ -25,6 +25,7 @@
 #define evr_temporary_occupied 3
 #define evr_end 4
 #define evr_user_data_invalid 5
+#define evr_exists 6
 
 /**
  * evr_index_db_corrupt indicates that the evr-glacier-storage

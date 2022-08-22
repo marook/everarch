@@ -25,6 +25,7 @@ done
 
 echo ''
 echo 'Run integration tests…'
+rm -f "testing/suite/put-parallel/glacier-benchmark.log"
 echo -n '' > "${script_dir}/test.log"
 for test_suite in testing/suite/*
 do
@@ -47,5 +48,6 @@ For complete failure details see ${script_dir}/test.log" >&2
 done
 
 "${script_dir}/etc/profile-aggregate/profile-aggregate.py" < "${script_dir}/test.log"
+cat "testing/suite/put-parallel/glacier-benchmark.log"
 
 echo SUCCESS

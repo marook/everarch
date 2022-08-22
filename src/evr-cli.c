@@ -360,7 +360,6 @@ int evr_cli_get_file(struct cli_cfg *cfg);
 int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key);
 int evr_cli_post_file(struct cli_cfg *cfg);
 int evr_cli_watch_blobs(struct cli_cfg *cfg);
-int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob);
 int evr_cli_sync(struct cli_cfg *cfg);
 
 int main(int argc, char **argv){
@@ -644,7 +643,8 @@ int evr_cli_put(struct cli_cfg *cfg){
     if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out_with_free_blob;
     }
-    if(evr_stat_and_put(&c, key, cfg->flags, blob) != evr_ok){
+    int put_res = evr_stat_and_put(&c, key, cfg->flags, blob);
+    if(put_res != evr_ok && put_res != evr_exists){
         goto out_with_close_c;
     }
     evr_blob_ref_str fmt_key;
@@ -703,7 +703,8 @@ int evr_cli_sign_put(struct cli_cfg *cfg){
     if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out_with_free_signed_buf;
     }
-    if(evr_stat_and_put(&c, key, cfg->flags, &signed_cs) != evr_ok){
+    int put_res = evr_stat_and_put(&c, key, cfg->flags, &signed_cs);
+    if(put_res != evr_ok && put_res != evr_exists){
         goto out_with_close_c;
     }
     evr_blob_ref_str fmt_key;
@@ -887,7 +888,8 @@ int evr_cli_post_file(struct cli_cfg *cfg){
     if(evr_calc_blob_ref(key, sc_blob.size_used, sc_blob.chunks) != evr_ok){
         goto out_with_free_sc;
     }
-    if(evr_stat_and_put(&ctx.c, key, evr_blob_flag_claim, &sc_blob) != evr_ok){
+    int put_res = evr_stat_and_put(&ctx.c, key, evr_blob_flag_claim, &sc_blob);
+    if(put_res != evr_ok && put_res != evr_exists){
         goto out_with_free_sc;
     }
     evr_claim_ref cref;
@@ -942,7 +944,8 @@ int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     if(evr_calc_blob_ref(fs->ref, size, blob.chunks) != evr_ok){
         goto out;
     }
-    if(evr_stat_and_put(&ctx->c, fs->ref, 0, &blob) != evr_ok){
+    int put_res = evr_stat_and_put(&ctx->c, fs->ref, 0, &blob);
+    if(put_res != evr_ok && put_res != evr_exists){
         goto out;
     }
     fs->size = size;
@@ -981,52 +984,6 @@ int evr_cli_watch_blobs(struct cli_cfg *cfg){
         evr_panic("Unable to close storage connection");
         ret = evr_error;
     }
- out:
-    return ret;
-}
-
-int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob){
-    int ret = evr_error;
-#ifdef EVR_LOG_DEBUG
-    evr_blob_ref_str fmt_key;
-    evr_fmt_blob_ref(fmt_key, key);
-#endif
-    struct evr_resp_header resp;
-    if(evr_req_cmd_stat_blob(c, key, &resp) != evr_ok){
-        goto out;
-    }
-    if(resp.status_code == evr_status_code_ok){
-        log_debug("blob already exists");
-        if(resp.body_size != evr_stat_blob_resp_n_size){
-            goto out;
-        }
-        // TODO update flags in storage if necessary
-        if(dump_n(c, evr_stat_blob_resp_n_size, NULL, NULL) != evr_ok){
-            goto out;
-        }
-        ret = evr_ok;
-        goto out;
-    }
-    if(resp.status_code != evr_status_code_blob_not_found){
-        goto out;
-    }
-    log_debug("Storage indicated blob does not yet exist");
-    if(resp.body_size != 0){
-        goto out;
-    }
-    if(evr_write_cmd_put_blob(c, key, flags, blob->size_used) != evr_ok){
-        goto out;
-    }
-    if(write_chunk_set(c, blob) != evr_ok){
-        goto out;
-    }
-    if(evr_read_resp_header(c, &resp) != evr_ok){
-        goto out;
-    }
-    if(resp.status_code != evr_status_code_ok){
-        goto out;
-    }
-    ret = evr_ok;
  out:
     return ret;
 }

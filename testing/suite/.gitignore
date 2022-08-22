@@ -3,6 +3,9 @@
 evr.conf
 evr-glacier-storage.conf
 evr-attr-index.conf
+glacier-benchmark.conf
 storage
 secondary-storage
 attr-index
+
+*.log

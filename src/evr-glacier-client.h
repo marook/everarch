@@ -50,6 +50,16 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
 
 int evr_fetch_stylesheet(xsltStylesheetPtr *style, struct evr_file *f, evr_blob_ref ref);
 
+/**
+ * evr_stat_and_put checks if the given key exists and puts it if
+ * not. Check and put are not one atomic operation.
+ *
+ * Returns evr_ok if blob did not exist and was put into
+ * storage. Returns evr_exists if stat indicated that the blob already
+ * exists.
+ */
+int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob);
+
 int evr_req_cmd_stat_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_header *resp);
 
 int evr_write_cmd_stat_blob(struct evr_file *f, evr_blob_ref key);

@@ -61,6 +61,13 @@ auth-token=${attr_index_auth_token}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
 EOF
     append_accepted_gpg_keys >> evr-attr-index.conf
+    cat > glacier-benchmark.conf <<EOF
+storage-port=${glacier_storage_port}
+ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
+auth-token=localhost:${glacier_storage_port}:${glacier_storage_auth_token}
+ssl-cert=localhost:${secondary_glacier_storage_port}:${glacier_storage_cert_path}
+auth-token=localhost:${secondary_glacier_storage_port}:${secondary_glacier_storage_auth_token}
+EOF
 }
 
 append_accepted_gpg_keys() {

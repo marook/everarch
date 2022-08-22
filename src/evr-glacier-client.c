@@ -134,6 +134,52 @@ int evr_fetch_stylesheet(xsltStylesheetPtr *style, struct evr_file *f, evr_blob_
     return ret;
 }
 
+int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob){
+    int ret = evr_error;
+#ifdef EVR_LOG_DEBUG
+    evr_blob_ref_str fmt_key;
+    evr_fmt_blob_ref(fmt_key, key);
+#endif
+    struct evr_resp_header resp;
+    if(evr_req_cmd_stat_blob(c, key, &resp) != evr_ok){
+        goto out;
+    }
+    if(resp.status_code == evr_status_code_ok){
+        log_debug("blob already exists");
+        if(resp.body_size != evr_stat_blob_resp_n_size){
+            goto out;
+        }
+        // TODO update flags in storage if necessary
+        if(dump_n(c, evr_stat_blob_resp_n_size, NULL, NULL) != evr_ok){
+            goto out;
+        }
+        ret = evr_exists;
+        goto out;
+    }
+    if(resp.status_code != evr_status_code_blob_not_found){
+        goto out;
+    }
+    log_debug("Storage indicated blob does not yet exist");
+    if(resp.body_size != 0){
+        goto out;
+    }
+    if(evr_write_cmd_put_blob(c, key, flags, blob->size_used) != evr_ok){
+        goto out;
+    }
+    if(write_chunk_set(c, blob) != evr_ok){
+        goto out;
+    }
+    if(evr_read_resp_header(c, &resp) != evr_ok){
+        goto out;
+    }
+    if(resp.status_code != evr_status_code_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
 int evr_req_cmd_stat_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_header *resp){
     if(evr_write_cmd_stat_blob(f, key) != evr_ok){
         return evr_error;

@@ -16,33 +16,10 @@ wpid1=$!
 ( evr watch > /dev/null ) &
 wpid2=$!
 
-put_pids=
-touch running
-put_loops=`grep '^cpu\\scores' '/proc/cpuinfo' | uniq |  awk '{print $4}'`
-put_loops=`expr 20 + ${put_loops}`
-echo "Starting ${put_loops} put loops…"
-i=0
-while [[ $i -lt $put_loops ]]
-do
-    ./put-loop &
-    p=$!
-    put_pids="${put_pids} ${p}"
-    i=`expr -- "${i}" '+' '1'`
-done
-
-echo "Running…"
-sleep 10
-
-echo "Stopping…"
-rm running
+glacier-benchmark > glacier-benchmark.log
 
 kill "${wpid1}"
 kill "${wpid2}"
-
-for pid in $put_pids
-do
-    wait "${pid}" || true
-done
 
 storage_size=`du -hs storage | awk '{print $1}'`
 echo "Produced ${storage_size} storage"

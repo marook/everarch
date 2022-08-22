@@ -17,4 +17,4 @@
 *.trs
 *.o
 *-test
-
+*-benchmark

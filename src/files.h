@@ -72,6 +72,8 @@ struct evr_file {
     /**
      * close must close the underlying file and free resources
      * allocated by ctx.
+     *
+     * Returns zero on success.
      */
     int (*close)(struct evr_file *f);
 

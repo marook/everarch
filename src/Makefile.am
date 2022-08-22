@@ -20,6 +20,7 @@ check_PROGRAMS = \
 	dyn-mem-test \
 	evr-tls-test \
 	files-test \
+	glacier-benchmark \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
@@ -205,6 +206,22 @@ files_test_SOURCES = \
 	files-test.c \
 	logger.c
 files_test_LDADD = $(EVERARCH_LIBS)
+
+glacier_benchmark_SOURCES = \
+	auth.c \
+	basics.c \
+	claims.c \
+	configp.c \
+	dyn-mem.c \
+	evr-glacier-client.c \
+	evr-tls.c \
+	files.c \
+	glacier-benchmark.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c \
+	signatures.c
+glacier_benchmark_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(GCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
 
 glacier_cmd_test_SOURCES = \
 	assert.c \
