@@ -27,10 +27,12 @@
 #include "errors.h"
 #include "logger.h"
 
+#define random_path "/dev/urandom"
+
 void test_read_fd_partial_file(){
     struct dynamic_array *buf = alloc_dynamic_array(1024);
     assert(buf);
-    int f = open("/dev/random", O_RDONLY);
+    int f = open(random_path, O_RDONLY);
     assert(f > -1);
     assert(is_ok(read_fd(&buf, f, 1024)));
     assert(buf);
@@ -85,7 +87,7 @@ void test_rollsum_split_infinite_file(){
     slice_counter = 0;
     small_slices_counter = 0;
     slice_size_sum = 0;
-    int f = open("/dev/random", O_RDONLY);
+    int f = open(random_path, O_RDONLY);
     size_t max_read = 10 << 20;
     assert(is_ok(evr_rollsum_split(f, max_read, visit_slice, NULL)));
     close(f);
