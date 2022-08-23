@@ -18,6 +18,7 @@
 
 (require 'helm)
 (require 'templar)
+(require 'seq)
 (require 'subr-x)
 
 (setq evr--claim-ref-pattern "sha[0-9]+-224-\\([0-9a-z]\\)\\{56\\}-\\([0-9a-f]\\)\\{4\\}")
