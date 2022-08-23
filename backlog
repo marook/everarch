@@ -1,3 +1,9 @@
+* improve query error messages if at least bison 3.6 is available
+bison before 3.6 does not support "%define parse.error
+detailed". that's why everarch right now uses the value "verbose".
+
+the configure script should detect the bison version and use
+"detailed" if at least bison 3.6 is available.
 * switch to mmap/msync for writing bucket files
 and measure the io performance compared to open and fsync.
 * open bucket file descriptor constant for uninitialized
