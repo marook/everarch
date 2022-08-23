@@ -68,9 +68,11 @@ AC_CHECK_FUNCS_ONCE([mkdtemp])
 
 AX_PTHREAD
 
-PKG_CHECK_MODULES([GCRYPT], [
-    libgcrypt
-])
+m4_ifdef([AM_PATH_LIBGCRYPT],[
+    AM_PATH_LIBGCRYPT("1.8.0", , [AC_MSG_ERROR([gcrypt was not found in a sufficient version.])])
+  ],
+  AC_MSG_ERROR([automake gcrypt support is missing.])
+)
 
 PKG_CHECK_MODULES([EVERARCH], [
     sqlite3

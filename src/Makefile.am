@@ -1,5 +1,8 @@
-AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(GCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS)
-BUILT_SOURCES = attr-query-parser.h attr_index_db_test-attr-query-lexer.c evr_attr_index-attr-query-lexer.c
+AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS)
+BUILT_SOURCES = \
+	attr-query-parser.h \
+	attr_index_db_test-attr-query-lexer.c \
+	evr_attr_index-attr-query-lexer.c
 AM_YFLAGS = -d
 
 info_TEXINFOS = evr.texi
@@ -65,7 +68,7 @@ attr_index_db_test_SOURCES = \
 	keys.c \
 	logger.c \
 	subprocess.c
-attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
+attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 auth_test_SOURCES = \
@@ -88,7 +91,7 @@ claims_test_SOURCES = \
 	claims-test.c \
 	keys.c \
 	logger.c
-claims_test_LDADD = $(XML_LIBS) $(GCRYPT_LIBS)
+claims_test_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS)
 
 concurrent_glacier_test_SOURCES = \
 	assert.c \
@@ -137,7 +140,7 @@ evr_attr_index_SOURCES = \
 	server.c \
 	signatures.c \
 	subprocess.c
-evr_attr_index_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
+evr_attr_index_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_SOURCES = \
@@ -155,7 +158,7 @@ evr_SOURCES = \
 	keys.c \
 	logger.c \
 	signatures.c
-evr_LDADD = $(XML_LIBS) $(GCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
+evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	auth.c \
@@ -174,7 +177,7 @@ evr_glacier_storage_SOURCES = \
 	keys.c \
 	logger.c \
 	server.c
-evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS) $(SSL_LIBS)
+evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
 
 evr_glacier_tool_SOURCES = \
 	basics.c \
@@ -186,7 +189,7 @@ evr_glacier_tool_SOURCES = \
 	glacier.c \
 	keys.c \
 	logger.c
-evr_glacier_tool_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+evr_glacier_tool_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 evr_tls_test_SOURCES = \
 	assert.c \
@@ -221,7 +224,7 @@ glacier_benchmark_SOURCES = \
 	keys.c \
 	logger.c \
 	signatures.c
-glacier_benchmark_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(GCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
+glacier_benchmark_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
 
 glacier_cmd_test_SOURCES = \
 	assert.c \
@@ -229,7 +232,7 @@ glacier_cmd_test_SOURCES = \
 	glacier-cmd-test.c \
 	keys.c \
 	logger.c
-glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
@@ -244,14 +247,14 @@ glacier_test_SOURCES = \
 	glacier-test.c \
 	keys.c \
 	logger.c
-glacier_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+glacier_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 keys_test_SOURCES = \
 	assert.c \
 	keys.c \
 	keys-test.c \
 	logger.c
-keys_test_LDADD = $(EVERARCH_LIBS) $(GCRYPT_LIBS)
+keys_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 rollsum_test_SOURCES = \
 	assert.c \
