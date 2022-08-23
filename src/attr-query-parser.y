@@ -46,7 +46,7 @@ void yyerror(struct evr_attr_query_result *res, char const *e){
 
 %define api.push-pull push
 %define api.pure full
-%define parse.error detailed
+%define parse.error verbose
 
 %parse-param {struct evr_attr_query_result *res}
 
