@@ -66,6 +66,15 @@ struct evr_file {
      */
     size_t (*pending)(struct evr_file *f);
 
+    /**
+     * received_shutdown tests and indicates if the peer indicated it
+     * wants to shutdown the connection.
+     *
+     * Returns 0 if shutdown was not indicated. Returns 1 if shutdown
+     * was indicated.
+     */
+    int (*received_shutdown)(struct evr_file *f);
+
     ssize_t (*read)(struct evr_file *f, void *buf, size_t count);
     ssize_t (*write)(struct evr_file *f, const void *buf, size_t count);
 

@@ -305,6 +305,7 @@ int evr_connect(char *host, char *port){
 int evr_file_ssl_get_fd(struct evr_file *f);
 int evr_file_ssl_wait_for_data(struct evr_file *f, int timeout);
 size_t evr_file_ssl_pending(struct evr_file *f);
+int evr_file_ssl_received_shutdown(struct evr_file *f);
 ssize_t evr_file_ssl_read(struct evr_file *f, void *buf, size_t count);
 ssize_t evr_file_ssl_write(struct evr_file *f, const void *buf, size_t count);
 int evr_file_ssl_close(struct evr_file *f);
@@ -314,6 +315,7 @@ void evr_file_bind_ssl(struct evr_file *f, SSL *s){
     f->get_fd = evr_file_ssl_get_fd;
     f->wait_for_data = evr_file_ssl_wait_for_data;
     f->pending = evr_file_ssl_pending;
+    f->received_shutdown = evr_file_ssl_received_shutdown;
     f->read = evr_file_ssl_read;
     f->write = evr_file_ssl_write;
     f->close = evr_file_ssl_close;
@@ -337,6 +339,17 @@ size_t evr_file_ssl_pending(struct evr_file *f){
     return (size_t)SSL_pending(evr_file_get_ssl(f));
 }
 
+int evr_file_ssl_received_shutdown(struct evr_file *f){
+    SSL *ssl = evr_file_get_ssl(f);
+    // the following SSL_peek_ex reads pending SSL signals buffered in
+    // OS.
+    if(evr_file_select(f, 0) == evr_ok){
+        size_t bytesread;
+        SSL_peek_ex(ssl, NULL, 0, &bytesread);
+    }
+    return SSL_get_shutdown(ssl) == SSL_RECEIVED_SHUTDOWN;
+}
+
 ssize_t evr_file_ssl_read(struct evr_file *f, void *buf, size_t count){
     return SSL_read(evr_file_get_ssl(f), buf, count);
 }
@@ -352,7 +365,14 @@ int evr_file_ssl_close(struct evr_file *f){
     }
     int fd = evr_file_ssl_get_fd(f);
     int shutdown_res = SSL_shutdown(ssl);
-    if(shutdown_res < 0){
+    if(shutdown_res == 0){
+        if(SSL_shutdown(ssl) != 1){
+            log_debug("SSL shutdown of socket %d failed with SSL error", fd);
+#ifdef EVR_LOG_DEBUG
+            evr_tls_log_ssl_errors(f, evr_log_level_debug);
+#endif
+        }
+    } else if(shutdown_res != 1){
         log_debug("SSL shutdown of socket %d failed with SSL error", fd);
 #ifdef EVR_LOG_DEBUG
         evr_tls_log_ssl_errors(f, evr_log_level_debug);

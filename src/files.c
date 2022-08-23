@@ -33,6 +33,7 @@
 
 int evr_file_fd_get_fd(struct evr_file *f);
 size_t evr_file_fd_pending(struct evr_file *f);
+int evr_file_fd_received_shutdown(struct evr_file *f);
 ssize_t evr_file_fd_read(struct evr_file *f, void *buf, size_t count);
 ssize_t evr_file_fd_write(struct evr_file *f, const void *buf, size_t count);
 int evr_file_fd_close(struct evr_file *f);
@@ -42,6 +43,7 @@ void evr_file_bind_fd(struct evr_file *f, int fd){
     f->get_fd = evr_file_fd_get_fd;
     f->wait_for_data = evr_file_select;
     f->pending = evr_file_fd_pending;
+    f->received_shutdown = evr_file_fd_received_shutdown;
     f->read = evr_file_fd_read;
     f->write = evr_file_fd_write;
     f->close = evr_file_fd_close;
@@ -62,11 +64,11 @@ int evr_file_select(struct evr_file *f, int timeout){
     FD_ZERO(&active_fd_set);
     FD_SET(fd, &active_fd_set);
     struct timeval tv;
-    if(timeout > 0){
+    if(timeout >= 0){
         tv.tv_sec = timeout;
         tv.tv_usec = 0;
     }
-    int sres = select(fd + 1, &active_fd_set, NULL, NULL, timeout > 0 ? &tv : NULL);
+    int sres = select(fd + 1, &active_fd_set, NULL, NULL, timeout >= 0 ? &tv : NULL);
     if(sres < 0){
         return evr_error;
     }
@@ -77,6 +79,10 @@ int evr_file_select(struct evr_file *f, int timeout){
 }
 
 size_t evr_file_fd_pending(struct evr_file *f){
+    return 0;
+}
+
+int evr_file_fd_received_shutdown(struct evr_file *f){
     return 0;
 }
 

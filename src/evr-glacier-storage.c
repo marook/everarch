@@ -667,6 +667,11 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         }
         struct evr_modified_blob blob;
         while(running){
+            if(ctx->socket.received_shutdown(&ctx->socket) == 1){
+                log_debug("Worker %d retrieved shutdown request from peer", ctx->socket.get_fd(&ctx->socket));
+                ret = evr_ok;
+                goto out_with_unlock_queue;
+            }
             while(running){
                 if(wctx.status != evr_ok){
                     goto out_with_unlock_queue;
