@@ -4,7 +4,13 @@ AC_CONFIG_SRCDIR([src/evr-glacier-storage.c])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC
+
 AC_PROG_LEX
+if test "x$LEX" == "x:"
+then
+  AC_MSG_ERROR(flex was not found.)
+fi
+
 AC_PROG_YACC
 PKG_PROG_PKG_CONFIG
 AM_PATH_PYTHON([3.0])
