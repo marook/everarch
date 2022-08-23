@@ -59,7 +59,9 @@ int evr_sign(char *signing_key_fpr, struct dynamic_array **dest, const char *s){
     if(gpgme_data_new(&out) != GPG_ERR_NO_ERROR){
         goto out_with_release_in;
     }
-    if(gpgme_op_sign(gpg_ctx, in, out, GPGME_SIG_MODE_CLEAR) != GPG_ERR_NO_ERROR){
+    gpgme_error_t sign_res = gpgme_op_sign(gpg_ctx, in, out, GPGME_SIG_MODE_CLEAR);
+    if(sign_res != GPG_ERR_NO_ERROR){
+        log_error("Unable to sign data with key %s: %s", signing_key_fpr, gpgme_strerror(sign_res));
         goto out_with_release_out;
     }
     if(evr_signatures_read_data(dest, out, s_len + 6 * 1024) != evr_ok){
@@ -160,7 +162,7 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
 int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s){
     for(; s; s = s->next){
         if((s->summary & GPGME_SIGSUM_VALID) == 0){
-            log_debug("Invalid signature of key with fingerprint %s found", s->fpr);
+            log_debug("Key with fingerprint %s is not valid for verification. So it is not used despite being required.", s->fpr);
             continue;
         }
         if(bsearch(&s->fpr, ctx->accepted_fprs, ctx->accepted_fprs_len, sizeof(*ctx->accepted_fprs), (int (*)(const void *l, const void *r))evr_strpcmp) == NULL){
