@@ -70,6 +70,11 @@ A detailed manual can be found in src/evr.texi.
 ------------------------------------------------------------------------
 Tests
 
+Executing the tests requires a GPG key usable for signing. If you
+don't have one it can be created using:
+
+$ gpg --gen-key
+
 Execute the following to run the whole test suite with unit and
 integration tests:
 
