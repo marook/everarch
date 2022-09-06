@@ -41,6 +41,16 @@ int evr_make_tcp_socket(char *host, char *port){
         return -1;
     }
     for(struct addrinfo *p = result; p != NULL; p = p->ai_next){
+#ifdef EVR_LOG_DEBUG
+        char num_addr[128];
+        char num_port[16];
+        if(getnameinfo(p->ai_addr, p->ai_addrlen, num_addr, sizeof(num_addr), num_port, sizeof(num_port), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
+            evr_panic("Unable to format numeric address for %s", host);
+            freeaddrinfo(result);
+            return -1;
+        }
+        log_debug("Trying address %s with port %s for server", num_addr, num_port);
+#endif
         int s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if(s == -1){
             continue;
