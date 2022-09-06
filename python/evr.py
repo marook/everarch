@@ -17,10 +17,12 @@
 # evr.py is a wrapper around the evr command line interface for more
 # python convenience.
 #
-# Provided functions you might care about are get_blob, get_verify and
-# watch.
+# Provided functions you might care about are get_blob, get_verify,
+# post_file and watch.
 
 import subprocess
+
+default_encoding = 'UTF-8'
 
 def get_blob(ref):
     """get_blob is a wrapper around 'evr get' shell command.
@@ -44,6 +46,14 @@ doc = et.fromstringlist(evr.get_verify('sha3-224-9a974826c9b0b66aff5205db87956f3
     """
     args = ['evr', 'get-verify', ref]
     return _evr(args)
+
+def post_file(path):
+    """post_file is a wrapper arount 'evr post-file' shell command.
+
+post_file returns the posted file's claim ref.
+"""
+    args = ['evr', 'post-file', path]
+    return next(_evr(args, encoding=default_encoding)).strip()
 
 class ModifiedBlob(object):
     def __init__(self, seed_ref, last_modified, watch_flags):
@@ -69,7 +79,7 @@ flags and last_modified_after are expected to be integers.
         args += ['--last-modified-after', str(last_modified_after)]
     if blobs_sort_order is not None:
         args += ['--blobs-sort-order', blobs_sort_order]
-    for line in _evr(args, encoding='UTF-8'):
+    for line in _evr(args, encoding=default_encoding):
         seed_ref, last_modified, watch_flags = line.split(' ')
         yield ModifiedBlob(seed_ref, int(last_modified), int(watch_flags))
 
