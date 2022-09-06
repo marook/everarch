@@ -118,6 +118,7 @@ wait_for_attr_index() {
 
 query_attr_index() {
     query="$1"
+    echo "Execute test query on evr-attr-index: ${query}" >&2
     socat ${socat_opts} "openssl:localhost:${attr_index_port},cafile=${attr_index_cert_path}" stdio <<EOF
 a token ${attr_index_auth_token}
 ${query}
@@ -130,7 +131,7 @@ wait_for_port() {
     sleep 0.1
     while true
     do
-        nc -q 0 localhost "${port}" < /dev/null && break
+        nc ${nc_opts} -q 0 localhost "${port}" < /dev/null && break
         echo "Waiting for port ${port}…"
         sleep 0.2
     done
@@ -138,7 +139,7 @@ wait_for_port() {
 
 ensure_port_available() {
     port="$1"
-    nc -z localhost "${port}" && occupied=1 || occupied=0
+    nc ${nc_opts} -z localhost "${port}" && occupied=1 || occupied=0
     if [[ "${occupied}" == '1' ]]
     then
         echo "Port ${port} is not available for integration test. Aborting." >&2
