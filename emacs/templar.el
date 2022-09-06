@@ -175,12 +175,13 @@ which is applied to the variable value before it is inserted. Use
       vars)
      nil)))
 
-(defun templar-if (key predicate body)
+(defun templar-if (key predicate then &optional else)
   (lambda (vars)
     (let ((var (assoc-string key vars)))
       (if var
           (if (funcall predicate (cdr var))
-              (list vars body))
+              (list vars then)
+            (when else (list vars else)))
         (error "No templar variable with name '%s' exists" key)))))
 
 (provide 'templar)
