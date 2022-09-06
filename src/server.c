@@ -48,6 +48,7 @@ int evr_make_tcp_socket(char *host, char *port){
         int enable = 1;
         if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
             close(s);
+            freeaddrinfo(result);
             return -1;
         }
         if(bind(s, p->ai_addr, p->ai_addrlen) < 0){
