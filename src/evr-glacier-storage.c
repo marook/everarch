@@ -723,7 +723,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
             time_t t;
             time(&t);
             struct timespec timeout;
-            timeout.tv_sec = t + 10;
+            timeout.tv_sec = t + 1;
             timeout.tv_nsec = 0;
             // cnd_timedwait returns an error either if a timeout is met
             // or another error occured. so we don't check the error

@@ -367,13 +367,13 @@ int evr_file_ssl_close(struct evr_file *f){
     int shutdown_res = SSL_shutdown(ssl);
     if(shutdown_res == 0){
         if(SSL_shutdown(ssl) != 1){
-            log_debug("SSL shutdown of socket %d failed with SSL error", fd);
+            log_debug("Second SSL shutdown of socket %d failed with SSL error", fd);
 #ifdef EVR_LOG_DEBUG
             evr_tls_log_ssl_errors(f, evr_log_level_debug);
 #endif
         }
     } else if(shutdown_res != 1){
-        log_debug("SSL shutdown of socket %d failed with SSL error", fd);
+        log_debug("First SSL shutdown of socket %d failed with SSL error %d", fd, shutdown_res);
 #ifdef EVR_LOG_DEBUG
         evr_tls_log_ssl_errors(f, evr_log_level_debug);
 #endif
