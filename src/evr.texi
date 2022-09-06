@@ -35,6 +35,7 @@ archive.
 * Overview::   Explains what everarch is about.
 * Storing Data:: How is everarch storing data?
 * The Everarch Applications:: Lists the applications bundled with everarch.
+* Getting started:: How to setup everarch.
 * Claims::     Details about the central data structure in everarch.
 * evr-attr-index::  How indexing and finding claims works.
 * Query Language::  Explains the claim query language.
@@ -133,9 +134,108 @@ blob's content. So blobs with the same content always have the same
 reference. A blob reference might be
 sha3-224-00000000000000000000000000000000000000000000000000000000.
 
+@note Getting started
+@chapter Getting started
+
+This chapter guides through the steps of setting up everarch on one
+host for one user. It assumes everarch has already been installed on
+the host.
+
+Claims are signed using GPG. So having a valid GPG key is
+mandatory. Everarch can only handle GPG keys without a password for
+now. If you already have a personal GPG key it is recommended to use
+it. If no GPG key exists a new one can be created by calling the
+following command:
+
+@example
+$ gpg --gen-key
+@end example
+
+The GPG wizzard will guide you through the process of creating a new
+key.
+
+The everarch servers require some configuration. This guide will
+quickly step over the most important configuration options. More help
+on possible configuration options may be available by calling for
+example evr-glacier-storage with the --help argument. Every argument
+may also be a configuration file option. Just leave the -- prefix away
+in the configuration file.
+
+The configuration is placed in the directory ~/.config/everarch. You
+should make sure ~/.config/everarch is only readable by your user
+because it will contain secret authentication and encryption
+information.
+
+The network communication between the everarch applications is
+encrypted using TLS. TLS requires a public and private key pair which
+can be generated using the openssl application:
+
+@example
+$ cd ~/.config/everarch
+$ openssl req -newkey rsa:4096 -x509 -sha512 -nodes -days 712 \
+    -out evr-glacier-storage-cert.pem -keyout evr-glacier-storage-key.pem
+$ openssl req -newkey rsa:4096 -x509 -sha512 -nodes -days 712 \
+    -out evr-attr-index-cert.pem -keyout evr-attr-index-key.pem
+@end example
+
+Then create the file ~/.config/everarch/evr-glacier-storage.conf. Copy
+the following content into it:
+
+@example
+auth-token=<change this>
+cert=/path/to/.config/everarch/evr-glacier-storage-cert.pem
+key=/path/to/.config/everarch/evr-glacier-storage-key.pem
+@end example
+
+The auth-token is a shared secret which clients of evr-glacier-storage
+must provide. It must be a 64 characters string made of 0-9 and a-f
+characters. openssl can be used to generate such a random string:
+
+@example
+$ openssl rand -hex 32
+@end example
+
+cert and key must point to the formerly generate TLS
+certificates. Adjust the path accordingly.
+
+The evr client applications has it's configuration file at
+~/.config/everarch/evr.conf. Put the following content into it:
+
+@example
+auth-token=localhost:2361:<change this>
+ssl-cert=localhost:2361:/path/to/.config/everarch/evr-glacier-storage-cert.pem
+@example end
+
+Change the auth-token option so it uses the same string as in the
+evr-glacier-storage.conf file. Also adjust the path for ssl-cert so it
+matches the one on your host.
+
+TODO create configuration file for evr-attr-index
+
+The everarch servers will only start if their data directories
+exist. Create them:
+
+@example
+$ mkdir -p ~/var/everarch/glacier ~/var/everarch/attr-index
+@end example
+
+systemd is one option to start the everarch daemons. For normal
+operation the evr-glacier-storage and evr-attr-index daemons must be
+running.
+
+Create a systemd user configuration for the evr-glacier-storage
+server. It should be placed in
+~/.config/systemd/user/evr-glacier-storage.service. The everarch git
+repository contains an example evr-glacier-storage.service file within
+the etc/systemd/user directory. Make sure the ExecStart property
+points to the evr-glacier-storage binary on your host.
+
+evr-attr-index requires a separate systemd configuration. Perform the
+same steps as just done for the evr-glacier-storage configuration.
+
 @node Claims
 @chapter Claims
-Claims are PGP signed XML documents which contain claim-set root
+Claims are GPG signed XML documents which contain claim-set root
 elements. An example claim-set may be:
 
 @example
