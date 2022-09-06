@@ -48,12 +48,26 @@ doc = et.fromstringlist(evr.get_verify('sha3-224-9a974826c9b0b66aff5205db87956f3
     return _evr(args)
 
 def post_file(path):
-    """post_file is a wrapper arount 'evr post-file' shell command.
+    """post_file is a wrapper around 'evr post-file' shell command.
 
 post_file returns the posted file's claim ref.
 """
     args = ['evr', 'post-file', path]
-    return next(_evr(args, encoding=default_encoding)).strip()
+    return _read_ref(_evr(args, encoding=default_encoding))
+
+def sign_put(data, flags=None):
+    """sign_put is a wrapper around 'evr sign-put' shell command.
+
+sign_put expects data string to be the signed and put buffer. The put
+blob's ref is returned.
+    """
+    args = ['evr', 'sign-put']
+    if flags is not None:
+        args += ['-f', flags]
+    return _read_ref(_evr(args, send=data, encoding=default_encoding))
+
+def _read_ref(lines):
+    return next(lines).strip()
 
 class ModifiedBlob(object):
     def __init__(self, seed_ref, last_modified, watch_flags):
@@ -83,7 +97,11 @@ flags and last_modified_after are expected to be integers.
         seed_ref, last_modified, watch_flags = line.split(' ')
         yield ModifiedBlob(seed_ref, int(last_modified), int(watch_flags))
 
-def _evr(args, encoding=None):
-    with subprocess.Popen(args, stdout=subprocess.PIPE, encoding=encoding) as p:
+def _evr(args, send=None, encoding=None):
+    stdin = None if send is None else subprocess.PIPE
+    with subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, encoding=encoding) as p:
+        if send is not None:
+            p.stdin.write(send)
+            p.stdin.close()
         for chunk in p.stdout:
             yield chunk
