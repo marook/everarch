@@ -1,3 +1,10 @@
+* evr --version should report bugfix version
+right now evr --version prints 'evr 0.1'. the bugfix version should
+also be printed. for example 0.1.0.
+* evr-glacier-storage --bucket-dir-path should be renamed
+probably to --bucket-dir to be consistent with cert and key.
+* evr-glacier-storage --help does not mention default bucket dir path
+* complete the 'getting started' in evr.texi
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".
