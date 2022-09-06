@@ -134,7 +134,7 @@ blob's content. So blobs with the same content always have the same
 reference. A blob reference might be
 sha3-224-00000000000000000000000000000000000000000000000000000000.
 
-@note Getting started
+@node Getting started
 @chapter Getting started
 
 This chapter guides through the steps of setting up everarch on one
@@ -204,7 +204,7 @@ The evr client applications has it's configuration file at
 @example
 auth-token=localhost:2361:<change this>
 ssl-cert=localhost:2361:/path/to/.config/everarch/evr-glacier-storage-cert.pem
-@example end
+@end example
 
 Change the auth-token option so it uses the same string as in the
 evr-glacier-storage.conf file. Also adjust the path for ssl-cert so it
