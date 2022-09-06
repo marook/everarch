@@ -11,7 +11,7 @@ trap stop_everarch_servers EXIT
 # should terminate.
 timeout_ret=0
 timeout 10s evr-attr-index || timeout_ret=$?
-echo "timeout status ${timeout_ret}"
+# timeout_status 124 indicates a timeout
 if [[ "${timeout_status}" == "124" ]]
 then
     echo "evr-attr-index did not terminate with missing evr-glacier-storage" >&2
