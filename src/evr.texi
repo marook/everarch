@@ -210,6 +210,18 @@ Change the auth-token option so it uses the same string as in the
 evr-glacier-storage.conf file. Also adjust the path for ssl-cert so it
 matches the one on your host.
 
+Create the file ~/.config/everarch/evr-attr-index.conf for the
+evr-attr-index server. Use the following content:
+
+@example
+auth-token=<change this>
+storage-auth-token=<change this>
+accepted-gpg-key=<change this>
+cert=/path/to/.config/everarch/evr-attr-index-cert.pem
+key=/path/to/.config/everarch/evr-attr-index-key.pem
+ssl-cert=localhost:2361:/path/to/.config/everarch/evr-glacier-storage-cert.pem
+@end example
+
 TODO create configuration file for evr-attr-index
 
 The everarch servers will only start if their data directories
