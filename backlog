@@ -1,12 +1,3 @@
-* claim without created date attribute terminates evr-attr-index
-#+BEGIN_SRC
-iI Listening on localhost:2562
-iI Checking index claim sha3-224-971acd98fc6c276acff41eaaa677c6fce7f44dfd3f203750e0a452b2 for attr-spec
-iI Start building attr index for sha3-224-971acd98fc6c276acff41eaaa677c6fce7f44dfd3f203750e0a452b2
-iE Failed to parse created date from claim-set within blob ref sha3-224-2c40648d65238edd606991cc045964435a>
-iE Failed building attr index for sha3-224-971acd98fc6c276acff41eaaa677c6fce7f44dfd3f203750e0a452b2
-iP Ended build index worker with result 1
-#+END_SRC
 * evr --version should report bugfix version
 right now evr --version prints 'evr 0.1'. the bugfix version should
 also be printed. for example 0.1.0.

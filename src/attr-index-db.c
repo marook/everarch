@@ -437,14 +437,15 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     if(!cs_node){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("No claim-set found in blob with ref %s", ref_str);
+        log_error("No claim set found in blob with ref %s", ref_str);
         goto out;
     }
     evr_time created;
     if(evr_parse_created(&created, cs_node) != evr_ok){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("Failed to parse created date from claim-set within blob ref %s", ref_str);
+        log_error("Failed to parse created date from claim set within blob ref %s", ref_str);
+        ret = evr_user_data_invalid;
         goto out;
     }
     if(sqlite3_bind_blob(db->insert_claim_set, 1, claim_set_ref, evr_blob_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
@@ -519,7 +520,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     };
     xmlDocPtr claim_set_doc = xsltApplyStylesheet(style, raw_claim_set_doc, xslt_params);
     if(!claim_set_doc){
-        evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to transform claim-set using XSLT stylesheet.");
+        evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to transform claim set using XSLT stylesheet.");
         goto out_with_reset_insert_claim_set;
     }
     cs_node = evr_get_root_claim_set(claim_set_doc);
@@ -531,7 +532,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             log_info("Transformed claim set blob %s does not contain claim-set element", ref_str);
         }
 #endif
-        evr_log_failed_claim_set_doc(db, claim_set_ref, claim_set_doc, "No claim-set element found in transformed claim-set.");
+        evr_log_failed_claim_set_doc(db, claim_set_ref, claim_set_doc, "No claim-set element found in transformed claim set.");
         ret = evr_ok;
         goto out_with_free_claim_set_doc;
     }

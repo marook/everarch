@@ -86,8 +86,9 @@ test_ref=`evr -f 1 sign-put < attr-claim-1.xml`
 test2_ref=`evr -f 1 sign-put < attr-claim-2.xml`
 evr -f 1 sign-put < attr-claim-future.xml
 
-# upload a broken claim-set. should be ignored by evr-attr-index.
+# upload a broken claim-sets. should be ignored by evr-attr-index.
 evr -f 1 sign-put < broken-claim.xml
+evr -f 1 sign-put < no-created-claim-set.xml
 
 start_attr_index
 wait_for_attr_index

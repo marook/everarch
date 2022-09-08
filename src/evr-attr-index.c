@@ -558,7 +558,7 @@ int evr_watch_index_claims_worker(void *arg){
         if(evr_parse_created(&created, cs_node) != evr_ok){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
-            log_error("Failed to parse created date from claim-set for blob key %s", fmt_key);
+            log_error("Failed to parse created date from index claim-set for blob ref %s", fmt_key);
             goto out_with_free_claim_doc;
         }
         if(latest_spec == NULL || created > latest_spec_created){
@@ -830,18 +830,25 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
     if(fetch_res == evr_user_data_invalid){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("Claim set with blob key %s has invalid XML syntax. Ignoring it.", ref_str);
+        log_error("Claim set with blob ref %s has invalid XML syntax. Ignoring it.", ref_str);
         ret = evr_ok;
         goto out;
     } else if(fetch_res != evr_ok){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("Claim set not fetchable for blob key %s", ref_str);
+        log_error("Claim set not fetchable for blob ref %s", ref_str);
         goto out;
     }
     evr_time t;
     evr_now(&t);
-    if(evr_merge_attr_index_claim_set(db, spec, style, t, claim_set_ref, claim_set, 0) != evr_ok){
+    int merge_res = evr_merge_attr_index_claim_set(db, spec, style, t, claim_set_ref, claim_set, 0);
+    if(merge_res == evr_user_data_invalid){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, claim_set_ref);
+        log_error("Claim set with blob ref %s is invalid. Ignoring it.", ref_str);
+        ret = evr_ok;
+        goto out;
+    } else if(merge_res != evr_ok){
         goto out_with_free_claim_set;
     }
     if(evr_attr_index_set_state(db, evr_state_key_last_indexed_claim_ts, claim_set_last_modified) != evr_ok){
