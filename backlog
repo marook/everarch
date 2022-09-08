@@ -1,18 +1,50 @@
+* claim without created date attribute terminates evr-attr-index
+#+BEGIN_SRC
+iI Listening on localhost:2562
+iI Checking index claim sha3-224-971acd98fc6c276acff41eaaa677c6fce7f44dfd3f203750e0a452b2 for attr-spec
+iI Start building attr index for sha3-224-971acd98fc6c276acff41eaaa677c6fce7f44dfd3f203750e0a452b2
+iE Failed to parse created date from claim-set within blob ref sha3-224-2c40648d65238edd606991cc045964435a>
+iE Failed building attr index for sha3-224-971acd98fc6c276acff41eaaa677c6fce7f44dfd3f203750e0a452b2
+iP Ended build index worker with result 1
+#+END_SRC
 * evr --version should report bugfix version
 right now evr --version prints 'evr 0.1'. the bugfix version should
 also be printed. for example 0.1.0.
 * evr-glacier-storage --bucket-dir-path should be renamed
 probably to --bucket-dir to be consistent with cert and key.
+* evr-attr-index --state-dir-path should be renamed
+probably to --state-dir to be consistent with cert and key.
 * evr-glacier-storage --help does not mention default bucket dir path
 * complete the 'getting started' in evr.texi
+* add evr-attr-index seed-description command
+returns all claim-sets for on seed grouped in one seed-description
+parent element.
+* add evr-attr-index watch command
+it should watch for changes on the index. the response of the watch
+should be the index ref followed by the changed seed ref, followed by
+the timestamp of the last indexed claim. the timestamp of the last
+indexed claim is already stored in the evr-attr-index index.db as
+evr_state_key_last_indexed_claim_ts.
+* implement evr-attr-index-client.[hc]
+the commands supported by the client library should be authenticate,
+search and watch.
+* implement evr-fs
+evr-fs should be a user space file system which provides access to
+files stored in everarch.
+
+usage should be like:
+
+#+BEGIN_SRC
+$ evr-fs mount/point
+#+END_SRC
+
+evr-fs should watch the evr-attr-index.
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".
 
 the configure script should detect the bison version and use
 "detailed" if at least bison 3.6 is available.
-* switch to mmap/msync for writing bucket files
-and measure the io performance compared to open and fsync.
 * open bucket file descriptor constant for uninitialized
 glacier opens bucket files in a lazy way. the value for identifiying a
 not yet opened bucket file should be a constant instead of just -1.
@@ -203,6 +235,8 @@ descriptor using writev.
 
 ** TODO struct evr_auth_token_cfg should use the linked list
 ** TODO struct evr_cert_cfg should use the linked list
+* switch to mmap/msync for writing bucket files
+and measure the io performance compared to open and fsync.
 * add quic support
 in order to get faster connection building and encryption.
 
