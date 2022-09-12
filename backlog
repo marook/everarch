@@ -1,6 +1,3 @@
-* evr --version should report bugfix version
-right now evr --version prints 'evr 0.1'. the bugfix version should
-also be printed. for example 0.1.0.
 * evr-glacier-storage --bucket-dir-path should be renamed
 probably to --bucket-dir to be consistent with cert and key.
 * evr-attr-index --state-dir-path should be renamed

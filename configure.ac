@@ -1,4 +1,4 @@
-AC_INIT([everarch], [0.1], [markus.peroebner@gmail.com])
+AC_INIT([everarch], [0.1.0], [markus.peroebner@gmail.com])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/evr-glacier-storage.c])
 AC_CONFIG_MACRO_DIR([m4])
