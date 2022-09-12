@@ -183,8 +183,9 @@ the following content into it:
 
 @example
 auth-token=<change this>
-cert=/path/to/.config/everarch/evr-glacier-storage-cert.pem
-key=/path/to/.config/everarch/evr-glacier-storage-key.pem
+bucket-dir=~/var/everarch/glacier
+cert=~/.config/everarch/evr-glacier-storage-cert.pem
+key=~/.config/everarch/evr-glacier-storage-key.pem
 @end example
 
 The auth-token is a shared secret which clients of evr-glacier-storage
@@ -217,12 +218,28 @@ evr-attr-index server. Use the following content:
 auth-token=<change this>
 storage-auth-token=<change this>
 accepted-gpg-key=<change this>
-cert=/path/to/.config/everarch/evr-attr-index-cert.pem
-key=/path/to/.config/everarch/evr-attr-index-key.pem
-ssl-cert=localhost:2361:/path/to/.config/everarch/evr-glacier-storage-cert.pem
+state-dir=~/var/everarch/evr-attr-index
+cert=~/.config/everarch/evr-attr-index-cert.pem
+key=~/.config/everarch/evr-attr-index-key.pem
+ssl-cert=localhost:2361:~/.config/everarch/evr-glacier-storage-cert.pem
 @end example
 
-TODO create configuration file for evr-attr-index
+Generate another auth-token just like before for the
+evr-glacier-storage.conf file.
+
+The storage-auth-token must be exactly the same value as from the
+evr-glacier-storage.conf's auth-token property.
+
+The accepted-gpg-key must be the fingerprint of the gpg key you
+initially generated. A list of all available gpg keys can be obtained
+via the following command:
+
+@example
+$ gpg --list-public-keys
+@end example
+
+Adjust the TLS paths with the cert, key and ssl-cert attributes to
+point to the formerly generated certificates.
 
 The everarch servers will only start if their data directories
 exist. Create them:
@@ -244,6 +261,14 @@ points to the evr-glacier-storage binary on your host.
 
 evr-attr-index requires a separate systemd configuration. Perform the
 same steps as just done for the evr-glacier-storage configuration.
+
+Now you should be able to start the evr-glacier-storage and
+evr-attr-index servers:
+
+@example
+$ systemctl start evr-glacier-storage
+$ systemctl start evr-attr-index
+@end example
 
 @node Claims
 @chapter Claims
