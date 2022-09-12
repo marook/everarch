@@ -55,9 +55,10 @@ static char doc[] = program_name " is a content addressable storage server.";
 
 static char args_doc[] = "";
 
-#define default_host "localhost"
-#define default_ssl_cert_path EVR_PREFIX "/etc/everarch/glacier-cert.pem"
-#define default_ssl_key_path EVR_PREFIX "/etc/everarch/glacier-key.pem"
+#define default_bucket_dir_path EVR_PREFIX "/var/everarch/" program_name
+#define default_host evr_glacier_storage_host
+#define default_ssl_cert_path default_storage_ssl_cert_path
+#define default_ssl_key_path EVR_PREFIX "/etc/everarch/" program_name "-key.pem"
 
 #define arg_host 256
 #define arg_ssl_cert_path 257
@@ -224,7 +225,7 @@ int evr_load_glacier_storage_cfg(int argc, char **argv){
     cfg->auth_token_set = 0;
     memset(cfg->auth_token, 0, sizeof(cfg->auth_token));
     cfg->max_bucket_size = 1024 << 20;
-    cfg->bucket_dir_path = strdup("~/var/everarch/glacier");
+    cfg->bucket_dir_path = strdup(default_bucket_dir_path);
     if(!cfg->host || !cfg->port || !cfg->bucket_dir_path){
         evr_panic("Unable to allocate memory for configuration");
         return evr_error;

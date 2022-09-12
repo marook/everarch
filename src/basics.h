@@ -46,7 +46,7 @@
 
 #define evr_glacier_storage_host "localhost"
 #define evr_glacier_storage_port 2361
-#define default_storage_ssl_cert_path EVR_PREFIX "/etc/everarch/glacier-cert.pem"
+#define default_storage_ssl_cert_path EVR_PREFIX "/etc/everarch/evr-glacier-storage-cert.pem"
 
 #define evr_glacier_attr_index_port 2362
 
@@ -230,9 +230,10 @@ int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep);
 
 int evr_strpcmp(char **l, char **r);
 
-#define evr_program_config_paths() {                \
-        program_name ".conf",                       \
-        "~/.config/everarch/" program_name ".conf", \
-        "/etc/everarch/" program_name ".conf",      \
-        NULL,                                       \
+#define evr_program_config_paths() {                       \
+        program_name ".conf",                              \
+        "~/.config/everarch/" program_name ".conf",        \
+        EVR_PREFIX "/etc/everarch/" program_name ".conf",  \
+        "/etc/everarch/" program_name ".conf",             \
+        NULL,                                              \
 }

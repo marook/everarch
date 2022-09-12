@@ -50,10 +50,10 @@ static char doc[] = program_name " provides an index over a evr-glacier-storage 
 
 static char args_doc[] = "";
 
-#define default_state_dir_path EVR_PREFIX "/var/everarch/attr-index"
+#define default_state_dir_path EVR_PREFIX "/var/everarch/" program_name
 #define default_host "localhost"
-#define default_ssl_cert_path EVR_PREFIX "/etc/everarch/attr-index-cert.pem"
-#define default_ssl_key_path EVR_PREFIX "/etc/everarch/attr-index-key.pem"
+#define default_ssl_cert_path EVR_PREFIX "/etc/everarch/" program_name "-cert.pem"
+#define default_ssl_key_path EVR_PREFIX "/etc/everarch/" program_name "-key.pem"
 
 #define arg_host 256
 #define arg_storage_host 257
