@@ -1,6 +1,4 @@
 * complete the 'getting started' in evr.texi
-* skeleton evr-fs which can be mounted and shows empty directory
-use hello_ll.c from libfuse examples as inspiration.
 * define evr-fs files and directories data structure
 there should be a struct evr_fs_nodes which contains file system
 nodes. node must be lookupable in O(1) via fuse_ino_t inodes. a file

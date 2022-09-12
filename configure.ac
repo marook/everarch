@@ -84,6 +84,9 @@ PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9])
 PKG_CHECK_MODULES([XSLT], [libxslt >= 1.1])
 PKG_CHECK_MODULES([SSL], [libssl >= 1.1 libcrypto >= 1.1])
 
+AC_DEFINE(FUSE_USE_VERSION, 34, Fuse target API version.)
+PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0])
+
 AM_PATH_LISPDIR()
 
 AC_CONFIG_HEADERS([config.h])

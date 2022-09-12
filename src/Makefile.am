@@ -1,4 +1,4 @@
-AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS)
+AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS)
 BUILT_SOURCES = \
 	attr-query-parser.h \
 	attr_index_db_test-attr-query-lexer.c \
@@ -10,6 +10,7 @@ info_TEXINFOS = evr.texi
 bin_PROGRAMS = \
 	evr-attr-index \
 	evr \
+	evr-fs \
 	evr-glacier-storage \
 	evr-glacier-tool
 
@@ -159,6 +160,12 @@ evr_SOURCES = \
 	logger.c \
 	signatures.c
 evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
+
+evr_fs_SOURCES = \
+	configp.c \
+	evr-fs.c \
+	logger.c
+evr_fs_LDADD = $(FUSE_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	auth.c \
