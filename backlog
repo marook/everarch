@@ -1,21 +1,45 @@
-* evr-glacier-storage --bucket-dir-path should be renamed
-probably to --bucket-dir to be consistent with cert and key.
-* evr-attr-index --state-dir-path should be renamed
-probably to --state-dir to be consistent with cert and key.
-* evr-glacier-storage --help does not mention default bucket dir path
 * complete the 'getting started' in evr.texi
-* add evr-attr-index seed-description command
-returns all claim-sets for on seed grouped in one seed-description
-parent element.
+* skeleton evr-fs which can be mounted and shows empty directory
+use hello_ll.c from libfuse examples as inspiration.
+* define evr-fs files and directories data structure
+there should be a struct evr_fs_nodes which contains file system
+nodes. node must be lookupable in O(1) via fuse_ino_t inodes. a file
+node must hold it's creation timestamp, ref and seed ref.
+
+a file node must hold it's file size.
+
+file nodes can point to a a struct evr_file_claim. the pointer is
+assigned when the file is opened. the file node has an open reference
+counter. an open reference counter of 0 will free the pointer.
+
+a directory node must reference it's child inodes.
+
+a node must be findable via it's seed ref at or below O(n).
+
+a directory or file must be findable via path string at or below O(n).
+
+nodes should be add- and removeable via functions.
 * add evr-attr-index watch command
 it should watch for changes on the index. the response of the watch
 should be the index ref followed by the changed seed ref, followed by
 the timestamp of the last indexed claim. the timestamp of the last
 indexed claim is already stored in the evr-attr-index index.db as
 evr_state_key_last_indexed_claim_ts.
+* build seed-description XML
+puts all claim-sets for one seed grouped in one seed-description
+parent element.
 * implement evr-attr-index-client.[hc]
 the commands supported by the client library should be authenticate,
-search and watch.
+search, seed-description and watch.
+* implement struct + parser for file-set claims
+probably in claims.[hc]
+
+an evr-fs file set may look like this:
+#+BEGIN_SRC xml
+<evr:file-set>
+  <evr:file path="path/to/file.name" file-claim="sha3-224-123-0000"/>
+</evr:file-set>
+#+END_SRC
 * implement evr-fs
 evr-fs should be a user space file system which provides access to
 files stored in everarch.
@@ -23,10 +47,14 @@ files stored in everarch.
 usage should be like:
 
 #+BEGIN_SRC
-$ evr-fs mount/point
+$ evr-fs blob:sha3-224-dirs-files-xslt mount/point
 #+END_SRC
 
-evr-fs should watch the evr-attr-index.
+the first argument is a reference to the xslt stylesheet used for
+transforming a seed-description into a evr-fs file set.
+
+evr-fs should watch the evr-attr-index and update it's file system
+representation on evr-attr-index changes.
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".

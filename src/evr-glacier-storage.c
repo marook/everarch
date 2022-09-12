@@ -71,7 +71,7 @@ static struct argp_option options[] = {
     {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
     {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
     // TODO max-bucket-size
-    {"bucket-dir-path", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted."},
+    {"bucket-dir", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted. Default path is " default_bucket_dir_path "."},
     {0},
 };
 

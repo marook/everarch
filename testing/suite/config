@@ -48,10 +48,10 @@ port=${glacier_storage_port}
 cert=${glacier_storage_cert_path}
 key=${script_dir}/../tls/glacier-key.pem
 auth-token=${glacier_storage_auth_token}
-bucket-dir-path=${glacier_storage_bucket_dir}
+bucket-dir=${glacier_storage_bucket_dir}
 EOF
     cat > evr-attr-index.conf <<EOF
-state-dir-path=${attr_index_state_dir}
+state-dir=${attr_index_state_dir}
 port=${attr_index_port}
 storage-port=${glacier_storage_port}
 storage-auth-token=${glacier_storage_auth_token}
@@ -93,7 +93,7 @@ start_secondary_glacier_storage() {
     rm -rf -- "${secondary_glacier_storage_bucket_dir}"
     mkdir -- "${secondary_glacier_storage_bucket_dir}"
     echo "Starting secondary evr-glacier-storage…"
-    evr-glacier-storage --port "${secondary_glacier_storage_port}" --auth-token "${secondary_glacier_storage_auth_token}" --bucket-dir-path "${secondary_glacier_storage_bucket_dir}" &
+    evr-glacier-storage --port "${secondary_glacier_storage_port}" --auth-token "${secondary_glacier_storage_auth_token}" --bucket-dir "${secondary_glacier_storage_bucket_dir}" &
     secondary_glacier_storage_pid=$!
 }
 
