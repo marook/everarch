@@ -1,4 +1,3 @@
-* complete the 'getting started' in evr.texi
 * define evr-fs files and directories data structure
 there should be a struct evr_fs_nodes which contains file system
 nodes. node must be lookupable in O(1) via fuse_ino_t inodes. a file
@@ -92,9 +91,6 @@ transformation.
 
 index-seed must be provided by transformation.
 ** describe how seed and index-seed must be handled in transformations
-* implement an evr-glacier-storage blob put/get benchmark
-should connect via network socket. send lots of blobs. request lots of
-blobs. count blobs per second. maybe different blob sizes etc.
 * reserve keywords in attr-query language
 right now there are some keywords in attr-query language like for
 example 'ref'. think about future keywords and reserve them so nobody
