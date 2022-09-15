@@ -24,6 +24,7 @@ check_PROGRAMS = \
 	dyn-mem-test \
 	evr-tls-test \
 	files-test \
+	fs-inode-test \
 	glacier-benchmark \
 	glacier-cmd-test \
 	glacier-test \
@@ -37,11 +38,12 @@ TESTS = \
 	auth-test \
 	basics-test \
 	claims-test \
-	configp-test \
 	concurrent-glacier-test \
+	configp-test \
 	dyn-mem-test \
 	evr-tls-test \
 	files-test \
+	fs-inode-test \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
@@ -216,6 +218,13 @@ files_test_SOURCES = \
 	files-test.c \
 	logger.c
 files_test_LDADD = $(EVERARCH_LIBS)
+
+fs_inode_test_SOURCES = \
+	assert.c \
+	basics.c \
+	fs-inode.c \
+	fs-inode-test.c \
+	logger.c
 
 glacier_benchmark_SOURCES = \
 	auth.c \

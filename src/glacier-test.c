@@ -178,8 +178,8 @@ void test_evr_glacier_write_smal_blobs(){
         };
         visit_blobs(read_ctx, &filter, &visit_ctx);
         assert(visit_ctx.visited_keys_len == 2);
-        assert(memcmp(visited_keys[0], second_key, evr_blob_ref_size) == 0);
-        assert(memcmp(visited_keys[1], first_key, evr_blob_ref_size) == 0);
+        assert(evr_cmp_blob_ref(visited_keys[0], second_key) == 0);
+        assert(evr_cmp_blob_ref(visited_keys[1], first_key) == 0);
     }
     free_glacier_ctx(write_ctx);
     assert(is_ok(evr_free_glacier_read_ctx(read_ctx)));

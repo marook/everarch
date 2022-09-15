@@ -641,7 +641,7 @@ void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_clai
 int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
     ++asserting_claims_visitor_calls;
     assert(ctx == NULL);
-    int ref_cmp = memcmp(ref, asserting_claims_visitor_expected_ref, evr_claim_ref_size);
+    int ref_cmp = evr_cmp_claim_ref(ref, asserting_claims_visitor_expected_ref);
     evr_claim_ref_str ref_str, asserting_claims_visitor_expected_ref_str;
     evr_fmt_claim_ref(ref_str, ref);
     evr_fmt_claim_ref(asserting_claims_visitor_expected_ref_str, asserting_claims_visitor_expected_ref);

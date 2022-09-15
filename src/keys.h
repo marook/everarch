@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <gcrypt.h>
+#include <string.h>
 
 #define evr_blob_ref_bit_size 224
 #define evr_blob_ref_size (evr_blob_ref_bit_size / 8)
@@ -104,6 +105,8 @@ int evr_blob_ref_hd_match(evr_blob_ref_hd hd, evr_blob_ref expected_ref);
 // TODO rename to evr_close_blob_ref_hd
 #define evr_blob_ref_close gcry_md_close
 
+#define evr_cmp_blob_ref(r1, r2) memcmp(r1, r2, evr_blob_ref_size)
+
 void evr_build_claim_ref(evr_claim_ref cref, evr_blob_ref bref, int claim);
 
 void evr_split_claim_ref(evr_blob_ref bref, int *claim, evr_claim_ref cref);
@@ -111,5 +114,7 @@ void evr_split_claim_ref(evr_blob_ref bref, int *claim, evr_claim_ref cref);
 void evr_fmt_claim_ref(char *dest, const evr_claim_ref cref);
 
 int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref);
+
+#define evr_cmp_claim_ref(r1, r2) memcmp(r1, r2, evr_claim_ref_size)
 
 #endif

@@ -102,7 +102,7 @@ void evr_blob_ref_final(evr_blob_ref ref, gcry_md_hd_t hd){
 int evr_blob_ref_hd_match(evr_blob_ref_hd hd, evr_blob_ref expected_ref){
     evr_blob_ref actual_ref;
     evr_blob_ref_final(actual_ref, hd);
-    if(memcmp(expected_ref, actual_ref, evr_blob_ref_size) != 0){
+    if(evr_cmp_blob_ref(expected_ref, actual_ref) != 0){
         evr_blob_ref_str expected_ref_str;
         evr_fmt_blob_ref(expected_ref_str, expected_ref);
         evr_blob_ref_str actual_ref_str;

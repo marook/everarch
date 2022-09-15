@@ -1113,7 +1113,7 @@ int evr_cli_sync(struct cli_cfg *cfg) {
         } else if(dst_state == sync_state_end){
             ref_cmp = -1;
         } else {
-            ref_cmp = memcmp(src_next_blob.key, dst_next_blob.key, evr_blob_ref_size);
+            ref_cmp = evr_cmp_blob_ref(src_next_blob.key, dst_next_blob.key);
         }
         ++blob_count;
         if(ref_cmp == 0){

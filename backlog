@@ -1,21 +1,3 @@
-* define evr-fs files and directories data structure
-there should be a struct evr_fs_nodes which contains file system
-nodes. node must be lookupable in O(1) via fuse_ino_t inodes. a file
-node must hold it's creation timestamp, ref and seed ref.
-
-a file node must hold it's file size.
-
-file nodes can point to a a struct evr_file_claim. the pointer is
-assigned when the file is opened. the file node has an open reference
-counter. an open reference counter of 0 will free the pointer.
-
-a directory node must reference it's child inodes.
-
-a node must be findable via it's seed ref at or below O(n).
-
-a directory or file must be findable via path string at or below O(n).
-
-nodes should be add- and removeable via functions.
 * add evr-attr-index watch command
 it should watch for changes on the index. the response of the watch
 should be the index ref followed by the changed seed ref, followed by
