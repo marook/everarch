@@ -33,9 +33,14 @@ probably in claims.[hc]
 
 an evr-fs file set may look like this:
 #+BEGIN_SRC xml
-<evr:file-set>
-  <evr:file path="path/to/file.name" file-claim="sha3-224-123-0000"/>
-</evr:file-set>
+<efs:file-set>
+  <efs:file
+    path="path/to/file.name"
+    file-claim="sha3-224-123-0000"
+    created="…"
+    last-modified="…"
+    />
+</efs:file-set>
 #+END_SRC
 * implement evr-fs
 evr-fs should be a user space file system which provides access to
@@ -52,6 +57,10 @@ transforming a seed-description into a evr-fs file set.
 
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
+* reserve .evr in root directory within evr-fs
+.evr should always be an empty directory. event if a efs:file mapps to
+.evr. it should be like a reserved namespace for future interaction
+with evr-fs during runtime.
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".
