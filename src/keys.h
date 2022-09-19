@@ -117,4 +117,19 @@ int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref);
 
 #define evr_cmp_claim_ref(r1, r2) memcmp(r1, r2, evr_claim_ref_size)
 
+struct evr_claim_ref_tiny_set {
+    size_t refs_len;
+    size_t refs_used;
+    evr_claim_ref *refs;
+    char hash_set[256];
+};
+
+struct evr_claim_ref_tiny_set *evr_create_claim_ref_tiny_set(size_t refs_len);
+
+#define evr_free_claim_ref_tiny_set(set) free(set)
+
+void evr_reset_claim_ref_tiny_set(struct evr_claim_ref_tiny_set *set);
+
+int evr_claim_ref_tiny_set_add(struct evr_claim_ref_tiny_set *set, evr_claim_ref ref);
+
 #endif

@@ -157,3 +157,42 @@ int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref){
  out:
     return ret;
 }
+
+struct evr_claim_ref_tiny_set *evr_create_claim_ref_tiny_set(size_t refs_len){
+    char *buf = malloc(sizeof(struct evr_claim_ref_tiny_set) + refs_len * evr_claim_ref_size);
+    if(!buf){
+        return NULL;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_claim_ref_tiny_set *set;
+    evr_map_struct(&bp, set);
+    set->refs_len = refs_len;
+    set->refs = (evr_claim_ref*)bp.pos;
+    evr_reset_claim_ref_tiny_set(set);
+    return set;
+}
+
+void evr_reset_claim_ref_tiny_set(struct evr_claim_ref_tiny_set *set){
+    set->refs_used = 0;
+    memset(set->hash_set, 0, sizeof(set->hash_set));
+}
+
+int evr_claim_ref_tiny_set_add(struct evr_claim_ref_tiny_set *set, evr_claim_ref ref){
+    char *hs = &set->hash_set[(unsigned char)ref[0]];
+    if(*hs){
+        evr_claim_ref *end = &set->refs[set->refs_used];
+        for(evr_claim_ref *it = set->refs; it != end; ++it){
+            if(evr_cmp_claim_ref(ref, *it) == 0){
+                return evr_ok;
+            }
+        }
+    } else {
+        *hs = 1;
+    }
+    if(set->refs_len <= set->refs_used){
+        return evr_error;
+    }
+    memcpy(set->refs[set->refs_used++], ref, evr_claim_ref_size);
+    return evr_ok;
+}

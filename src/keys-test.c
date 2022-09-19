@@ -56,7 +56,7 @@ void test_calc_blob_key(){
 
 void test_build_fmt_claim_ref(){
     evr_blob_ref bref;
-    evr_parse_blob_ref(bref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5");
+    assert(is_ok(evr_parse_blob_ref(bref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5")));
     evr_claim_ref cref;
     evr_build_claim_ref(cref, bref, 65000);
     evr_claim_ref_str cref_str;
@@ -76,10 +76,33 @@ void test_build_fmt_claim_ref(){
 
 void test_parse_fmt_claim_ref(){
     evr_claim_ref in;
-    evr_parse_claim_ref(in, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8");
+    assert(is_ok(evr_parse_claim_ref(in, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8")));
     evr_claim_ref_str out_str;
     evr_fmt_claim_ref(out_str, in);
     assert(is_str_eq(out_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8"));
+}
+
+void test_claim_ref_tiny_set(){
+    struct evr_claim_ref_tiny_set *set = evr_create_claim_ref_tiny_set(16);
+    assert(set);
+    evr_claim_ref c1;
+    assert(is_ok(evr_parse_claim_ref(c1, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8")));
+    evr_claim_ref c2;
+    assert(is_ok(evr_parse_claim_ref(c2, "sha3-224-00000000000000000000000000000000000000000000000000000000-0000")));
+    assert(is_ok(evr_claim_ref_tiny_set_add(set, c1)));
+    assert(is_ok(evr_claim_ref_tiny_set_add(set, c2)));
+    assert(is_ok(evr_claim_ref_tiny_set_add(set, c1)));
+    assert(set->refs_used == 2);
+    assert(evr_cmp_claim_ref(c1, set->refs[0]) == 0);
+    assert(evr_cmp_claim_ref(c2, set->refs[1]) == 0);
+    evr_reset_claim_ref_tiny_set(set);
+    assert(set->refs_used == 0);
+    assert(is_ok(evr_claim_ref_tiny_set_add(set, c2)));
+    assert(is_ok(evr_claim_ref_tiny_set_add(set, c1)));
+    assert(set->refs_used == 2);
+    assert(evr_cmp_claim_ref(c2, set->refs[0]) == 0);
+    assert(evr_cmp_claim_ref(c1, set->refs[1]) == 0);
+    evr_free_claim_ref_tiny_set(set);
 }
 
 int main(){
@@ -88,5 +111,6 @@ int main(){
     run_test(test_calc_blob_key);
     run_test(test_build_fmt_claim_ref);
     run_test(test_parse_fmt_claim_ref);
+    run_test(test_claim_ref_tiny_set);
     return 0;
 }
