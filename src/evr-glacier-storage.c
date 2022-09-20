@@ -333,7 +333,11 @@ int evr_connection_worker(void *context){
     free(context);
     const int worker = ctx.socket.get_fd(&ctx.socket);
     log_debug("Started worker %d", worker);
-    if(evr_authenticate_client(&ctx.socket) != evr_ok){
+    int auth_res = evr_authenticate_client(&ctx.socket);
+    if(auth_res == evr_user_data_invalid){
+        result = evr_ok;
+        goto out_with_close_socket;
+    } else if(auth_res != evr_ok) {
         goto out_with_close_socket;
     }
     struct evr_glacier_read_ctx *rctx = NULL;
@@ -441,14 +445,14 @@ int evr_authenticate_client(struct evr_file *c){
     int auth_type;
     evr_pull_as(&bp, &auth_type, uint8_t);
     if(auth_type != evr_auth_type_token){
-        log_debug("Client tried to authenticate using unknown authentication type %d", auth_type);
-        return evr_error;
+        log_debug("Worker %d client tried to authenticate using unknown authentication type %d", c->get_fd(c), auth_type);
+        return evr_user_data_invalid;
     }
     evr_auth_token token;
     evr_pull_n(&bp, token, sizeof(evr_auth_token));
     if(memcmp(cfg->auth_token, token, sizeof(evr_auth_token)) != 0){
-        log_debug("Client presented wrong auth token");
-        return evr_error;
+        log_debug("Worker %d client presented wrong auth token", c->get_fd(c));
+        return evr_user_data_invalid;
     }
     log_debug("Client successfully authenticated");
     return evr_ok;
