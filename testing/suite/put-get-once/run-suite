@@ -29,7 +29,6 @@ then
 fi
 echo 'another one' | evr put --flags 1
 
-echo "${PYTHONPATH}"
 ./evr-py-test.py "${ref}"
 
 ( evr watch > late-watch.actual.log ) &
@@ -53,6 +52,8 @@ echo 'Test unauthorized access...'
 echo 'unauthorized value' | evr --auth-token "localhost:${glacier_storage_port}:00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff" put && exit 1 || true
 
 sleep 1
+
+echo 'Ending watchers...'
 
 kill "${ewpid}"
 kill "${lwpid}"

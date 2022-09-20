@@ -972,6 +972,9 @@ int evr_cli_watch_blobs(struct cli_cfg *cfg){
     evr_blob_ref_str fmt_key;
     while(1){
         if(evr_read_watch_blobs_body(&c, &body) != evr_ok){
+            // TODO differientiate between closed connection and other
+            // errors. right now evr-cli program ends with errorno !=
+            // 0 even if the server perfectly closed the connection.
             goto out_with_close_c;
         }
         evr_fmt_blob_ref(fmt_key, body.key);
