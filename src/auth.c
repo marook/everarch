@@ -32,7 +32,7 @@ int evr_parse_auth_token(evr_auth_token t, evr_auth_token_str s){
     char buf[3];
     buf[2] = '\0';
     int v;
-    for(int i = 0; i < sizeof(evr_auth_token); ++i){
+    for(size_t i = 0; i < sizeof(evr_auth_token); ++i){
         buf[0] = s[2 * i];
         buf[1] = s[2 * i + 1];
         if(sscanf(buf, "%02x", &v) != 1){
@@ -41,6 +41,14 @@ int evr_parse_auth_token(evr_auth_token t, evr_auth_token_str s){
         t[i] = v;
     }
     return evr_ok;
+}
+
+void evr_fmt_auth_token(char *s, evr_auth_token t){
+    for(size_t i = 0; i < sizeof(evr_auth_token); ++i){
+        sprintf(s, "%02x", t[i]);
+        s += 2;
+    }
+    *s = '\0';
 }
 
 int evr_push_auth_token(struct evr_auth_token_cfg **cfg, char *host, char *port, char *token);

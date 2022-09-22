@@ -22,13 +22,16 @@
 #include "assert.h"
 #include "test.h"
 
-void test_parse_auth_token(){
+void test_parse_and_fmt_auth_token(){
     evr_auth_token t;
     assert(is_err(evr_parse_auth_token(t, "")));
     assert(is_err(evr_parse_auth_token(t, "00")));
     assert(is_ok(evr_parse_auth_token(t, "00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff")));
     assert(t[0] == 0);
     assert(t[1] == (char)0xff);
+    evr_auth_token_str s;
+    evr_fmt_auth_token(s, t);
+    assert_msg(is_str_eq(s, "00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff"), "But was %s", s);
 }
 
 void test_parse_and_push_auth_token(){
@@ -42,7 +45,7 @@ void test_parse_and_push_auth_token(){
 }
 
 int main(){
-    run_test(test_parse_auth_token);
+    run_test(test_parse_and_fmt_auth_token);
     run_test(test_parse_and_push_auth_token);
     return 0;
 }
