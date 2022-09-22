@@ -118,12 +118,6 @@ struct evr_connection{
     struct evr_file socket;
 };
 
-struct evr_modified_blob {
-    evr_blob_ref key;
-    evr_time last_modified;
-    int flags;
-};
-
 /**
  * evr_list_blobs_blobs_len's value tries to fill one IP packet well.
  */
@@ -145,7 +139,6 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
 int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
 int evr_handle_blob_list(void *ctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob);
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx);
-void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, evr_time last_modified);
 int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, struct evr_connection *ctx);
 int send_get_response(void *arg, int exists, int flags, size_t blob_size);
 int pipe_data(void *arg, const char *data, size_t data_size);
@@ -595,14 +588,6 @@ int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, s
     return ret;
 }
 
-struct evr_work_watch_ctx {
-    struct evr_blob_filter *filter;
-    /**
-     * queue contains evr_modified_blob items.
-     */
-    struct evr_queue *queue;
-};
-
 int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx){
     int ret = evr_error;
     if(cmd->body_size != evr_blob_filter_n_size){
@@ -627,18 +612,12 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         goto out;
     }
     const int live_watch = f.sort_order == evr_cmd_watch_sort_order_last_modified;
-    struct evr_work_watch_ctx wctx;
-    int wd = -1;
+    struct evr_queue *mod_blobs = NULL;
     if(live_watch){
-        wctx.filter = &f;
-        wctx.queue = evr_create_queue(8, sizeof(struct evr_modified_blob));
-        if(!wctx.queue){
-            goto out;
-        }
-        wd = evr_persister_add_watcher(evr_handle_blob_modified, &wctx);
-        if(wd < 0){
+        mod_blobs = evr_persister_add_watcher(&f);
+        if(!mod_blobs){
             log_error("Worker %d can't add watcher because list full", ctx->socket.get_fd(&ctx->socket));
-            goto out_with_free_queue;
+            goto out;
         }
     }
     if(evr_ensure_worker_rctx_exists(rctx, ctx) != evr_ok){
@@ -662,7 +641,7 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
                 goto out_with_rm_watcher;
             }
             while(running){
-                int take_res = evr_queue_take(wctx.queue, &blob);
+                int take_res = evr_queue_take(mod_blobs, &blob);
                 if(take_res == evr_not_found){
                     break;
                 } else if(take_res == evr_ok){
@@ -705,24 +684,9 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
     }
     ret = evr_ok;
  out_with_rm_watcher:
-    if(live_watch){
-        if(evr_persister_rm_watcher(wd) != evr_ok){
-            evr_panic("Worker %d is unable to remove a persister watcher", ctx->socket.get_fd(&ctx->socket));
-            ret = evr_error;
-        }
-        evr_queue_end_producing(wctx.queue);
-    }
- out_with_free_queue:
-    if(live_watch){
-        int status;
-        if(evr_free_queue(wctx.queue, &status) != evr_ok){
-            evr_panic("Worker %d is unable to free persister queue", ctx->socket.get_fd(&ctx->socket));
-            ret = evr_error;
-        }
-        log_debug("Worker %d watch context reported status %d", ctx->socket.get_fd(&ctx->socket), status);
-        if(status != evr_ok){
-            ret = evr_error;
-        }
+    if(mod_blobs && evr_persister_rm_watcher(mod_blobs) != evr_ok){
+        evr_panic("Worker %d is unable to remove a persister watcher", ctx->socket.get_fd(&ctx->socket));
+        ret = evr_error;
     }
  out:
     log_debug("Worker %d watch ends with status %d", ctx->socket.get_fd(&ctx->socket), ret);
@@ -768,20 +732,6 @@ int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx){
     ret = evr_ok;
  out:
     return ret;
-}
-
-void evr_handle_blob_modified(void *ctx, int wd, evr_blob_ref key, int flags, evr_time last_modified){
-    struct evr_work_watch_ctx *wctx = ctx;
-    if((wctx->filter->flags_filter & flags) != wctx->filter->flags_filter){
-        return;
-    }
-    struct evr_modified_blob b;
-    memcpy(b.key, key, evr_blob_ref_size);
-    b.last_modified = last_modified;
-    if(evr_queue_put(wctx->queue, &b) != evr_ok){
-        log_debug("Unable to put modified blob into watcher queue");
-        return;
-    }
 }
 
 int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, struct evr_connection *ctx){

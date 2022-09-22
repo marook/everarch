@@ -88,8 +88,19 @@ int evr_free_queue(struct evr_queue *q, int *status);
 
 int evr_queue_get_status(struct evr_queue *q);
 
+/**
+ * evr_queue_take blocks for a moment and retrieves and removes the
+ * next entry from the queue.
+ *
+ * Returns evr_not_found if no entry was available.
+ */
 int evr_queue_take(struct evr_queue *q, void *entry);
 
+/**
+ * evr_queue_put puts the given entry into the queue.
+ *
+ * Returns evr_temporary_occupied if the queue is out of capacity.
+ */
 int evr_queue_put(struct evr_queue *q, void *entry);
 
 #endif

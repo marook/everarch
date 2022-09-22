@@ -29,6 +29,7 @@ check_PROGRAMS = \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
+	notify-test \
 	queue-test \
 	rollsum-test \
 	signatures-test \
@@ -48,6 +49,7 @@ TESTS = \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
+	notify-test \
 	queue-test \
 	rollsum-test \
 	signatures-test \
@@ -107,8 +109,11 @@ concurrent_glacier_test_SOURCES = \
 	dyn-mem.c \
 	files.c \
 	glacier-storage-configuration.c \
-	logger.c
-concurrent_glacier_test_LDADD = $(EVERARCH_LIBS)
+	keys.c \
+	logger.c \
+	notify.c \
+	queue.c
+concurrent_glacier_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 configp_test_SOURCES = \
 	assert.c \
@@ -187,6 +192,7 @@ evr_glacier_storage_SOURCES = \
 	glacier-storage-configuration.c \
 	keys.c \
 	logger.c \
+	notify.c \
 	queue.c \
 	server.c
 evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
@@ -274,6 +280,13 @@ keys_test_SOURCES = \
 	keys-test.c \
 	logger.c
 keys_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+
+notify_test_SOURCES = \
+	assert.c \
+	logger.c \
+	notify.c \
+	notify-test.c \
+	queue.c
 
 queue_test_SOURCES = \
 	assert.c \

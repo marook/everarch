@@ -36,6 +36,12 @@
 
 #include "glacier.h"
 
+struct evr_modified_blob {
+    evr_blob_ref key;
+    evr_time last_modified;
+    int flags;
+};
+
 /**
  * evr_persister_start starts the persister background thread.
  *
@@ -101,23 +107,12 @@ int evr_persister_queue_task(struct evr_persister_task *task);
  */
 int evr_persister_wait_for_task(struct evr_persister_task *task);
 
-typedef void (*evr_persister_watcher)(void *ctx, int wd, evr_blob_ref key, int flags, evr_time last_modified);
-
 /**
- * evr_persister_add_watcher registers a callback which fires after a
- * blob got modified.
- *
- * Returns a negative value on error and a watch descriptor (wd) on
- * success.
+ * evr_persister_add_watcher creates a queue which will be filled with
+ * struct evr_modified_blob items.
  */
-int evr_persister_add_watcher(evr_persister_watcher watcher, void *ctx);
+struct evr_queue *evr_persister_add_watcher(struct evr_blob_filter *filter);
 
-/**
- * evr_persister_rm_watcher unregisters a watch callback.
- *
- * Returns evr_ok on success. Otherwise evr_error.
- */
-int evr_persister_rm_watcher(int wd);
-
+int evr_persister_rm_watcher(struct evr_queue *msgs);
 
 #endif
