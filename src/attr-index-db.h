@@ -148,9 +148,15 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
  */
 int evr_prepare_attr_index_db(struct evr_attr_index_db *db);
 
-int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, xmlDocPtr (*get_claim_set)(void *ctx, evr_blob_ref claim_set_ref), void *ctx);
+/**
+ * evr_max_claim_sets_per_reindex defines how many failed claim-sets
+ * are reindexed in one reindex batch at once.
+ */
+#define evr_max_claim_sets_per_reindex 256
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc, int reindex);
+int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, xmlDocPtr (*get_claim_set)(void *ctx, evr_blob_ref claim_set_ref), void *ctx, struct evr_claim_ref_tiny_set *visited_seed_set);
+
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc, int reindex, struct evr_claim_ref_tiny_set *visited_seed_set);
 
 int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, evr_claim_ref cref, struct evr_attr_claim *claim);
 

@@ -40,6 +40,7 @@
 #include "configp.h"
 #include "handover.h"
 #include "evr-tls.h"
+#include "notify.h"
 
 #define program_name "evr-attr-index"
 
@@ -144,9 +145,10 @@ static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
     return parse_opt(key, arg, state, argp_usage);
 }
 
-sig_atomic_t running = 1;
-mtx_t stop_lock;
-cnd_t stop_signal;
+static sig_atomic_t running = 1;
+static mtx_t stop_lock;
+static cnd_t stop_signal;
+static struct evr_notify_ctx *watchers = NULL;
 
 struct evr_connection {
     struct evr_file socket;
@@ -189,6 +191,12 @@ struct evr_search_ctx {
     int parse_res;
 };
 
+struct evr_modified_seed {
+    evr_time change_time;
+    evr_blob_ref index_ref;
+    evr_claim_ref seed;
+};
+
 int evr_load_attr_index_cfg(int argc, char **argv);
 
 void handle_sigterm(int signum);
@@ -203,15 +211,11 @@ int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
 int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
-int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, struct evr_file *c);
 int evr_attr_index_tcp_server();
 int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
-int evr_work_authenticate_cmd(struct evr_connection *ctx, char *query);
-int evr_work_search_cmd(struct evr_connection *ctx, char *query);
 int evr_respond_search_status(void *context, int parse_res, char *parse_errer);
 int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
-int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str);
 int evr_get_current_index_ref(evr_blob_ref index_ref);
 int evr_respond_help(struct evr_connection *ctx);
 int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
@@ -237,8 +241,12 @@ int main(int argc, char **argv){
     if(cnd_init(&stop_signal) != thrd_success){
         goto out_with_free_stop_lock;
     }
-    if(evr_init_current_index_ctx(&current_index_ctx) != evr_ok){
+    watchers = evr_create_notify_ctx(32, 8, sizeof(struct evr_modified_seed));
+    if(!watchers){
         goto out_with_free_stop_signal;
+    }
+    if(evr_init_current_index_ctx(&current_index_ctx) != evr_ok){
+        goto out_with_free_watchers;
     }
     {
         struct sigaction action;
@@ -348,6 +356,11 @@ int main(int argc, char **argv){
     xmlCleanupParser();
  out_with_free_current_index:
     evr_free_current_index_ctx(&current_index_ctx);
+ out_with_free_watchers:
+    if(evr_free_notify_ctx(watchers) != evr_ok){
+        evr_panic("Unable to free watchers");
+        ret = evr_error;
+    }
  out_with_free_stop_signal:
     cnd_destroy(&stop_signal);
  out_with_free_stop_lock:
@@ -706,6 +719,8 @@ int evr_build_index_worker(void *arg){
     return ret;
 }
 
+int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr stylesheet, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, struct evr_file *c, struct evr_claim_ref_tiny_set *visited_seed_refs);
+
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     int ret = evr_error;
     evr_blob_ref_str claim_key_str;
@@ -774,7 +789,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
         if(evr_read_watch_blobs_body(&cw, &wbody) != evr_ok){
             goto out_with_close_cs;
         }
-        if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cs) != evr_ok){
+        if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cs, NULL) != evr_ok){
             goto out_with_close_cs;
         }
         if((wbody.flags & evr_watch_flag_eob) == evr_watch_flag_eob){
@@ -807,7 +822,9 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     return ret;
 }
 
-int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, struct evr_file *c){
+#define evr_max_seeds_per_claim_set (2 << 7) // 256
+
+int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_blob_ref claim_set_ref, evr_time claim_set_last_modified, struct evr_file *c, struct evr_claim_ref_tiny_set *visited_seed_refs){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
     {
@@ -841,7 +858,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
     }
     evr_time t;
     evr_now(&t);
-    int merge_res = evr_merge_attr_index_claim_set(db, spec, style, t, claim_set_ref, claim_set, 0);
+    int merge_res = evr_merge_attr_index_claim_set(db, spec, style, t, claim_set_ref, claim_set, 0, visited_seed_refs);
     if(merge_res == evr_user_data_invalid){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
@@ -862,6 +879,8 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
 }
 
 xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref);
+
+int evr_notify_watchers(evr_blob_ref index_ref, evr_time change_time, evr_claim_ref *changed_seeds, size_t changed_seeds_len);
 
 int evr_index_sync_worker(void *arg){
     int ret = evr_error;
@@ -889,6 +908,11 @@ int evr_index_sync_worker(void *arg){
     struct evr_attr_spec_claim *spec = NULL;
     xsltStylesheetPtr style = NULL;
     evr_time last_reindex = 0;
+    struct evr_claim_ref_tiny_set *visited_seed_refs = NULL;
+    visited_seed_refs = evr_create_claim_ref_tiny_set(evr_max_seeds_per_claim_set * evr_max_claim_sets_per_reindex);
+    if(!visited_seed_refs){
+        goto out_with_free;
+    }
     while(running){
         if(evr_lock_handover(&ctx->handover) != evr_ok){
             goto out_with_free;
@@ -1023,9 +1047,14 @@ int evr_index_sync_worker(void *arg){
             evr_now(&now);
             // TODO we should use a time source which does not jump on ntpd actions
             if(now - last_reindex >= evr_reindex_interval) {
+                evr_reset_claim_ref_tiny_set(visited_seed_refs);
                 last_reindex = now;
-                if(evr_reindex_failed_claim_sets(db, spec, style, now, get_claim_set_for_reindex, &cg) != evr_ok){
+                if(evr_reindex_failed_claim_sets(db, spec, style, now, get_claim_set_for_reindex, &cg, visited_seed_refs) != evr_ok){
                     log_error("Error while reindexing failed claim-sets");
+                    goto out_with_free;
+                }
+                if(evr_notify_watchers(index_ref, now, visited_seed_refs->refs, visited_seed_refs->refs_used) != evr_ok){
+                    log_error("Unable to inform watchers after reindex");
                     goto out_with_free;
                 }
             }
@@ -1035,12 +1064,22 @@ int evr_index_sync_worker(void *arg){
         if(evr_read_watch_blobs_body(&cw, &wbody) != evr_ok){
             goto out_with_free;
         }
-        if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cg) != evr_ok){
+        evr_reset_claim_ref_tiny_set(visited_seed_refs);
+        if(evr_index_claim_set(db, spec, style, wbody.key, wbody.last_modified, &cg, visited_seed_refs) != evr_ok){
             goto out_with_free;
+        }
+        {
+            evr_time now;
+            evr_now(&now);
+            if(evr_notify_watchers(index_ref, now, visited_seed_refs->refs, visited_seed_refs->refs_used) != evr_ok){
+                log_error("Unable to inform attr index watchers after blob change");
+                goto out_with_free;
+            }
         }
     }
     ret = evr_ok;
  out_with_free:
+    evr_free_claim_ref_tiny_set(visited_seed_refs);
     if(cg.get_fd(&cg) >= 0){
         if(cg.close(&cg) != 0){
             evr_panic("Unable to close watch connection");
@@ -1056,9 +1095,7 @@ int evr_index_sync_worker(void *arg){
     if(style){
         xsltFreeStylesheet(style);
     }
-    if(spec){
-        free(spec);
-    }
+    free(spec);
     if(db){
         if(evr_free_attr_index_db(db) != evr_ok){
             ret = evr_error;
@@ -1067,6 +1104,20 @@ int evr_index_sync_worker(void *arg){
  out:
     evr_worker_ended("index sync", ret);
     return ret;
+}
+
+int evr_notify_watchers(evr_blob_ref index_ref, evr_time change_time, evr_claim_ref *changed_seeds, size_t changed_seeds_len){
+    struct evr_modified_seed mod_seed;
+    mod_seed.change_time = change_time;
+    memcpy(mod_seed.index_ref, index_ref, evr_blob_ref_size);
+    evr_claim_ref *end = &changed_seeds[changed_seeds_len];
+    for(evr_claim_ref *it = changed_seeds; it != end; ++it){
+        memcpy(mod_seed.seed, *it, evr_claim_ref_size);
+        if(evr_notify_send(watchers, &mod_seed, NULL, NULL) != evr_ok){
+            return evr_error;
+        }
+    }
+    return evr_ok;
 }
 
 xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
@@ -1215,6 +1266,11 @@ int evr_connection_worker(void *context) {
     return ret;
 }
 
+int evr_work_authenticate_cmd(struct evr_connection *ctx, char *query);
+int evr_work_search_cmd(struct evr_connection *ctx, char *query);
+int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str);
+int evr_watch_index(struct evr_connection *ctx);
+
 int evr_work_cmd(struct evr_connection *ctx, char *line){
     log_debug("Connection worker %d retrieved cmd: %s", ctx->socket.get_fd(&ctx->socket), line);
     char *cmd = line;
@@ -1232,6 +1288,9 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
        }
        if(strcmp(cmd, "c") == 0){
            return evr_list_claims_for_seed(ctx, args);
+       }
+       if(strcmp(cmd, "w") == 0){
+           return evr_watch_index(ctx);
        }
     }
     if(strcmp(cmd, "exit") == 0){
@@ -1310,49 +1369,6 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     return ret;
 }
 
-int evr_respond_search_status(void *context, int parse_res, char *parse_error){
-    struct evr_search_ctx *ctx = context;
-    ctx->parse_res = parse_res;
-    if(parse_res != evr_ok){
-        return evr_respond_status(ctx->con, 0, parse_error);
-    }
-    return evr_respond_status(ctx->con, 1, NULL);
-}
-
-int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
-    int ret = evr_error;
-    size_t attrs_size = 0;
-    if(attrs){
-        struct evr_attr_tuple *end = &attrs[attrs_len];
-        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
-            attrs_size += 1 + strlen(a->key) + 1 + strlen(a->value) + 1;
-        }
-    }
-    struct evr_search_ctx *ctx = context;
-    char buf[evr_claim_ref_str_size + attrs_size];
-    struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, buf);
-    evr_fmt_claim_ref(bp.pos, ref);
-    evr_inc_buf_pos(&bp, evr_claim_ref_str_size - 1);
-    evr_push_concat(&bp, "\n");
-    if(attrs){
-        struct evr_attr_tuple *end = &attrs[attrs_len];
-        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
-            evr_push_concat(&bp, "\t");
-            evr_push_concat(&bp, a->key);
-            evr_push_concat(&bp, "=");
-            evr_push_concat(&bp, a->value);
-            evr_push_concat(&bp, "\n");
-        }
-    }
-    if(write_n(&ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
 int evr_respond_claims_for_seed_result(void *ctx, const evr_claim_ref claim);
 
 int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str){
@@ -1406,6 +1422,117 @@ int evr_respond_claims_for_seed_result(void *context, const evr_claim_ref claim)
     evr_fmt_claim_ref(claim_str, claim);
     claim_str[evr_claim_ref_str_size - 1] = '\n';
     return write_n(&ctx->socket, claim_str, evr_claim_ref_str_size);
+}
+
+int evr_watch_index(struct evr_connection *ctx){
+    int ret = evr_error;
+    log_debug("Connection worker %d retrieved watch command", ctx->socket.get_fd(&ctx->socket));
+    struct evr_queue *msgs = evr_notify_register(watchers, NULL);
+    if(!msgs){
+        goto out;
+    }
+    struct evr_modified_seed mod_seed;
+    char buf[evr_blob_ref_str_len + 1 + evr_claim_ref_str_len + 1 + (evr_max_time_iso8601_size - 1) + 1 + 1];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    while(running){
+        if(ctx->socket.received_shutdown(&ctx->socket) == 1){
+            log_debug("Worker %d retrieved shutdown request from peer", ctx->socket.get_fd(&ctx->socket));
+            ret = evr_end;
+            goto out_with_rm_watcher;
+        }
+        while(running){
+            int take_res = evr_queue_take(msgs, &mod_seed);
+            if(take_res == evr_not_found){
+                break;
+            } else if(take_res != evr_ok){
+                goto out_with_rm_watcher;
+            }
+#ifdef EVR_LOG_DEBUG
+            {
+                evr_blob_ref_str index_ref_str;
+                evr_fmt_blob_ref(index_ref_str, mod_seed.index_ref);
+                evr_claim_ref_str seed_str;
+                evr_fmt_claim_ref(seed_str, mod_seed.seed);
+                log_debug("Worker %d watch indicates index %s changed seed %s", ctx->socket.get_fd(&ctx->socket), index_ref_str, seed_str);
+            }
+#endif
+            evr_reset_buf_pos(&bp);
+            evr_fmt_blob_ref(bp.pos, mod_seed.index_ref);
+            evr_inc_buf_pos(&bp, evr_blob_ref_str_len);
+            evr_push_concat(&bp, " ");
+            evr_fmt_claim_ref(bp.pos, mod_seed.seed);
+            evr_inc_buf_pos(&bp, evr_claim_ref_str_len);
+            evr_push_concat(&bp, " ");
+            evr_time_to_iso8601(bp.pos, evr_max_time_iso8601_size, &mod_seed.change_time);
+            evr_forward_to_eos(&bp);
+            evr_push_concat(&bp, "\n");
+            if(write_n(&ctx->socket, buf, bp.pos - bp.buf) != evr_ok){
+                goto out_with_rm_watcher;
+            }
+        }
+        if(!running){
+            break;
+        }
+        int hang_up_res = evr_peer_hang_up(&ctx->socket);
+        if(hang_up_res == evr_end){
+            ret = evr_end;
+            goto out_with_rm_watcher;
+        } else if(hang_up_res != evr_ok){
+            goto out_with_rm_watcher;
+        }
+    }
+    ret = evr_ok;
+ out_with_rm_watcher:
+    if(evr_notify_unregister(watchers, msgs) != evr_ok){
+        evr_panic("Worker %d is unable to unregister watcher", ctx->socket.get_fd(&ctx->socket));
+        ret = evr_error;
+    }
+ out:
+    return ret;
+}
+
+int evr_respond_search_status(void *context, int parse_res, char *parse_error){
+    struct evr_search_ctx *ctx = context;
+    ctx->parse_res = parse_res;
+    if(parse_res != evr_ok){
+        return evr_respond_status(ctx->con, 0, parse_error);
+    }
+    return evr_respond_status(ctx->con, 1, NULL);
+}
+
+int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
+    int ret = evr_error;
+    size_t attrs_size = 0;
+    if(attrs){
+        struct evr_attr_tuple *end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
+            attrs_size += 1 + strlen(a->key) + 1 + strlen(a->value) + 1;
+        }
+    }
+    struct evr_search_ctx *ctx = context;
+    char buf[evr_claim_ref_str_size + attrs_size];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_fmt_claim_ref(bp.pos, ref);
+    evr_inc_buf_pos(&bp, evr_claim_ref_str_size - 1);
+    evr_push_concat(&bp, "\n");
+    if(attrs){
+        struct evr_attr_tuple *end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
+            evr_push_concat(&bp, "\t");
+            evr_push_concat(&bp, a->key);
+            evr_push_concat(&bp, "=");
+            evr_push_concat(&bp, a->value);
+            evr_push_concat(&bp, "\n");
+        }
+    }
+    if(write_n(&ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
 }
 
 int evr_get_current_index_ref(evr_blob_ref index_ref){

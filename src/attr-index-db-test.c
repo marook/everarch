@@ -126,7 +126,7 @@ void test_open_new_attr_index_db_twice(){
                     evr_blob_ref claim_set_ref;
                     assert(is_ok(evr_parse_blob_ref(claim_set_ref, merge_claim_refs[aai])));
                     xmlDoc *claim_set_doc = create_xml_doc(merge_claims[aai]);
-                    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
+                    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0, NULL)));
                     xmlFreeDoc(claim_set_doc);
                 }
             }
@@ -418,7 +418,7 @@ void test_attr_factories(){
     xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0, NULL)));
     evr_claim_ref static_claim_ref;
     evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
 #define t_str "2022-01-01T00:00:00.000000Z"
@@ -463,15 +463,15 @@ void test_attr_factories_fail_and_reindex(){
     xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0, NULL)));
     xmlFreeDoc(raw_claim_set);
     evr_claim_ref static_claim_ref;
     evr_build_claim_ref(static_claim_ref, claim_set_ref, 0);
     assert_query_no_result(db, "at 2022-01-01T00:00:00.000000Z");
     one_attr_factory_blob_file_writer_should_fail(db, 0);
-    assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 30, get_claim_set_adapter, raw_claim_set_content)));
+    assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 30, get_claim_set_adapter, raw_claim_set_content, NULL)));
     assert_query_no_result(db, "at 2022-01-01T00:00:00.000000Z");
-    assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 60*60*1000, get_claim_set_adapter, raw_claim_set_content)));
+    assert(is_ok(evr_reindex_failed_claim_sets(db, &spec, style, 60*60*1000, get_claim_set_adapter, raw_claim_set_content, NULL)));
     xsltFreeStylesheet(style);
     assert_query_one_result(db, "at 2022-01-01T00:00:00.000000Z", static_claim_ref);
     assert(is_ok(evr_free_attr_index_db(db)));
@@ -509,7 +509,7 @@ void test_attr_attribute_factories(){
     xmlDocPtr raw_claim_set = create_xml_doc(raw_claim_set_content);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, raw_claim_set, 0, NULL)));
     evr_claim_ref attr_claim_ref;
     evr_build_claim_ref(attr_claim_ref, claim_set_ref, 0);
 #define t_str "2022-01-01T00:00:00.000000Z"
@@ -546,7 +546,7 @@ void test_attr_value_type_self_claim_ref(){
     assert(claim_set_doc);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
+    assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0, NULL)));
     xmlFreeDoc(claim_set_doc);
     evr_claim_ref seed;
     assert(is_ok(evr_parse_claim_ref(seed, seed_str)));
@@ -586,7 +586,7 @@ void test_failed_transformation(){
     assert(claim_set_doc);
     evr_blob_ref claim_set_ref;
     assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
-    assert(is_err(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0)));
+    assert(is_err(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0, NULL)));
     xmlFreeDoc(claim_set_doc);
     const size_t state_dir_path_len = strlen(cfg->state_dir_path);
     const char log_path_suffix[] = "/ye-db/claim-logs/00/sha3-224-c0000000000000000000000000000000000000000000000000000000.log";

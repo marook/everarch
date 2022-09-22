@@ -30,7 +30,6 @@
 #include <signal.h>
 #include <stdatomic.h>
 #include <time.h>
-#include <poll.h>
 #include <gcrypt.h>
 
 #include "basics.h"
@@ -637,47 +636,42 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
         while(running){
             if(ctx->socket.received_shutdown(&ctx->socket) == 1){
                 log_debug("Worker %d retrieved shutdown request from peer", ctx->socket.get_fd(&ctx->socket));
-                ret = evr_ok;
+                ret = evr_end;
                 goto out_with_rm_watcher;
             }
             while(running){
                 int take_res = evr_queue_take(mod_blobs, &blob);
                 if(take_res == evr_not_found){
                     break;
-                } else if(take_res == evr_ok){
+                } else if(take_res != evr_ok){
+                    goto out_with_rm_watcher;
+                }
 #ifdef EVR_LOG_DEBUG
-                    {
-                        evr_blob_ref_str fmt_key;
-                        evr_fmt_blob_ref(fmt_key, blob.key);
-                        log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket.get_fd(&ctx->socket), fmt_key);
-                    }
+                {
+                    evr_blob_ref_str fmt_key;
+                    evr_fmt_blob_ref(fmt_key, blob.key);
+                    log_debug("Worker %d watch indicates blob with key %s modified", ctx->socket.get_fd(&ctx->socket), fmt_key);
+                }
 #endif
-                    struct evr_buf_pos bp;
-                    evr_init_buf_pos(&bp, buf);
-                    memcpy(bp.pos, blob.key, evr_blob_ref_size);
-                    bp.pos += evr_blob_ref_size;
-                    evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
-                    int flags = evr_watch_flag_eob;
-                    evr_push_as(&bp, &flags, uint8_t);
-                    if(write_n(&ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
-                        goto out_with_rm_watcher;
-                    }
-                } else {
+                struct evr_buf_pos bp;
+                evr_init_buf_pos(&bp, buf);
+                memcpy(bp.pos, blob.key, evr_blob_ref_size);
+                bp.pos += evr_blob_ref_size;
+                evr_push_map(&bp, &blob.last_modified, uint64_t, htobe64);
+                int flags = evr_watch_flag_eob;
+                evr_push_as(&bp, &flags, uint8_t);
+                if(write_n(&ctx->socket, buf, evr_blob_ref_size + sizeof(uint64_t) + sizeof(uint8_t)) != evr_ok){
                     goto out_with_rm_watcher;
                 }
             }
             if(!running){
                 break;
             }
-            struct pollfd fds;
-            fds.fd = ctx->socket.get_fd(&ctx->socket);
-            fds.events = POLLRDHUP | POLLHUP;
-            if(poll(&fds, 1, 0) < 0){
-                goto out_with_rm_watcher;
-            }
-            if(fds.revents & (POLLRDHUP | POLLHUP)){
-                // peer closed connection
+            int hang_up_res = evr_peer_hang_up(&ctx->socket);
+            if(hang_up_res == evr_end){
                 ret = evr_end;
+                goto out_with_rm_watcher;
+            } else if(hang_up_res != evr_ok){
                 goto out_with_rm_watcher;
             }
         }

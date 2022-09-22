@@ -365,12 +365,11 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
 
 int evr_find_reindexable_claim_sets(struct evr_attr_index_db *db, evr_time t, size_t max_claim_sets, evr_blob_ref *claim_sets, size_t *found_claim_sets);
 
-int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, xmlDocPtr (*get_claim_set)(void *ctx, evr_blob_ref claim_set_ref), void *ctx){
+int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, xmlDocPtr (*get_claim_set)(void *ctx, evr_blob_ref claim_set_ref), void *ctx, struct evr_claim_ref_tiny_set *visited_seed_set){
     int ret = evr_error;
-    const size_t max_claim_sets = 256;
-    evr_blob_ref reindexed_claim_set_refs[max_claim_sets];
+    evr_blob_ref reindexed_claim_set_refs[evr_max_claim_sets_per_reindex];
     size_t found_claim_sets_len;
-    if(evr_find_reindexable_claim_sets(db, t, max_claim_sets, reindexed_claim_set_refs, &found_claim_sets_len) != evr_ok){
+    if(evr_find_reindexable_claim_sets(db, t, evr_max_claim_sets_per_reindex, reindexed_claim_set_refs, &found_claim_sets_len) != evr_ok){
         goto out;
     }
     evr_blob_ref *reindexed_claim_set_refs_end = &reindexed_claim_set_refs[found_claim_sets_len];
@@ -382,7 +381,7 @@ int evr_reindex_failed_claim_sets(struct evr_attr_index_db *db, struct evr_attr_
             log_error("Claim set not fetchable for blob key %s", ref_str);
             goto out;
         }
-        if(evr_merge_attr_index_claim_set(db, spec, style, t, *cs_ref, cs_doc, 1) != evr_ok){
+        if(evr_merge_attr_index_claim_set(db, spec, style, t, *cs_ref, cs_doc, 1, visited_seed_set) != evr_ok){
             xmlFreeDoc(cs_doc);
             goto out;
         }
@@ -431,7 +430,7 @@ void evr_log_failed_claim_set_doc(struct evr_attr_index_db *db, evr_blob_ref cla
 
 void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref claim_set_ref, char *claim_set_buf, int claim_set_buf_size, char *fail_reason);
 
-int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc, int reindex){
+int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim *spec, xsltStylesheetPtr style, evr_time t, evr_blob_ref claim_set_ref, xmlDocPtr raw_claim_set_doc, int reindex, struct evr_claim_ref_tiny_set *visited_seed_set){
     int ret = evr_error;
     xmlNode *cs_node = evr_get_root_claim_set(raw_claim_set_doc);
     if(!cs_node){
@@ -564,6 +563,13 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         evr_claim_ref cref;
         evr_build_claim_ref(cref, claim_set_ref, attr->index_seed);
         int merge_res = evr_merge_attr_index_claim(db, created, cref, attr);
+        if(merge_res == evr_ok && visited_seed_set && evr_claim_ref_tiny_set_add(visited_seed_set, attr->seed) != evr_ok) {
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Transformed claim-set for blob with ref %s produced more than %zu attr seed references.", ref_str, visited_seed_set->refs_len);
+            free(attr);
+            goto out_with_free_claim_set_doc;
+        }
         free(attr);
         if(merge_res != evr_ok){
             evr_blob_ref_str ref_str;
@@ -605,6 +611,13 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             goto out_with_reset_archive_claim;
         }
         if(evr_step_stmt(db->db, db->archive_claim) != SQLITE_DONE){
+            goto out_with_reset_archive_claim;
+        }
+        if(visited_seed_set && evr_claim_ref_tiny_set_add(visited_seed_set, arch->seed) != evr_ok){
+            evr_blob_ref_str ref_str;
+            evr_fmt_blob_ref(ref_str, claim_set_ref);
+            log_error("Transformed claim-set for blob with ref %s produced more than %zu seed references.", ref_str, visited_seed_set->refs_len);
+            free(arch);
             goto out_with_reset_archive_claim;
         }
         free(arch);

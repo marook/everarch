@@ -147,6 +147,8 @@ evr_attr_index_SOURCES = \
 	handover.c \
 	keys.c \
 	logger.c \
+	notify.c \
+	queue.c \
 	server.c \
 	signatures.c \
 	subprocess.c

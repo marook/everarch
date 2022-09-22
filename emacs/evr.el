@@ -51,6 +51,13 @@ evr-attr-index and prints the results into a new buffer."
            `("where " ,query)))
       ""))))
 
+(defun evr-attr-index-watch ()
+  (interactive)
+  (let ((buf (get-buffer-create "*evr-attr-index watch*")))
+    (switch-to-buffer buf)
+    (setq buffer-read-only t)
+    (evr--query-attr-index "w")))
+
 (defvar evr-attr-index-authentication-tokens
   ()
   "Assoc list of authentication tokens. Keys are HOST:PORT

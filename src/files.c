@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <poll.h>
 
 #include "basics.h"
 #include "errors.h"
@@ -363,4 +364,18 @@ int evr_rollsum_split(int f, size_t max_read, int (*slice)(char *buf, size_t siz
     }
  out:
     return ret;
+}
+
+int evr_peer_hang_up(struct evr_file *f){
+    struct pollfd fds;
+    fds.fd = f->get_fd(f);
+    fds.events = POLLRDHUP | POLLHUP;
+    if(poll(&fds, 1, 0) < 0){
+        return evr_error;
+    }
+    if(fds.revents & (POLLRDHUP | POLLHUP)){
+        // peer closed connection
+        return evr_end;
+    }
+    return evr_ok;
 }

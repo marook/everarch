@@ -137,4 +137,12 @@ int append_into_chunk_set(struct chunk_set *cs, int f);
  */
 int evr_rollsum_split(int f, size_t max_size, int (*slice)(char *buf, size_t size, void *ctx), void *ctx);
 
+/**
+ * evr_peer_hand_up detects if the peer closed the file.
+ *
+ * Returns evr_end if the peer closed the file. Returns evr_ok if the
+ * file is still open.
+ */
+int evr_peer_hang_up(struct evr_file *f);
+
 #endif

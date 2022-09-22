@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <time.h>
+#include <string.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) < (b) ? (b) : (a))
@@ -144,6 +145,9 @@ struct evr_buf_pos {
         size_t len = strlen(_s);                \
         evr_push_n(bp, _s, len);                \
     } while(0)
+
+#define evr_forward_to_eos(bp) \
+    for(; *((bp)->pos); ++(bp)->pos){}
 
 #define evr_push_eos(bp)                        \
     do {                                        \
