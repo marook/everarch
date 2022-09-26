@@ -55,8 +55,10 @@ typedef uint8_t evr_claim_ref[evr_claim_ref_size];
  * The formular consists of: <prefix> <hex key> \0
  */
 #define evr_blob_ref_str_size (evr_blob_ref_str_prefix_len + 2 * evr_blob_ref_size + 1)
+#define evr_blob_ref_str_len (evr_blob_ref_str_size - 1)
 typedef char evr_blob_ref_str[evr_blob_ref_str_size];
 #define evr_claim_ref_str_size (evr_blob_ref_str_size + evr_claim_ref_str_separator_len + 4)
+#define evr_claim_ref_str_len (evr_claim_ref_str_size - 1)
 typedef char evr_claim_ref_str[evr_claim_ref_str_size];
 
 /**

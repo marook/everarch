@@ -22,6 +22,7 @@ check_PROGRAMS = \
 	concurrent-glacier-test \
 	configp-test \
 	dyn-mem-test \
+	evr-attr-index-client-test \
 	evr-tls-test \
 	files-test \
 	fs-inode-test \
@@ -43,6 +44,7 @@ TESTS = \
 	concurrent-glacier-test \
 	configp-test \
 	dyn-mem-test \
+	evr-attr-index-client-test \
 	evr-tls-test \
 	files-test \
 	fs-inode-test \
@@ -210,6 +212,19 @@ evr_glacier_tool_SOURCES = \
 	keys.c \
 	logger.c
 evr_glacier_tool_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+
+evr_attr_index_client_test_SOURCES = \
+	assert.c \
+	auth.c \
+	basics.c \
+	dyn-mem.c \
+	evr-attr-index-client.c \
+	evr-attr-index-client-test.c \
+	file-mem.c \
+	files.c \
+	keys.c \
+	logger.c
+evr_attr_index_client_test_LDADD = $(LIBGCRYPT_LIBS)
 
 evr_tls_test_SOURCES = \
 	assert.c \
