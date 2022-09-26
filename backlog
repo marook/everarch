@@ -1,12 +1,9 @@
-* add evr-attr-index watch command
-it should watch for changes on the index. the response of the watch
-should be the index ref followed by the changed seed ref, followed by
-the timestamp of the last indexed claim. the timestamp of the last
-indexed claim is already stored in the evr-attr-index index.db as
-evr_state_key_last_indexed_claim_ts.
 * build seed-description XML
 puts all claim-sets for one seed grouped in one seed-description
 parent element.
+* buffered reader around evr_file
+parsing evr-attr-index responses will require a buffered reader in
+order to scan for the next newline or wait for more data.
 * implement evr-attr-index-client.[hc]
 the commands supported by the client library should be authenticate,
 search, seed-description and watch.
@@ -24,6 +21,20 @@ an evr-fs file set may look like this:
     />
 </efs:file-set>
 #+END_SRC
+* implement evr file reader with cache
+api should be like 'read n bytes at offset o in evr:file from a
+glacier server'.
+
+reading should cache the last read slices in memory until a given
+maximum cache size. this is sensible because sequenced read calls may
+affect the same slices.
+
+maybe we only want to cache the slices at the edges of the read
+interval. so we are prepared for stepping forward and backward through
+the file.
+
+maybe the cache should be a shared cache so concurrent reads from
+different file descriptors on the same file reuse the cache.
 * implement evr-fs
 evr-fs should be a user space file system which provides access to
 files stored in everarch.
@@ -36,7 +47,7 @@ $ evr-fs blob:sha3-224-dirs-files-xslt mount/point
 
 the first argument is a reference to the xslt stylesheet used for
 transforming a seed-description into a evr-fs file set.
-
+* evr-fs should wath the evr-attr-index
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
 * reserve .evr in root directory within evr-fs
@@ -153,6 +164,8 @@ next queued slot and prepare it.
 everything above will be part of the second major release of everarch.
 
 the vision of the second release is: let's go web
+* get rid of double _ in defines
+as they are not intended for userspace. mentioned by pitrp.
 * add has key operator to attr query language
 extend the attr query language to support searching for claims which
 have a certain key.
@@ -245,6 +258,16 @@ the most interesting quic library to use right now would be [[https://github.com
 because it depends just on OpenSSL. OpenSSL with downstream patches
 unfortunately. there are [[https://www.openssl.org/blog/blog/2021/12/03/starting-the-quic-design/][plans by the OpenSSL team]] to add quic
 support.
+* switch to io_uring for network io
+* use readv and writev in struct evr_file
+right how read and write operations use via evr_file implement thea
+read/write interface with one buffer.
+
+struct evr_file should implement the readv and writev interface to
+reduce the number of system calls needed.
+
+the struct evr_file read and write functions should be removed. caller
+code should be adjusted.
 * introduce scripted transformations
 attr specs should also support scripts which perform the claim
 transformations instead of just xslt stylesheets.
@@ -260,13 +283,6 @@ a new transformation could look like this:
 
 the transformation would point to an executable elf binary, shell or
 python script.
-* use writev instead of buf copying
-writev can write mutliple buffers in one system call. this may reduce
-the amout of memory being copied before a write call. there are
-probably some places in glacier.c and the networking code which can
-benefit from writev.
-* get rid of double _ in defines
-as they are not intended for userspace. mentioned by pitrp.
 * gracefully handle sqlite database is locked in evr-glacier-storage
 sqlite's step function will exit with SQLITE_LOCKED if a table is
 locked for more than 1sec (configured right now).
@@ -276,9 +292,3 @@ available' to the client.
 
 i guess the basis for this task is no longer existent because we
 switched to sqlite's WAL mode.
-* analyze and maybe replace own queues with lib io_uring
-inter thread communitcation queues have been implemented in struct
-evr_work_watch_ctx and struct evr_persister_ctx.
-
-for the sake of using well tested code we should check migrating our
-own queues to lib io_uring. mentioned by pitrp.
