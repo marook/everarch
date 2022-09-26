@@ -145,4 +145,31 @@ int evr_rollsum_split(int f, size_t max_size, int (*slice)(char *buf, size_t siz
  */
 int evr_peer_hang_up(struct evr_file *f);
 
+struct evr_buf_read {
+    struct evr_file *f;
+    size_t read_i;
+    size_t write_i;
+    char *buf;
+    size_t buf_size;
+};
+
+struct evr_buf_read *evr_create_buf_read(struct evr_file *f, size_t buf_size_exp);
+
+#define evr_free_buf_read(br) free(br)
+
+#define evr_buf_read_bytes_ready(br) (((br)->write_i - (br)->read_i) & ((br)->buf_size - 1))
+
+#define evr_buf_read_peek(br, offset) ((br)->buf[(((br)->read_i + offset) & ((br)->buf_size - 1))])
+
+int evr_buf_read_read(struct evr_buf_read *br);
+
+/**
+ * evr_buf_read_pop will read n bytes from struct evr_buf_read. Make
+ * sure the buffer has at least n bytes via comparing with
+ * evr_buf_read_bytes_ready's return value.
+ *
+ * Returns evr_ok on success.
+ */
+int evr_buf_read_pop(struct evr_buf_read *br, char *buf, size_t bytes);
+
 #endif

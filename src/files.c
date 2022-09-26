@@ -379,3 +379,52 @@ int evr_peer_hang_up(struct evr_file *f){
     }
     return evr_ok;
 }
+
+struct evr_buf_read *evr_create_buf_read(struct evr_file *f, size_t buf_size_exp){
+    size_t buf_size = 1 << buf_size_exp;
+    char *buf = malloc(sizeof(struct evr_buf_read) + buf_size);
+    if(!buf){
+        return NULL;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_buf_read *br;
+    evr_map_struct(&bp, br);
+    br->f = f;
+    br->read_i = 0;
+    br->write_i = 0;
+    br->buf = bp.pos;
+    br->buf_size = buf_size;
+    return br;
+}
+
+int evr_buf_read_read(struct evr_buf_read *br){
+    size_t rsize;
+    if(br->read_i <= br->write_i){
+        rsize = br->buf_size - br->write_i;
+        if(br->read_i == 0){
+            --rsize;
+        }
+        if(rsize == 0){
+            // buffer exceeded
+            return -1;
+        }
+    } else {
+        rsize = br->read_i - br->write_i - 1;
+    }
+    char *rbuf = &br->buf[br->write_i];
+    int bytes_read = br->f->read(br->f, rbuf, rsize);
+    if(bytes_read <= 0){
+        return bytes_read;
+    }
+    br->write_i = (br->write_i + bytes_read) & (br->buf_size - 1);
+    return bytes_read;
+}
+
+int evr_buf_read_pop(struct evr_buf_read *br, char *buf, size_t bytes){
+    for(size_t i = 0; i < bytes; ++i){
+        buf[i] = evr_buf_read_peek(br, i);
+    }
+    br->read_i = (br->read_i + bytes) & (br->buf_size - 1);
+    return evr_ok;
+}

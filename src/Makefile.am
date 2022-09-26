@@ -225,6 +225,7 @@ evr_tls_test_LDADD = $(SSL_LIBS)
 files_test_SOURCES = \
 	assert.c \
 	dyn-mem.c \
+	file-mem.c \
 	files.c \
 	files-test.c \
 	logger.c

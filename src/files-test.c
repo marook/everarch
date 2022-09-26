@@ -26,6 +26,7 @@
 #include "test.h"
 #include "errors.h"
 #include "logger.h"
+#include "file-mem.h"
 
 #define random_path "/dev/urandom"
 
@@ -129,11 +130,77 @@ int visit_slice(char *buf, size_t size, void *ctx){
     return evr_ok;
 }
 
+void test_buf_read_bytes_ready(){
+    struct evr_file_mem fm;
+    evr_init_file_mem(&fm, 32);
+    assert(fm.data);
+    struct evr_file f;
+    evr_file_bind_file_mem(&f, &fm);
+    char data[] = "hello!";
+    assert(is_ok(write_n(&f, data, sizeof(data) - 1)));
+    fm.offset = 0;
+    struct evr_buf_read *br = evr_create_buf_read(&f, 2);
+    assert(br);
+    size_t bytes_ready = evr_buf_read_bytes_ready(br);
+    assert_msg(bytes_ready == 0, "But was %zu", bytes_ready);
+    ssize_t bytes_read = evr_buf_read_read(br);
+    // br ring buffer has allocated 2^2 = 4 bytes so it has capacity
+    // of 3.
+    assert_msg(bytes_read == 3, "But was %zd", bytes_read);
+    bytes_ready = evr_buf_read_bytes_ready(br);
+    assert_msg(bytes_ready == 3, "But was %zu", bytes_ready);
+    assert(evr_buf_read_peek(br, 0) == 'h');
+    assert(evr_buf_read_peek(br, 1) == 'e');
+    char rbuf[3];
+    rbuf[0] = 'x';
+    assert(is_ok(evr_buf_read_pop(br, rbuf, 1)));
+    assert(rbuf[0] == 'h');
+    bytes_ready = evr_buf_read_bytes_ready(br);
+    assert_msg(bytes_ready == 2, "But was %zu", bytes_ready);
+    assert(evr_buf_read_peek(br, 0) == 'e');
+    bytes_read = evr_buf_read_read(br);
+    assert_msg(bytes_read == 1, "But was %zd", bytes_read);
+    bytes_ready = evr_buf_read_bytes_ready(br);
+    assert_msg(bytes_ready == 3, "But was %zu", bytes_ready);
+    assert(evr_buf_read_peek(br, 0) == 'e');
+    assert(evr_buf_read_peek(br, 1) == 'l');
+    assert(evr_buf_read_peek(br, 2) == 'l');
+    rbuf[0] = 'x';
+    rbuf[1] = 'x';
+    assert(is_ok(evr_buf_read_pop(br, rbuf, 2)));
+    assert(rbuf[0] == 'e');
+    assert(rbuf[1] == 'l');
+    bytes_read = 0;
+    while(bytes_read < 2){
+        // we read the bytes in this while loop because currently the
+        // implementation is not very optimized and requires multiple
+        // underlying read calls to fetch two bytes IF they overlap
+        // the limits of the ring buffer. this while loop
+        // implementation must not break even if the implementation is
+        // optimized in the future.
+        int brc = evr_buf_read_read(br);
+        assert(brc > 0);
+        bytes_read += brc;
+    }
+    bytes_ready = evr_buf_read_bytes_ready(br);
+    assert_msg(bytes_ready == 3, "But was %zu", bytes_ready);
+    assert(evr_buf_read_peek(br, 0) == 'l');
+    bytes_read = evr_buf_read_read(br);
+    assert(evr_buf_read_peek(br, 1) == 'o');
+    bytes_read = evr_buf_read_read(br);
+    assert(evr_buf_read_peek(br, 2) == '!');
+    bytes_read = evr_buf_read_read(br);
+    assert(evr_buf_read_read(br) == 0);
+    evr_free_buf_read(br);
+    free(fm.data);
+}
+
 int main(){
     run_test(test_read_fd_partial_file);
     run_test(test_read_into_chunks_with_small_file);
     run_test(test_append_into_chunk_set_with_small_file);
     run_test(test_rollsum_split_infinite_file);
     run_test(test_rollsum_split_tiny_file);
+    run_test(test_buf_read_bytes_ready);
     return 0;
 }
