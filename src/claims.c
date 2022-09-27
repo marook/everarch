@@ -669,3 +669,51 @@ xmlNode *evr_find_next_element(xmlNode *n, char *name_filter){
     return NULL;
     
 }
+
+struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
+    struct evr_fs_file *c = NULL;
+    char *path = (char*)xmlGetProp(cn, BAD_CAST "path");
+    if(!path){
+        goto out;
+    }
+    char *file_ref_str = (char*)xmlGetProp(cn, BAD_CAST "file-ref");
+    if(!file_ref_str){
+        goto out_with_free_path;
+    }
+    evr_claim_ref file_ref;
+    if(evr_parse_claim_ref(file_ref, file_ref_str) != evr_ok){
+        goto out_with_free_file_ref_str;
+    }
+    evr_time created = 0;
+    char *created_str = (char*)xmlGetProp(cn, BAD_CAST "created");
+    if(created_str && evr_time_from_iso8601(&created, created_str) != evr_ok){
+        goto out_with_free_created_str;
+    }
+    evr_time last_modified = created;
+    char *last_modified_str = (char*)xmlGetProp(cn, BAD_CAST "last-modified");
+    if(last_modified_str && evr_time_from_iso8601(&last_modified, last_modified_str) != evr_ok){
+        goto out_with_free_last_modified_str;
+    }
+    size_t path_size = strlen(path) + 1;
+    char *buf = malloc(sizeof(struct evr_fs_file) + path_size);
+    if(!buf){
+        goto out_with_free_last_modified_str;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp);
+    evr_map_struct(&bp, c);
+    c->path = bp.pos;
+    memcpy(c->path, path, path_size);
+    memcpy(c->file_ref, file_ref, evr_claim_ref_size);
+    c->created = created;
+    c->last_modified = last_modified;
+ out_with_free_last_modified_str:
+    xmlFree(last_modified_str);
+ out_with_free_created_str:
+    xmlFree(created_str);
+ out_with_free_file_ref_str:
+    xmlFree(file_ref_str);
+ out_with_free_path:
+    xmlFree(path);
+    return c;
+}

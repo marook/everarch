@@ -212,4 +212,15 @@ struct evr_archive_claim *evr_parse_archive_claim(xmlNode *claim_node);
  */
 xmlNode *evr_find_next_element(xmlNode *n, char *name_filter);
 
+struct evr_fs_file {
+    char *path;
+    evr_claim_ref file_ref;
+    evr_time created;
+    evr_time last_modified;
+};
+
+struct evr_fs_file *evr_parse_fs_file(xmlNode *cn);
+
+#define evr_free_fs_file(f) free(f)
+
 #endif
