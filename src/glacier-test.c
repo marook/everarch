@@ -628,6 +628,7 @@ void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *b
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_evr_glacier_open_same_empty_glacier_twice);
     run_test(test_evr_glacier_create_context_twice_fails);
     run_test(test_evr_glacier_write_smal_blobs);

@@ -181,7 +181,7 @@ int evr_chunk_setify(struct chunk_set *cs, char *buf, size_t size){
     return ret;
 }
 
-struct evr_llbuf *evr_init_llbuf(struct evr_buf_pos *bp, size_t data_size){
+struct evr_llbuf *evr_create_llbuf(struct evr_buf_pos *bp, size_t data_size){
     char *buf = malloc(sizeof(struct evr_buf_pos) + data_size);
     if(!buf){
         return NULL;
@@ -194,9 +194,9 @@ struct evr_llbuf *evr_init_llbuf(struct evr_buf_pos *bp, size_t data_size){
     return llb;
 }
 
-int evr_llbuf_push(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_size){
+int evr_llbuf_prepend(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_size){
     struct evr_llbuf *old = *llb;
-    *llb = evr_init_llbuf(bp, data_size);
+    *llb = evr_create_llbuf(bp, data_size);
     if(!*llb){
         *llb = old;
         return evr_error;
@@ -215,4 +215,41 @@ void evr_free_llbuf_chain(struct evr_llbuf *llb, void (*free_item)(void *item)){
         free(llb);
         llb = l;
     }
+}
+
+void evr_init_llbuf_s(struct evr_llbuf_s *llb, size_t child_size){
+    llb->first = NULL;
+    llb->last = NULL;
+    llb->block_count = 0;
+    llb->block_child_count = max(1, (evr_page_size - sizeof(struct evr_llbuf)) / child_size);
+    llb->child_count = 0;
+    llb->child_size = child_size;
+}
+
+int evr_llbuf_s_append(struct evr_llbuf_s *llb, void **child){
+    if(llb->child_count + 1 >= llb->block_count * llb->block_child_count){
+        // grow llbuf
+        struct evr_buf_pos bp;
+        struct evr_llbuf *blk = evr_create_llbuf(&bp, llb->child_size);
+        if(!blk){
+            return evr_error;
+        }
+        if(llb->last){
+            llb->last->next = blk;
+        } else {
+            llb->first = blk;
+        }
+        llb->last = blk;
+        llb->block_count += 1;
+    }
+    size_t blk_child_index = llb->child_count % llb->block_child_count;
+    *child = &((char*)llb->last->data)[blk_child_index * llb->child_size];
+    return evr_ok;
+}
+
+void evr_init_llbuf_s_iter(struct evr_llbuf_s_iter *iter, struct evr_llbuf_s *llb){
+    iter->llb = llb;
+    iter->block = llb->first;
+    iter->child = iter->block ? iter->block->data : NULL;
+    iter->remaining_children = llb->child_count;
 }

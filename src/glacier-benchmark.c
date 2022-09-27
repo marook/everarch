@@ -129,6 +129,7 @@ int glacier_write_worker(void *context);
 int main(int argc, char **argv){
     int ret = 1;
     evr_log_fd = STDERR_FILENO;
+    evr_init_basics();
     evr_tls_init();
     gcry_check_version(EVR_GCRY_MIN_VERSION);
     int nprocs = get_nprocs();

@@ -423,6 +423,7 @@ void test_parse_xml_user_data_invalid(){
 
 int main(){
     xmlInitParser();
+    evr_init_basics();
     run_test(test_empty_claim_without_finalize);
     run_test(test_empty_claim);
     run_test(test_file_claim_with_filename);

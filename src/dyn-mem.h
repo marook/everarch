@@ -78,6 +78,9 @@ struct dynamic_array *write_n_dynamic_array(struct dynamic_array *da, const char
 #define evr_chunk_size (1*1024*1024)
 #define evr_chunk_set_max_chunks (evr_max_blob_data_size / evr_chunk_size + 1)
 
+/**
+ * struct chunk_set is deprecated. Use struct evr_llbuf_s instead.
+ */
 struct chunk_set {
     size_t chunks_len;
     size_t size_used;
@@ -113,9 +116,13 @@ struct evr_llbuf {
     void *data;
 };
 
-struct evr_llbuf *evr_init_llbuf(struct evr_buf_pos *bp, size_t data_size);
+struct evr_llbuf *evr_create_llbuf(struct evr_buf_pos *bp, size_t data_size);
 
-int evr_llbuf_push(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_size);
+/**
+ * evr_llbuf_prepend inserts an a new struct evr_llbuf at the beginnig
+ * of llb.
+ */
+int evr_llbuf_prepend(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_size);
 
 /**
  * evr_free_llbuf_chain frees all linked struct evr_llbuf items.
@@ -124,5 +131,92 @@ int evr_llbuf_push(struct evr_llbuf **llb, struct evr_buf_pos *bp, size_t data_s
  * item itself freed. May be NULL if no such operation is necessary.
  */
 void evr_free_llbuf_chain(struct evr_llbuf *llb, void (*free_item)(void *item));
+
+/**
+ * evr_llbuf_s is a linked list is intended for storing children made
+ * up of the same size. The _s in evr_llbuf_s stands for structs
+ * because most of the time these same sized children will be structs.
+ */
+struct evr_llbuf_s {
+    struct evr_llbuf *first;
+    struct evr_llbuf *last;
+
+    /**
+     * block_count stores the number of struct evr_llbuf blocks
+     * chained from first to last.
+     */
+    size_t block_count;
+
+    /**
+     * block_child_count stores the number of childer store in one
+     * block.
+     */
+    size_t block_child_count;
+
+    /**
+     * child_count is the total number of children stored.
+     */
+    size_t child_count;
+
+    /**
+     * child_size is the size of one child in bytes.
+     */
+    size_t child_size;
+};
+
+/**
+ * evr_init_llbuf_s prepares a struct evr_llbuf_s for being used with
+ * maximum a few thousand children with a child_size way below the
+ * system's page size.
+ *
+ * If the constraints above don't apply to your case initialize the
+ * llbuf's block_child_count to something more appropriate. This can
+ * be done immediately after the evr_init_llbuf_s call.
+ */
+void evr_init_llbuf_s(struct evr_llbuf_s *llb, size_t child_size);
+
+int evr_llbuf_s_append(struct evr_llbuf_s *llb, void **child);
+
+/**
+ * evr_llbuf_s_empty frees all resources used within the given
+ * llb. The memory where the struct evr_llbuf_s points to is not
+ * freed.
+ */
+#define evr_llbuf_s_empty(llb, free_item) evr_free_llbuf_chain((llb)->first, free_item)
+
+struct evr_llbuf_s_iter {
+    struct evr_llbuf_s *llb;
+    struct evr_llbuf *block;
+    char *child;
+    size_t remaining_children;
+};
+
+/**
+ * evr_init_llbuf_s_iter initializes an iterator over llb's children.
+ *
+ * This function does not allocate memory. The iterator is only valid
+ * as long as llb is allocated and the number of children stays fixed.
+ */
+void evr_init_llbuf_s_iter(struct evr_llbuf_s_iter *iter, struct evr_llbuf_s *llb);
+
+/**
+ * evr_llbuf_s_iter_next returns a pointer to the next child.
+ *
+ * Returns NULL if no more children are available.
+ */
+inline void *evr_llbuf_s_iter_next(struct evr_llbuf_s_iter *iter){
+    if(iter->remaining_children == 0){
+        return NULL;
+    }
+    iter->remaining_children -= 1;
+    void *ret = iter->child;
+    void *end = &((char*)iter->block->data)[iter->llb->block_child_count];
+    iter->child += iter->llb->child_size;
+    if(iter->child == end){
+        iter->block = iter->block->next;
+        iter->child = iter->block->data;
+    }
+    return ret;
+}
 
 #endif

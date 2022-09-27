@@ -25,6 +25,12 @@
 #include <time.h>
 #include <string.h>
 
+/**
+ * evr_page_size contains sysconf(_SC_PAGESIZE) or 4096 if no page
+ * size can be determined.
+ */
+extern size_t evr_page_size;
+
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) < (b) ? (b) : (a))
 
@@ -44,6 +50,8 @@
         }                                       \
         s = strdup(arg);                        \
     } while(0)
+
+void evr_init_basics();
 
 #define evr_glacier_storage_host "localhost"
 #define evr_glacier_storage_port 2361

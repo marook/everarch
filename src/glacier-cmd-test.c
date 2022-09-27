@@ -45,6 +45,7 @@ void test_format_parse_resp_header(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_format_parse_cmd_header);
     run_test(test_format_parse_resp_header);
     return 0;

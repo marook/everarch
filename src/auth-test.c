@@ -45,6 +45,7 @@ void test_parse_and_push_auth_token(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_parse_and_fmt_auth_token);
     run_test(test_parse_and_push_auth_token);
     return 0;

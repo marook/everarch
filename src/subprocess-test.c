@@ -97,6 +97,7 @@ void test_pass_path_to_subprocess(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_cat_subprocess);
     run_test(test_false_subprocess);
     run_test(test_pass_path_to_subprocess);

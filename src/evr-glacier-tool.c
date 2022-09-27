@@ -112,6 +112,7 @@ int main(int argc, char **argv){
     int ret = 1;
     evr_log_fd = STDERR_FILENO;
     evr_log_app = "G";
+    evr_init_basics();
     struct cli_cfg cfg;
     cfg.cmd = cli_cmd_none;
     cfg.bucket_file = NULL;

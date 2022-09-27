@@ -42,6 +42,7 @@ void test_notify_send(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_notify_send);
     return 0;
 }

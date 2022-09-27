@@ -130,6 +130,7 @@ void stringify_dynamic_array(struct dynamic_array **da){
 }
 
 int main(){
+    evr_init_basics();
     evr_init_signatures();
     run_test(test_hello_world_signature);
     run_test(test_validate_hello_world_signature);

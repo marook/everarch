@@ -58,6 +58,7 @@ void test_inodes_with_file(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_create_free_inodes);
     run_test(test_inodes_with_file);
     return 0;

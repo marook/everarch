@@ -103,6 +103,7 @@ static const struct fuse_lowlevel_ops evr_fs_oper = {
 
 int main(int argc, char *argv[]) {
     int ret = 1;
+    evr_init_basics();
     struct evr_fs_cfg cfg;
     cfg.foreground = 0;
     cfg.single_thread = 0;

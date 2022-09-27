@@ -115,6 +115,7 @@ void test_evr_cert_cfg(){
 }
 
 int main(){
+    evr_init_basics();
     evr_tls_init();
     run_test(test_tls_accept_connect);
     run_test(test_evr_cert_cfg);

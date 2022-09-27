@@ -73,6 +73,7 @@ void test_parse_config(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_parse_config);
     return 0;
 }

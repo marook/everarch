@@ -130,7 +130,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     case arg_gpg_key: {
         const size_t arg_size = strlen(arg) + 1;
         struct evr_buf_pos bp;
-        if(evr_llbuf_push(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
+        if(evr_llbuf_prepend(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
             usage(state);
             return ARGP_ERR_UNKNOWN;
         }
@@ -225,6 +225,7 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
 int main(int argc, char **argv){
     int ret = evr_error;
     evr_log_app = "i";
+    evr_init_basics();
     evr_tls_init();
     gcry_check_version(EVR_GCRY_MIN_VERSION);
     if(evr_load_attr_index_cfg(argc, argv) != evr_ok){

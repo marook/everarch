@@ -651,6 +651,7 @@ int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_open_new_attr_index_db_twice);
     run_test(test_add_two_attr_claims_for_same_target);
     run_test(test_get_set_state);

@@ -56,6 +56,7 @@ void test_write_list_claims_for_seed(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_write_auth_token);
     run_test(test_write_list_claims_for_seed);
     return 0;

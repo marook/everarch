@@ -104,6 +104,7 @@ claims_test_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS)
 
 concurrent_glacier_test_SOURCES = \
 	assert.c \
+	basics.c \
 	concurrent-glacier-test.c \
 	concurrent-glacier.c \
 	configuration-testutil.c \
@@ -119,14 +120,17 @@ concurrent_glacier_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 configp_test_SOURCES = \
 	assert.c \
+	basics.c \
 	configp.c \
 	configp-test.c \
 	logger.c
 
 dyn_mem_test_SOURCES = \
 	assert.c \
+	basics.c \
 	dyn-mem.c \
-	dyn-mem-test.c
+	dyn-mem-test.c \
+	logger.c
 dyn_mem_test_LDADD = $(EVERARCH_LIBS)
 
 evr_attr_index_SOURCES = \
@@ -175,6 +179,7 @@ evr_SOURCES = \
 evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
 
 evr_fs_SOURCES = \
+	basics.c \
 	configp.c \
 	evr-fs.c \
 	logger.c
@@ -239,6 +244,7 @@ evr_tls_test_LDADD = $(SSL_LIBS)
 
 files_test_SOURCES = \
 	assert.c \
+	basics.c \
 	dyn-mem.c \
 	file-mem.c \
 	files.c \
@@ -271,6 +277,7 @@ glacier_benchmark_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
 
 glacier_cmd_test_SOURCES = \
 	assert.c \
+	basics.c \
 	glacier-cmd.c \
 	glacier-cmd-test.c \
 	keys.c \
@@ -294,6 +301,7 @@ glacier_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 keys_test_SOURCES = \
 	assert.c \
+	basics.c \
 	keys.c \
 	keys-test.c \
 	logger.c
@@ -301,6 +309,7 @@ keys_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
 
 notify_test_SOURCES = \
 	assert.c \
+	basics.c \
 	logger.c \
 	notify.c \
 	notify-test.c \
@@ -308,12 +317,14 @@ notify_test_SOURCES = \
 
 queue_test_SOURCES = \
 	assert.c \
+	basics.c \
 	logger.c \
 	queue.c \
 	queue-test.c
 
 rollsum_test_SOURCES = \
 	assert.c \
+	basics.c \
 	logger.c \
 	rollsum.c \
 	rollsum-test.c
@@ -329,6 +340,7 @@ signatures_test_LDADD = $(GPGME_LIBS)
 
 subprocess_test_SOURCES = \
 	assert.c \
+	basics.c \
 	dyn-mem.c \
 	files.c \
 	logger.c \

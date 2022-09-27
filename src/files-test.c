@@ -196,6 +196,7 @@ void test_buf_read_bytes_ready(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_read_fd_partial_file);
     run_test(test_read_into_chunks_with_small_file);
     run_test(test_append_into_chunk_set_with_small_file);

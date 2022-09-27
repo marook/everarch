@@ -20,9 +20,23 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "logger.h"
 #include "errors.h"
+
+void evr_get_sysconf_size(int name, size_t* v){
+    long s = sysconf(name);
+    if(s >= 0){
+        *v = s;
+    }
+}
+
+size_t evr_page_size = 4096;
+
+void evr_init_basics(){
+    evr_get_sysconf_size(_SC_PAGESIZE, &evr_page_size);
+}
 
 #define is_whitespace(w) (w != ' ' && w != '\t' && w != '\n')
 

@@ -215,7 +215,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     case arg_accepted_gpg_key: {
         const size_t arg_size = strlen(arg) + 1;
         struct evr_buf_pos bp;
-        if(evr_llbuf_push(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
+        if(evr_llbuf_prepend(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
             usage(state);
             return ARGP_ERR_UNKNOWN;
         }
@@ -364,6 +364,7 @@ int evr_cli_sync(struct cli_cfg *cfg);
 
 int main(int argc, char **argv){
     int ret = 1;
+    evr_init_basics();
     evr_tls_init();
     gcry_check_version(EVR_GCRY_MIN_VERSION);
     evr_init_xml_error_logging();

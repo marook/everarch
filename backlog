@@ -226,29 +226,28 @@ should be used instead. this should guarantee compatibility for other
 platforms.
 * use $XDG_CONFIG_HOME to lookup configuration directory
 XDG_* is defined by the [[https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html][basedir-spec]].
-* replace struct chunk_set with linked list
-dny-mem.h should provide one growable random access data structure and
-one growable linked list data structure. the growable linked list data
-structure is implemented in struct evr_llbuf.
+* replace struct chunk_set with struct evr_llbuf_s
+child_size could be 1 and block_child_count may be 1MB.
 
-especially struct dynamic_array is not very well fitted for growing
-because of the evr_chunk_set_max_chunks limitation.
-
-struct dynamic_array should be renamed to hint the random access
-usage. maybe rabuf instead of dynamic_array and llbuf for chunk_set.
-
-pitrp also suggests to copy the XARRAY or X_ARRAY implementation from
-the linux kernel.
-
-linked list chunk sizes maybe should be aligned with RLIMIT_FSIZE. see
-[[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for retrieving RLIMIT_FSIZE and limit the chunk size
-regarding to it. also the chunk size should not grow over 1MB.
+especially because struct chunk_set is not very well fitted for
+growing because of the evr_chunk_set_max_chunks limitation.
 
 there should also be a function for writing linked lists to a file
 descriptor using writev.
-
 ** TODO struct evr_auth_token_cfg should use the linked list
 ** TODO struct evr_cert_cfg should use the linked list
+* rename struct dynamic_array to evr_rabuf
+dny-mem.h should provide one growable random access data structure.
+
+struct dynamic_array should be renamed to hint the random access
+usage. maybe evr_rabuf instead of dynamic_array.
+
+pitrp also suggests to copy the XARRAY or X_ARRAY implementation from
+the linux kernel.
+* keep bucket file sizes below RLIMIT_FSIZE
+bucket file sizes shold be below RLIMIT_FSIZE. see [[elisp:(manual-entry "setrlimit(2)")][setrlimit(2)]] for
+retrieving RLIMIT_FSIZE and limit the bucket size regarding to
+it. also the chunk size should not grow over the configured limit.
 * switch to mmap/msync for writing bucket files
 and measure the io performance compared to open and fsync.
 * add quic support

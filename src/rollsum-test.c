@@ -102,6 +102,7 @@ int print_splits(char *buffer, size_t buffer_size, size_t *splits){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_zero_input_rollsum);
     return 0;
 }

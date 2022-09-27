@@ -106,6 +106,7 @@ void test_claim_ref_tiny_set(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_evr_fmt_key_into);
     run_test(test_evr_parse_blob_ref);
     run_test(test_calc_blob_key);

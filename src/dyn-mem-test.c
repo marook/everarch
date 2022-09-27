@@ -112,14 +112,14 @@ void test_llbuf(){
     struct evr_llbuf *llb = NULL;
     struct evr_buf_pos bp;
     int v = 42;
-    assert(is_ok(evr_llbuf_push(&llb, &bp, sizeof(int))));
+    assert(is_ok(evr_llbuf_prepend(&llb, &bp, sizeof(int))));
     evr_push_as(&bp, &v, int);
     assert(llb);
     assert(llb->next == NULL);
     assert(*(int*)llb->data == 42);
     struct evr_llbuf *first_llb = llb;
     v = 123;
-    assert(is_ok(evr_llbuf_push(&llb, &bp, sizeof(int))));
+    assert(is_ok(evr_llbuf_prepend(&llb, &bp, sizeof(int))));
     evr_push_as(&bp, &v, int);
     assert(llb);
     assert(llb->next == first_llb);
@@ -127,7 +127,49 @@ void test_llbuf(){
     evr_free_llbuf_chain(llb, NULL);
 }
 
+struct a_child {
+    int i;
+    char c;
+};
+
+void test_empty_llbuf_s(){
+    struct evr_llbuf_s llb;
+    evr_init_llbuf_s(&llb, sizeof(struct a_child));
+    assert(!llb.first);
+    assert(!llb.last);
+    assert(llb.block_count == 0);
+    // actual block_child_count depends on system's page size
+    assert_msg(llb.block_child_count > 0, "But was %zu with child_size %zu", llb.block_child_count, llb.child_size);
+    assert(llb.child_count == 0);
+    assert(llb.child_size == sizeof(struct a_child));
+    struct evr_llbuf_s_iter it;
+    evr_init_llbuf_s_iter(&it, &llb);
+    assert(!evr_llbuf_s_iter_next(&it));
+    evr_llbuf_s_empty(&llb, NULL);
+}
+
+void test_filled_llbuf_s(){
+    struct evr_llbuf_s llb;
+    evr_init_llbuf_s(&llb, sizeof(struct a_child));
+    struct a_child *c;
+    assert(is_ok(evr_llbuf_s_append(&llb, (void**)&c)));
+    assert(c);
+    assert(llb.block_count = 1);
+    assert(llb.child_count = 1);
+    c->i = 42;
+    c->c = 'x';
+    struct evr_llbuf_s_iter it;
+    evr_init_llbuf_s_iter(&it, &llb);
+    c = evr_llbuf_s_iter_next(&it);
+    assert(c);
+    assert(c->i == 42);
+    assert(c->c == 'x');
+    assert(evr_llbuf_s_iter_next(&it) == NULL);
+    evr_llbuf_s_empty(&llb, NULL);
+}
+
 int main(){
+    evr_init_basics();
     run_test(test_fill_dynamic_array);
     run_test(test_rtrim_empty_array);
     run_test(test_rtrim_end_of_array);
@@ -136,5 +178,7 @@ int main(){
     run_test(test_dynamic_array_remove);
     run_test(test_allocate_chunk_set);
     run_test(test_llbuf);
+    run_test(test_empty_llbuf_s);
+    run_test(test_filled_llbuf_s);
     return 0;
 }

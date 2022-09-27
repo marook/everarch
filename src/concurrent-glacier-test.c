@@ -157,6 +157,7 @@ void queue_and_process_many_blobs(struct timespec *queue_delay){
 }
 
 int main(){
+    evr_init_basics();
     test_config = create_temp_evr_glacier_storage_cfg();
     assert(test_config);
     run_test(test_queue_one_blob_success);

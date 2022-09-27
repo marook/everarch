@@ -63,6 +63,7 @@ void test_put_take_queue(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_empty_queue_wait);
     run_test(test_overflow_queue);
     run_test(test_put_take_queue);

@@ -131,6 +131,7 @@ void test_split_n(){
 }
 
 int main(){
+    evr_init_basics();
     run_test(test_evr_trim);
     run_test(test_buf_pos_checksums);
     run_test(test_evr_time);
