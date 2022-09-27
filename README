@@ -38,6 +38,10 @@ what we are heading for in the v0.1 release.
 ------------------------------------------------------------------------
 Build & Installation
 
+everarch uses some linux and GNU libc APIs which makes it POSIX
+incompatible. So you might not be able to compilie it on Windows or
+BSD systems.
+
 Install the dependencies:
 
 $ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev libxslt1-dev flex bison texinfo elpa-helm
