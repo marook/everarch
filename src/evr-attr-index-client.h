@@ -29,4 +29,8 @@ int evr_attri_write_auth_token(struct evr_file *f, evr_auth_token t);
 
 int evr_attri_write_list_claims_for_seed(struct evr_file *f, evr_claim_ref seed);
 
+int evr_attri_write_search(struct evr_file *f, char *query);
+
+int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx);
+
 #endif

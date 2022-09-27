@@ -161,7 +161,24 @@ struct evr_buf_read *evr_create_buf_read(struct evr_file *f, size_t buf_size_exp
 
 #define evr_buf_read_peek(br, offset) ((br)->buf[(((br)->read_i + offset) & ((br)->buf_size - 1))])
 
+/**
+ * evr_buf_read_read reads the next part into the buffer.
+ *
+ * Returns the number of bytes read. Returns -1 on error. Returns 0 if
+ * the input evr_file ended.
+ */
 int evr_buf_read_read(struct evr_buf_read *br);
+
+/**
+ * evr_buf_read_read_until reads until the given sentinel character is
+ * observed.
+ *
+ * The found sentinel index will be written to offset if not NULL.
+ *
+ * Returns evr_end if the underlying evr_buf_read ends before the
+ * sentinel was reached.
+ */
+int evr_buf_read_read_until(struct evr_buf_read *br, char sentinel, size_t *offset);
 
 /**
  * evr_buf_read_pop will read n bytes from struct evr_buf_read. Make

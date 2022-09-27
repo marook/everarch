@@ -421,6 +421,27 @@ int evr_buf_read_read(struct evr_buf_read *br){
     return bytes_read;
 }
 
+int evr_buf_read_read_until(struct evr_buf_read *br, char sentinel, size_t *offset){
+    size_t i = 0;
+    while(1){
+        size_t bytes_ready = evr_buf_read_bytes_ready(br);
+        for(; i < bytes_ready; ++i){
+            if(evr_buf_read_peek(br, i) == sentinel){
+                if(offset){
+                    *offset = i;
+                    return evr_ok;
+                }
+            }
+        }
+        int bytes_read = evr_buf_read_read(br);
+        if(bytes_read == 0){
+            return evr_end;
+        } else if(bytes_read < 0) {
+            return evr_error;
+        }
+    }
+}
+
 int evr_buf_read_pop(struct evr_buf_read *br, char *buf, size_t bytes){
     for(size_t i = 0; i < bytes; ++i){
         buf[i] = evr_buf_read_peek(br, i);
