@@ -1,13 +1,25 @@
-* build seed-description XML
-puts all claim-sets for one seed grouped in one seed-description
-parent element.
-* buffered reader around evr_file
-parsing evr-attr-index responses will require a buffered reader in
-order to scan for the next newline or wait for more data.
 * implement evr-attr-index-client.[hc]
-the commands supported by the client library should be authenticate,
-search, seed-description and watch.
-* implement struct + parser for file-set claims
+the commands supported by the client library should be authenticate
+and search.
+* build seed-description XML
+combines data about one seed in an xml element.
+
+#+BEGIN_SRC xml
+<seed-description>
+  <claims>
+    <!-- claims go here, may be implemented later -->
+  </claims>
+  <attr-index>
+    <!-- provide only current attributes from attr-index -->
+    <attr k="my-key" v="my-value"/>
+  </attr-index>
+</seed-description>
+#+END_SRC
+
+implement a formatter like the claim-set formatter in claims.h. see
+the functions evr_init_claim_set, evr_append_file_claim,
+evr_finalize_claim_set and evr_free_claim_set.
+* implement parser for file-set claims
 probably in claims.[hc]
 
 an evr-fs file set may look like this:
@@ -15,26 +27,15 @@ an evr-fs file set may look like this:
 <efs:file-set>
   <efs:file
     path="path/to/file.name"
-    file-claim="sha3-224-123-0000"
+    file-ref="sha3-224-123-0000"
     created="…"
     last-modified="…"
     />
 </efs:file-set>
 #+END_SRC
-* implement evr file reader with cache
-api should be like 'read n bytes at offset o in evr:file from a
-glacier server'.
 
-reading should cache the last read slices in memory until a given
-maximum cache size. this is sensible because sequenced read calls may
-affect the same slices.
-
-maybe we only want to cache the slices at the edges of the read
-interval. so we are prepared for stepping forward and backward through
-the file.
-
-maybe the cache should be a shared cache so concurrent reads from
-different file descriptors on the same file reuse the cache.
+probably only functions for iterating over efs:file nodes are
+necessary.
 * implement evr-fs
 evr-fs should be a user space file system which provides access to
 files stored in everarch.
@@ -47,6 +48,9 @@ $ evr-fs blob:sha3-224-dirs-files-xslt mount/point
 
 the first argument is a reference to the xslt stylesheet used for
 transforming a seed-description into a evr-fs file set.
+* evr-fs should implement a blob cache
+blobs should be cached so follow up reads of partial blobs are more
+don't need refetching the blob from evr-glacier-storage.
 * evr-fs should wath the evr-attr-index
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
