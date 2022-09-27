@@ -58,6 +58,13 @@ representation on evr-attr-index changes.
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
 with evr-fs during runtime.
+* show in emacs if query is still running
+evr-attr-index commands like defun evr-attr-index-search-from-buffer
+don't indicate wether they are still running or completed.
+
+the user should be informed if the command completed. either by
+showing a status like the emacs compile command or maybe a final line
+in the buffer.
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".
