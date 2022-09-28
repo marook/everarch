@@ -22,7 +22,7 @@ files stored in everarch.
 usage should be like:
 
 #+BEGIN_SRC
-$ evr-fs blob:sha3-224-dirs-files-xslt mount/point
+$ evr-fs xslt:blob:sha3-224-dirs-files-xslt mount/point
 #+END_SRC
 
 the first argument is a reference to the xslt stylesheet used for
@@ -37,6 +37,9 @@ representation on evr-attr-index changes.
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
 with evr-fs during runtime.
+* document evr-fs in evr.texi
+especially the seed-description xml format and the efs:file-set xml
+format.
 * show in emacs if query is still running
 evr-attr-index commands like defun evr-attr-index-search-from-buffer
 don't indicate wether they are still running or completed.
