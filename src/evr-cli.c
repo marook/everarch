@@ -42,6 +42,8 @@
 #include "handover.h"
 #include "evr-tls.h"
 #include "auth.h"
+#include "seed-desc.h"
+#include "evr-attr-index-client.h"
 
 #define program_name "evr"
 
@@ -61,6 +63,7 @@ static char doc[] =
     "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
     "The post-file command expects one optional file name argument for upload to the evr-glacier-storage. File will be read from stdin if no file name argument is given.\n\n"
+    "The desc-seed command provides a seed description for the given seed. Expects the seed ref as argument.\n\n"
     "The watch command prints modified blob keys.\n\n"
     "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST:SRC_PORT DST_HOST:DST_PORT after the sync argument."
     ;
@@ -75,10 +78,14 @@ static char args_doc[] = "CMD";
 #define arg_auth_token 261
 #define arg_accepted_gpg_key 262
 #define arg_signing_gpg_key 263
+#define arg_index_host 264
+#define arg_index_port 265
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
-    {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
+    {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glacier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
+    {"index-host", arg_index_host, "HOST", 0, "The hostname of the evr-attr-index server to connect to. Default hostname is " evr_attr_index_host "."},
+    {"index-port", arg_index_port, "PORT", 0, "The port of the evr-attr-index server to connect to. Default port is " to_string(evr_attr_index_port) "."},
     {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of the server. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
     {"auth-token", arg_auth_token, "HOST:PORT:TOKEN", 0, "A hostname, port and authorization token which is presented to the server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"flags", 'f', "F", 0, "Use the given flags when put a blob to evr-glacier-storage."},
@@ -103,11 +110,14 @@ static struct argp_option options[] = {
 #define cli_cmd_watch_blobs 7
 #define cli_cmd_sync 8
 #define cli_cmd_get_verify 9
+#define cli_cmd_desc_seed 10
 
 struct cli_cfg {
     int cmd;
     char *storage_host;
     char *storage_port;
+    char *index_host;
+    char *index_port;
     struct evr_auth_token_cfg *auth_tokens;
     struct evr_cert_cfg *ssl_certs;
     char *key;
@@ -187,6 +197,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     case arg_storage_port:
         evr_replace_str(cfg->storage_port, arg);
         break;
+    case arg_index_host:
+        evr_replace_str(cfg->index_host, arg);
+        break;
+    case arg_index_port:
+        evr_replace_str(cfg->index_port, arg);
+        break;
     case arg_auth_token:
         if(evr_parse_and_push_auth_token(&cfg->auth_tokens, arg) != evr_ok){
             usage(state);
@@ -245,6 +261,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 cfg->cmd = cli_cmd_get_file;
             } else if(strcmp("post-file", arg) == 0){
                 cfg->cmd = cli_cmd_post_file;
+            } else if(strcmp("desc-seed", arg) == 0){
+                cfg->cmd = cli_cmd_desc_seed;
             } else if(strcmp("watch", arg) == 0){
                 cfg->cmd = cli_cmd_watch_blobs;
             } else if(strcmp("sync", arg) == 0){
@@ -267,6 +285,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 break;
             case cli_cmd_post_file:
                 evr_replace_str(cfg->file, arg);
+                break;
+            case cli_cmd_desc_seed:
+                if(evr_parse_claim_ref(cfg->seed, arg) != evr_ok){
+                    usage(state);
+                    return ARGP_ERR_UNKNOWN;
+                }
+                cfg->has_seed = 1;
                 break;
             case cli_cmd_sync:
                 if(evr_replace_host_port(&cfg->src_storage_host, &cfg->src_storage_port, arg) != evr_ok){
@@ -301,6 +326,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         case cli_cmd_get_verify:
         case cli_cmd_get_claim:
         case cli_cmd_get_file:
+        case cli_cmd_desc_seed:
             if(state->arg_num < 2){
                 usage(state);
                 return ARGP_ERR_UNKNOWN;
@@ -359,6 +385,7 @@ int evr_cli_sign_put(struct cli_cfg *cfg);
 int evr_cli_get_file(struct cli_cfg *cfg);
 int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key);
 int evr_cli_post_file(struct cli_cfg *cfg);
+int evr_cli_desc_seed(struct cli_cfg *cfg);
 int evr_cli_watch_blobs(struct cli_cfg *cfg);
 int evr_cli_sync(struct cli_cfg *cfg);
 
@@ -374,6 +401,8 @@ int main(int argc, char **argv){
     cfg.cmd = cli_cmd_none;
     cfg.storage_host = strdup(evr_glacier_storage_host);
     cfg.storage_port = strdup(to_string(evr_glacier_storage_port));
+    cfg.index_host = strdup(evr_attr_index_host);
+    cfg.index_port = strdup(to_string(evr_attr_index_port));
     cfg.auth_tokens = NULL;
     cfg.ssl_certs = NULL;
     cfg.key = NULL;
@@ -394,6 +423,9 @@ int main(int argc, char **argv){
     cfg.verify_ctx = NULL;
     cfg.signing_gpg_fpr = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
+        goto out_with_free_cfg;
+    }
+    if(evr_push_cert(&cfg.ssl_certs, evr_attr_index_host, to_string(evr_attr_index_port), default_index_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
     char *config_paths[] = evr_program_config_paths();
@@ -431,6 +463,9 @@ int main(int argc, char **argv){
     case cli_cmd_post_file:
         ret = evr_cli_post_file(&cfg);
         break;
+    case cli_cmd_desc_seed:
+        ret = evr_cli_desc_seed(&cfg);
+        break;
     case cli_cmd_watch_blobs:
         ret = evr_cli_watch_blobs(&cfg);
         break;
@@ -441,6 +476,8 @@ int main(int argc, char **argv){
     void *tbfree[] = {
         cfg.storage_host,
         cfg.storage_port,
+        cfg.index_host,
+        cfg.index_port,
         cfg.key,
         cfg.file,
         cfg.title,
@@ -468,6 +505,7 @@ int main(int argc, char **argv){
 }
 
 int evr_connect_to_storage(struct evr_file *f, struct cli_cfg *cfg, char *host, char *port);
+int evr_connect_to_index(struct evr_file *c, struct evr_buf_read **r, struct cli_cfg *cfg, char *host, char *port);
 
 int evr_cli_get(struct cli_cfg *cfg){
     int result = evr_error;
@@ -924,6 +962,44 @@ int evr_cli_post_file(struct cli_cfg *cfg){
     return ret;
 }
 
+int evr_cli_desc_seed(struct cli_cfg *cfg){
+    int ret = evr_error;
+    xmlDoc *doc;
+    xmlNode *desc_node;
+    if(evr_seed_desc_create_doc(&doc, &desc_node, cfg->seed) != evr_ok){
+        goto out;
+    }
+    struct evr_file c;
+    struct evr_buf_read *r = NULL;
+    if(evr_connect_to_index(&c, &r, cfg, cfg->index_host, cfg->index_port) != evr_ok){
+        goto out_with_free_doc;
+    }
+    // TODO append claims
+    if(evr_seed_desc_append_attrs(doc, desc_node, r, cfg->seed) != evr_ok){
+        goto out_with_free_r;
+    }
+    char *seed_desc_str = NULL;
+    int seed_desc_size;
+    xmlDocDumpMemoryEnc(doc, (xmlChar**)&seed_desc_str, &seed_desc_size, "UTF-8");
+    if(!seed_desc_str){
+        goto out_with_free_r;
+    }
+    printf("%s", seed_desc_str);
+    ret = evr_ok;
+ out_with_free_r:
+    if(r){
+        evr_free_buf_read(r);
+        if(c.close(&c) != 0){
+            evr_panic("Unable to close evr-attr-index connection");
+            ret = evr_error;
+        }
+    }
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out:
+    return ret;
+}
+
 int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     int ret = evr_error;
     struct post_file_ctx *ctx = ctx0;
@@ -1336,7 +1412,38 @@ int evr_connect_to_storage(struct evr_file *c, struct cli_cfg *cfg, char *host, 
         return evr_error;
     }
     if(evr_write_auth_token(c, t_cfg->token) != evr_ok){
+        if(c->close(c) != 0){
+            evr_panic("Unable to close evr-glacier-storage connection");
+        }
         return evr_error;
     }
     return evr_ok;
+}
+
+int evr_connect_to_index(struct evr_file *c, struct evr_buf_read **r, struct cli_cfg *cfg, char *host, char *port){
+    struct evr_auth_token_cfg *t_cfg;
+    if(evr_find_auth_token(&t_cfg, cfg->auth_tokens, host, port) != evr_ok){
+        log_error("No auth token found for server %s:%s", host, port);
+        goto fail;
+    }
+    if(evr_tls_connect_once(c, host, port, cfg->ssl_certs) != evr_ok){
+        log_error("Failed to connect to evr-attr-index server %s:%s", host, port);
+        goto fail;
+    }
+    *r = evr_create_buf_read(c, 12);
+    if(!*r){
+        goto fail_with_close_c;
+    }
+    if(evr_attri_write_auth_token(c, t_cfg->token) != evr_ok){
+        goto fail_with_free_r;
+    }
+    return evr_ok;
+ fail_with_free_r:
+    evr_free_buf_read(*r);
+ fail_with_close_c:
+    if(c->close(c) != 0){
+        evr_panic("Unable to close evr-attr-index connection");
+    }
+ fail:
+    return evr_error;
 }

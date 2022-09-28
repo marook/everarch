@@ -700,7 +700,7 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
         goto out_with_free_last_modified_str;
     }
     struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp);
+    evr_init_buf_pos(&bp, buf);
     evr_map_struct(&bp, c);
     c->path = bp.pos;
     memcpy(c->path, path, path_size);
@@ -715,5 +715,6 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
     xmlFree(file_ref_str);
  out_with_free_path:
     xmlFree(path);
+ out:
     return c;
 }

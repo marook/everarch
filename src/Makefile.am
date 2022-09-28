@@ -167,6 +167,7 @@ evr_SOURCES = \
 	claims.c \
 	configp.c \
 	dyn-mem.c \
+	evr-attr-index-client.c \
 	evr-cli.c \
 	evr-glacier-client.c \
 	evr-tls.c \
@@ -175,6 +176,7 @@ evr_SOURCES = \
 	handover.c \
 	keys.c \
 	logger.c \
+	seed-desc.c \
 	signatures.c
 evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
 

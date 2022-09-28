@@ -45,7 +45,7 @@ int evr_parse_auth_token(evr_auth_token t, evr_auth_token_str s){
 
 void evr_fmt_auth_token(char *s, evr_auth_token t){
     for(size_t i = 0; i < sizeof(evr_auth_token); ++i){
-        sprintf(s, "%02x", t[i]);
+        sprintf(s, "%02x", (unsigned char)t[i]);
         s += 2;
     }
     *s = '\0';

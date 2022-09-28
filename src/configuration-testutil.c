@@ -59,7 +59,7 @@ struct evr_attr_index_cfg *create_temp_attr_index_db_configuration(){
     memset(cfg, 0, sizeof(struct evr_attr_index_cfg));
     cfg->state_dir_path = new_temp_dir_path();
     cfg->host = strdup("localhost");
-    cfg->port = strdup(to_string(evr_glacier_attr_index_port));
+    cfg->port = strdup(to_string(evr_attr_index_port));
     cfg->storage_host = strdup("localhost");
     cfg->storage_port = strdup(to_string(evr_glacier_storage_port));
     log_info("Using %s as attr-index state dir", cfg->state_dir_path);

@@ -57,7 +57,9 @@ void evr_init_basics();
 #define evr_glacier_storage_port 2361
 #define default_storage_ssl_cert_path EVR_PREFIX "/etc/everarch/evr-glacier-storage-cert.pem"
 
-#define evr_glacier_attr_index_port 2362
+#define evr_attr_index_host "localhost"
+#define evr_attr_index_port 2362
+#define default_index_ssl_cert_path EVR_PREFIX "/etc/everarch/evr-attr-index-cert.pem"
 
 #define evr_max_blob_data_size (16*1024*1024)
 

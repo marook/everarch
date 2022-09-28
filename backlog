@@ -1,21 +1,3 @@
-* build seed-description XML
-combines data about one seed in an xml element.
-
-#+BEGIN_SRC xml
-<seed-description>
-  <claims>
-    <!-- claims go here, may be implemented later -->
-  </claims>
-  <attr-index>
-    <!-- provide only current attributes from attr-index -->
-    <attr k="my-key" v="my-value"/>
-  </attr-index>
-</seed-description>
-#+END_SRC
-
-implement a formatter like the claim-set formatter in claims.h. see
-the functions evr_init_claim_set, evr_append_file_claim,
-evr_finalize_claim_set and evr_free_claim_set.
 * implement parser for file-set claims
 probably in claims.[hc]
 

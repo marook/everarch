@@ -41,6 +41,9 @@ ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
 auth-token=localhost:${glacier_storage_port}:${glacier_storage_auth_token}
 ssl-cert=localhost:${secondary_glacier_storage_port}:${glacier_storage_cert_path}
 auth-token=localhost:${secondary_glacier_storage_port}:${secondary_glacier_storage_auth_token}
+index-port=${attr_index_port}
+auth-token=localhost:${attr_index_port}:${attr_index_auth_token}
+ssl-cert=localhost:${attr_index_port}:${attr_index_cert_path}
 EOF
     append_accepted_gpg_keys >> evr.conf
     cat > evr-glacier-storage.conf <<EOF

@@ -119,6 +119,13 @@ then
     exit 1
 fi
 
+seed_desc=`evr desc-seed "${test_ref}-0000"`
+if [[ "${seed_desc}" != *"test claim"* ]]
+then
+    echo "Unexpected result from evr desc-seed: ${seed_desc}" >&2
+    exit 1
+fi
+
 results=`query_attr_index "s select * where ref=${test_ref}-0000"`
 if [[ "${results}" != "OK
 ${test_ref}-0000

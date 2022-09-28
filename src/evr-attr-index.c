@@ -52,8 +52,7 @@ static char doc[] = program_name " provides an index over a evr-glacier-storage 
 static char args_doc[] = "";
 
 #define default_state_dir_path EVR_PREFIX "/var/everarch/" program_name
-#define default_host "localhost"
-#define default_ssl_cert_path EVR_PREFIX "/etc/everarch/" program_name "-cert.pem"
+#define default_ssl_cert_path default_index_ssl_cert_path
 #define default_ssl_key_path EVR_PREFIX "/etc/everarch/" program_name "-key.pem"
 
 #define arg_host 256
@@ -68,8 +67,8 @@ static char args_doc[] = "";
 
 static struct argp_option options[] = {
     {"state-dir", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
-    {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
-    {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_glacier_attr_index_port) "."},
+    {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " evr_attr_index_host "."},
+    {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_attr_index_port) "."},
     {"cert", arg_ssl_cert_path, "FILE", 0, "The path to the pem file which contains the public SSL certificate. Default path is " default_ssl_cert_path "."},
     {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
     {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
@@ -382,8 +381,8 @@ int evr_load_attr_index_cfg(int argc, char **argv){
         return evr_error;
     }
     cfg->state_dir_path = strdup(default_state_dir_path);
-    cfg->host = strdup(default_host);
-    cfg->port = strdup(to_string(evr_glacier_attr_index_port));
+    cfg->host = strdup(evr_attr_index_host);
+    cfg->port = strdup(to_string(evr_attr_index_port));
     cfg->ssl_cert_path = strdup(default_ssl_cert_path);
     cfg->ssl_key_path = strdup(default_ssl_key_path);
     cfg->auth_token_set = 0;
@@ -1312,11 +1311,11 @@ int evr_work_authenticate_cmd(struct evr_connection *ctx, char *args_str){
     if(evr_split_n(args, args_len, args_str, ' ') != evr_ok){
         // no logging of actual arguments to prevent accidential leak
         // of credentials.
-        log_debug("Illegal authenticate arguments syntax");
+        log_error("Illegal authenticate arguments syntax");
         return evr_error;
     }
     if(strcmp(args[0], "token") != 0){
-        log_debug("Unknown authentication method requested");
+        log_error("Unknown authentication method requested: %s", args[0]);
         return evr_error;
     }
     evr_auth_token client_token;
@@ -1324,7 +1323,7 @@ int evr_work_authenticate_cmd(struct evr_connection *ctx, char *args_str){
         return evr_error;
     }
     if(memcmp(cfg->auth_token, client_token, sizeof(evr_auth_token)) != 0){
-        log_debug("Client provided invalid authentication token");
+        log_error("Client provided invalid authentication token");
         return evr_error;
     }
     ctx->authenticated = 1;

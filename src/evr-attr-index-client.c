@@ -19,12 +19,14 @@
 #include "evr-attr-index-client.h"
 
 #include "errors.h"
+#include "logger.h"
 
 int evr_attri_write_auth_token(struct evr_file *f, evr_auth_token t){
-    char buf[2 + sizeof(evr_auth_token_str) - 1 + 1];
+    const char prefix[] = "a token ";
+    char buf[sizeof(prefix) - 1 + sizeof(evr_auth_token_str) - 1 + 1];
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, buf);
-    evr_push_concat(&bp, "a ");
+    evr_push_concat(&bp, prefix);
     evr_fmt_auth_token(bp.pos, t);
     evr_inc_buf_pos(&bp, sizeof(evr_auth_token_str) - 1);
     evr_push_concat(&bp, "\n");
@@ -50,10 +52,16 @@ int evr_attri_write_search(struct evr_file *f, char *query){
     evr_push_concat(&bp, "s ");
     evr_push_n(&bp, query, query_len);
     evr_push_concat(&bp, "\n");
+    log_debug("Writing evr-attr-index query to fd %d: %s", f->get_fd(f), query);
     return write_n(f, buf, bp.pos - bp.buf);
 }
 
+int evr_attri_read_status(struct evr_buf_read *r);
+
 int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx){
+    if(evr_attri_read_status(r) != evr_ok){
+        return evr_error;
+    }
     int has_seed = 0;
     evr_claim_ref seed;
     while(1){
@@ -94,4 +102,20 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, e
             has_seed = 1;
         }
     }
+}
+
+int evr_attri_read_status(struct evr_buf_read *r){
+    size_t nl_offset;
+    if(evr_buf_read_read_until(r, '\n', &nl_offset) != evr_ok){
+        return evr_error;
+    }
+    char line[nl_offset + 1];
+    if(evr_buf_read_pop(r, line, sizeof(line)) != evr_ok){
+        return evr_error;
+    }
+    line[nl_offset] = '\0';
+    if(strcmp(line, "OK") != 0){
+        log_error("evr-attr-index indicated former query failed: %s", line);
+    }
+    return evr_ok;
 }

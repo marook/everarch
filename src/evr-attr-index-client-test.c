@@ -35,7 +35,7 @@ void test_write_auth_token(){
     memset(t, 42, sizeof(t));
     assert(is_ok(evr_attri_write_auth_token(&f, t)));
     assert(fm.data);
-    char expected[] = "a 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a\n";
+    char expected[] = "a token 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a\n";
     assert(fm.offset == sizeof(expected) - 1);
     assert(memcmp(fm.data->data, expected, sizeof(expected) - 1) == 0);
     free(fm.data);
@@ -85,6 +85,7 @@ void test_read_search(){
     struct evr_file f;
     evr_file_bind_file_mem(&f, &fm);
     char resp[] =
+        "OK\n"
         "sha3-224-1bcc97e1092fcc9532881316663c6025d1b7c7faf92571cb2de5a995-0000\n"
         "	title= my=title \n"
         "	file=sha3-224-1bcc97e1092fcc9532881316663c6025d1b7c7faf92571cb2de5a995-0000\n"
