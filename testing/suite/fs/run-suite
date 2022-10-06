@@ -1,0 +1,62 @@
+#!/bin/bash
+set -e
+set -o pipefail
+. ../config
+
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
+
+start_glacier_storage
+wait_for_glacier_storage
+
+echo "Uploading basic attr-spec…"
+basic_xslt_ref=`evr put < basic.xslt`
+evr -f 3 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:00:00.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <attr-def k="title" type="str"/>
+    <transformation type="xslt" blob="${basic_xslt_ref}"/>
+  </attr-spec>
+</claim-set>
+EOF
+
+fs_xslt_ref=`evr put < fs.xslt`
+echo 'hello world!' | evr post-file --title 'msg.txt'
+
+start_attr_index
+wait_for_attr_index
+
+mount_evr_fs "${fs_xslt_ref}"
+
+find_mnt=`find mnt`
+if [[ "${find_mnt}" != 'mnt
+mnt/test-subdir
+mnt/test-subdir/msg.txt' ]]
+then
+    echo "Unexpected find mnt: ${find_mnt}" >&2
+    exit 1
+fi
+
+size_msg_txt=`stat -c '%s' mnt/test-subdir/msg.txt`
+if [[ "${size_msg_txt}" != '13' ]]
+then
+    echo "Unexpected disk usage of msg.txt: ${size_msg_txt}" >&2
+    exit 1
+fi
+
+# upcomming feature
+# cat_msg=`cat mnt/test-subdir/msg.txt`
+# if [[ "${cat_msg}" != 'TODO' ]]
+# then
+#     echo "Unexpected mnt/test-subdir/msg.txt contents: ${cat_msg}" >&2
+#     exit 1
+# fi
+
+echo "Stopping…"

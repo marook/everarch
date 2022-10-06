@@ -151,7 +151,7 @@ void test_parse_file_claim_claim_set(){
     int file_claims_found = 0;
     int unknown_claims_found = 0;
     for(xmlNode *cn = evr_first_claim(csn); cn; cn = evr_next_claim(cn)){
-        if(evr_is_evr_element(cn, "file")){
+        if(evr_is_evr_element(cn, "file", evr_claims_ns)){
             ++file_claims_found;
             struct evr_file_claim *c = evr_parse_file_claim(cn);
             assert(c);

@@ -38,6 +38,9 @@
 #include "basics.h"
 #include "keys.h"
 
+#define evr_claims_ns "https://evr.ma300k.de/claims/"
+#define evr_files_ns "https://evr.ma300k.de/files/"
+
 /**
  * evr_init_xml_error_logging initializes the libxml error
  * logging. Must be called once per thread.
@@ -155,7 +158,7 @@ int evr_free_claim_set(struct evr_claim_set *cs);
  * evr_parse_created(&created, xmlDocGetRootElement(doc));
  * for(cn = evr_first_claim(); cn; cn = evr_next_claim(cn)){
  *   …
- *   if(evr_is_evr_element(cn, "file"){
+ *   if(evr_is_evr_element(cn, "file", evr_claims_ns){
  *     struct evr_file_claim c;
  *     evr_parse_file_claim(&c, cn);
  *     …
@@ -178,7 +181,7 @@ xmlNode *evr_next_claim(xmlNode *claim_node);
 
 xmlNode *evr_nth_claim(xmlNode *claim_set, int n);
 
-int evr_is_evr_element(xmlNode *n, char *name);
+int evr_is_evr_element(xmlNode *n, char *name, char *ns);
 
 /**
  * evr_add_claim_seed_attrs makes sure every claim within the doc has a
@@ -206,15 +209,21 @@ struct evr_archive_claim *evr_parse_archive_claim(xmlNode *claim_node);
  * name_filter. Starting with n and following with every following
  * sibling of n.
  *
- * name_filter can only match names in the everarch claims
- * namespace. name_filter may be NULL if the element name filter
- * should be ignored.
+ * name_filter may be NULL if the element name filter should be
+ * ignored.
  */
-xmlNode *evr_find_next_element(xmlNode *n, char *name_filter);
+xmlNode *evr_find_next_element(xmlNode *n, char *name_filter, char *ns);
+
+xmlNode *evr_get_root_file_set(xmlDoc *doc);
+
+xmlNode *evr_first_file_node(xmlNode *file_set);
+
+xmlNode *evr_next_file_node(xmlNode *file);
 
 struct evr_fs_file {
     char *path;
     evr_claim_ref file_ref;
+    size_t size;
     evr_time created;
     evr_time last_modified;
 };

@@ -44,6 +44,65 @@ int evr_attri_write_list_claims_for_seed(struct evr_file *f, evr_claim_ref seed)
     return write_n(f, buf, bp.pos - bp.buf);
 }
 
+struct evr_attri_search_ctx {
+    size_t visited_seed_count;
+    void *ctx;
+    int (*visit_seed)(void *ctx, evr_claim_ref seed);
+    int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val);
+};
+
+int evr_attri_search_visit_seed(void *ctx, evr_claim_ref seed);
+int evr_attri_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val);
+
+int evr_attri_search(struct evr_buf_read *r, char *query, int (*visit_seed)(void *ctx, evr_claim_ref seed), int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx){
+    size_t offset = 0;
+    const size_t limit = 256;
+    size_t query_len = strlen(query);
+    const char limit_exp[] = " limit ";
+    char limit_query[query_len + (sizeof(limit_exp) - 1) + 40];
+    memcpy(limit_query, query, query_len);
+    memcpy(&limit_query[query_len], limit_exp, sizeof(limit_exp) - 1);
+    char *limit_query_offset = &limit_query[query_len + sizeof(limit_exp) - 1];
+    struct evr_attri_search_ctx search_ctx;
+    search_ctx.ctx = ctx;
+    search_ctx.visit_seed = visit_seed;
+    search_ctx.visit_attr = visit_attr;
+    while(1){
+        if(sprintf(limit_query_offset, "%zu offset %zu", limit, offset) <= 0){
+            return evr_error;
+        }
+        if(evr_attri_write_search(r->f, limit_query) != evr_ok){
+            return evr_error;
+        }
+        search_ctx.visited_seed_count = 0;
+        if(evr_attri_read_search(r, evr_attri_search_visit_seed, evr_attri_search_visit_attr, &search_ctx) != evr_ok){
+            return evr_error;
+        }
+        if(search_ctx.visited_seed_count < limit){
+            break;
+        }
+        offset += limit;
+    }
+    return evr_ok;
+}
+
+int evr_attri_search_visit_seed(void *ctx, evr_claim_ref seed){
+    struct evr_attri_search_ctx *search_ctx = ctx;
+    search_ctx->visited_seed_count += 1;
+    if(search_ctx->visit_seed){
+        return search_ctx->visit_seed(search_ctx->ctx, seed);
+    }
+    return evr_ok;
+}
+
+int evr_attri_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val){
+    struct evr_attri_search_ctx *search_ctx = ctx;
+    if(search_ctx->visit_attr){
+        return search_ctx->visit_attr(search_ctx->ctx, seed, key, val);
+    }
+    return evr_ok;
+}
+
 int evr_attri_write_search(struct evr_file *f, char *query){
     size_t query_len = strlen(query);
     char buf[2 + query_len + 1];
@@ -58,7 +117,7 @@ int evr_attri_write_search(struct evr_file *f, char *query){
 
 int evr_attri_read_status(struct evr_buf_read *r);
 
-int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx){
+int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, evr_claim_ref seed), int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx){
     if(evr_attri_read_status(r) != evr_ok){
         return evr_error;
     }
@@ -88,7 +147,7 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, e
             }
             line[eq_i] = '\0';
             line[sizeof(line) - 1] = '\0';
-            if(visit_attr(ctx, seed, &line[1], &line[eq_i + 1]) != evr_ok){
+            if(visit_attr && visit_attr(ctx, seed, &line[1], &line[eq_i + 1]) != evr_ok){
                 return evr_error;
             }
         } else if(line[0] == '\n'){
@@ -100,6 +159,9 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, e
                 return evr_error;
             }
             has_seed = 1;
+            if(visit_seed && visit_seed(ctx, seed) != evr_ok){
+                return evr_error;
+            }
         }
     }
 }

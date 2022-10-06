@@ -541,7 +541,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     xmlNode *c_node = evr_first_claim(cs_node);
     struct evr_attr_claim *attr;
     while(c_node){
-        c_node = evr_find_next_element(c_node, "attr");
+        c_node = evr_find_next_element(c_node, "attr", evr_claims_ns);
         if(!c_node){
             break;
         }
@@ -582,7 +582,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
     c_node = evr_first_claim(cs_node);
     struct evr_archive_claim *arch;
     while(c_node){
-        c_node = evr_find_next_element(c_node, "archive");
+        c_node = evr_find_next_element(c_node, "archive", evr_claims_ns);
         if(!c_node){
             break;
         }
@@ -904,7 +904,7 @@ int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, cha
     }
     xmlNode *sc = evr_first_claim(scs);
     while(sc){
-        sc = evr_find_next_element(sc, NULL);
+        sc = evr_find_next_element(sc, NULL, NULL);
         if(!sc){
             break;
         }

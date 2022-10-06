@@ -28,7 +28,6 @@ void evr_init_xml_error_logging(){
 
 const char *evr_claim_encoding = "utf-8";
 const char *evr_iso_8601_timestamp = "%FT%TZ";
-const char *evr_claims_ns = "https://evr.ma300k.de/claims/";
 const char *evr_dc_ns = "http://purl.org/dc/terms/";
 
 int evr_init_claim_set(struct evr_claim_set *cs, const evr_time *created){
@@ -165,7 +164,7 @@ int evr_parse_xml(xmlDocPtr *doc, const char *buf, size_t buf_size){
 xmlNode *evr_get_root_claim_set(xmlDocPtr doc){
     xmlNode *cs = NULL;
     xmlNode *n = xmlDocGetRootElement(doc);
-    if(!evr_is_evr_element(n, "claim-set")){
+    if(!evr_is_evr_element(n, "claim-set", evr_claims_ns)){
         goto out;
     }
     cs = n;
@@ -190,11 +189,11 @@ int evr_parse_created(evr_time *t, xmlNode *node){
 }
 
 xmlNode *evr_first_claim(xmlNode *claim_set){
-    return evr_find_next_element(claim_set->children, NULL);
+    return evr_find_next_element(claim_set->children, NULL, NULL);
 }
 
 xmlNode *evr_next_claim(xmlNode *claim_node){
-    return evr_find_next_element(claim_node->next, NULL);
+    return evr_find_next_element(claim_node->next, NULL, NULL);
 }
 
 xmlNode *evr_nth_claim(xmlNode *claim_set, int n){
@@ -205,7 +204,7 @@ xmlNode *evr_nth_claim(xmlNode *claim_set, int n){
     return node;
 }
 
-int evr_is_evr_element(xmlNode *n, char *name){
+int evr_is_evr_element(xmlNode *n, char *name, char *ns){
     int ret = 0;
     if(!n || !n->name || !n->ns || n->type != XML_ELEMENT_NODE){
         goto out;
@@ -213,7 +212,7 @@ int evr_is_evr_element(xmlNode *n, char *name){
     if(strcmp((char*)n->name, name) != 0){
         goto out;
     }
-    if(strcmp(evr_claims_ns, (char*)n->ns->href) != 0){
+    if(strcmp(ns, (char*)n->ns->href) != 0){
         goto out;
     }
     ret = 1;
@@ -232,7 +231,7 @@ int evr_add_claim_seed_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
     xmlNode *c = evr_first_claim(cs);
     size_t index_seed;
     while(c){
-        c = evr_find_next_element(c, NULL);
+        c = evr_find_next_element(c, NULL, NULL);
         if(!c){
             break;
         }
@@ -264,7 +263,7 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     size_t attr_def_str_size_sum = 0;
     xmlNode *attr_def_node = claim_node->children;
     while(1){
-        attr_def_node = evr_find_next_element(attr_def_node, "attr-def");
+        attr_def_node = evr_find_next_element(attr_def_node, "attr-def", evr_claims_ns);
         if(!attr_def_node){
             break;
         }
@@ -281,14 +280,14 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     size_t attr_factories_len = 0;
     xmlNode *attr_factory_node = claim_node->children;
     while(1){
-        attr_factory_node = evr_find_next_element(attr_factory_node, "attr-factory");
+        attr_factory_node = evr_find_next_element(attr_factory_node, "attr-factory", evr_claims_ns);
         if(!attr_factory_node){
             break;
         }
         ++attr_factories_len;
         attr_factory_node = attr_factory_node->next;
     }
-    xmlNode *transformation_node = evr_find_next_element(claim_node->children, "transformation");
+    xmlNode *transformation_node = evr_find_next_element(claim_node->children, "transformation", evr_claims_ns);
     if(!transformation_node){
         log_error("Missing transformation element in attr-spec claim");
         goto out;
@@ -325,7 +324,7 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     struct evr_attr_def *next_attr_def = c->attr_def;
     attr_def_node = claim_node->children;
     while(1){
-        attr_def_node = evr_find_next_element(attr_def_node, "attr-def");
+        attr_def_node = evr_find_next_element(attr_def_node, "attr-def", evr_claims_ns);
         if(!attr_def_node){
             break;
         }
@@ -363,7 +362,7 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
     c->attr_factories = attr_factories;
     attr_factory_node = claim_node->children;
     while(1){
-        attr_factory_node = evr_find_next_element(attr_factory_node, "attr-factory");
+        attr_factory_node = evr_find_next_element(attr_factory_node, "attr-factory", evr_claims_ns);
         if(!attr_factory_node){
             break;
         }
@@ -408,7 +407,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
         // TODO support no title
         goto out;
     }
-    xmlNode *body = evr_find_next_element(claim_node->children, "body");
+    xmlNode *body = evr_find_next_element(claim_node->children, "body", evr_claims_ns);
     if(!body){
         goto out_with_free_title;
     }
@@ -428,7 +427,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     int si = 0;
     xmlNode *slice = body->children;
     while(1){
-        slice = evr_find_next_element(slice, "slice");
+        slice = evr_find_next_element(slice, "slice", evr_claims_ns);
         if(!slice){
             break;
         }
@@ -471,7 +470,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
 size_t evr_count_elements(xmlNode *start, char *name){
     size_t count = 0;
     while(1){
-        start = evr_find_next_element(start, name);
+        start = evr_find_next_element(start, name, evr_claims_ns);
         if(start){
             ++count;
             start = start->next;
@@ -515,7 +514,7 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     size_t attr_str_size_sum = 0;
     xmlNode *attr = claim_node->children;
     while(1){
-        attr = evr_find_next_element(attr, "a");
+        attr = evr_find_next_element(attr, "a", evr_claims_ns);
         if(!attr){
             break;
         }
@@ -551,7 +550,7 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
     struct evr_attr *next_attr = c->attr;
     attr = claim_node->children;
     while(1){
-        attr = evr_find_next_element(attr, "a");
+        attr = evr_find_next_element(attr, "a", evr_claims_ns);
         if(!attr){
             break;
         }
@@ -657,17 +656,35 @@ int evr_parse_claim_index_seed_attr(size_t *index_seed, xmlNode *claim){
     return ret;
 }
 
-xmlNode *evr_find_next_element(xmlNode *n, char *name_filter){
+xmlNode *evr_find_next_element(xmlNode *n, char *name_filter, char *ns){
     for(xmlNode *c = n; c; c = c->next){
         if(c->type != XML_ELEMENT_NODE){
             continue;
         }
-        if(!name_filter || evr_is_evr_element(c, name_filter)){
+        if(!name_filter || evr_is_evr_element(c, name_filter, ns)){
             return c;
         }
     }
     return NULL;
-    
+}
+
+xmlNode *evr_get_root_file_set(xmlDoc *doc){
+    xmlNode *fs = NULL;
+    xmlNode *n = xmlDocGetRootElement(doc);
+    if(!evr_is_evr_element(n, "file-set", evr_files_ns)){
+        goto out;
+    }
+    fs = n;
+ out:
+    return fs;
+}
+
+xmlNode *evr_first_file_node(xmlNode *file_set){
+    return evr_find_next_element(file_set->children, "file", evr_files_ns);
+}
+
+xmlNode *evr_next_file_node(xmlNode *file){
+    return evr_find_next_element(file->next, "file-set", evr_files_ns);
 }
 
 struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
@@ -683,6 +700,15 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
     evr_claim_ref file_ref;
     if(evr_parse_claim_ref(file_ref, file_ref_str) != evr_ok){
         goto out_with_free_file_ref_str;
+    }
+    char *size_str = (char*)xmlGetProp(cn, BAD_CAST "size");
+    if(!size_str){
+        log_error("file element with path %s is missing size attribute", path);
+        goto out_with_free_file_ref_str;
+    }
+    size_t size;
+    if(sscanf(size_str, "%zu", &size) != 1){
+        goto out_with_free_size_str;
     }
     evr_time created = 0;
     char *created_str = (char*)xmlGetProp(cn, BAD_CAST "created");
@@ -704,6 +730,7 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
     evr_map_struct(&bp, c);
     c->path = bp.pos;
     memcpy(c->path, path, path_size);
+    c->size = size;
     memcpy(c->file_ref, file_ref, evr_claim_ref_size);
     c->created = created;
     c->last_modified = last_modified;
@@ -711,6 +738,8 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
     xmlFree(last_modified_str);
  out_with_free_created_str:
     xmlFree(created_str);
+ out_with_free_size_str:
+    xmlFree(size_str);
  out_with_free_file_ref_str:
     xmlFree(file_ref_str);
  out_with_free_path:

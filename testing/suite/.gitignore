@@ -1,6 +1,7 @@
 /config.local
 
 evr.conf
+evr-fs.conf
 evr-glacier-storage.conf
 evr-attr-index.conf
 glacier-benchmark.conf

@@ -33,9 +33,11 @@ int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_desc_node, evr_claim_ref 
         goto fail_with_free_doc;
     }
     xmlDocSetRootElement(doc, desc_node);
-    if(xmlNewNs(desc_node, BAD_CAST evr_seed_desc_ns, NULL) == NULL){
+    xmlNs *ns = xmlNewNs(desc_node, BAD_CAST evr_seed_desc_ns, NULL);
+    if(ns == NULL){
         goto fail_with_free_doc;
     }
+    xmlSetNs(desc_node, ns);
     evr_claim_ref_str seed_str;
     evr_fmt_claim_ref(seed_str, seed);
     if(xmlSetProp(desc_node, BAD_CAST "seed", BAD_CAST seed_str) == NULL){
@@ -113,7 +115,7 @@ int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_r
     if(evr_attri_write_search(r->f, query) != evr_ok){
         goto fail_with_free_attrs_node;
     }
-    if(evr_attri_read_search(r, evr_seed_desc_append_attrs_visit_attr, attrs_node) != evr_ok){
+    if(evr_attri_read_search(r, NULL, evr_seed_desc_append_attrs_visit_attr, attrs_node) != evr_ok){
         goto fail_with_free_attrs_node;
     }
     if(!xmlAddChild(desc_node, attrs_node)){

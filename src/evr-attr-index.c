@@ -575,7 +575,7 @@ int evr_watch_index_claims_worker(void *arg){
             goto out_with_free_claim_doc;
         }
         if(latest_spec == NULL || created > latest_spec_created){
-            xmlNode *c_node = evr_find_next_element(evr_first_claim(cs_node), "attr-spec");
+            xmlNode *c_node = evr_find_next_element(evr_first_claim(cs_node), "attr-spec", evr_claims_ns);
             if(c_node){
                 if(latest_spec){
                     free(latest_spec);
@@ -1004,7 +1004,7 @@ int evr_index_sync_worker(void *arg){
             if(!cs_node){
                 goto out_with_free_cs_doc;
             }
-            xmlNode *c_node = evr_find_next_element(evr_first_claim(cs_node), "attr-spec");
+            xmlNode *c_node = evr_find_next_element(evr_first_claim(cs_node), "attr-spec", evr_claims_ns);
             if(!c_node){
                 goto out_with_free_cs_doc;
             }

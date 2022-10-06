@@ -27,7 +27,13 @@ char *evr_alloc_chunk();
 void evr_free_chunk(char *chunk);
 
 struct dynamic_array *alloc_dynamic_array(size_t initial_size){
-    size_t da_size = get_dynamic_array_size(initial_size);
+    size_t da_size;
+    if(initial_size == 0){
+        da_size = evr_page_size;
+        initial_size = da_size - sizeof(struct dynamic_array);
+    } else {
+        da_size = get_dynamic_array_size(initial_size);
+    }
     struct dynamic_array *da = (struct dynamic_array*)malloc(da_size);
     if(!da){
         return NULL;

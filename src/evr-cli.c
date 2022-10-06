@@ -391,12 +391,12 @@ int evr_cli_sync(struct cli_cfg *cfg);
 
 int main(int argc, char **argv){
     int ret = 1;
+    evr_log_fd = STDERR_FILENO;
+    evr_log_app = "e";
     evr_init_basics();
     evr_tls_init();
     gcry_check_version(EVR_GCRY_MIN_VERSION);
     evr_init_xml_error_logging();
-    evr_log_fd = STDERR_FILENO;
-    evr_log_app = "e";
     struct cli_cfg cfg;
     cfg.cmd = cli_cmd_none;
     cfg.storage_host = strdup(evr_glacier_storage_host);
@@ -804,16 +804,16 @@ int evr_cli_get_file(struct cli_cfg *cfg){
         log_error("There is no claim with index %d in claim-set with ref %s", claim, cfg->key);
         goto out_with_free_doc;
     }
-    if(!evr_is_evr_element(fc, "file")){
+    if(!evr_is_evr_element(fc, "file", evr_claims_ns)){
         log_error("The claim with index %d in claim-set with ref %s is not a file claim", claim, cfg->key);
         goto out_with_free_doc;
     }
-    xmlNode *fbody = evr_find_next_element(fc->children, "body");
+    xmlNode *fbody = evr_find_next_element(fc->children, "body", evr_claims_ns);
     if(!fbody){
         log_error("No body found in file claim");
         goto out_with_free_doc;
     }
-    xmlNode *slice = evr_find_next_element(fbody->children, "slice");
+    xmlNode *slice = evr_find_next_element(fbody->children, "slice", evr_claims_ns);
     evr_blob_ref sref;
     struct evr_resp_header resp;
     struct evr_file stdout;
@@ -850,7 +850,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
         if(pipe_res != evr_ok){
             goto out_with_free_doc;
         }
-        slice = evr_find_next_element(slice->next, "slice");
+        slice = evr_find_next_element(slice->next, "slice", evr_claims_ns);
     }
     ret = evr_ok;
  out_with_free_doc:

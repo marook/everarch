@@ -96,7 +96,7 @@ void test_read_search(){
     struct evr_buf_read *r = evr_create_buf_read(&f, 7);
     assert(r);
     int state = 1;
-    assert(is_ok(evr_attri_read_search(r, test_read_search_visit_attr, &state)));
+    assert(is_ok(evr_attri_read_search(r, NULL, test_read_search_visit_attr, &state)));
     assert(state == 3);
     evr_free_buf_read(r);
     free(fm.data);

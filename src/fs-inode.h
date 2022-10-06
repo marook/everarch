@@ -31,22 +31,26 @@
 #define evr_fs_inode_type_dir 1
 #define evr_fs_inode_type_file 2
 
+// TODO drop _fs from name
 struct evr_fs_inode_dir {
     size_t children_len;
     fuse_ino_t *children;
 };
 
+// TODO drop _fs from name
 struct evr_fs_inode_file {
     size_t file_size;
     evr_claim_ref file_ref;
     evr_claim_ref seed;
 };
 
+// TODO drop _fs from name
 union evr_fs_inode_data {
     struct evr_fs_inode_dir dir;
     struct evr_fs_inode_file file;
 };
 
+// TODO drop _fs from name
 struct evr_fs_inode {
     fuse_ino_t parent;
     char *name;
@@ -79,5 +83,22 @@ fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_le
  * become childless except the root inode 1.
  */
 void evr_inode_remove(struct evr_fs_inode *inodes, fuse_ino_t n);
+
+struct evr_inode_set {
+    struct evr_fs_inode *inodes;
+    size_t inodes_len;
+};
+
+int evr_init_inode_set(struct evr_inode_set *s);
+
+#define evr_empty_inode_set(s) evr_free_inodes((s)->inodes)
+
+/**
+ * evr_inode_set_create_file creates a file inode and all missing
+ * parent directory inodes.
+ *
+ * Returns 0 on error. Otherwise the created inode.
+ */
+#define evr_inode_set_create_file(s, file_path) evr_inode_create_file(&(s)->inodes, &(s)->inodes_len, file_path)
 
 #endif

@@ -23,6 +23,8 @@ attr_index_pid=
 attr_index_cert_path="${script_dir}/../tls/attr-index-cert.pem"
 attr_index_auth_token='7c0c40cb392ceeb42097988f21ed968f3590f25ae3deca8632e4a905cd340cbe'
 
+evr_fs_mnt_dir=mnt
+
 if [ -e "${script_dir}/config.local" ]
 then
     . "${script_dir}/config.local"
@@ -46,6 +48,14 @@ auth-token=localhost:${attr_index_port}:${attr_index_auth_token}
 ssl-cert=localhost:${attr_index_port}:${attr_index_cert_path}
 EOF
     append_accepted_gpg_keys >> evr.conf
+    cat > evr-fs.conf <<EOF
+storage-port=${glacier_storage_port}
+ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
+auth-token=localhost:${glacier_storage_port}:${glacier_storage_auth_token}
+index-port=${attr_index_port}
+auth-token=localhost:${attr_index_port}:${attr_index_auth_token}
+ssl-cert=localhost:${attr_index_port}:${attr_index_cert_path}
+EOF
     cat > evr-glacier-storage.conf <<EOF
 port=${glacier_storage_port}
 cert=${glacier_storage_cert_path}
@@ -129,6 +139,20 @@ exit
 EOF
 }
 
+mount_evr_fs() {
+    xslt_ref="$1"
+    rm -rf -- "${evr_fs_mnt_dir}"
+    mkdir -p -- "${evr_fs_mnt_dir}"
+    echo "Mounting evr-fs…"
+    evr-fs "xslt:blob:${xslt_ref}" "${evr_fs_mnt_dir}"
+}
+
+umount_evr_fs() {
+    parent_dir=`readlink -f .`
+    mnt_dir="${parent_dir}/${evr_fs_mnt_dir}"
+    findmnt -M "${mnt_dir}" >/dev/null && fusermount -u "${evr_fs_mnt_dir}" || true
+}
+
 wait_for_port() {
     port="$1"
     sleep 0.1
@@ -153,6 +177,7 @@ ensure_port_available() {
 # stop_everarch_servers is usually the target of a trap:
 # trap stop_everarch_servers EXIT
 stop_everarch_servers() {
+    umount_evr_fs
     if [[ -n "${attr_index_pid}" ]]
     then
         kill -s sigint "${attr_index_pid}"

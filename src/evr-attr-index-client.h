@@ -29,8 +29,19 @@ int evr_attri_write_auth_token(struct evr_file *f, evr_auth_token t);
 
 int evr_attri_write_list_claims_for_seed(struct evr_file *f, evr_claim_ref seed);
 
+/**
+ * evr_attri_search writes search commands to r and visits the
+ * results.
+ *
+ * Query must not contain the limit or offset evr query language
+ * keywords. limit and offset are added by evr_attri_search in order
+ * to read the matching seeds page by page. The caller should add an
+ * 'at' timestamp to the query so the pages are somehow stable.
+ */
+int evr_attri_search(struct evr_buf_read *r, char *query, int (*visit_seed)(void *ctx, evr_claim_ref seed), int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx);
+
 int evr_attri_write_search(struct evr_file *f, char *query);
 
-int evr_attri_read_search(struct evr_buf_read *r, int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx);
+int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, evr_claim_ref seed), int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx);
 
 #endif

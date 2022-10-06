@@ -181,11 +181,23 @@ evr_SOURCES = \
 evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
 
 evr_fs_SOURCES = \
+	auth.c \
 	basics.c \
+	claims.c \
 	configp.c \
+	dyn-mem.c \
+	evr-attr-index-client.c \
 	evr-fs.c \
-	logger.c
-evr_fs_LDADD = $(FUSE_LIBS)
+	evr-glacier-client.c \
+	evr-tls.c \
+	files.c \
+	fs-inode.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c \
+	seed-desc.c \
+	signatures.c
+evr_fs_LDADD = $(FUSE_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	auth.c \

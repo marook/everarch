@@ -46,6 +46,10 @@ struct dynamic_array {
 /**
  * alloc_dynamic_array allocates a dynamic_array using malloc.
  *
+ * initial_size defines the initial size of data. It may be null to
+ * indicate one page should be used for the struct dynamic_array and
+ * the data initially.
+ *
  * Returns NULL if the memory could not be allocated.
  *
  * The returned dynamic_array can be freed using free(…).

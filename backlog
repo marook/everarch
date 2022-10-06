@@ -30,7 +30,7 @@ transforming a seed-description into a evr-fs file set.
 * evr-fs should implement a blob cache
 blobs should be cached so follow up reads of partial blobs are more
 don't need refetching the blob from evr-glacier-storage.
-* evr-fs should wath the evr-attr-index
+* evr-fs should watch the evr-attr-index
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
 * reserve .evr in root directory within evr-fs
@@ -47,6 +47,13 @@ don't indicate wether they are still running or completed.
 the user should be informed if the command completed. either by
 showing a status like the emacs compile command or maybe a final line
 in the buffer.
+* migrate to partial evr-fs readdir buffer rebuilds
+right now evr_fs_readdir in evr-fs.c builds the complete readdir
+buffer only to report a slice of at an the end.
+
+the off parameter should be used to communicate which inodes should
+be read. probably the off parameter should be the directory child's
+index from struct evr_fs_inode_dir.
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".

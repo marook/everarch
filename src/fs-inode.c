@@ -33,7 +33,7 @@ struct evr_fs_inode *evr_create_inodes(size_t inodes_len){
         return NULL;
     }
     struct evr_fs_inode *root = &inodes[FUSE_ROOT_ID];
-    root->parent = 0;
+    root->parent = FUSE_ROOT_ID;
     root->name = NULL;
     evr_now(&root->created);
     root->last_modified = root->created;
@@ -218,4 +218,15 @@ void evr_inode_remove(struct evr_fs_inode *inodes, fuse_ino_t n){
             evr_panic("Shrinking dir inode children array not possible.");
         }
     }
+}
+
+int evr_init_inode_set(struct evr_inode_set *s){
+    const size_t inodes_len = 1024;
+    struct evr_fs_inode *ino = evr_create_inodes(inodes_len);
+    if(!ino){
+        return evr_error;
+    }
+    s->inodes_len = inodes_len;
+    s->inodes = ino;
+    return evr_ok;
 }
