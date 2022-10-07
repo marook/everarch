@@ -29,6 +29,7 @@ EOF
 
 fs_xslt_ref=`evr put < fs.xslt`
 echo 'hello world!' | evr post-file --title 'msg.txt'
+dd bs=4000 count=300 if=/dev/urandom | evr post-file --title 'little-random.bin'
 
 start_attr_index
 wait_for_attr_index
@@ -38,6 +39,7 @@ mount_evr_fs "${fs_xslt_ref}"
 find_mnt=`find mnt`
 if [[ "${find_mnt}" != 'mnt
 mnt/test-subdir
+mnt/test-subdir/little-random.bin
 mnt/test-subdir/msg.txt' ]]
 then
     echo "Unexpected find mnt: ${find_mnt}" >&2
@@ -51,12 +53,18 @@ then
     exit 1
 fi
 
-# upcomming feature
-# cat_msg=`cat mnt/test-subdir/msg.txt`
-# if [[ "${cat_msg}" != 'TODO' ]]
-# then
-#     echo "Unexpected mnt/test-subdir/msg.txt contents: ${cat_msg}" >&2
-#     exit 1
-# fi
+cat_msg=`cat mnt/test-subdir/msg.txt`
+if [[ "${cat_msg}" != 'hello world!' ]]
+then
+    echo "Unexpected mnt/test-subdir/msg.txt content: ${cat_msg}" >&2
+    exit 1
+fi
+
+little_random_bytes=`cat mnt/test-subdir/little-random.bin | wc --bytes`
+if [[ "${little_random_bytes}" != '1200000' ]]
+then
+    echo "Unexpected mnt/test-subdir/little-random.bin content size: ${little_random_bytes}" >&2
+    exit 1
+fi
 
 echo "Stopping…"

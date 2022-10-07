@@ -48,6 +48,7 @@ auth-token=localhost:${attr_index_port}:${attr_index_auth_token}
 ssl-cert=localhost:${attr_index_port}:${attr_index_cert_path}
 EOF
     append_accepted_gpg_keys >> evr.conf
+
     cat > evr-fs.conf <<EOF
 storage-port=${glacier_storage_port}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
@@ -56,6 +57,8 @@ index-port=${attr_index_port}
 auth-token=localhost:${attr_index_port}:${attr_index_auth_token}
 ssl-cert=localhost:${attr_index_port}:${attr_index_cert_path}
 EOF
+    append_accepted_gpg_keys >> evr-fs.conf
+
     cat > evr-glacier-storage.conf <<EOF
 port=${glacier_storage_port}
 cert=${glacier_storage_cert_path}
@@ -63,6 +66,7 @@ key=${script_dir}/../tls/glacier-key.pem
 auth-token=${glacier_storage_auth_token}
 bucket-dir=${glacier_storage_bucket_dir}
 EOF
+
     cat > evr-attr-index.conf <<EOF
 state-dir=${attr_index_state_dir}
 port=${attr_index_port}
@@ -74,6 +78,7 @@ auth-token=${attr_index_auth_token}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
 EOF
     append_accepted_gpg_keys >> evr-attr-index.conf
+
     cat > glacier-benchmark.conf <<EOF
 storage-port=${glacier_storage_port}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
@@ -144,7 +149,8 @@ mount_evr_fs() {
     rm -rf -- "${evr_fs_mnt_dir}"
     mkdir -p -- "${evr_fs_mnt_dir}"
     echo "Mounting evr-fs…"
-    evr-fs "xslt:blob:${xslt_ref}" "${evr_fs_mnt_dir}"
+    evr-fs -f "xslt:blob:${xslt_ref}" "${evr_fs_mnt_dir}" &
+    sleep 1
 }
 
 umount_evr_fs() {

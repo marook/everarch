@@ -37,6 +37,7 @@
 #include "evr-attr-index-client.h"
 #include "seed-desc.h"
 #include "claims.h"
+#include "open-files.h"
 
 #define program_name "evr-fs"
 
@@ -54,6 +55,7 @@ static char args_doc[] = "TRANSFORMATION MOUNT_POINT";
 #define arg_auth_token 259
 #define arg_index_host 260
 #define arg_index_port 261
+#define arg_accepted_gpg_key 262
 
 struct evr_fs_cfg {
     char *storage_host;
@@ -72,7 +74,22 @@ struct evr_fs_cfg {
     int single_thread;
     char *transformation;
     char *mount_point;
+
+    /**
+     * accepted_gpg_fprs contains the accepted gpg fingerprints for
+     * signed claims.
+     *
+     * The llbuf data points to a fingerprint string.
+     *
+     * This field is only filled during the initialization of the
+     * application. During runtime verify_ctx should be used.
+     */
+    struct evr_llbuf *accepted_gpg_fprs;
+
+    struct evr_verify_ctx *verify_ctx;
 };
+
+struct evr_fs_cfg cfg;
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
@@ -83,6 +100,7 @@ static struct argp_option options[] = {
     {"auth-token", arg_auth_token, "HOST:PORT:TOKEN", 0, "A hostname, port and authorization token which is presented to the server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"foreground", 'f', NULL, 0, "The process will not demonize. It will stay in the foreground instead."},
     {"single-thread", 's', NULL, 0, "The fuse layer will be single threaded."},
+    {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
     {0},
 };
 
@@ -121,6 +139,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
             return ARGP_ERR_UNKNOWN;
         }
         break;
+    case arg_accepted_gpg_key: {
+        const size_t arg_size = strlen(arg) + 1;
+        struct evr_buf_pos bp;
+        if(evr_llbuf_prepend(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        evr_push_n(&bp, arg, arg_size);
+        break;
+    }
     case ARGP_KEY_ARG:
         switch(state->arg_num){
         default:
@@ -150,6 +178,7 @@ static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
 
 static xsltStylesheet *transformation;
 static struct evr_inode_set inode_set;
+static struct evr_open_file_set open_files;
 
 int evr_connect_to_storage(struct evr_file *c, struct evr_fs_cfg *cfg, char *host, char *port);
 int evr_connect_to_index(struct evr_file *c, struct evr_buf_read **r, struct evr_fs_cfg *cfg, char *host, char *port);
@@ -163,7 +192,7 @@ int main(int argc, char *argv[]) {
     evr_init_basics();
     evr_tls_init();
     xmlInitParser();
-    struct evr_fs_cfg cfg;
+    evr_init_signatures();
     cfg.storage_host = strdup(evr_glacier_storage_host);
     cfg.storage_port = strdup(to_string(evr_glacier_storage_port));
     cfg.index_host = strdup(evr_attr_index_host);
@@ -174,6 +203,8 @@ int main(int argc, char *argv[]) {
     cfg.single_thread = 0;
     cfg.transformation = NULL;
     cfg.mount_point = NULL;
+    cfg.accepted_gpg_fprs = NULL;
+    cfg.verify_ctx = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -184,6 +215,12 @@ int main(int argc, char *argv[]) {
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, &cfg);
+    cfg.verify_ctx = evr_build_verify_ctx(cfg.accepted_gpg_fprs);
+    if(!cfg.verify_ctx){
+        goto out_with_free_cfg;
+    }
+    evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
+    cfg.accepted_gpg_fprs = NULL;
     struct evr_file gc;
     if(evr_connect_to_storage(&gc, &cfg, cfg.storage_host, cfg.storage_port) != evr_ok){
         goto out_with_free_cfg;
@@ -203,10 +240,17 @@ int main(int argc, char *argv[]) {
     if(evr_populate_inode_set(ir, &cfg) != evr_ok){
         goto out_with_close_ic;
     }
-    if(run_fuse(argv[0], &cfg) != 0){
+    if(evr_init_open_file_set(&open_files) != evr_ok){
         goto out_with_close_ic;
     }
+    if(run_fuse(argv[0], &cfg) != 0){
+        goto out_with_empty_open_file_set;
+    }
     ret = 0;
+ out_with_empty_open_file_set:
+    if(evr_empty_open_file_set(&open_files) != evr_ok){
+        ret = 1;
+    }
  out_with_close_ic:
     if(ir){
         evr_free_buf_read(ir);
@@ -241,6 +285,10 @@ int main(int argc, char *argv[]) {
     } while(0);
     evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
+    evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
+    if(cfg.verify_ctx){
+        evr_free_verify_ctx(cfg.verify_ctx);
+    }
     xsltCleanupGlobals();
     xmlCleanupParser();
     evr_tls_free();
@@ -434,22 +482,24 @@ xmlDoc *evr_seed_desc_to_file_set(xmlDoc *seed_desc_doc, evr_claim_ref seed){
 static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
 static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
 static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
-//static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
+static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
+static void evr_fs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
+static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
 
 static const struct fuse_lowlevel_ops evr_fs_oper = {
     .lookup = evr_fs_lookup,
     .getattr = evr_fs_getattr,
     .readdir = evr_fs_readdir,
-      /*
-        .open = evr_fs_open,
-      .read = evr_fs_read,*/
+    .open = evr_fs_open,
+    .release = evr_fs_release,
+    .read = evr_fs_read,
 };
 
 struct evr_fs_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino);
 
 static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
-    log_debug("lookup with parent inode %d", (int)parent);
+    log_debug("fuse lookup with parent inode %d the name %s", (int)parent, name);
     struct evr_fs_inode *pnd = evr_get_inode(req, parent);
     if(!pnd){
         return;
@@ -486,7 +536,7 @@ static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
 }
 
 static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
-    log_debug("getattr with inode %d", (int)ino);
+    log_debug("fuse getattr with inode %d", (int)ino);
     struct stat st;
     if(evr_fs_stat(req, &st, ino) != evr_ok){
         return;
@@ -537,7 +587,7 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
 
 static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
     int err = EINVAL;
-    log_debug("readdir with inode %d (size %zu, off %zu)", (int)ino, size, off);
+    log_debug("fuse readdir with inode %d (size %zu, off %zu)", (int)ino, size, off);
     struct evr_fs_inode *nd = evr_get_inode(req, ino);
     if(nd->type != evr_fs_inode_type_dir){
         log_error("Inode %d is not a directory", (int)ino);
@@ -580,6 +630,119 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
 }
 
 #undef evr_add_direntry
+
+struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref);
+
+static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
+    int err = EINVAL;
+    log_debug("fuse open inode %d", (int)ino);
+    struct evr_fs_inode *nd = evr_get_inode(req, ino);
+    if(nd->type != evr_fs_inode_type_file){
+        log_error("Inode %d is not a file", (int)ino);
+        err = EISDIR;
+        goto fail;
+    }
+    if(evr_allocate_open_file(&open_files, &fi->fh) != evr_ok){
+        goto fail;
+    }
+    struct evr_open_file *of = &open_files.files[fi->fh];
+    if(evr_connect_to_storage(&of->gc, &cfg, cfg.storage_host, cfg.storage_port) != evr_ok){
+        log_error("Unable to connect to glacier when opening file with inode %d", (int)ino);
+        goto fail_with_close_open_file;
+    }
+    of->claim = evr_fetch_file_claim(&of->gc, nd->data.file.file_ref);
+    if(!of->claim){
+        log_error("Unable to fetch file claim for inode %d", (int)ino);
+        goto fail_with_close_open_file;
+    }
+    if(fuse_reply_open(req, fi) != 0){
+        goto fail_with_close_open_file;
+    }
+    return;
+ fail_with_close_open_file:
+    if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
+        evr_panic("Unable to close file with inode %d on failed open", (int)ino);
+    }
+ fail:
+    if(fuse_reply_err(req, err) != 0){
+        evr_panic("Unable to report error %d on open", err);
+    }
+}
+
+struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref){
+    struct evr_file_claim *ret = NULL;
+    evr_blob_ref blob_ref;
+    int claim_index;
+    evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
+    xmlDoc *doc = NULL;
+    if(evr_fetch_signed_xml(&doc, cfg.verify_ctx, c, blob_ref) != evr_ok){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("No validly signed XML found for ref %s", claim_ref_str);
+        goto out;
+    }
+    xmlNode *cs = evr_get_root_claim_set(doc);
+    if(!cs){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("No claim set found in blob for claim ref %s", claim_ref_str);
+        goto out_with_free_doc;
+    }
+    xmlNode *cn = evr_nth_claim(cs, claim_index);
+    if(!cn){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("There is no claim with index %d in claim-set with ref %s", claim_index, claim_ref_str);
+        goto out_with_free_doc;
+    }
+    ret = evr_parse_file_claim(cn);
+    if(!ret){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("Unable to parse file claim from claim XML with ref %s", claim_ref_str);
+    }
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out:
+    return ret;
+}
+
+static void evr_fs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
+    log_debug("fuse release file handle %u for inode %d", (unsigned int)fi->fh, (int)ino);
+    if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
+        goto fail;
+    }
+    return;
+ fail:
+    if(fuse_reply_err(req, EINVAL) != 0){
+        evr_panic("Unable to report error on release");
+    }
+}
+
+static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
+    int err = EINVAL;
+    log_debug("fuse read %zu bytes from file handle %u on inode %d at offset %zu", size, (unsigned int)fi->fh, (int)ino, (size_t)off);
+    char *buf = malloc(size);
+    if(!buf){
+        goto fail;
+    }
+    struct evr_open_file *f = &open_files.files[fi->fh];
+    size_t read_size = size;
+    if(evr_open_file_read(f, buf, &read_size, off) != evr_ok){
+        goto fail_with_free_buf;
+    }
+    if(fuse_reply_buf(req, buf, read_size) != 0){
+        goto fail_with_free_buf;
+    }
+    free(buf);
+    return;
+ fail_with_free_buf:
+    free(buf);
+ fail:
+    if(fuse_reply_err(req, err) != 0){
+        evr_panic("Unable to report error %d on read file handle %u", err, (unsigned int)fi->fh);
+    }
+}
 
 struct evr_fs_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
     if(ino < FUSE_ROOT_ID || ino >= inode_set.inodes_len){

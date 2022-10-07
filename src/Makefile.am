@@ -195,6 +195,7 @@ evr_fs_SOURCES = \
 	glacier-cmd.c \
 	keys.c \
 	logger.c \
+	open-files.c \
 	seed-desc.c \
 	signatures.c
 evr_fs_LDADD = $(FUSE_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
