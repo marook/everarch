@@ -1,35 +1,5 @@
-* implement parser for file-set claims
-probably in claims.[hc]
-
-an evr-fs file set may look like this:
-#+BEGIN_SRC xml
-<efs:file-set>
-  <efs:file
-    path="path/to/file.name"
-    file-ref="sha3-224-123-0000"
-    created="…"
-    last-modified="…"
-    />
-</efs:file-set>
-#+END_SRC
-
-probably only functions for iterating over efs:file nodes are
-necessary.
-* implement evr-fs
-evr-fs should be a user space file system which provides access to
-files stored in everarch.
-
-usage should be like:
-
-#+BEGIN_SRC
-$ evr-fs xslt:blob:sha3-224-dirs-files-xslt mount/point
-#+END_SRC
-
-the first argument is a reference to the xslt stylesheet used for
-transforming a seed-description into a evr-fs file set.
-* evr-fs should implement a blob cache
-blobs should be cached so follow up reads of partial blobs are more
-don't need refetching the blob from evr-glacier-storage.
+* evr-fs should show files as process owners ones
+right now files and directories within evr-fs are owned by root.
 * evr-fs should watch the evr-attr-index
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
