@@ -93,6 +93,8 @@ fuse_ino_t evr_inode_append_dir(struct evr_fs_inode **inodes, size_t *inodes_len
 
 fuse_ino_t evr_inode_append_file(struct evr_fs_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name);
 
+fuse_ino_t evr_inode_get_child_dir(struct evr_fs_inode *inodes, fuse_ino_t parent, char *name);
+
 fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_len, char *file_path){
     char *name = file_path;
     char *p_it = name;
@@ -101,7 +103,10 @@ fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_le
         // TODO add support for escaped paths. for example "my\/file.txt"
         if(*p_it == '/'){
             *p_it = '\0';
-            int res = evr_inode_append_dir(inodes, inodes_len, n, name);
+            int res = evr_inode_get_child_dir(*inodes, n, name);
+            if(res == 0){
+                res = evr_inode_append_dir(inodes, inodes_len, n, name);
+            }
             *p_it = '/';
             if(res == 0){
                 return 0;
@@ -117,6 +122,22 @@ fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_le
         }
         ++p_it;
     }
+}
+
+fuse_ino_t evr_inode_get_child_dir(struct evr_fs_inode *inodes, fuse_ino_t parent, char *name){
+    struct evr_fs_inode *p = &inodes[parent];
+    fuse_ino_t *c_end = &p->data.dir.children[p->data.dir.children_len];
+    for(fuse_ino_t *cino = p->data.dir.children; cino != c_end; ++cino){
+        struct evr_fs_inode *c = &inodes[*cino];
+        if(c->type != evr_fs_inode_type_dir){
+            continue;
+        }
+        if(strcmp(name, c->name) != 0){
+            continue;
+        }
+        return *cino;
+    }
+    return 0;
 }
 
 fuse_ino_t evr_inode_get_available(struct evr_fs_inode **inodes, size_t *inodes_len);

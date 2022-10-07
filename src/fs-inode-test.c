@@ -37,11 +37,12 @@ void test_inodes_with_file(){
     size_t inodes_len = 100;
     struct evr_fs_inode *inodes = evr_create_inodes(inodes_len);
     assert(inodes);
+    // add first file
     char *name = strdup("my-dir/file.txt");
     assert(name);
-    fuse_ino_t f = evr_inode_create_file(&inodes, &inodes_len, name);
+    fuse_ino_t f1 = evr_inode_create_file(&inodes, &inodes_len, name);
     free(name);
-    assert(f != 0);
+    assert(f1 != 0);
     struct evr_fs_inode *root = &inodes[FUSE_ROOT_ID];
     assert(root->data.dir.children_len == 1);
     fuse_ino_t dir = root->data.dir.children[0];
@@ -50,10 +51,20 @@ void test_inodes_with_file(){
     assert(dir_node->type == evr_fs_inode_type_dir);
     assert(is_str_eq(dir_node->name, "my-dir"));
     assert(dir_node->data.dir.children_len == 1);
-    assert(dir_node->data.dir.children[0] == f);
-    struct evr_fs_inode *file_node = &inodes[f];
+    assert(dir_node->data.dir.children[0] == f1);
+    struct evr_fs_inode *file_node = &inodes[f1];
     assert(file_node->type == evr_fs_inode_type_file);
     assert(is_str_eq(file_node->name, "file.txt"));
+    // add second file
+    name = strdup("my-dir/other.txt");
+    assert(name);
+    fuse_ino_t f2 = evr_inode_create_file(&inodes, &inodes_len, name);
+    free(name);
+    assert(f2 != 0);
+    assert(root->data.dir.children_len == 1);
+    assert(dir_node->data.dir.children_len == 2);
+    assert(dir_node->data.dir.children[0] == f1);
+    assert(dir_node->data.dir.children[1] == f2);
     evr_free_inodes(inodes);
 }
 
