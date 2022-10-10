@@ -24,16 +24,6 @@ buffer only to report a slice of at an the end.
 the off parameter should be used to communicate which inodes should
 be read. probably the off parameter should be the directory child's
 index from struct evr_fs_inode_dir.
-* add attr index search command to evr cli
-right now the integration tests use socat to query the index from
-within scripts. this is a little bit inconvenient because so many
-things must be remembered.
-
-it would be nice to have:
-
-#+BEGIN_SRC
-evr search 'tag=todo'
-#+END_SRC
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".

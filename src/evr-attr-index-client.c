@@ -21,6 +21,15 @@
 #include "errors.h"
 #include "logger.h"
 
+int evr_attri_validate_argument(char *arg){
+    for(char *c = arg; *c != '\0'; ++c){
+        if(*c == '\n'){
+            return evr_error;
+        }
+    }
+    return evr_ok;
+}
+
 int evr_attri_write_auth_token(struct evr_file *f, evr_auth_token t){
     const char prefix[] = "a token ";
     char buf[sizeof(prefix) - 1 + sizeof(evr_auth_token_str) - 1 + 1];
@@ -75,7 +84,10 @@ int evr_attri_search(struct evr_buf_read *r, char *query, int (*visit_seed)(void
             return evr_error;
         }
         search_ctx.visited_seed_count = 0;
-        if(evr_attri_read_search(r, evr_attri_search_visit_seed, evr_attri_search_visit_attr, &search_ctx) != evr_ok){
+        int read_res = evr_attri_read_search(r, evr_attri_search_visit_seed, evr_attri_search_visit_attr, &search_ctx);
+        if(read_res == evr_end){
+            return evr_ok;
+        } else if(read_res != evr_ok){
             return evr_error;
         }
         if(search_ctx.visited_seed_count < limit){
@@ -123,6 +135,7 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, e
     }
     int has_seed = 0;
     evr_claim_ref seed;
+    int end = 0;
     while(1){
         size_t nl_offset;
         if(evr_buf_read_read_until(r, '\n', &nl_offset) != evr_ok){
@@ -151,7 +164,7 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, e
                 return evr_error;
             }
         } else if(line[0] == '\n'){
-            return evr_ok;
+            return end ? evr_end : evr_ok;
         } else {
             // claim-ref line
             line[sizeof(line) - 1] = '\0';
@@ -159,8 +172,13 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, e
                 return evr_error;
             }
             has_seed = 1;
-            if(visit_seed && visit_seed(ctx, seed) != evr_ok){
-                return evr_error;
+            if(visit_seed){
+                int visit_res = visit_seed(ctx, seed);
+                if(visit_res == evr_end){
+                    end = 1;
+                } else if(visit_res != evr_ok){
+                    return evr_error;
+                }
             }
         }
     }

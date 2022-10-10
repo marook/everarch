@@ -63,6 +63,7 @@ static char doc[] =
     "The sign-put command retrieves textual content via stdin, signs it and sends it to the evr-glacier-storage.\n\n"
     "The get-file command expects one file claim key argument. If found the first file in the claim will be written to stdout.\n\n"
     "The post-file command expects one optional file name argument for upload to the evr-glacier-storage. File will be read from stdin if no file name argument is given.\n\n"
+    "The search command executes the given query on the default evr-attr-index server. The results are written to stdout.\n\n"
     "The desc-seed command provides a seed description for the given seed. Expects the seed ref as argument.\n\n"
     "The watch command prints modified blob keys.\n\n"
     "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST:SRC_PORT DST_HOST:DST_PORT after the sync argument."
@@ -111,6 +112,7 @@ static struct argp_option options[] = {
 #define cli_cmd_sync 8
 #define cli_cmd_get_verify 9
 #define cli_cmd_desc_seed 10
+#define cli_cmd_search 11
 
 struct cli_cfg {
     int cmd;
@@ -153,6 +155,8 @@ struct cli_cfg {
     struct evr_verify_ctx *verify_ctx;
 
     char *signing_gpg_fpr;
+
+    char *query;
 };
 
 int evr_replace_host_port(char **host, char **port, char *host_port_expr);
@@ -261,6 +265,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 cfg->cmd = cli_cmd_get_file;
             } else if(strcmp("post-file", arg) == 0){
                 cfg->cmd = cli_cmd_post_file;
+            } else if(strcmp("search", arg) == 0){
+                cfg->cmd = cli_cmd_search;
             } else if(strcmp("desc-seed", arg) == 0){
                 cfg->cmd = cli_cmd_desc_seed;
             } else if(strcmp("watch", arg) == 0){
@@ -285,6 +291,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
                 break;
             case cli_cmd_post_file:
                 evr_replace_str(cfg->file, arg);
+                break;
+            case cli_cmd_search:
+                evr_replace_str(cfg->query, arg);
                 break;
             case cli_cmd_desc_seed:
                 if(evr_parse_claim_ref(cfg->seed, arg) != evr_ok){
@@ -326,6 +335,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         case cli_cmd_get_verify:
         case cli_cmd_get_claim:
         case cli_cmd_get_file:
+        case cli_cmd_search:
         case cli_cmd_desc_seed:
             if(state->arg_num < 2){
                 usage(state);
@@ -385,6 +395,7 @@ int evr_cli_sign_put(struct cli_cfg *cfg);
 int evr_cli_get_file(struct cli_cfg *cfg);
 int evr_write_cmd_get_blob(struct evr_file *f, evr_blob_ref key);
 int evr_cli_post_file(struct cli_cfg *cfg);
+int evr_cli_search(struct cli_cfg *cfg);
 int evr_cli_desc_seed(struct cli_cfg *cfg);
 int evr_cli_watch_blobs(struct cli_cfg *cfg);
 int evr_cli_sync(struct cli_cfg *cfg);
@@ -422,6 +433,7 @@ int main(int argc, char **argv){
     cfg.accepted_gpg_fprs = NULL;
     cfg.verify_ctx = NULL;
     cfg.signing_gpg_fpr = NULL;
+    cfg.query = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -463,6 +475,9 @@ int main(int argc, char **argv){
     case cli_cmd_post_file:
         ret = evr_cli_post_file(&cfg);
         break;
+    case cli_cmd_search:
+        ret = evr_cli_search(&cfg);
+        break;
     case cli_cmd_desc_seed:
         ret = evr_cli_desc_seed(&cfg);
         break;
@@ -486,6 +501,7 @@ int main(int argc, char **argv){
         cfg.dst_storage_host,
         cfg.dst_storage_port,
         cfg.signing_gpg_fpr,
+        cfg.query,
     };
     void **tbfree_end = &tbfree[sizeof(tbfree) / sizeof(void*)];
  out_with_free_cfg:
@@ -960,6 +976,71 @@ int evr_cli_post_file(struct cli_cfg *cfg){
     }
  out:
     return ret;
+}
+
+int evr_cli_search_visit_seed(void *ctx, evr_claim_ref seed);
+int evr_cli_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val);
+
+int evr_cli_search(struct cli_cfg *cfg){
+    int ret = evr_error;
+    if(evr_attri_validate_argument(cfg->query) != evr_ok){
+        log_error("The search query is invalid.");
+        goto out;
+    }
+    struct evr_file c;
+    struct evr_buf_read *r = NULL;
+    if(evr_connect_to_index(&c, &r, cfg, cfg->index_host, cfg->index_port) != evr_ok){
+        goto out;
+    }
+    size_t seeds_visited = 0;
+    if(evr_attri_search(r, cfg->query, evr_cli_search_visit_seed, evr_cli_search_visit_attr, &seeds_visited) != evr_ok){
+        goto out_with_free_r;
+    }
+    ret = evr_ok;
+ out_with_free_r:
+    if(r){
+        evr_free_buf_read(r);
+        if(c.close(&c) != 0){
+            evr_panic("Unable to close evr-attr-index connection");
+            ret = evr_error;
+        }
+    }
+ out:
+    return ret;
+}
+
+#define evr_max_printed_search_results 100
+
+int evr_cli_search_visit_seed(void *ctx, evr_claim_ref seed){
+    size_t *seeds_visited = ctx;
+    *seeds_visited += 1;
+    if(*seeds_visited > evr_max_printed_search_results) {
+        return evr_end;
+    }
+    char buf[evr_claim_ref_str_len + 1];
+    evr_fmt_claim_ref(buf, seed);
+    buf[evr_claim_ref_str_len] = '\n';
+    struct evr_file f;
+    evr_file_bind_fd(&f, STDOUT_FILENO);
+    return write_n(&f, buf, sizeof(buf));
+}
+
+int evr_cli_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val){
+    size_t *seeds_visited = ctx;
+    if(*seeds_visited > evr_max_printed_search_results) {
+        return evr_ok;
+    }
+    size_t key_len = strlen(key);
+    size_t val_len = strlen(val);
+    char buf[1 + key_len + 1 + val_len + 1];
+    buf[0] = '\t';
+    memcpy(&buf[1], key, key_len);
+    buf[1 + key_len] = '=';
+    memcpy(&buf[1 + key_len + 1], val, val_len);
+    buf[1 + key_len + 1 + val_len] = '\n';
+    struct evr_file f;
+    evr_file_bind_fd(&f, STDOUT_FILENO);
+    return write_n(&f, buf, sizeof(buf));
 }
 
 int evr_cli_desc_seed(struct cli_cfg *cfg){
