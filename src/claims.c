@@ -747,3 +747,34 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
  out:
     return c;
 }
+
+char *evr_format_xml_node(xmlNode *n){
+    char *doc_str = NULL;
+    xmlDoc *doc = xmlNewDoc(BAD_CAST "1.0");
+    if(!doc){
+        goto out;
+    }
+    xmlNode *n2 = xmlCopyNode(n, 1);
+    if(!n2){
+        goto out_with_free_doc;
+    }
+    xmlDocSetRootElement(doc, n2);
+    char *xml_doc_str;
+    int doc_size;
+    xmlDocDumpMemoryEnc(doc, (xmlChar**)&xml_doc_str, &doc_size, "UTF-8");
+    if(!xml_doc_str){
+        goto out_with_free_doc;
+    }
+    doc_str = malloc(doc_size + 1);
+    if(!doc_str){
+        goto out_with_free_xml_doc_str;
+    }
+    memcpy(doc_str, xml_doc_str, doc_size);
+    doc_str[doc_size] = '\0';
+ out_with_free_xml_doc_str:
+    xmlFree(xml_doc_str);
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out:
+    return doc_str;
+}

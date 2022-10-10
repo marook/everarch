@@ -421,6 +421,23 @@ void test_parse_xml_user_data_invalid(){
     }
 }
 
+void test_format_xml_node(){
+    const char src_doc_str[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<root xmlns=\"https://whatever\">"
+        "<an-element a-key=\"a-val\">peng</an-element>"
+        "</root>";
+    xmlDoc *src_doc = NULL;
+    assert(is_ok(evr_parse_xml(&src_doc, src_doc_str, sizeof(src_doc_str) - 1)));
+    assert(src_doc);
+    xmlNode *an_el = xmlDocGetRootElement(src_doc)->children;
+    assert(an_el);
+    char *an_el_str = evr_format_xml_node(an_el);
+    xmlFreeDoc(src_doc);
+    assert_msg(is_str_in(an_el_str, "<an-element xmlns=\"https://whatever\" a-key=\"a-val\">peng</an-element>"), "But was %s", an_el_str);
+    free(an_el_str);
+}
+
 int main(){
     xmlInitParser();
     evr_init_basics();
@@ -440,6 +457,7 @@ int main(){
     run_test(test_parse_attr_spec_claim_error_unknown_attr_factory_type);
     run_test(test_nth_claim);
     run_test(test_parse_xml_user_data_invalid);
+    run_test(test_format_xml_node);
     xmlCleanupParser();
     return 0;
 }

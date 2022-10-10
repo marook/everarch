@@ -430,8 +430,9 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     for(xmlNode *fn = evr_first_file_node(file_set); fn; fn = evr_next_file_node(fn)){
         struct evr_fs_file *f = evr_parse_fs_file(fn);
         if(!f){
-            // TODO dump not parseable fn node
-            log_error("Unable to parse XML file node");
+            char *fn_str = evr_format_xml_node(fn);
+            log_error("Unable to parse XML file node: %s", fn_str);
+            free(fn_str);
             goto out_with_free_files_doc;
         }
 #ifdef EVR_LOG_DEBUG

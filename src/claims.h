@@ -232,4 +232,13 @@ struct evr_fs_file *evr_parse_fs_file(xmlNode *cn);
 
 #define evr_free_fs_file(f) free(f)
 
+/**
+ * evr_format_xml_node serializes the given node as root element in an
+ * otherwise empty document.
+ *
+ * Returns NULL on errors or the formatted document. The returned
+ * string must be freed using free after usage.
+ */
+char *evr_format_xml_node(xmlNode *n);
+
 #endif
