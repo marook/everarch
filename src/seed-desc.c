@@ -99,13 +99,26 @@ int evr_seed_desc_append_claims(xmlDoc *doc, xmlNode *desc_node, struct evr_veri
 
 int evr_seed_desc_append_attrs_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val);
 
+struct evr_seed_desc_append_attrs_ctx {
+    xmlDoc *doc;
+    xmlNs *ns;
+    xmlNode *attrs_node;
+};
+
 int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_read *r, evr_claim_ref seed){
     const char prefix[] = "select * where ref=";
     char query[strlen(prefix) + (evr_claim_ref_str_size - 1) + 1];
-    xmlNode *attrs_node = xmlNewNode(NULL, BAD_CAST "attr-index");
-    if(!attrs_node){
+    struct evr_seed_desc_append_attrs_ctx ctx;
+    ctx.doc = doc;
+    ctx.ns = xmlSearchNsByHref(doc, desc_node, BAD_CAST evr_seed_desc_ns);
+    if(!ctx.ns){
         goto fail;
     }
+    ctx.attrs_node = xmlNewNode(ctx.ns, BAD_CAST "attr-index");
+    if(!ctx.attrs_node){
+        goto fail;
+    }
+    xmlSetNs(ctx.attrs_node, ctx.ns);
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, query);
     evr_push_concat(&bp, prefix);
@@ -115,26 +128,27 @@ int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_r
     if(evr_attri_write_search(r->f, query) != evr_ok){
         goto fail_with_free_attrs_node;
     }
-    if(evr_attri_read_search(r, NULL, evr_seed_desc_append_attrs_visit_attr, attrs_node) != evr_ok){
+    if(evr_attri_read_search(r, NULL, evr_seed_desc_append_attrs_visit_attr, &ctx) != evr_ok){
         goto fail_with_free_attrs_node;
     }
-    if(!xmlAddChild(desc_node, attrs_node)){
+    if(!xmlAddChild(desc_node, ctx.attrs_node)){
         goto fail_with_free_attrs_node;
     }
     return evr_ok;
  fail_with_free_attrs_node:
-    xmlFreeNode(attrs_node);
+    xmlFreeNode(ctx.attrs_node);
  fail:
     return evr_error;
 }
 
-int evr_seed_desc_append_attrs_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val){
-    xmlNode *attrs_node = ctx;
-    xmlNode *an = xmlNewNode(NULL, BAD_CAST "attr");
+int evr_seed_desc_append_attrs_visit_attr(void *_ctx, evr_claim_ref seed, char *key, char *val){
+    struct evr_seed_desc_append_attrs_ctx *ctx = _ctx;
+    xmlNode *an = xmlNewNode(ctx->ns, BAD_CAST "attr");
     if(!an){
         return evr_error;
     }
-    if(!xmlAddChild(attrs_node, an)){
+    xmlSetNs(an, ctx->ns);
+    if(!xmlAddChild(ctx->attrs_node, an)){
         goto fail_with_free_an;
     }
     if(!xmlNewProp(an, BAD_CAST "k", BAD_CAST key)){

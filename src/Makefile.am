@@ -14,7 +14,7 @@ bin_PROGRAMS = \
 	evr-glacier-storage \
 	evr-glacier-tool
 
-check_PROGRAMS = \
+evr_c_unit_tests = \
 	attr-index-db-test \
 	auth-test \
 	basics-test \
@@ -26,36 +26,21 @@ check_PROGRAMS = \
 	evr-tls-test \
 	files-test \
 	fs-inode-test \
-	glacier-benchmark \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
 	notify-test \
 	queue-test \
 	rollsum-test \
+	seed-desc-test \
 	signatures-test \
 	subprocess-test
 
-TESTS = \
-	attr-index-db-test \
-	auth-test \
-	basics-test \
-	claims-test \
-	concurrent-glacier-test \
-	configp-test \
-	dyn-mem-test \
-	evr-attr-index-client-test \
-	evr-tls-test \
-	files-test \
-	fs-inode-test \
-	glacier-cmd-test \
-	glacier-test \
-	keys-test \
-	notify-test \
-	queue-test \
-	rollsum-test \
-	signatures-test \
-	subprocess-test
+check_PROGRAMS = \
+	$(evr_c_unit_tests) \
+	glacier-benchmark
+
+TESTS = $(evr_c_unit_tests)
 
 attr_index_db_test_SOURCES = \
 	assert.c \
@@ -343,6 +328,16 @@ rollsum_test_SOURCES = \
 	logger.c \
 	rollsum.c \
 	rollsum-test.c
+
+seed_desc_test_SOURCES = \
+	assert.c \
+	basics.c \
+	claims.c \
+	keys.c \
+	logger.c \
+	seed-desc.c \
+	seed-desc-test.c
+seed_desc_test_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS)
 
 signatures_test_SOURCES = \
 	assert.c \
