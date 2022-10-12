@@ -1,3 +1,4 @@
+* evr-fs should allow passing the fuse "-oallow_other" option
 * evr-fs should show files as process owners ones
 right now files and directories within evr-fs are owned by root.
 * evr-fs should watch the evr-attr-index
