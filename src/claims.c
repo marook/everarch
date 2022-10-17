@@ -684,7 +684,7 @@ xmlNode *evr_first_file_node(xmlNode *file_set){
 }
 
 xmlNode *evr_next_file_node(xmlNode *file){
-    return evr_find_next_element(file->next, "file-set", evr_files_ns);
+    return evr_find_next_element(file->next, "file", evr_files_ns);
 }
 
 struct evr_fs_file *evr_parse_fs_file(xmlNode *cn){
