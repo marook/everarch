@@ -552,7 +552,7 @@ int evr_watch_index_claims_worker(void *arg){
         if(fetch_res == evr_user_data_invalid){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
-            log_error("Index claim with blob key %s has invalid XML syntax. Ignoring this claim.", fmt_key);
+            log_error("Index claim with blob key %s has invalid content. Ignoring this claim.", fmt_key);
             continue;
         } else if(fetch_res != evr_ok){
             evr_blob_ref_str fmt_key;
@@ -847,7 +847,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
     if(fetch_res == evr_user_data_invalid){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
-        log_error("Claim set with blob ref %s has invalid XML syntax. Ignoring it.", ref_str);
+        log_error("Claim set with blob ref %s has invalid content. Ignoring it.", ref_str);
         ret = evr_ok;
         goto out;
     } else if(fetch_res != evr_ok){
@@ -988,11 +988,12 @@ int evr_index_sync_worker(void *arg){
             if(fetch_res == evr_user_data_invalid){
                 // this situation is somehow theoretical. it would
                 // mean that when initially building the index db the
-                // blob contained valid XML but now does no
-                // longer.
+                // blob contained validly signed XML but now does no
+                // longer. maybe the gpg signature is no longer
+                // accepted?
                 evr_blob_ref_str ref_str;
                 evr_fmt_blob_ref(ref_str, index_ref);
-                log_error("Index claim with blob key %s has invalid XML syntax.", ref_str);
+                log_error("Index claim with blob key %s has invalid content.", ref_str);
                 goto out_with_free;
             } else if(fetch_res != evr_ok){
                 evr_blob_ref_str fmt_key;

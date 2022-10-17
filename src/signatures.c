@@ -143,6 +143,7 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
         goto out_with_release_out;
     }
     if(evr_is_signature_accepted(ctx, res->signatures) != evr_ok){
+        ret = evr_user_data_invalid;
         goto out_with_release_out;
     }
     if(evr_signatures_read_data(dest, out, s_len) != evr_ok){

@@ -88,7 +88,9 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
     struct dynamic_array *claim = NULL;
     int verify_res = evr_verify(ctx, &claim, buf, resp.body_size - evr_blob_flags_n_size);
     free(buf);
-    if(verify_res != evr_ok){
+    if(verify_res == evr_user_data_invalid){
+        return evr_user_data_invalid;
+    } else if(verify_res != evr_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, key);
         log_error("Failed to verify claim with ref %s", fmt_key);

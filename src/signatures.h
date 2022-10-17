@@ -60,6 +60,9 @@ struct evr_verify_ctx* evr_init_verify_ctx(char **accepted_fprs, size_t accepted
 /**
  * evr_verify will verify the signature attached to message s. Also it
  * will write the message without signature wrapping into dest.
+ *
+ * Return evr_ok on success. Returns evr_user_data_invalid if the
+ * message's signature is not trusted for some reason. Otherwise evr_error.
  */
 int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen);
 

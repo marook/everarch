@@ -1,16 +1,3 @@
-* evr-attr-index terminates on not verifyable signatures
-evr-attr-index will terminate when discovering a claim signed with an
-unknown key.
-
-#+BEGIN_SRC
-Okt 17 17:31:22 mammut evr-attr-index[579469]: 2022-10-17T17:31:22 iE Failed to verify claim with ref sha3-224-56990e24073ae6967d165e4715f22a4d8f9b87ef28a8c940a81ae625
-Okt 17 17:31:22 mammut evr-attr-index[579469]: 2022-10-17T17:31:22 iE Claim set not fetchable for blob ref sha3-224-56990e24073ae6967d165e4715f22a4d8f9b87ef28a8c940a81ae625
-#+END_SRC
-
-evr-attr-index should log claims signed with unknown gpg keys. the
-fingerprint of the unknown key should be logged.
-
-claims signed with unknown gpg keys should otherwise be ignored.
 * evr cli should print error if no cert for server was found
 if evr.conf has configured only not accessible cert paths for a server
 the error message on connect is not very helpful:
