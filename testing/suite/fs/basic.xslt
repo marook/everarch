@@ -24,7 +24,7 @@
     <evr:attr>
       <xsl:call-template name="seed-attr"/>
       <evr:a op="=" k="title" v="{@dc:title}"/>
-      <evr:a op="=" k="file-size" v="{sum(evr:body/evr:slice/@size)}"/>
+      <evr:a op="=" k="file-size" v="{format-number(sum(evr:body/evr:slice/@size), '0')}"/>
       <evr:a op="=" k="file" vf="claim-ref"/>
     </evr:attr>
   </xsl:template>
