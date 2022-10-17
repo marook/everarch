@@ -56,6 +56,7 @@ static char args_doc[] = "TRANSFORMATION MOUNT_POINT";
 #define arg_index_host 260
 #define arg_index_port 261
 #define arg_accepted_gpg_key 262
+#define arg_allow_other 263
 
 struct evr_fs_cfg {
     char *storage_host;
@@ -72,6 +73,11 @@ struct evr_fs_cfg {
      * single_thread's meaning is defined by the fuse -s option.
      */
     int single_thread;
+    /**
+     * allow_other indicates if other users may access this file
+     * system.
+     */
+    int allow_other;
     char *transformation;
     char *mount_point;
 
@@ -100,6 +106,7 @@ static struct argp_option options[] = {
     {"auth-token", arg_auth_token, "HOST:PORT:TOKEN", 0, "A hostname, port and authorization token which is presented to the server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"foreground", 'f', NULL, 0, "The process will not demonize. It will stay in the foreground instead."},
     {"single-thread", 's', NULL, 0, "The fuse layer will be single threaded."},
+    {"oallow-other", arg_allow_other, NULL, 0, "The file system will be accessible by other users. Requires the user_allow_other option to be set in the global fuse configuration."},
     {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
     {0},
 };
@@ -114,6 +121,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case 's':
         cfg->single_thread = 1;
+        break;
+    case arg_allow_other:
+        cfg->allow_other = 1;
         break;
     case arg_storage_host:
         evr_replace_str(cfg->storage_host, arg);
@@ -201,6 +211,7 @@ int main(int argc, char *argv[]) {
     cfg.ssl_certs = NULL;
     cfg.foreground = 0;
     cfg.single_thread = 0;
+    cfg.allow_other = 0;
     cfg.transformation = NULL;
     cfg.mount_point = NULL;
     cfg.accepted_gpg_fprs = NULL;
@@ -767,11 +778,16 @@ struct evr_fs_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
 
 int run_fuse(char *program, struct evr_fs_cfg *cfg){
     int ret = 1;
+    size_t fuse_argv_len = 2;
     char *fuse_argv[] = {
         program,
-        "-osubtype=evr-fs",
+        "-osubtype=" program_name,
+        NULL,
     };
-    struct fuse_args fuse_args = FUSE_ARGS_INIT(sizeof(fuse_argv) / sizeof(char*), fuse_argv);
+    if(cfg->allow_other){
+        fuse_argv[fuse_argv_len++] = "-oallow_other";
+    }
+    struct fuse_args fuse_args = FUSE_ARGS_INIT(fuse_argv_len, fuse_argv);
     struct fuse_session *se = fuse_session_new(&fuse_args, &evr_fs_oper, sizeof(evr_fs_oper), NULL);
     if(se == NULL) {
         goto out;
