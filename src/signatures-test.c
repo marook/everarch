@@ -63,7 +63,7 @@ void test_validate_hello_world_signature(){
         struct evr_verify_ctx *v_ctx = evr_init_verify_ctx(&fpr, 1);
         assert(v_ctx);
         struct dynamic_array *msg2 = NULL;
-        assert(is_err(evr_verify(v_ctx, &msg2, sgn->data, sgn->size_used)));
+        assert(evr_verify(v_ctx, &msg2, sgn->data, sgn->size_used) == evr_user_data_invalid);
         free(msg2);
         evr_free_verify_ctx(v_ctx);
     }
