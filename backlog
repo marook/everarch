@@ -21,6 +21,68 @@ with evr-fs during runtime.
 * document evr-fs in evr.texi
 especially the seed-description xml format and the efs:file-set xml
 format.
+* add claim-ref type in attr-spec's attr-def
+add a new type which tells the attr-index to expect a reference to a
+claim as value. attr-index should check if the value is parseable
+using evr_parse_claim_ref(…).
+* seed-description should also contain referenced seed's description
+right now the seed description describes exactly one seed.
+
+the attr-spec contains claim-ref types which should be walked and
+added to the seed-description. a seed description could then look like
+this:
+
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<seed-description-set
+    xmlns="https://evr.ma300k.de/seed-description/"
+    entry-seed="sha3-224-…-0000">
+  <seed-description seed="sha3-224-…-0000">
+    <attr-index>
+      <attr k="title" v="ye-think"/>
+      <attr k="owner" v="sha3-224-…-0001"/>
+      <attr k="storage-box" v="sha3-224-…-9999"/>
+    </attr-index>
+  </seed-description>
+  <seed-description seed="sha3-224-…-0001">
+    <attr-index>
+      <attr k="title" v="some dude"/>
+      <attr k="citizen-of" v="sha3-224-…-0002"/>
+    </attr-index>
+  </seed-description>
+  <seed-description seed="sha3-224-…-0002">
+    <attr-index>
+      <attr k="title" v="Hades"/>
+    </attr-index>
+  </seed-description>
+</seed-description-set>
+#+END_SRC
+
+evr cli's desc-seed should produce a seed-description-set instead of a
+single seed-description.
+
+when producing a seed description multiple traces can be specified by
+the caller which describe the nodes in the graph to be added. traces
+are comma separated attr keys.
+
+the above seed-description-set could have been produces with the trace
+'owner,citizen-of'.
+
+multiple traces can be space separated. for example 'a,b c,d'.
+
+calling evr cli with two traces could look like this:
+
+#+BEGIN_SRC
+$ evr -T a,b -T c,d desc-seed sha3-224-…-0000
+#+END_SRC
+* add traces support to evr-fs when producing seed-description
+right now evr-fs only produces the seed-description for each seed.
+
+traces should be specfiyable as evr-fs command line argument.
+
+#+BEGIN_SRC
+$ evr-fs -T a,b -T c,d xslt:blob:sha3-224-… mnt
+#+END_SRC
 * show in emacs if query is still running
 evr-attr-index commands like defun evr-attr-index-search-from-buffer
 don't indicate wether they are still running or completed.
@@ -52,10 +114,6 @@ case conversion support the [[https://github.com/sqlite/sqlite/tree/master/ext/i
 
 test if this extension is part of the sqlite3 debian packaging. load
 it gracefully. log info if it can't be loaded and continue.
-* add claim-ref type in attr-spec's attr-def
-add a new type which tells the attr-index to expect a reference to a
-claim as value. attr-index should check if the value is parseable
-using evr_parse_claim_ref(…).
 * make attr-index host and port configurabel in evr.el
 right now it's hard coded in two places. first where the connection is
 opened. second where the auth token is looked up.
