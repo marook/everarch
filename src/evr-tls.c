@@ -141,6 +141,7 @@ SSL_CTX *evr_create_ssl_client_ctx(char *host, char *port, struct evr_cert_cfg *
         return NULL;
     }
     if(SSL_CTX_load_verify_locations(ctx, cfg->cert_path, NULL) != 1){
+        log_error("Unable to load SSL cert %s", cfg->cert_path);
         goto out_with_free_ctx;
     }
     return ctx;

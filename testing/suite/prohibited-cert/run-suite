@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+set -o pipefail
+. ../config
+
+if [[ ! -e 'prohibited-cert.pem' ]]
+then
+    cp "${glacier_storage_cert_path}" 'prohibited-cert.pem'
+    chmod 0 'prohibited-cert.pem'
+fi
+
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
+
+cat > evr.conf <<EOF
+storage-port=${glacier_storage_port}
+ssl-cert=localhost:${glacier_storage_port}:prohibited-cert.pem
+auth-token=localhost:${glacier_storage_port}:${glacier_storage_auth_token}
+EOF
+
+start_glacier_storage
+wait_for_glacier_storage
+
+echo "hello world!" | evr put && exit 1 || true
