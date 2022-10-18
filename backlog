@@ -1,3 +1,11 @@
+* evr cli is unable to connect to remote evr-glacier-storage
+#+BEGIN_SRC
+2022-10-18T21:18:30 eE Server mammut:2561 certificate was not verified successfully. Verify result 18.
+2022-10-18T21:18:30 eE Failed to connect to evr-glacier-storage server mammut:2561
+#+END_SRC
+* make attr-index host and port configurabel in evr.el :emacs:
+right now it's hard coded in two places. first where the connection is
+opened. second where the auth token is looked up.
 * add claim-ref type in attr-spec's attr-def
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable
@@ -101,9 +109,6 @@ case conversion support the [[https://github.com/sqlite/sqlite/tree/master/ext/i
 
 test if this extension is part of the sqlite3 debian packaging. load
 it gracefully. log info if it can't be loaded and continue.
-* make attr-index host and port configurabel in evr.el :emacs:
-right now it's hard coded in two places. first where the connection is
-opened. second where the auth token is looked up.
 * create bucket directory if not existing :bdircre:
 * auto generate ssl cert and key if they don't exists
 use some command like written in tls.txt
