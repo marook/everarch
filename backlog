@@ -1,26 +1,5 @@
-* evr cli should print error if no cert for server was found
-if evr.conf has configured only not accessible cert paths for a server
-the error message on connect is not very helpful:
-
-#+BEGIN_SRC
-$ evr search 'title~Sohn'
-2022-10-17T18:47:29 eE Failed to connect to evr-attr-index server localhost:2562
-#+END_SRC
-
-evr cli and evr-fs should log if no certificate is available when
-connecting to an evr-glacier-storage or evr-attr-index server.
 * evr-fs should show files as process owners ones
 right now files and directories within evr-fs are owned by root.
-* evr-fs should watch the evr-attr-index
-evr-fs should watch the evr-attr-index and update it's file system
-representation on evr-attr-index changes.
-* reserve .evr in root directory within evr-fs
-.evr should always be an empty directory. event if a efs:file mapps to
-.evr. it should be like a reserved namespace for future interaction
-with evr-fs during runtime.
-* document evr-fs in evr.texi
-especially the seed-description xml format and the efs:file-set xml
-format.
 * add claim-ref type in attr-spec's attr-def
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable
@@ -83,7 +62,17 @@ traces should be specfiyable as evr-fs command line argument.
 #+BEGIN_SRC
 $ evr-fs -T a,b -T c,d xslt:blob:sha3-224-… mnt
 #+END_SRC
-* show in emacs if query is still running
+* reserve .evr in root directory within evr-fs
+.evr should always be an empty directory. event if a efs:file mapps to
+.evr. it should be like a reserved namespace for future interaction
+with evr-fs during runtime.
+* evr-fs should watch the evr-attr-index
+evr-fs should watch the evr-attr-index and update it's file system
+representation on evr-attr-index changes.
+* document evr-fs in evr.texi
+especially the seed-description xml format and the efs:file-set xml
+format.
+* show in emacs if query is still running :emacs:
 evr-attr-index commands like defun evr-attr-index-search-from-buffer
 don't indicate wether they are still running or completed.
 
@@ -114,7 +103,7 @@ case conversion support the [[https://github.com/sqlite/sqlite/tree/master/ext/i
 
 test if this extension is part of the sqlite3 debian packaging. load
 it gracefully. log info if it can't be loaded and continue.
-* make attr-index host and port configurabel in evr.el
+* make attr-index host and port configurabel in evr.el :emacs:
 right now it's hard coded in two places. first where the connection is
 opened. second where the auth token is looked up.
 * create bucket directory if not existing :bdircre:
