@@ -25,6 +25,7 @@
 #include <string.h>
 #include <libxslt/xsltInternals.h>
 #include <libxslt/transform.h>
+#include <unistd.h>
 
 #include "basics.h"
 #include "configp.h"
@@ -93,6 +94,16 @@ struct evr_fs_cfg {
     struct evr_llbuf *accepted_gpg_fprs;
 
     struct evr_verify_ctx *verify_ctx;
+
+    /**
+     * uid of the owner of the virtual files and directories.
+     */
+    uid_t uid;
+
+    /**
+     * gid of the owner of the virtual files and directories.
+     */
+    gid_t gid;
 };
 
 struct evr_fs_cfg cfg;
@@ -216,6 +227,8 @@ int main(int argc, char *argv[]) {
     cfg.mount_point = NULL;
     cfg.accepted_gpg_fprs = NULL;
     cfg.verify_ctx = NULL;
+    cfg.uid = getuid();
+    cfg.gid = getgid();
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -582,6 +595,10 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
         break;
     }
     st->st_ino = ino;
+    st->st_uid = cfg.uid;
+    st->st_gid = cfg.gid;
+    evr_time_to_timespec(&st->st_mtim, &nd->last_modified);
+    evr_time_to_timespec(&st->st_ctim, &nd->created);
     return evr_ok;
 }
 

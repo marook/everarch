@@ -12,7 +12,7 @@
 
   <xsl:template match="/esd:seed-description">
     <efs:file-set>
-      <efs:file>
+      <efs:file last-modified="2022-10-10T12:13:14.000000Z">
         <xsl:attribute name="path">test-subdir/<xsl:value-of select="//esd:attr[@k='title']/@v"/></xsl:attribute>
         <xsl:attribute name="size"><xsl:value-of select="//esd:attr[@k='file-size']/@v"/></xsl:attribute>
         <xsl:attribute name="file-ref"><xsl:value-of select="//esd:attr[@k='file']/@v"/></xsl:attribute>

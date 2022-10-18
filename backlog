@@ -1,5 +1,3 @@
-* evr-fs should show files as process owners ones
-right now files and directories within evr-fs are owned by root.
 * add claim-ref type in attr-spec's attr-def
 add a new type which tells the attr-index to expect a reference to a
 claim as value. attr-index should check if the value is parseable

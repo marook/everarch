@@ -211,9 +211,15 @@ typedef uint64_t evr_time;
 
 void evr_now(evr_time *t);
 
-#define evr_time_from_timespec(t, ts)                           \
+#define evr_time_from_timespec(t, ts)                                   \
     do {                                                                \
         *(t) = ((evr_time)(ts)->tv_sec) * 1000 + (ts)->tv_nsec / 1000000; \
+    } while(0)
+
+#define evr_time_to_timespec(ts, t)                     \
+    do {                                                \
+        (ts)->tv_sec = *(t) / 1000;                     \
+        (ts)->tv_nsec = (*(t) % 1000) * 1000000;        \
     } while(0)
 
 /**
