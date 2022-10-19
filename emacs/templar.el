@@ -99,6 +99,10 @@ template in the current buffer."
    var-specs))
 
 (defun templar--render (vars template)
+  "templar--render evaluates the given template.
+
+It returns a list tuple with the output variables and the
+rendition."
   (cond
    ((stringp template)
     (push

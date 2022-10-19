@@ -24,7 +24,7 @@
 (setq evr--claim-ref-pattern "sha[0-9]+-224-\\([0-9a-z]\\)\\{56\\}-\\([0-9a-f]\\)\\{4\\}")
 
 ;;;###autoload
-(defun evr-attr-index-search (query)
+(defun evr-attr-index-search (query &optional env)
   "evr-search performs a search against the default
 evr-attr-index and prints the results into a new buffer."
   (interactive "sQuery: ")
@@ -35,6 +35,8 @@ evr-attr-index and prints the results into a new buffer."
       query)))
   (insert query "\n")
   (evr-attr-index-results-mode)
+  (make-variable-buffer-local 'evr-current-environment)
+  (setq evr-current-environment env)
   (evr-attr-index-search-from-buffer))
 
 (defun evr-attr-index-search-from-buffer ()
@@ -58,7 +60,39 @@ evr-attr-index and prints the results into a new buffer."
     (setq buffer-read-only t)
     (evr--query-attr-index "w")))
 
-(defvar evr-attr-index-authentication-tokens
+(defvar evr-default-environment "default")
+(defvar evr-current-environment nil)
+(defvar evr-environments
+  '(
+   ("default" .
+    (
+     ("evr-glacier-storage" . ("localhost" 2361))
+     ("evr-attr-index" . ("localhost" 2362))
+     ))
+   )
+  "Contains shorthands for everarch server environments. Each
+  environment has a name and provides host and port for each
+  everarch server.")
+
+;; (evr--get-server "evr-attr-index")
+;; (evr--get-server "evr-attr-index" "unknown-env")
+;; (evr--get-server "evr-no-such")
+(defun evr--get-server (server &optional env)
+  (let ((selected-env (or env evr-current-environment evr-default-environment)))
+    (let ((env-config (assoc-string selected-env evr-environments)))
+      (unless env-config
+        (error "Unknown evr environment %s requested" selected-env))
+      (let ((server-config (assoc-string server env-config)))
+        (unless server-config
+          (error "Unknown server %s in environment %s requested" server selected-env))
+        (cdr server-config)))))
+
+;; (evr--evr-cli)
+(defun evr--evr-cli (&optional env)
+  (seq-let (storage-host storage-port) (evr--get-server "evr-glacier-storage" env)
+    `("evr" "--storage-host" ,storage-host "--storage-port" ,(format "%d" storage-port))))
+
+(defvar evr-authentication-tokens
   ()
   "Assoc list of authentication tokens. Keys are HOST:PORT
   strings. Values are authentication tokens.")
@@ -181,7 +215,7 @@ Returns the buffer's name."
         (setq proc (make-process
                     :name (concat "evr get-claim " claim-ref)
                     :buffer claim-ref
-                    :command `("evr" "get-claim" ,claim-ref)
+                    :command (append (evr--evr-cli) `("get-claim" ,claim-ref))
                     :sentinel
                     (lambda (process event)
                       (if (string= event "finished\n")
@@ -204,7 +238,7 @@ Returns the buffer's name."
       (make-process
        :name (concat "evr get-file " claim-ref)
        :buffer buffer-name
-       :command `("evr" "get-file" ,claim-ref)
+       :command (append (evr--evr-cli) `("get-file" ,claim-ref))
        :sentinel
        (lambda (process event)
          (if (string= event "finished\n")
@@ -236,10 +270,13 @@ in a new buffer."
 
 (defun evr-compose-claim-set-for-seed ()
   (interactive)
-  (let ((seed-ref (evr--get-seed-ref))
+  (let ((env evr-current-environment)
+        (seed-ref (evr--get-seed-ref))
         (claim-set-buf (evr-compose-claim-set)))
     (with-current-buffer claim-set-buf
-      (setq-local evr-seed-ref seed-ref))))
+      (setq-local evr-seed-ref seed-ref)
+      (make-variable-buffer-local 'evr-current-environment)
+      (setq evr-current-environment env))))
 
 (defun evr-follow-claim-ref-contents ()
   "Follows the claim ref at point.
@@ -295,24 +332,25 @@ should be appended and returns the query string."
      (point))))
 
 (defun evr--query-attr-index (cmd)
-  (let ((con (open-network-stream
-              "evr-attr-index-cmd"
-              (buffer-name)
-              "localhost" 2362
-              :type 'tls)))
-    (set-process-filter con 'evr--not-moving-filter)
-    (set-process-sentinel
-     con
-     (lambda (con event)
-       ;; prevent process status from being printed to the search
-       ;; results buffer
-       nil))
-    (process-send-string
-     con
-     (concat
-      "a token " (cdr (assoc-string "localhost:2362" evr-attr-index-authentication-tokens)) "\n"
-      cmd
-      "\nexit\n"))))
+  (seq-let (index-host index-port) (evr--get-server "evr-attr-index")
+    (let ((con (open-network-stream
+                "evr-attr-index-cmd"
+                (buffer-name)
+                index-host index-port
+                :type 'tls)))
+      (set-process-filter con 'evr--not-moving-filter)
+      (set-process-sentinel
+       con
+       (lambda (con event)
+         ;; prevent process status from being printed to the search
+         ;; results buffer
+         nil))
+      (process-send-string
+       con
+       (concat
+        "a token " (cdr (assoc-string (format "%s:%d" index-host index-port) evr-authentication-tokens)) "\n"
+        cmd
+        "\nexit\n")))))
 
 (defun evr--not-moving-filter (proc string)
   (when (buffer-live-p (process-buffer proc))
@@ -436,7 +474,7 @@ Returns t if the claim-set was successfully saved."
                  :buffer (get-buffer-create "*evr post-file errors*")
                  :command
                  (nconc
-                  `("evr" "post-file" "--title" ,file-buffer-name)
+                  (append (evr--evr-cli) `("post-file" "--title" ,file-buffer-name))
                   (if seed-ref
                       `("--seed" ,seed-ref)
                     ()))
@@ -483,11 +521,11 @@ composed claim-sets."
 This function is expected to be used with templar templates."
   (lambda (vars)
     (if (boundp 'evr-seed-ref)
-        (concat
+        (list vars (concat
          " seed=\""
          evr-seed-ref
-         "\"")
-      "")))
+         "\""))
+      (list vars ""))))
 
 (defvar
   evr-claim-templates
@@ -622,7 +660,7 @@ Returns t if the claim-set was successfully saved."
     (let ((proc (make-process
                  :name (concat "evr sign-put " claim-set-buffer-name)
                  :buffer (get-buffer-create "*evr put claim-set errors*")
-                 :command `("evr" "sign-put" "--flags" "1")
+                 :command (append (evr--evr-cli) `("sign-put" "--flags" "1"))
                  :filter
                  (lambda (proc out)
                    (with-current-buffer claim-set-buffer-name
