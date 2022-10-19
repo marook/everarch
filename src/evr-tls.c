@@ -256,7 +256,16 @@ int evr_tls_connect(struct evr_file *f, char *host, char *port, SSL_CTX *ssl_ctx
     if(verify_res != X509_V_OK){
         // the verify result constants are defined in
         // /usr/include/openssl/x509_vfy.h.
-        log_error("Server %s:%s certificate was not verified successfully. Verify result %d.", host, port, verify_res);
+        char *reason;
+        switch(verify_res){
+        default:
+            reason = "Unknown. Try looking it up in /usr/include/openssl/x509_vfy.h";
+            break;
+        case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+            reason = "The server used an unknown self signed certificate.";
+            break;
+        }
+        log_error("Server %s:%s certificate was not verified successfully. Verify result %d: %s", host, port, verify_res, reason);
         struct evr_file lf;
         evr_file_bind_ssl(&lf, ssl);
         evr_tls_log_ssl_errors(&lf, evr_log_level_error);
