@@ -79,6 +79,7 @@ struct evr_file_claim {
 
 #define evr_type_str 0x01
 #define evr_type_int 0x02
+#define evr_type_claim_ref 0x03
 
 struct evr_attr_def {
     char *key;

@@ -571,7 +571,10 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             goto out_with_free_claim_set_doc;
         }
         free(attr);
-        if(merge_res != evr_ok){
+        if(merge_res == evr_user_data_invalid){
+            ret = evr_user_data_invalid;
+            goto out_with_free_claim_set_doc;
+        } else if(merge_res != evr_ok){
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
             log_error("Failed to merge attr claim from transformed claim-set for blob with ref %s into attr index", ref_str);
@@ -999,7 +1002,11 @@ int evr_merge_attr_index_claim(struct evr_attr_index_db *db, evr_time t, evr_cla
         log_error("Only attr claims with claim seed can be merged into attr-index");
         goto out;
     }
-    if(evr_merge_attr_index_attr(db, t, claim->seed, cref, claim->attr, claim->attr_len) != evr_ok){
+    int merge_res = evr_merge_attr_index_attr(db, t, claim->seed, cref, claim->attr, claim->attr_len);
+    if(merge_res == evr_user_data_invalid){
+        ret = evr_user_data_invalid;
+        goto out;
+    } else if(merge_res != evr_ok){
         goto out;
     }
     if(sqlite3_bind_blob(db->insert_claim, 1, cref, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
@@ -1063,25 +1070,26 @@ int evr_merge_attr_index_attr(struct evr_attr_index_db *db, evr_time t, evr_clai
             log_debug("Merging attr op=0x%02x, k=%s, v=%s", a->op, a->key, value_str);
         } while(0);
 #endif
+        int merge_res;
         switch(a->op){
         default:
             log_error("Requested to merge attr with unknown op 0x%02x", a->op);
             goto out;
         case evr_attr_op_replace:
-            if(evr_merge_attr_index_attr_replace(db, t, seed, a->key, value) != evr_ok){
-                goto out;
-            }
+            merge_res = evr_merge_attr_index_attr_replace(db, t, seed, a->key, value);
             break;
         case evr_attr_op_add:
-            if(evr_merge_attr_index_attr_add(db, t, seed, a->key, value) != evr_ok){
-                goto out;
-            }
+            merge_res = evr_merge_attr_index_attr_add(db, t, seed, a->key, value);
             break;
         case evr_attr_op_rm:
-            if(evr_merge_attr_index_attr_rm(db, t, seed, a->key, value) != evr_ok){
-                goto out;
-            }
+            merge_res = evr_merge_attr_index_attr_rm(db, t, seed, a->key, value);
             break;
+        }
+        if(merge_res == evr_user_data_invalid){
+            ret = evr_user_data_invalid;
+            goto out;
+        } else if(merge_res != evr_ok){
+            goto out;
         }
     }
     ret = evr_ok;
@@ -1201,7 +1209,11 @@ int evr_merge_attr_index_attr_replace(struct evr_attr_index_db *db, evr_time t, 
     if(is_valid_until){
         valid_until = sqlite3_column_int64(db->find_future_attr_siblings, 1);
     }
-    if(evr_insert_attr(db, seed, key, value, t, is_valid_until, valid_until, 1) != evr_ok){
+    int insert_res = evr_insert_attr(db, seed, key, value, t, is_valid_until, valid_until, 1);
+    if(insert_res == evr_user_data_invalid) {
+        ret = evr_user_data_invalid;
+        goto out_with_reset_find_future_attr_siblings;
+    } else if(insert_res != evr_ok){
         goto out_with_reset_find_future_attr_siblings;
     }
     ret = evr_ok;
@@ -1276,7 +1288,11 @@ int evr_merge_attr_index_attr_add(struct evr_attr_index_db *db, evr_time t, evr_
     if(is_valid_until){
         valid_until = sqlite3_column_int64(db->find_future_attr_siblings, 1);
     }
-    if(evr_insert_attr(db, seed, key, value, t, is_valid_until, valid_until, 0) != evr_ok){
+    int insert_res = evr_insert_attr(db, seed, key, value, t, is_valid_until, valid_until, 0);
+    if(insert_res == evr_user_data_invalid) {
+        ret = evr_user_data_invalid;
+        goto out_with_reset_find_future_attr_siblings;
+    } else if(insert_res != evr_ok){
         goto out_with_reset_find_future_attr_siblings;
     }
     ret = evr_ok;
@@ -1335,7 +1351,11 @@ int evr_merge_attr_index_attr_rm(struct evr_attr_index_db *db, evr_time t, evr_c
     if(is_valid_until){
         valid_until = sqlite3_column_int64(db->find_future_attr_siblings, 1);
     }
-    if(evr_insert_attr(db, seed, key, value, t, is_valid_until, valid_until, 1) != evr_ok){
+    int insert_res = evr_insert_attr(db, seed, key, value, t, is_valid_until, valid_until, 1);
+    if(insert_res == evr_user_data_invalid) {
+        ret = evr_user_data_invalid;
+        goto out_with_reset_find_future_attr_siblings;
+    } else if(insert_res != evr_ok){
         goto out_with_reset_find_future_attr_siblings;
     }
     ret = evr_ok;
@@ -1433,6 +1453,7 @@ int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, 
         if(attr_type == evr_type_int){
             int number;
             if(sscanf(value, "%d", &number) != 1){
+                ret = evr_user_data_invalid;
                 log_debug("Failed to parse '%s' as decimal number", value);
                 goto out_with_reset_insert;
             }
@@ -1441,6 +1462,14 @@ int evr_insert_attr(struct evr_attr_index_db *db, evr_claim_ref ref, char *key, 
             }
         } else {
             if(sqlite3_bind_null(db->insert_attr, 4) != SQLITE_OK){
+                goto out_with_reset_insert;
+            }
+        }
+        if(attr_type == evr_type_claim_ref){
+            evr_claim_ref value_ref;
+            if(evr_parse_claim_ref(value_ref, value) != evr_ok){
+                ret = evr_user_data_invalid;
+                log_debug("Failed to parse '%s' as claim-ref", value);
                 goto out_with_reset_insert;
             }
         }

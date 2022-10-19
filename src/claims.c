@@ -338,6 +338,8 @@ struct evr_attr_spec_claim *evr_parse_attr_spec_claim(xmlNode *claim_node){
             type = evr_type_str;
         } else if(strcmp(type_name, "int") == 0){
             type = evr_type_int;
+        } else if(strcmp(type_name, "claim-ref") == 0){
+            type = evr_type_claim_ref;
         } else {
             log_error("Found unknown type '%s' in attr-def", type_name);
             xmlFree(type_name);

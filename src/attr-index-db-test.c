@@ -560,6 +560,44 @@ void test_attr_value_type_self_claim_ref(){
     evr_free_attr_index_cfg(cfg);
 }
 
+void test_attr_type_claim_ref_invalid_value(){
+    struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_def defs[] = {
+        {
+            "my-ref", evr_type_claim_ref
+        },
+    };
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 1;
+    spec.attr_def = defs;
+    spec.attr_factories_len = 0;
+    spec.attr_factories = NULL;
+    memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
+    struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, &spec, NULL);
+    xsltStylesheetPtr style = create_attr_mapping_stylesheet();
+#define seed_str "sha3-224-00000000000000000000000000000000000000000000000000000000-0000"
+    char doc_str[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"1970-01-01T00:00:00.000000Z\">"
+        "<attr seed=\"" seed_str "\">"
+        "<a op=\"=\" k=\"my-ref\" v=\"sha3-224-whatever-0000\"/>"
+        "</attr>"
+        "</claim-set>";
+    xmlDoc *claim_set_doc = create_xml_doc(doc_str);
+    assert(claim_set_doc);
+    evr_blob_ref claim_set_ref;
+    assert(is_ok(evr_parse_blob_ref(claim_set_ref, "sha3-224-c0000000000000000000000000000000000000000000000000000000")));
+    assert(evr_merge_attr_index_claim_set(db, &spec, style, 0, claim_set_ref, claim_set_doc, 0, NULL) == evr_user_data_invalid);
+    xmlFreeDoc(claim_set_doc);
+    evr_claim_ref seed;
+    assert(is_ok(evr_parse_claim_ref(seed, seed_str)));
+#undef seed_str
+    assert_query_no_result(db, "my-ref=sha3-224-whatever-0000 at 1970-01-01T00:00:00.020000Z");
+    assert(is_ok(evr_free_attr_index_db(db)));
+    xsltFreeStylesheet(style);
+    evr_free_attr_index_cfg(cfg);
+}
+
 void test_failed_transformation(){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
@@ -627,7 +665,7 @@ void assert_query_no_result(struct evr_attr_index_db *db, char *query){
     asserting_claims_visitor_calls = 0;
     memset(asserting_claims_visitor_expected_ref, 0, evr_claim_ref_size);
     assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, asserting_claims_visitor, NULL)));
-    assert_msg(asserting_claims_visitor_calls == 0, "Claims found but expected none", NULL);
+    assert_msg(asserting_claims_visitor_calls == 0, "Claims found but expected none for query: %s", query);
 }
 
 void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_claim_ref expected_ref){
@@ -661,6 +699,7 @@ int main(){
     run_test(test_attr_factories_fail_and_reindex);
     run_test(test_attr_attribute_factories);
     run_test(test_attr_value_type_self_claim_ref);
+    run_test(test_attr_type_claim_ref_invalid_value);
     run_test(test_failed_transformation);
     return 0;
 }

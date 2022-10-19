@@ -1,7 +1,3 @@
-* add claim-ref type in attr-spec's attr-def
-add a new type which tells the attr-index to expect a reference to a
-claim as value. attr-index should check if the value is parseable
-using evr_parse_claim_ref(…).
 * seed-description should also contain referenced seed's description
 right now the seed description describes exactly one seed.
 

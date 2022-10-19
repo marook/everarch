@@ -302,6 +302,7 @@ void test_parse_attr_spec_claim(){
         "<attr-spec>"
         "<attr-def k=\"tag\" type=\"str\"/>"
         "<attr-def k=\"body-size\" type=\"int\"/>"
+        "<attr-def k=\"cref\" type=\"claim-ref\"/>"
         "<attr-factory type=\"executable\" blob=\"sha3-224-99900000000000000000000000000000000000000000000000000000\"/>"
         "<transformation type=\"xslt\" blob=\"sha3-224-32100000000000000000000000000000000000000000000000000123\"/>"
         "</attr-spec>"
@@ -316,13 +317,16 @@ void test_parse_attr_spec_claim(){
     assert(cn);
     struct evr_attr_spec_claim *c = evr_parse_attr_spec_claim(cn);
     assert(c);
-    assert(c->attr_def_len == 2);
+    assert(c->attr_def_len == 3);
     struct evr_attr_def *tag_def = &c->attr_def[0];
     assert(is_str_eq(tag_def->key, "tag"));
     assert(tag_def->type == evr_type_str);
     struct evr_attr_def *size_def = &c->attr_def[1];
     assert(is_str_eq(size_def->key, "body-size"));
     assert(size_def->type == evr_type_int);
+    struct evr_attr_def *claim_ref_def = &c->attr_def[2];
+    assert(is_str_eq(claim_ref_def->key, "cref"));
+    assert(claim_ref_def->type == evr_type_claim_ref);
     evr_blob_ref_str fmt_transformation_blob_ref;
     evr_fmt_blob_ref(fmt_transformation_blob_ref, c->transformation_blob_ref);
     assert(is_str_eq(fmt_transformation_blob_ref, "sha3-224-32100000000000000000000000000000000000000000000000000123"));
