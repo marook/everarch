@@ -1,3 +1,20 @@
+* wrap seed-description responses into seed-description-set element
+for example:
+
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<seed-description-set
+    xmlns="https://evr.ma300k.de/seed-description/"
+    entry-seed="sha3-224-…-0000">
+  <seed-description seed="sha3-224-…-0000">
+    <attr-index>
+      <attr k="title" v="ye-think"/>
+      <attr k="owner" v="sha3-224-…-0001"/>
+      <attr k="storage-box" v="sha3-224-…-9999"/>
+    </attr-index>
+  </seed-description>
+</seed-description-set>
+#+END_SRC
 * seed-description should also contain referenced seed's description
 right now the seed description describes exactly one seed.
 
@@ -60,6 +77,26 @@ $ evr-fs -T a,b -T c,d xslt:blob:sha3-224-… mnt
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
 with evr-fs during runtime.
+* add has key operator to attr query language
+extend the attr query language to support searching for claims which
+have a certain key.
+
+not sure yet about the syntax:
+#+BEGIN_SRC
+tag=todo && some-key
+tag=todo && some-key=*
+has(some-key) // might clash with 'match functions' comming later
+some-key!
+#+END_SRC
+* add not operator to attr query language
+#+BEGIN_SRC
+!tag=nsfw
+!(tag=B || tag=C)
+#+END_SRC
+
+mapping the first example to sql would be quite easy because we could
+do "c.seed not in (…)". but how to map the braces part i'm not sure
+yet.
 * evr-fs should watch the evr-attr-index
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
@@ -123,6 +160,13 @@ perkeep stuff.
 * evaluate http libraries for C
 the evaluation should decide if the evr-web-server is implemented in C
 , node.js or maybe deno.
+* plan graph query approach
+[[https://en.wikipedia.org/wiki/SPARQL][sparql]] queryability can be achieved via [[https://librdf.org/][librdf]] which stores data in
+RDF. query output can be formatted with [[https://www.w3.org/TR/2013/REC-rdf-sparql-XMLres-20130321/][sparql xml results]].
+
+we probably want to become a [[https://www.w3.org/wiki/SparqlEndpoints][SPARQL endpoint]]. despite this means we
+need http support. SPARQL http access is described in [[https://www.w3.org/TR/2013/REC-sparql11-http-rdf-update-20130321/][SPARQL 1.1 Graph
+Store HTTP Protocol]].
 * report ref and some attributes specified by key in attr querries
 the query might be something like: select title where tag=todo
 * sort attr-query results by last modified timestamp
@@ -185,24 +229,6 @@ everything above will be part of the second major release of everarch.
 the vision of the second release is: let's go web
 * get rid of double _ in defines
 as they are not intended for userspace. mentioned by pitrp.
-* add has key operator to attr query language
-extend the attr query language to support searching for claims which
-have a certain key.
-
-not sure yet about the syntax:
-#+BEGIN_SRC
-tag=todo && some-key
-tag=todo && some-key=*
-#+END_SRC
-* add not operator to attr query language
-#+BEGIN_SRC
-!tag=nsfw
-!(tag=B || tag=C)
-#+END_SRC
-
-mapping the first example to sql would be quite easy because we could
-do "c.seed not in (…)". but how to map the braces part i'm not sure
-yet.
 * sort attr-query results by a certain attr key
 right now found claims are sortable by their creation and last
 modification date. with this task sorting by a certain attr should be
