@@ -1046,9 +1046,13 @@ int evr_cli_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *va
 int evr_cli_desc_seed(struct cli_cfg *cfg){
     int ret = evr_error;
     xmlDoc *doc;
-    xmlNode *desc_node;
-    if(evr_seed_desc_create_doc(&doc, &desc_node, cfg->seed) != evr_ok){
+    xmlNode *set_node;
+    if(evr_seed_desc_create_doc(&doc, &set_node) != evr_ok){
         goto out;
+    }
+    xmlNode *desc_node;
+    if(evr_seed_desc_append_desc(doc, set_node, &desc_node, cfg->seed) != evr_ok){
+        goto out_with_free_doc;
     }
     struct evr_file c;
     struct evr_buf_read *r = NULL;

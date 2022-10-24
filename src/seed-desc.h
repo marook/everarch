@@ -27,7 +27,12 @@
 #include "files.h"
 #include "signatures.h"
 
-int evr_seed_desc_create_doc(xmlDoc **doc, xmlNode **desc_node, evr_claim_ref seed);
+int evr_seed_desc_create_doc(xmlDoc **doc, xmlNode **set_node);
+
+/**
+ * evr_seed_desc_append_desc creates a seed-description element
+ */
+int evr_seed_desc_append_desc(xmlDoc *doc, xmlNode *set_node, xmlNode **desc_node, evr_claim_ref seed);
 
 /**
  * evr_seed_desc_append_claims inserts a child node with the tag name

@@ -1,20 +1,3 @@
-* wrap seed-description responses into seed-description-set element
-for example:
-
-#+BEGIN_SRC xml
-<?xml version="1.0" encoding="UTF-8"?>
-<seed-description-set
-    xmlns="https://evr.ma300k.de/seed-description/"
-    entry-seed="sha3-224-…-0000">
-  <seed-description seed="sha3-224-…-0000">
-    <attr-index>
-      <attr k="title" v="ye-think"/>
-      <attr k="owner" v="sha3-224-…-0001"/>
-      <attr k="storage-box" v="sha3-224-…-9999"/>
-    </attr-index>
-  </seed-description>
-</seed-description-set>
-#+END_SRC
 * seed-description should also contain referenced seed's description
 right now the seed description describes exactly one seed.
 

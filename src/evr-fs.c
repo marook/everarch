@@ -430,9 +430,13 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     }
 #endif
     xmlDoc *desc_doc;
-    xmlNode *desc_node;
-    if(evr_seed_desc_create_doc(&desc_doc, &desc_node, seed) != evr_ok){
+    xmlNode *set_node;
+    if(evr_seed_desc_create_doc(&desc_doc, &set_node) != evr_ok){
         goto out;
+    }
+    xmlNode *desc_node;
+    if(evr_seed_desc_append_desc(desc_doc, set_node, &desc_node, seed) != evr_ok){
+        goto out_with_free_desc_doc;
     }
     if(evr_seed_desc_append_attrs(desc_doc, desc_node, ctx->ir, seed) != evr_ok){
         goto out_with_free_desc_doc;

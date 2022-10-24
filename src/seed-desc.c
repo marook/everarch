@@ -23,28 +23,23 @@
 
 #define evr_seed_desc_ns "https://evr.ma300k.de/seed-description/"
 
-int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_desc_node, evr_claim_ref seed){
+int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_set_node){
     xmlDoc *doc = xmlNewDoc(BAD_CAST "1.0");
     if(!doc){
         goto fail;
     }
-    xmlNode *desc_node = xmlNewNode(NULL, BAD_CAST "seed-description");
-    if(!desc_node){
+    xmlNode *set_node = xmlNewNode(NULL, BAD_CAST "seed-description-set");
+    if(!set_node){
         goto fail_with_free_doc;
     }
-    xmlDocSetRootElement(doc, desc_node);
-    xmlNs *ns = xmlNewNs(desc_node, BAD_CAST evr_seed_desc_ns, NULL);
+    xmlDocSetRootElement(doc, set_node);
+    xmlNs *ns = xmlNewNs(set_node, BAD_CAST evr_seed_desc_ns, NULL);
     if(ns == NULL){
         goto fail_with_free_doc;
     }
-    xmlSetNs(desc_node, ns);
-    evr_claim_ref_str seed_str;
-    evr_fmt_claim_ref(seed_str, seed);
-    if(xmlSetProp(desc_node, BAD_CAST "seed", BAD_CAST seed_str) == NULL){
-        goto fail_with_free_doc;
-    }
+    xmlSetNs(set_node, ns);
     *_doc = doc;
-    *_desc_node = desc_node;
+    *_set_node = set_node;
     return evr_ok;
  fail_with_free_doc:
     xmlFreeDoc(doc);
@@ -52,7 +47,33 @@ int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_desc_node, evr_claim_ref 
     return evr_error;
 }
 
+int evr_seed_desc_append_desc(xmlDoc *doc, xmlNode *set_node, xmlNode **desc_node, evr_claim_ref seed){
+    xmlNs *desc_ns = xmlSearchNsByHref(doc, set_node, BAD_CAST evr_seed_desc_ns);
+    if(!desc_ns){
+        goto fail;
+    }
+    *desc_node = xmlNewNode(desc_ns, BAD_CAST "seed-description");
+    if(!desc_node){
+        goto fail;
+    }
+    xmlSetNs(*desc_node, desc_ns);
+    evr_claim_ref_str seed_str;
+    evr_fmt_claim_ref(seed_str, seed);
+    if(xmlSetProp(*desc_node, BAD_CAST "seed", BAD_CAST seed_str) == NULL){
+        goto fail_with_free_desc_node;
+    }
+    if(!xmlAddChild(set_node, *desc_node)){
+        goto fail_with_free_desc_node;
+    }
+    return evr_ok;
+ fail_with_free_desc_node:
+    xmlFreeNode(*desc_node);
+ fail:
+    return evr_error;
+}
+
 int evr_seed_desc_append_claims(xmlDoc *doc, xmlNode *desc_node, struct evr_verify_ctx *vctx, struct evr_file *c, evr_claim_ref *claims, size_t claims_len){
+    // TODO replace xmlNewNs with xmlSearchNsByHref
     xmlNs *desc_ns = xmlNewNs(NULL, BAD_CAST evr_seed_desc_ns, NULL);
     if(!desc_ns){
         goto out;

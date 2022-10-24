@@ -10,7 +10,7 @@
     >
   <xsl:output encoding="UTF-8"/>
 
-  <xsl:template match="/esd:seed-description">
+  <xsl:template match="/esd:seed-description-set/esd:seed-description">
     <efs:file-set>
       <efs:file last-modified="2022-10-10T12:13:14.000000Z">
         <xsl:attribute name="path">test-subdir/<xsl:value-of select="//esd:attr[@k='title']/@v"/></xsl:attribute>
