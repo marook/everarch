@@ -23,7 +23,7 @@
 
 #define evr_seed_desc_ns "https://evr.ma300k.de/seed-description/"
 
-int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_set_node){
+int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_set_node, evr_claim_ref entry_seed){
     xmlDoc *doc = xmlNewDoc(BAD_CAST "1.0");
     if(!doc){
         goto fail;
@@ -38,6 +38,11 @@ int evr_seed_desc_create_doc(xmlDoc **_doc, xmlNode **_set_node){
         goto fail_with_free_doc;
     }
     xmlSetNs(set_node, ns);
+    evr_claim_ref_str entry_seed_str;
+    evr_fmt_claim_ref(entry_seed_str, entry_seed);
+    if(xmlSetProp(set_node, BAD_CAST "entry-seed", BAD_CAST entry_seed_str) == NULL){
+        goto fail_with_free_doc;
+    }
     *_doc = doc;
     *_set_node = set_node;
     return evr_ok;

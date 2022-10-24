@@ -54,12 +54,12 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, e
 xsltStylesheet *create_fs_map_xslt();
 
 void test_build_seed_desc(){
-    xmlDoc *doc;
-    xmlNode *set_node;
-    assert(is_ok(evr_seed_desc_create_doc(&doc, &set_node)));
-    assert(set_node);
     evr_claim_ref seed;
     assert(is_ok(evr_parse_claim_ref(seed, test_claim_ref)));
+    xmlDoc *doc;
+    xmlNode *set_node;
+    assert(is_ok(evr_seed_desc_create_doc(&doc, &set_node, seed)));
+    assert(set_node);
     xmlNode *desc_node;
     assert(is_ok(evr_seed_desc_append_desc(doc, set_node, &desc_node, seed)));
     assert(desc_node);

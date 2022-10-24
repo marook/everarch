@@ -431,7 +431,7 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
 #endif
     xmlDoc *desc_doc;
     xmlNode *set_node;
-    if(evr_seed_desc_create_doc(&desc_doc, &set_node) != evr_ok){
+    if(evr_seed_desc_create_doc(&desc_doc, &set_node, seed) != evr_ok){
         goto out;
     }
     xmlNode *desc_node;

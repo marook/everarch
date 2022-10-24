@@ -1047,7 +1047,7 @@ int evr_cli_desc_seed(struct cli_cfg *cfg){
     int ret = evr_error;
     xmlDoc *doc;
     xmlNode *set_node;
-    if(evr_seed_desc_create_doc(&doc, &set_node) != evr_ok){
+    if(evr_seed_desc_create_doc(&doc, &set_node, cfg->seed) != evr_ok){
         goto out;
     }
     xmlNode *desc_node;

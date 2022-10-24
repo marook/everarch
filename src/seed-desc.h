@@ -27,7 +27,7 @@
 #include "files.h"
 #include "signatures.h"
 
-int evr_seed_desc_create_doc(xmlDoc **doc, xmlNode **set_node);
+int evr_seed_desc_create_doc(xmlDoc **doc, xmlNode **set_node, evr_claim_ref entry_seed);
 
 /**
  * evr_seed_desc_append_desc creates a seed-description element
