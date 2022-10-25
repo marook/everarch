@@ -22,38 +22,68 @@ evr -f 3 sign-put <<EOF
   <attr-spec>
     <attr-def k="tag" type="str"/>
     <attr-def k="title" type="str"/>
+    <attr-def k="category" type="claim-ref"/>
     <transformation type="xslt" blob="${basic_xslt_ref}"/>
   </attr-spec>
 </claim-set>
 EOF
 
 fs_xslt_ref=`evr put < fs.xslt`
-echo 'hello world!' | evr post-file --title 'msg.txt'
+msg_file_ref=`echo 'hello world!' | evr post-file --title 'msg.txt'`
 dd bs=4000 count=300 if=/dev/urandom | evr post-file --title 'little-random.bin'
+now=`date -u '+%Y-%m-%dT%H:%M:%S'`
+category_ref=`evr sign-put -f 1 <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="${now}.999999Z"
+    >
+  <attr>
+    <a op="=" k="title" v="my-category"/>
+  </attr>
+</claim-set>
+EOF`
+evr sign-put -f 1 <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="${now}.999999Z"
+    >
+  <attr seed="${msg_file_ref}">
+    <a op="=" k="category" v="${category_ref}-0000"/>
+  </attr>
+</claim-set>
+EOF
 
 start_attr_index
 wait_for_attr_index
 
+sleep 1
+
+evr_fs_opts='-T category'
 mount_evr_fs "${fs_xslt_ref}"
 
 find_mnt=`find mnt`
 if [[ "${find_mnt}" != 'mnt
 mnt/test-subdir
 mnt/test-subdir/little-random.bin
-mnt/test-subdir/msg.txt' ]]
+mnt/test-subdir/cat-my-category
+mnt/test-subdir/cat-my-category/msg.txt' ]]
 then
     echo "Unexpected find mnt: ${find_mnt}" >&2
     exit 1
 fi
 
-size_msg_txt=`stat -c '%s' mnt/test-subdir/msg.txt`
+size_msg_txt=`stat -c '%s' mnt/test-subdir/cat-my-category/msg.txt`
 if [[ "${size_msg_txt}" != '13' ]]
 then
     echo "Unexpected disk usage of msg.txt: ${size_msg_txt}" >&2
     exit 1
 fi
 
-cat_msg=`cat mnt/test-subdir/msg.txt`
+cat_msg=`cat mnt/test-subdir/cat-my-category/msg.txt`
 if [[ "${cat_msg}" != 'hello world!' ]]
 then
     echo "Unexpected mnt/test-subdir/msg.txt content: ${cat_msg}" >&2

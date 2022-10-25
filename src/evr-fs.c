@@ -59,6 +59,8 @@ static char args_doc[] = "TRANSFORMATION MOUNT_POINT";
 #define arg_accepted_gpg_key 262
 #define arg_allow_other 263
 
+#define max_traces_len 64
+
 struct evr_fs_cfg {
     char *storage_host;
     char *storage_port;
@@ -66,6 +68,8 @@ struct evr_fs_cfg {
     char *index_port;
     struct evr_auth_token_cfg *auth_tokens;
     struct evr_cert_cfg *ssl_certs;
+    size_t traces_len;
+    char *traces[max_traces_len];
     /**
      * foreground's meaning is defined by the fuse -d option.
      */
@@ -115,6 +119,7 @@ static struct argp_option options[] = {
     {"index-port", arg_index_port, "PORT", 0, "The port of the evr-attr-index server to connect to. Default port is " to_string(evr_attr_index_port) "."},
     {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of the server. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
     {"auth-token", arg_auth_token, "HOST:PORT:TOKEN", 0, "A hostname, port and authorization token which is presented to the server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
+    {"trace", 'T', "T", 0, "Trace of the produced seed-description set. May be specified multiple times for multiple traces. No more than " to_string(max_traces_len) " traces are allowed right now."},
     {"foreground", 'f', NULL, 0, "The process will not demonize. It will stay in the foreground instead."},
     {"single-thread", 's', NULL, 0, "The fuse layer will be single threaded."},
     {"oallow-other", arg_allow_other, NULL, 0, "The file system will be accessible by other users. Requires the user_allow_other option to be set in the global fuse configuration."},
@@ -127,6 +132,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     switch(key){
     default:
         return ARGP_ERR_UNKNOWN;
+    case 'T':
+        if(cfg->traces_len == static_len(cfg->traces)){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->traces[cfg->traces_len] = strdup(arg);
+        if(!cfg->traces[cfg->traces_len]){
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->traces_len += 1;
+        break;
     case 'f':
         cfg->foreground = 1;
         break;
@@ -220,6 +236,7 @@ int main(int argc, char *argv[]) {
     cfg.index_port = strdup(to_string(evr_attr_index_port));
     cfg.auth_tokens = NULL;
     cfg.ssl_certs = NULL;
+    cfg.traces_len = 0;
     cfg.foreground = 0;
     cfg.single_thread = 0;
     cfg.allow_other = 0;
@@ -307,6 +324,9 @@ int main(int argc, char *argv[]) {
             free(*it);
         }
     } while(0);
+    for(size_t i = 0; i < cfg.traces_len; ++i){
+        free(cfg.traces[i]);
+    }
     evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
     evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
@@ -430,16 +450,8 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     }
 #endif
     xmlDoc *desc_doc;
-    xmlNode *set_node;
-    if(evr_seed_desc_create_doc(&desc_doc, &set_node, seed) != evr_ok){
+    if(evr_seed_desc_build(&desc_doc, ctx->ir, seed, cfg.traces_len, cfg.traces) != evr_ok){
         goto out;
-    }
-    xmlNode *desc_node;
-    if(evr_seed_desc_append_desc(desc_doc, set_node, &desc_node, seed) != evr_ok){
-        goto out_with_free_desc_doc;
-    }
-    if(evr_seed_desc_append_attrs(desc_doc, desc_node, ctx->ir, seed, NULL, NULL) != evr_ok){
-        goto out_with_free_desc_doc;
     }
     xmlDoc *files_doc = evr_seed_desc_to_file_set(desc_doc, seed);
     if(!files_doc){

@@ -1,11 +1,3 @@
-* add traces support to evr-fs when producing seed-description
-right now evr-fs only produces the seed-description for each seed.
-
-traces should be specfiyable as evr-fs command line argument.
-
-#+BEGIN_SRC
-$ evr-fs -T a,b -T c,d xslt:blob:sha3-224-… mnt
-#+END_SRC
 * reserve .evr in root directory within evr-fs
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction

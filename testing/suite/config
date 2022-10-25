@@ -149,7 +149,7 @@ mount_evr_fs() {
     rm -rf -- "${evr_fs_mnt_dir}"
     mkdir -p -- "${evr_fs_mnt_dir}"
     echo "Mounting evr-fs…"
-    evr-fs -f "xslt:blob:${xslt_ref}" "${evr_fs_mnt_dir}" &
+    evr-fs -f "xslt:blob:${xslt_ref}" ${evr_fs_opts} "${evr_fs_mnt_dir}" &
     sleep 1
 }
 
