@@ -129,9 +129,11 @@ struct evr_seed_desc_append_attrs_ctx {
     xmlDoc *doc;
     xmlNs *ns;
     xmlNode *attrs_node;
+    int (*visit_attr)(void *ctx, char *key, char *val);
+    void *visit_ctx;
 };
 
-int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_read *r, evr_claim_ref seed){
+int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_read *r, evr_claim_ref seed, int (*visit_attr)(void *ctx, char *key, char *val), void *visit_ctx){
     const char prefix[] = "select * where ref=";
     char query[strlen(prefix) + (evr_claim_ref_str_size - 1) + 1];
     struct evr_seed_desc_append_attrs_ctx ctx;
@@ -144,6 +146,8 @@ int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_r
     if(!ctx.attrs_node){
         goto fail;
     }
+    ctx.visit_attr = visit_attr;
+    ctx.visit_ctx = visit_ctx;
     xmlSetNs(ctx.attrs_node, ctx.ns);
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, query);
@@ -181,6 +185,9 @@ int evr_seed_desc_append_attrs_visit_attr(void *_ctx, evr_claim_ref seed, char *
         goto fail_with_free_an;
     }
     if(!xmlNewProp(an, BAD_CAST "v", BAD_CAST val)){
+        goto fail_with_free_an;
+    }
+    if(ctx->visit_attr && ctx->visit_attr(ctx->visit_ctx, key, val) != evr_ok){
         goto fail_with_free_an;
     }
     return evr_ok;

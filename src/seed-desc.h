@@ -50,6 +50,6 @@ int evr_seed_desc_append_claims(xmlDoc *doc, xmlNode *decs_node, struct evr_veri
  *
  * r is a connection to the evr-attr-index.
  */
-int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_read *r, evr_claim_ref seed);
+int evr_seed_desc_append_attrs(xmlDoc *doc, xmlNode *desc_node, struct evr_buf_read *r, evr_claim_ref seed, int (*visit_attr)(void *ctx, char *key, char *val), void *ctx);
 
 #endif

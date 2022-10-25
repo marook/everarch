@@ -34,6 +34,8 @@ extern size_t evr_page_size;
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) < (b) ? (b) : (a))
 
+#define static_len(a) (sizeof(a) / sizeof(typeof(*a)))
+
 #define ceil_div(dividend, divisor) ((dividend + (divisor - 1)) / divisor)
 
 /*

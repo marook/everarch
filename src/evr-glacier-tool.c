@@ -133,7 +133,7 @@ int main(int argc, char **argv){
     void *tbfree[] = {
         cfg.bucket_file,
     };
-    void **tbfree_end = &tbfree[sizeof(tbfree) / sizeof(void*)];
+    void **tbfree_end = &tbfree[static_len(tbfree)];
     for(void **it = tbfree; it != tbfree_end; ++it){
         if(*it){
             free(*it);

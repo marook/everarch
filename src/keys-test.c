@@ -24,6 +24,7 @@
 #include "keys.h"
 #include "test.h"
 #include "logger.h"
+#include "errors.h"
 
 void test_evr_fmt_key_into(){
     evr_blob_ref_str fmt_key;
@@ -91,7 +92,7 @@ void test_claim_ref_tiny_set(){
     assert(is_ok(evr_parse_claim_ref(c2, "sha3-224-00000000000000000000000000000000000000000000000000000000-0000")));
     assert(is_ok(evr_claim_ref_tiny_set_add(set, c1)));
     assert(is_ok(evr_claim_ref_tiny_set_add(set, c2)));
-    assert(is_ok(evr_claim_ref_tiny_set_add(set, c1)));
+    assert(evr_claim_ref_tiny_set_add(set, c1) == evr_exists);
     assert(set->refs_used == 2);
     assert(evr_cmp_claim_ref(c1, set->refs[0]) == 0);
     assert(evr_cmp_claim_ref(c2, set->refs[1]) == 0);

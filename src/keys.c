@@ -184,7 +184,7 @@ int evr_claim_ref_tiny_set_add(struct evr_claim_ref_tiny_set *set, evr_claim_ref
         evr_claim_ref *end = &set->refs[set->refs_used];
         for(evr_claim_ref *it = set->refs; it != end; ++it){
             if(evr_cmp_claim_ref(ref, *it) == 0){
-                return evr_ok;
+                return evr_exists;
             }
         }
     } else {

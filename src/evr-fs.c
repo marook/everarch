@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
             cfg.transformation,
             cfg.mount_point,
         };
-        void **tbfree_end = &tbfree[sizeof(tbfree) / sizeof(void*)];
+        void **tbfree_end = &tbfree[static_len(tbfree)];
         for(void **it = tbfree; it != tbfree_end; ++it){
             free(*it);
         }
@@ -438,7 +438,7 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     if(evr_seed_desc_append_desc(desc_doc, set_node, &desc_node, seed) != evr_ok){
         goto out_with_free_desc_doc;
     }
-    if(evr_seed_desc_append_attrs(desc_doc, desc_node, ctx->ir, seed) != evr_ok){
+    if(evr_seed_desc_append_attrs(desc_doc, desc_node, ctx->ir, seed, NULL, NULL) != evr_ok){
         goto out_with_free_desc_doc;
     }
     xmlDoc *files_doc = evr_seed_desc_to_file_set(desc_doc, seed);

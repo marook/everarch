@@ -76,6 +76,7 @@ evr -f 3 sign-put <<EOF
   <attr-spec>
     <attr-def k="tag" type="str"/>
     <attr-def k="title" type="str"/>
+    <attr-def k="capital" type="claim-ref"/>
     <transformation type="xslt" blob="${basic_xslt_ref}"/>
   </attr-spec>
 </claim-set>
@@ -86,12 +87,33 @@ test_ref=`evr -f 1 sign-put < attr-claim-1.xml`
 test2_ref=`evr -f 1 sign-put < attr-claim-2.xml`
 evr -f 1 sign-put < attr-claim-future.xml
 
+berlin_ref=`evr -f 1 sign-put < berlin-claim.xml`
+germany_ref=`evr -f 1 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-10-24T01:00:00.000000Z"
+    >
+  <attr>
+    <a op="=" k="title" v="Germany"/>
+    <a op="=" k="capital" v="${berlin_ref}-0000"/>
+  </attr>
+</claim-set>
+EOF`
+
+echo "Test refs"
+echo "	berlin_ref ${berlin_ref}"
+echo "	germany_ref ${germany_ref}"
+
 # upload a broken claim-sets. should be ignored by evr-attr-index.
 evr -f 1 sign-put < broken-claim.xml
 evr -f 1 sign-put < no-created-claim-set.xml
 
 start_attr_index
 wait_for_attr_index
+
+sleep 1
 
 echo "Running test queries…"
 results=`query_attr_index 's tag=no-such-tag-exists'`
@@ -126,6 +148,13 @@ then
     exit 1
 fi
 
+seed_desc=`evr desc-seed -T capital "${germany_ref}-0000"`
+if [[ "${seed_desc}" != *"Berlin"* ]]
+then
+    echo "Unexpected result from evr desc-seed -T capital germany: ${seed_desc}" >&2
+    exit 1
+fi
+
 results=`query_attr_index "s select * where ref=${test_ref}-0000"`
 if [[ "${results}" != "OK
 ${test_ref}-0000
@@ -153,6 +182,8 @@ fi
 # this test has a space character after the 's'
 results=`query_attr_index 's '`
 if [[ "${results}" != "OK
+${germany_ref}-0000
+${berlin_ref}-0000
 ${test2_ref}-0000
 ${test_ref}-0000" ]]
 then
@@ -163,6 +194,8 @@ fi
 # this test has no space character after the 's'
 results=`query_attr_index 's'`
 if [[ "${results}" != "OK
+${germany_ref}-0000
+${berlin_ref}-0000
 ${test2_ref}-0000
 ${test_ref}-0000" ]]
 then
@@ -171,7 +204,9 @@ then
 fi
 
 results=`evr search ''`
-if [[ "${results}" != "${test2_ref}-0000
+if [[ "${results}" != "${germany_ref}-0000
+${berlin_ref}-0000
+${test2_ref}-0000
 ${test_ref}-0000" ]]
 then
     echo "Unexpected evr cli result from empty expression search query: ${results}" >&2

@@ -51,4 +51,6 @@ int evr_attri_write_search(struct evr_file *f, char *query);
 
 int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, evr_claim_ref seed), int (*visit_attr)(void *ctx, evr_claim_ref seed, char *key, char *val), void *ctx);
 
+int evr_attri_describe_index(struct evr_buf_read *r, evr_blob_ref *index_ref);
+
 #endif

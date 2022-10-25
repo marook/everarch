@@ -54,7 +54,7 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
         cfg->storage_host,
         cfg->storage_port,
     };
-    char **str_options_end = &str_options[sizeof(str_options) / sizeof(char*)];
+    char **str_options_end = &str_options[static_len(str_options)];
     for(char **it = str_options; it != str_options_end; ++it){
         if(*it){
             free(*it);
@@ -563,12 +563,15 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         evr_claim_ref cref;
         evr_build_claim_ref(cref, claim_set_ref, attr->index_seed);
         int merge_res = evr_merge_attr_index_claim(db, created, cref, attr);
-        if(merge_res == evr_ok && visited_seed_set && evr_claim_ref_tiny_set_add(visited_seed_set, attr->seed) != evr_ok) {
-            evr_blob_ref_str ref_str;
-            evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_error("Transformed claim-set for blob with ref %s produced more than %zu attr seed references.", ref_str, visited_seed_set->refs_len);
-            free(attr);
-            goto out_with_free_claim_set_doc;
+        if(merge_res == evr_ok && visited_seed_set) {
+            int add_res = evr_claim_ref_tiny_set_add(visited_seed_set, attr->seed);
+            if(add_res != evr_ok && add_res != evr_exists) {
+                evr_blob_ref_str ref_str;
+                evr_fmt_blob_ref(ref_str, claim_set_ref);
+                log_error("Transformed claim-set for blob with ref %s produced more than %zu attr seed references.", ref_str, visited_seed_set->refs_len);
+                free(attr);
+                goto out_with_free_claim_set_doc;
+            }
         }
         free(attr);
         if(merge_res == evr_user_data_invalid){
@@ -616,12 +619,15 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         if(evr_step_stmt(db->db, db->archive_claim) != SQLITE_DONE){
             goto out_with_reset_archive_claim;
         }
-        if(visited_seed_set && evr_claim_ref_tiny_set_add(visited_seed_set, arch->seed) != evr_ok){
-            evr_blob_ref_str ref_str;
-            evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_error("Transformed claim-set for blob with ref %s produced more than %zu seed references.", ref_str, visited_seed_set->refs_len);
-            free(arch);
-            goto out_with_reset_archive_claim;
+        if(visited_seed_set){
+            int add_res = evr_claim_ref_tiny_set_add(visited_seed_set, arch->seed);
+            if(add_res != evr_ok && add_res != evr_exists){
+                evr_blob_ref_str ref_str;
+                evr_fmt_blob_ref(ref_str, claim_set_ref);
+                log_error("Transformed claim-set for blob with ref %s produced more than %zu seed references.", ref_str, visited_seed_set->refs_len);
+                free(arch);
+                goto out_with_reset_archive_claim;
+            }
         }
         free(arch);
         c_node = c_node->next;

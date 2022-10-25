@@ -20,6 +20,8 @@
 
 #include <stdlib.h>
 
+#include "basics.h"
+
 void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg){
     if(!cfg){
         return;
@@ -31,7 +33,7 @@ void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg){
         cfg->ssl_key_path,
         cfg->bucket_dir_path,
     };
-    char **str_options_end = &str_options[sizeof(str_options) / sizeof(char*)];
+    char **str_options_end = &str_options[static_len(str_options)];
     for(char **it = str_options; it != str_options_end; ++it){
         if(*it){
             free(*it);

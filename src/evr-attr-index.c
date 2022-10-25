@@ -1271,6 +1271,7 @@ int evr_work_authenticate_cmd(struct evr_connection *ctx, char *query);
 int evr_work_search_cmd(struct evr_connection *ctx, char *query);
 int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str);
 int evr_watch_index(struct evr_connection *ctx);
+int evr_describe_index(struct evr_connection *ctx);
 
 int evr_work_cmd(struct evr_connection *ctx, char *line){
     log_debug("Connection worker %d retrieved cmd: %s", ctx->socket.get_fd(&ctx->socket), line);
@@ -1284,15 +1285,18 @@ int evr_work_cmd(struct evr_connection *ctx, char *line){
         return evr_work_authenticate_cmd(ctx, args);
     }
     if(ctx->authenticated) {
-       if(strcmp(cmd, "s") == 0){
-           return evr_work_search_cmd(ctx, args);
-       }
-       if(strcmp(cmd, "c") == 0){
-           return evr_list_claims_for_seed(ctx, args);
-       }
-       if(strcmp(cmd, "w") == 0){
-           return evr_watch_index(ctx);
-       }
+        if(strcmp(cmd, "s") == 0){
+            return evr_work_search_cmd(ctx, args);
+        }
+        if(strcmp(cmd, "c") == 0){
+            return evr_list_claims_for_seed(ctx, args);
+        }
+        if(strcmp(cmd, "w") == 0){
+            return evr_watch_index(ctx);
+        }
+        if(strcmp(cmd, "i") == 0){
+            return evr_describe_index(ctx);
+        }
     }
     if(strcmp(cmd, "exit") == 0){
         return evr_end;
@@ -1493,6 +1497,32 @@ int evr_watch_index(struct evr_connection *ctx){
     return ret;
 }
 
+int evr_describe_index(struct evr_connection *ctx){
+    log_debug("Connection worker %d retrieved describe index", ctx->socket.get_fd(&ctx->socket));
+    evr_blob_ref index_ref;
+    if(evr_get_current_index_ref(index_ref) != evr_ok){
+        return evr_error;
+    }
+    if(evr_respond_status(ctx, 1, NULL) != evr_ok){
+        return evr_error;
+    }
+    char index_ref_label[] = "index-ref: ";
+    char buf[sizeof(index_ref_label) - 1 + evr_blob_ref_str_len + 1];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_push_concat(&bp, index_ref_label);
+    evr_fmt_blob_ref(bp.pos, index_ref);
+    evr_inc_buf_pos(&bp, evr_blob_ref_str_len);
+    evr_push_concat(&bp, "\n");
+    if(write_n(&ctx->socket, buf, sizeof(buf)) != evr_ok){
+        return evr_error;
+    }
+    if(evr_respond_message_end(ctx) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
 int evr_respond_search_status(void *context, int parse_res, char *parse_error){
     struct evr_search_ctx *ctx = context;
     ctx->parse_res = parse_res;
@@ -1563,6 +1593,8 @@ int evr_respond_help(struct evr_connection *ctx){
         "a TOKEN - authenticates with given token.\n"
         "s QUERY - searches for claims matching the given query. Requires authentication.\n"
         "c REF - lists all claims referencing the given seed claim. Requires authentication.\n"
+        "w - watch for changes within the index\n"
+        "i - describe the currently used index\n"
         ;
     if(write_n(&ctx->socket, help, sizeof(help)) != evr_ok){
         goto out;

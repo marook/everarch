@@ -94,6 +94,7 @@ static struct argp_option options[] = {
     {"last-modified-after", 'm', "T", 0, "Start watching blobs after T. T is in unix epoch format in seconds."},
     {"title", 't', "T", 0, "Title of the created claim. Might be used together with post-file."},
     {"seed", 's', "REF", 0, "Makes the created claim reference another claim as seed."},
+    {"trace", 'T', "T", 0, "Trace of the produced seed-description set. May be specified multiple times for multiple traces. No more than 64 traces are allowed right now."},
     {"blobs-sort-order", arg_blobs_sort_order, "ORDER", 0, "Prints watched blobs in this order. Possible values are '" sort_order_last_modified_key "' and '" sort_order_blob_ref_key "'. The sort-order '" sort_order_last_modified_key "' will continue to emit changed blobs as they change live. Other sort orders will end the connection after all relevant blob refs have been emitted. Default is '" sort_order_last_modified_key "'."},
     {"two-way", arg_two_way, NULL, 0, "Synchronizes also from destination server to source server instead of just from source to destination server."},
     {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
@@ -128,6 +129,8 @@ struct cli_cfg {
     char *title;
     int has_seed;
     evr_claim_ref seed;
+    size_t traces_len;
+    char *traces[64];
     unsigned long long last_modified_after;
     int two_way;
 
@@ -195,6 +198,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         cfg->has_seed = 1;
         break;
     }
+    case 'T':
+        if(cfg->traces_len == static_len(cfg->traces)){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->traces[cfg->traces_len] = strdup(arg);
+        if(!cfg->traces[cfg->traces_len]){
+            return ARGP_ERR_UNKNOWN;
+        }
+        cfg->traces_len += 1;
+        break;
     case arg_storage_host:
         evr_replace_str(cfg->storage_host, arg);
         break;
@@ -423,6 +437,7 @@ int main(int argc, char **argv){
     cfg.has_seed = 0;
     // LLONG_MAX instead of ULLONG_MAX because of limitations in
     // glacier's sqlite.
+    cfg.traces_len = 0;
     cfg.last_modified_after = LLONG_MAX;
     cfg.two_way = 0;
     cfg.blobs_sort_order = evr_cmd_watch_sort_order_last_modified;
@@ -503,12 +518,15 @@ int main(int argc, char **argv){
         cfg.signing_gpg_fpr,
         cfg.query,
     };
-    void **tbfree_end = &tbfree[sizeof(tbfree) / sizeof(void*)];
+    void **tbfree_end = &tbfree[static_len(tbfree)];
  out_with_free_cfg:
     for(void **it = tbfree; it != tbfree_end; ++it){
         if(*it){
             free(*it);
         }
+    }
+    for(size_t i = 0; i < cfg.traces_len; ++i){
+        free(cfg.traces[i]);
     }
     evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
@@ -1043,25 +1061,70 @@ int evr_cli_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *va
     return write_n(&f, buf, sizeof(buf));
 }
 
+struct evr_cli_desc_seed_backlog_item {
+    evr_claim_ref seed;
+    size_t traces_len;
+    char **traces;
+};
+
+struct evr_cli_desc_seed_backlog_item *evr_create_cli_desc_seed_backlog(size_t backlog_len, size_t max_traces_len);
+int evr_cli_desc_seed_visit_attr(void *ctx, char *key, char *val);
+
+#define max_backlog_len 256
+
+struct evr_cli_desc_seed_ctx {
+    size_t backlog_len;
+    struct evr_cli_desc_seed_backlog_item *backlog;
+    struct evr_claim_ref_tiny_set *visited_seeds;
+    size_t current_traces_len;
+    char **current_traces;
+};
+
 int evr_cli_desc_seed(struct cli_cfg *cfg){
     int ret = evr_error;
+    evr_claim_ref current_seed;
+    char *current_traces[cfg->traces_len];
     xmlDoc *doc;
     xmlNode *set_node;
     if(evr_seed_desc_create_doc(&doc, &set_node, cfg->seed) != evr_ok){
         goto out;
     }
-    xmlNode *desc_node;
-    if(evr_seed_desc_append_desc(doc, set_node, &desc_node, cfg->seed) != evr_ok){
+    struct evr_cli_desc_seed_ctx ctx;
+    ctx.backlog = evr_create_cli_desc_seed_backlog(max_backlog_len, cfg->traces_len);
+    if(!ctx.backlog){
         goto out_with_free_doc;
+    }
+    ctx.backlog_len = 1;
+    memcpy(ctx.backlog[0].seed, cfg->seed, evr_claim_ref_size);
+    ctx.backlog[0].traces_len = cfg->traces_len;
+    memcpy(ctx.backlog[0].traces, cfg->traces, sizeof(char*) * cfg->traces_len);
+    ctx.visited_seeds = evr_create_claim_ref_tiny_set(256);
+    if(!ctx.visited_seeds){
+        goto out_with_free_backlog;
+    }
+    if(evr_claim_ref_tiny_set_add(ctx.visited_seeds, cfg->seed) != evr_ok){
+        goto out_with_free_visited_seeds;
     }
     struct evr_file c;
     struct evr_buf_read *r = NULL;
     if(evr_connect_to_index(&c, &r, cfg, cfg->index_host, cfg->index_port) != evr_ok){
-        goto out_with_free_doc;
+        goto out_with_free_visited_seeds;
     }
-    // TODO append claims
-    if(evr_seed_desc_append_attrs(doc, desc_node, r, cfg->seed) != evr_ok){
-        goto out_with_free_r;
+    ctx.current_traces = current_traces;
+    while(ctx.backlog_len > 0){
+        --ctx.backlog_len;
+        struct evr_cli_desc_seed_backlog_item *current_item = &ctx.backlog[ctx.backlog_len];
+        memcpy(current_seed, current_item->seed, evr_claim_ref_size);
+        ctx.current_traces_len = current_item->traces_len;
+        memcpy(current_traces, current_item->traces, ctx.current_traces_len * sizeof(char*));
+        xmlNode *desc_node;
+        if(evr_seed_desc_append_desc(doc, set_node, &desc_node, current_seed) != evr_ok){
+            goto out_with_free_r;
+        }
+        // TODO append claims
+        if(evr_seed_desc_append_attrs(doc, desc_node, r, current_seed, evr_cli_desc_seed_visit_attr, &ctx) != evr_ok){
+            goto out_with_free_r;
+        }
     }
     char *seed_desc_str = NULL;
     int seed_desc_size;
@@ -1079,11 +1142,86 @@ int evr_cli_desc_seed(struct cli_cfg *cfg){
             ret = evr_error;
         }
     }
+ out_with_free_visited_seeds:
+    evr_free_claim_ref_tiny_set(ctx.visited_seeds);
+ out_with_free_backlog:
+    free(ctx.backlog);
  out_with_free_doc:
     xmlFreeDoc(doc);
  out:
     return ret;
 }
+
+struct evr_cli_desc_seed_backlog_item *evr_create_cli_desc_seed_backlog(size_t backlog_len, size_t max_traces_len){
+    char *buf = malloc((sizeof(struct evr_cli_desc_seed_backlog_item) + sizeof(char*) * max_traces_len) * backlog_len);
+    if(!buf){
+        return NULL;
+    }
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_cli_desc_seed_backlog_item *backlog = (struct evr_cli_desc_seed_backlog_item*)bp.pos;
+    struct evr_cli_desc_seed_backlog_item *backlog_end = &backlog[backlog_len];
+    evr_inc_buf_pos(&bp, sizeof(struct evr_cli_desc_seed_backlog_item) * backlog_len);
+    for(struct evr_cli_desc_seed_backlog_item *b = backlog; b != backlog_end; ++b){
+        b->traces = (char**)bp.pos;
+        evr_inc_buf_pos(&bp, sizeof(char*) * max_traces_len);
+    }
+    return backlog;
+}
+
+int evr_cli_desc_seed_visit_attr(void *_ctx, char *key, char *val){
+    struct evr_cli_desc_seed_ctx *ctx = _ctx;
+    int key_is_ref = 0;
+    char **tr_end = &ctx->current_traces[ctx->current_traces_len];
+    size_t key_len = strlen(key);
+    for(char **tr = ctx->current_traces; tr != tr_end; ++tr){
+        if(strncmp(*tr, key, key_len) != 0){
+            continue;
+        }
+        if(*tr[key_len] != ',' && *tr[key_len] != '\0'){
+            continue;
+        }
+        key_is_ref = 1;
+    }
+    if(!key_is_ref){
+        return evr_ok;
+    }
+    log_debug("Following key %s with val %s while building seed-description", key, val);
+    evr_claim_ref ref;
+    if(evr_parse_claim_ref(ref, val) != evr_ok){
+        log_error("Unable to parse claim ref %s when following key %s while building seed-description", val, key);
+        return evr_error;
+    }
+    int add_res = evr_claim_ref_tiny_set_add(ctx->visited_seeds, ref);
+    if(add_res == evr_exists){
+        return evr_ok;
+    }
+    // we continue after this point ever if add_res ==
+    // evr_error. there might be an error because ctx->visited_seeds
+    // has exceeded it's size. if the size is exceeded we will just
+    // report seed-descriptions for the same seed multiple times.
+    if(ctx->backlog_len == max_backlog_len){
+        log_error("seed-description backlog exceeded %zu items", (size_t)max_backlog_len);
+        return evr_error;
+    }
+    struct evr_cli_desc_seed_backlog_item *item = &ctx->backlog[ctx->backlog_len];
+    memcpy(item->seed, ref, evr_claim_ref_size);
+    item->traces_len = 0;
+    for(char **tr = ctx->current_traces; tr != tr_end; ++tr){
+        if(strncmp(*tr, key, key_len) != 0){
+            continue;
+        }
+        if(*tr[key_len] != ','){
+            continue;
+        }
+        item->traces[item->traces_len] = tr[key_len + 1];
+        item->traces_len += 1;
+    }
+    ctx->backlog_len += 1;
+    return evr_ok;
+}
+
+#undef max_backlog_len
 
 int evr_post_and_collect_file_slice(char* buf, size_t size, void *ctx0){
     int ret = evr_error;

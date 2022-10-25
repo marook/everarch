@@ -199,3 +199,61 @@ int evr_attri_read_status(struct evr_buf_read *r){
     }
     return evr_ok;
 }
+
+int evr_attri_write_describe_index(struct evr_file *f);
+
+int evr_attri_describe_index(struct evr_buf_read *r, evr_blob_ref *index_ref){
+    if(evr_attri_write_describe_index(r->f) != evr_ok){
+        return evr_error;
+    }
+    if(evr_attri_read_status(r) != evr_ok){
+        return evr_error;
+    }
+    int has_index_ref = 0;
+    while(1){
+        size_t nl_offset;
+        if(evr_buf_read_read_until(r, '\n', &nl_offset) != evr_ok){
+            return evr_error;
+        }
+        char line[nl_offset + 1];
+        if(evr_buf_read_pop(r, line, sizeof(line)) != evr_ok){
+            return evr_error;
+        }
+        if(line[0] == '\n'){
+            break;
+        }
+        size_t colon_i = 0;
+        for(; colon_i < sizeof(line); ++colon_i){
+            if(line[colon_i] == ':'){
+                break;
+            }
+        }
+        // the 'one extra' is for the space after the colon
+        if(colon_i >= sizeof(line) - 1){
+            return evr_error;
+        }
+        if(line[colon_i + 1] != ' '){
+            return evr_error;
+        }
+        char *value = &line[colon_i + 2];
+        // replace \n with \0
+        line[sizeof(line) - 1] = '\0';
+        line[colon_i] = '\0';
+        if(strcmp(line, "index-ref") == 0){
+            has_index_ref = 1;
+            if(evr_parse_blob_ref(*index_ref, value) != evr_ok){
+                return evr_error;
+            }
+        }
+    }
+    if(!has_index_ref){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+int evr_attri_write_describe_index(struct evr_file *f){
+    log_debug("Writing evr-attr-index describe index command");
+    char cmd[] = "i\n";
+    return write_n(f, cmd, sizeof(cmd) - 1);
+}

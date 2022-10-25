@@ -66,7 +66,7 @@ void test_build_seed_desc(){
     struct evr_file f;
     struct evr_buf_read r;
     r.f = &f;
-    assert(is_ok(evr_seed_desc_append_attrs(doc, desc_node, &r, seed)));
+    assert(is_ok(evr_seed_desc_append_attrs(doc, desc_node, &r, seed, NULL, NULL)));
     char *desc_node_str = evr_format_xml_node(desc_node);
     assert(desc_node_str);
     xsltStylesheet *style = create_fs_map_xslt();
