@@ -1,3 +1,52 @@
+* fix panic when parsing claims in evr-attr-index
+#+BEGIN_SRC
+Okt 28 19:38:29 mammut evr-attr-index[128087]: 2022-10-28T19:38:29 iI Start building attr index for sha3-224-f5812b407333971edd3811ece91d788df769a7b1c5550a56ecefd032
+Okt 28 19:38:29 mammut evr-attr-index[128087]: 2022-10-28T19:38:29 iI Finished building attr index for sha3-224-f5812b407333971edd3811ece91d788df769a7b1c5550a56ecefd032
+Okt 28 19:38:29 mammut evr-attr-index[128087]: 2022-10-28T19:38:29 iI Index sync worker switches to index sha3-224-f5812b407333971edd3811ece91d788df769a7b1c5550a56ecefd032
+Okt 28 19:38:47 mammut evr-attr-index[128087]: 2022-10-28T19:38:47 iE Failed to parse attr claim from transformed claim-set for blob with ref sha3-224-78…d9
+Okt 28 19:38:48 mammut evr-attr-index[128087]: 2022-10-28T19:38:47 iP Ended index sync worker with result 1
+#+END_SRC
+
+the failed transformed claim log is:
+#+BEGIN_SRC
+Failed to parse attr claim from transformed claim-set.
+
+<?xml version="1.0" encoding="UTF-8"?>
+<evr:claim-set xmlns:evr="https://evr.ma300k.de/claims/" xmlns:dc="http://purl.org/dc/terms/" xmlns:ani="https://ma300k.de/animations/claims/" dc:created="…">
+  <evr:attr index-seed="0" seed="sha3-224-84682bde34b5f87789407c88888c31073e71710c6c0220745ecd2afb-0000"><evr:a op="=" k="title" v="Bad Mans"/><evr:a op="+" k="class" v="episode"/></evr:attr><evr:attr seed=""><evr:a op="+" k="episode-ref" v="sha3-224-84682bde34b5f87789407c88888c31073e71710c6c0220745ecd2afb-0000"/></evr:attr>
+</evr:claim-set>
+#+END_SRC
+
+the transformed claim now formatted:
+#+BEGIN_SRC xml
+<evr:attr index-seed="0" seed="sha3-224-84682bde34b5f87789407c88888c31073e71710c6c0220745ecd2afb-0000">
+  <evr:a op="=" k="title" v="Bad Mans"/>
+  <evr:a op="+" k="class" v="episode"/>
+</evr:attr>
+<evr:attr seed="">
+  <evr:a op="+" k="episode-ref" v="sha3-224-84682bde34b5f87789407c88888c31073e71710c6c0220745ecd2afb-0000"/>
+</evr:attr>
+#+END_SRC
+
+we can see that the seed attribute on the second attr node is empty.
+
+the failed original blob
+sha3-224-78…d9
+contains:
+#+BEGIN_SRC
+$ evr get-verify sha3-224-78…d9
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set xmlns="https://evr.ma300k.de/claims/" xmlns:dc="http://purl.org/dc/terms/" xmlns:m3k="https://ma300k.de/claims/" xmlns:ani="https://ma300k.de/animations/claims/" dc:created="…">
+  <ani:episode seed="sha3-224-84682bde34b5f87789407c88888c31073e71710c6c0220745ecd2afb-0000" dc:title="Bad Mans">
+  </ani:episode>
+</claim-set>
+#+END_SRC
+* n/p-key navigation in evr.el's attr index search resuts should jump seeds
+instead of jumping from claim ref to claim ref. it's quite annoying to
+jump from found seeds to claim references in attributes.
+* evr cli should validate put claim sets before upload
+validate claims with xsds or dtds before putting them into
+evr-glacier-storage.
 * reserve .evr in root directory within evr-fs
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
@@ -22,6 +71,11 @@ some-key!
 mapping the first example to sql would be quite easy because we could
 do "c.seed not in (…)". but how to map the braces part i'm not sure
 yet.
+* glacier client must update flags in storage if necessary          :gcflgup:
+right now the blob flags are untouched if the blob already
+exists. this situation can actually happend if a user by accident
+uploads a claim and misses the flags command line argument with evr
+cli. if the user retries the upload with flags they will not be set.
 * evr-fs should watch the evr-attr-index
 evr-fs should watch the evr-attr-index and update it's file system
 representation on evr-attr-index changes.
@@ -48,6 +102,9 @@ detailed". that's why everarch right now uses the value "verbose".
 
 the configure script should detect the bison version and use
 "detailed" if at least bison 3.6 is available.
+* validate random blobs every 24 hours
+so that basic sanity checks on servers with seldom reboots won't
+happend seldom.
 * open bucket file descriptor constant for uninitialized
 glacier opens bucket files in a lazy way. the value for identifiying a
 not yet opened bucket file should be a constant instead of just -1.

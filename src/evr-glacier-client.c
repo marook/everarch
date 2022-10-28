@@ -151,7 +151,7 @@ int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chu
         if(resp.body_size != evr_stat_blob_resp_n_size){
             goto out;
         }
-        // TODO update flags in storage if necessary
+        // TODO :gcflgup: update flags in storage if necessary
         if(dump_n(c, evr_stat_blob_resp_n_size, NULL, NULL) != evr_ok){
             goto out;
         }
