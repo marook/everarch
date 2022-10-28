@@ -195,7 +195,7 @@ fuse_ino_t evr_inode_get_available(struct evr_fs_inode **inodes, size_t *inodes_
         return 0;
     }
     for(fuse_ino_t n = old_inodes_len; n < new_inodes_len; ++n){
-        (*inodes)[n].type = evr_fs_inode_type_unlinked;
+        new_inodes[n].type = evr_fs_inode_type_unlinked;
     }
     *inodes = new_inodes;
     *inodes_len = new_inodes_len;

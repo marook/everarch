@@ -68,9 +68,23 @@ void test_inodes_with_file(){
     evr_free_inodes(inodes);
 }
 
+void test_grow_inode_set(){
+    struct evr_inode_set s;
+    assert(is_ok(evr_init_inode_set(&s)));
+    const size_t initial_inode_set_len = s.inodes_len;
+    char path[32];
+    for(size_t i = 0; i < initial_inode_set_len + 1; ++i){
+        assert(snprintf(path, sizeof(path), "%zu", i) < sizeof(path));
+        assert_msg(evr_inode_set_create_file(&s, path) != 0, "Failed to insert node #%zu", i);
+    }
+    assert(s.inodes_len >= initial_inode_set_len);
+    evr_empty_inode_set(&s);
+}
+
 int main(){
     evr_init_basics();
     run_test(test_create_free_inodes);
     run_test(test_inodes_with_file);
+    run_test(test_grow_inode_set);
     return 0;
 }

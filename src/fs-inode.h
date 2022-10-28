@@ -74,6 +74,9 @@ void evr_inode_remove_by_seed(struct evr_fs_inode *inodes, size_t inodes_len, ev
  * evr_inode_create_file creates a file inode and all missing parent
  * directory inodes.
  *
+ * The file_path should not start with a slash. Except you want an
+ * empty directory name which is very weird to me if you ask.
+ *
  * Returns 0 on error. Otherwise the created inode.
  */
 fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_len, char *file_path);
