@@ -47,12 +47,15 @@ doc = et.fromstringlist(evr.get_verify('sha3-224-9a974826c9b0b66aff5205db87956f3
     args = ['evr', 'get-verify', ref]
     return _evr(args)
 
-def post_file(path):
+def post_file(path, title=None):
     """post_file is a wrapper around 'evr post-file' shell command.
 
 post_file returns the posted file's claim ref.
 """
-    args = ['evr', 'post-file', path]
+    args = ['evr', 'post-file']
+    if title is not None:
+        args += ['--title', title]
+    args.append(path)
     return _read_ref(_evr(args, encoding=default_encoding))
 
 def sign_put(data, flags=None):
