@@ -26,7 +26,10 @@
 ;;;###autoload
 (defun evr-attr-index-search (query &optional env)
   "evr-search performs a search against the default
-evr-attr-index and prints the results into a new buffer."
+evr-attr-index and prints the results into a new buffer.
+
+The optional env argument may be the name of an environment from
+`evr-environments'."
   (interactive "sQuery: ")
   (switch-to-buffer
    (generate-new-buffer
@@ -601,8 +604,11 @@ buffer afterwards.
 
 ;;;###autoload
 ;; (evr-compose-claim-set)
-(defun evr-compose-claim-set ()
-  "Creates a new buffer with a template claim-set for everarch."
+(defun evr-compose-claim-set (&optional env)
+  "Creates a new buffer with a template claim-set for everarch.
+
+The optional env argument may be the name of an environment from
+`evr-environments'."
   (interactive)
   (let ((buf (generate-new-buffer "claim-set")) cursor-pos)
         (switch-to-buffer buf)
@@ -628,6 +634,8 @@ buffer afterwards.
         (goto-char cursor-pos)
         (nxml-mode)
         (evr-claim-set-mode t)
+        (make-variable-buffer-local 'evr-current-environment)
+        (setq evr-current-environment env)
         buf
         ))
 
