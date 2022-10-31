@@ -41,9 +41,6 @@ $ evr get-verify sha3-224-78…d9
   </ani:episode>
 </claim-set>
 #+END_SRC
-* hitting enter on claim-ref won't inherit selected profile           :emacs:
-hitting enter within the claim search results on an claim-ref won't
-inherit the used server profile. so nothing is probably be found.
 * creating a claim from attr-index results should split screen        :emacs:
 so that the original search result and the newly edited claim can be seen
 * n/p-key navigation in evr.el's attr index search resuts should jump seeds :emacs:

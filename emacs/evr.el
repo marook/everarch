@@ -269,7 +269,7 @@ a new buffer."
   "Follows the claim ref at point and will show it's attributes
 in a new buffer."
   (interactive)
-  (evr-attr-index-search (concat "ref=" (evr--get-claim-ref))))
+  (evr-attr-index-search (concat "ref=" (evr--get-claim-ref)) evr-current-environment))
 
 (defun evr-compose-claim-set-for-seed ()
   (interactive)
