@@ -41,7 +41,12 @@ $ evr get-verify sha3-224-78…d9
   </ani:episode>
 </claim-set>
 #+END_SRC
-* n/p-key navigation in evr.el's attr index search resuts should jump seeds
+* hitting enter on claim-ref won't inherit selected profile           :emacs:
+hitting enter within the claim search results on an claim-ref won't
+inherit the used server profile. so nothing is probably be found.
+* creating a claim from attr-index results should split screen        :emacs:
+so that the original search result and the newly edited claim can be seen
+* n/p-key navigation in evr.el's attr index search resuts should jump seeds :emacs:
 instead of jumping from claim ref to claim ref. it's quite annoying to
 jump from found seeds to claim references in attributes.
 * evr cli should validate put claim sets before upload
@@ -71,6 +76,13 @@ some-key!
 mapping the first example to sql would be quite easy because we could
 do "c.seed not in (…)". but how to map the braces part i'm not sure
 yet.
+* support xsl:import with blob ref in xslt
+evr uses xslt stylesheets when transforming claims in evr-attr-index
+and when producing file metadata in evr-fs.
+
+both places should support xsl:import statements so that stylesheets
+can be structured. the xsl:import statements should be able to
+reference blobs.
 * glacier client must update flags in storage if necessary          :gcflgup:
 right now the blob flags are untouched if the blob already
 exists. this situation can actually happend if a user by accident
