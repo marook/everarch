@@ -190,7 +190,8 @@ void test_parse_attr_claim_with_claim_seed(){
     assert(csn);
     xmlNode *cn = evr_first_claim(csn);
     assert(cn);
-    struct evr_attr_claim *c = evr_parse_attr_claim(cn);
+    struct evr_attr_claim *c;
+    assert(is_ok(evr_parse_attr_claim(&c, cn)));
     assert(c);
     evr_blob_ref_str fmt_seed;
     evr_fmt_claim_ref(fmt_seed, c->seed);
@@ -232,7 +233,8 @@ void test_parse_attr_claim_with_self_ref(){
     assert(csn);
     xmlNode *cn = evr_first_claim(csn);
     assert(cn);
-    struct evr_attr_claim *c = evr_parse_attr_claim(cn);
+    struct evr_attr_claim *c;
+    assert(is_ok(evr_parse_attr_claim(&c, cn)));
     assert(c);
     assert(c->seed_type == evr_seed_type_self);
     assert(c->index_seed == 0);
@@ -255,7 +257,8 @@ void test_parse_attr_claim_with_index_seed(){
     assert(csn);
     xmlNode *cn = evr_first_claim(csn);
     assert(cn);
-    struct evr_attr_claim *c = evr_parse_attr_claim(cn);
+    struct evr_attr_claim *c;
+    assert(is_ok(evr_parse_attr_claim(&c, cn)));
     assert(c);
     assert(c->seed_type == evr_seed_type_self);
     assert(c->index_seed == 1024);
@@ -279,14 +282,15 @@ void test_parse_two_attr_claims(){
     assert(csn);
     xmlNode *cn = evr_first_claim(csn);
     assert(cn);
-    struct evr_attr_claim *c = evr_parse_attr_claim(cn);
+    struct evr_attr_claim *c;
+    assert(is_ok(evr_parse_attr_claim(&c, cn)));
     assert(c);
     assert(c->seed_type == evr_seed_type_self);
     assert(c->index_seed == 0);
     assert(c->attr_len == 0);
     free(c);
     cn = evr_next_claim(cn);
-    c = evr_parse_attr_claim(cn);
+    assert(is_ok(evr_parse_attr_claim(&c, cn)));
     assert(c);
     assert(c->seed_type == evr_seed_type_self);
     assert(c->index_seed == 1);

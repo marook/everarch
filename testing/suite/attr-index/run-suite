@@ -107,8 +107,10 @@ echo "	berlin_ref ${berlin_ref}"
 echo "	germany_ref ${germany_ref}"
 
 # upload a broken claim-sets. should be ignored by evr-attr-index.
-evr -f 1 sign-put < broken-claim.xml
-evr -f 1 sign-put < no-created-claim-set.xml
+for cs in broken-claim.xml no-created-claim-set.xml no-seed-claim-set.xml
+do
+    evr -f 1 sign-put < "${cs}"
+done
 
 start_attr_index
 wait_for_attr_index

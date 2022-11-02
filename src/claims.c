@@ -483,7 +483,8 @@ size_t evr_count_elements(xmlNode *start, char *name){
     return count;
 }
 
-struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
+int evr_parse_attr_claim(struct evr_attr_claim **_c, xmlNode *claim_node){
+    int ret = evr_error;
     struct evr_attr_claim *c = NULL;
     int seed_type;
     char *fmt_seed = (char*)xmlGetProp(claim_node, BAD_CAST "seed");
@@ -493,6 +494,7 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
         int parse_seed_ret = evr_parse_claim_ref(seed, fmt_seed);
         xmlFree(fmt_seed);
         if(parse_seed_ret != evr_ok){
+            ret = evr_user_data_invalid;
             goto out;
         }
     } else {
@@ -614,11 +616,13 @@ struct evr_attr_claim *evr_parse_attr_claim(xmlNode *claim_node){
         ++next_attr;
         attr = attr->next;
     }
+    ret = evr_ok;
+    *_c = c;
  out:
-    return c;
+    return ret;
  fail_with_free_c:
     free(c);
-    return NULL;
+    return ret;
 }
 
 struct evr_archive_claim *evr_parse_archive_claim(xmlNode *claim_node){

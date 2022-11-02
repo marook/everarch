@@ -548,12 +548,16 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
 #ifdef EVR_FUTILE_CLAIM_SET_TRACKING
         claim_set_futile = 0;
 #endif
-        attr = evr_parse_attr_claim(c_node);
-        if(!attr){
+        int attr_res = evr_parse_attr_claim(&attr, c_node);
+        if(attr_res != evr_ok){
             evr_log_failed_claim_set_doc(db, claim_set_ref, claim_set_doc, "Failed to parse attr claim from transformed claim-set.");
             evr_blob_ref_str ref_str;
             evr_fmt_blob_ref(ref_str, claim_set_ref);
-            log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s", ref_str);
+            char *reason_msg = attr_res == evr_user_data_invalid ? "invalid user data" : "a system error";
+            log_error("Failed to parse attr claim from transformed claim-set for blob with ref %s because of %s", ref_str, reason_msg);
+            if(attr_res == evr_user_data_invalid){
+                ret = evr_user_data_invalid;
+            }
             goto out_with_free_claim_set_doc;
         }
         if(attr->seed_type == evr_seed_type_self){
