@@ -118,17 +118,23 @@ limit is expected to be an integer.
     if limit is not None:
         args += ['--limit', str(limit)]
     args.append(query)
+    seed = None
     attrs = []
     for line in _evr(args, encoding=default_encoding):
         if line[0] == '\t':
+            if seed is None:
+                raise Exception('Unexpected attribute response')
             sep = line.index('=', 1)
             key = line[1:sep]
             val = line[sep+1:-1]
             attrs.append((key, val))
         else:
+            if seed is not None:
+                yield SearchResult(seed, attrs)
             seed = line[:-1]
-            yield SearchResult(seed, attrs)
             attrs = []
+    if seed is not None:
+        yield SearchResult(seed, attrs)
 
 def _evr(args, send=None, encoding=None):
     stdin = None if send is None else subprocess.PIPE
