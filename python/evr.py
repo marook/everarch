@@ -100,6 +100,28 @@ flags and last_modified_after are expected to be integers.
         seed_ref, last_modified, watch_flags = line.split(' ')
         yield ModifiedBlob(seed_ref, int(last_modified), int(watch_flags))
 
+class SearchResult(object):
+    def __init__(self, seed, attrs):
+        self.seed = seed
+        self.attrs = attrs
+
+def search(query):
+    args = [
+        'evr', 'search',
+        query,
+    ]
+    attrs = []
+    for line in _evr(args, encoding=default_encoding):
+        if line[0] == '\t':
+            sep = line.index('=', 1)
+            key = line[1:sep]
+            val = line[sep+1:-1]
+            attrs.append((key, val))
+        else:
+            seed = line[:-1]
+            yield SearchResult(seed, attrs)
+            attrs = []
+
 def _evr(args, send=None, encoding=None):
     stdin = None if send is None else subprocess.PIPE
     with subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, encoding=encoding) as p:
