@@ -629,33 +629,34 @@ The optional env argument may be the name of an environment from
 `evr-environments'."
   (interactive)
   (let ((buf (generate-new-buffer "claim-set")) cursor-pos)
-        (switch-to-buffer buf)
-        (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set")
-        (mapc
-         (lambda (xmlns)
-           (seq-let (abbrev ns) xmlns
-             (insert "\n    xmlns")
-             (if abbrev
-                 (progn
-                   (insert ":")
-                   (insert abbrev)))
-             (insert "=\"")
-             (insert ns)
-             (insert "\"")
-             ))
-         evr-default-claim-set-xmlns-list)
-        (if (>= (length evr-default-claim-set-xmlns-list) 0)
-            (insert "\n    "))
-        (insert ">\n  ")
-        (setq cursor-pos (point))
-        (insert "\n</claim-set>")
-        (goto-char cursor-pos)
-        (nxml-mode)
-        (evr-claim-set-mode t)
-        (make-variable-buffer-local 'evr-current-environment)
-        (setq evr-current-environment env)
-        buf
-        ))
+    (select-window (display-buffer buf '(nil (inhibit-same-window . t))))
+    (with-current-buffer buf
+      (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set")
+      (mapc
+       (lambda (xmlns)
+         (seq-let (abbrev ns) xmlns
+           (insert "\n    xmlns")
+           (if abbrev
+               (progn
+                 (insert ":")
+                 (insert abbrev)))
+           (insert "=\"")
+           (insert ns)
+           (insert "\"")
+           ))
+       evr-default-claim-set-xmlns-list)
+      (if (>= (length evr-default-claim-set-xmlns-list) 0)
+          (insert "\n    "))
+      (insert ">\n  ")
+      (setq cursor-pos (point))
+      (insert "\n</claim-set>")
+      (goto-char cursor-pos)
+      (nxml-mode)
+      (evr-claim-set-mode t)
+      (make-variable-buffer-local 'evr-current-environment)
+      (setq evr-current-environment env)
+      )
+    buf))
 
 (defcustom evr-claim-set-saved-hook nil
   "Run after `evr-save-claim-set' saved a claim set.
@@ -697,7 +698,9 @@ Returns t if the claim-set was successfully saved."
                           (funcall hook claim-set-ref))
                         evr-claim-set-saved-hook)
                        (message "Wrote claim-set %s" claim-set-ref)
-                       (kill-buffer claim-set-buffer-name)))
+                       (quit-window)
+                       (kill-buffer claim-set-buffer-name)
+                       ))
                    nil)
                  :stderr (get-buffer-create "*evr put claim-set errors*")
                  )))
