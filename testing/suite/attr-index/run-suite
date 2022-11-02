@@ -215,4 +215,21 @@ then
     exit 1
 fi
 
+results=`evr search -l 1 ''`
+if [[ "${results}" != "${germany_ref}-0000" ]]
+then
+    echo "Unexpected evr cli result from empty expression search query: ${results}" >&2
+    exit 1
+fi
+
+results=`evr search -l 0 ''`
+if [[ "${results}" != "${germany_ref}-0000
+${berlin_ref}-0000
+${test2_ref}-0000
+${test_ref}-0000" ]]
+then
+    echo "Unexpected evr cli result from empty expression search query: ${results}" >&2
+    exit 1
+fi
+
 echo "Stopping…"

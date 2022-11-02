@@ -84,6 +84,8 @@ static char args_doc[] = "CMD";
 
 #define max_traces_len 64
 
+#define default_limit 100
+
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glacier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
@@ -101,6 +103,7 @@ static struct argp_option options[] = {
     {"two-way", arg_two_way, NULL, 0, "Synchronizes also from destination server to source server instead of just from source to destination server."},
     {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
     {"signing-gpg-key", arg_signing_gpg_key, "FINGERPRINT", 0, "Fingerprint of the GPG key which is used for signing claims. You can call 'gpg --list-secret-keys' to see your known keys."},
+    {"limit", 'l', "LIMIT", 0, "Sets an upper limit for the maximum number results for evr-attr-index search queries. A value of 0 will not limit the number of results. Default is " to_string(default_limit) "."},
     {0}
 };
 
@@ -162,6 +165,7 @@ struct cli_cfg {
     char *signing_gpg_fpr;
 
     char *query;
+    size_t limit;
 };
 
 int evr_replace_host_port(char **host, char **port, char *host_port_expr);
@@ -211,6 +215,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         }
         cfg->traces_len += 1;
         break;
+    case 'l': {
+        size_t arg_len = strlen(arg);
+        size_t parsed_len = sscanf(arg, "%zu", &cfg->limit);
+        if(arg_len == 0 || parsed_len != 1){
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
+        break;
+    }
     case arg_storage_host:
         evr_replace_str(cfg->storage_host, arg);
         break;
@@ -451,6 +464,7 @@ int main(int argc, char **argv){
     cfg.verify_ctx = NULL;
     cfg.signing_gpg_fpr = NULL;
     cfg.query = NULL;
+    cfg.limit = default_limit;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -998,6 +1012,11 @@ int evr_cli_post_file(struct cli_cfg *cfg){
     return ret;
 }
 
+struct evr_cli_search_ctx {
+    size_t seeds_visited;
+    struct cli_cfg *cfg;
+};
+
 int evr_cli_search_visit_seed(void *ctx, evr_claim_ref seed);
 int evr_cli_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val);
 
@@ -1012,8 +1031,10 @@ int evr_cli_search(struct cli_cfg *cfg){
     if(evr_connect_to_index(&c, &r, cfg, cfg->index_host, cfg->index_port) != evr_ok){
         goto out;
     }
-    size_t seeds_visited = 0;
-    if(evr_attri_search(r, cfg->query, evr_cli_search_visit_seed, evr_cli_search_visit_attr, &seeds_visited) != evr_ok){
+    struct evr_cli_search_ctx ctx;
+    ctx.seeds_visited = 0;
+    ctx.cfg = cfg;
+    if(evr_attri_search(r, cfg->query, evr_cli_search_visit_seed, evr_cli_search_visit_attr, &ctx) != evr_ok){
         goto out_with_free_r;
     }
     ret = evr_ok;
@@ -1029,12 +1050,10 @@ int evr_cli_search(struct cli_cfg *cfg){
     return ret;
 }
 
-#define evr_max_printed_search_results 100
-
-int evr_cli_search_visit_seed(void *ctx, evr_claim_ref seed){
-    size_t *seeds_visited = ctx;
-    *seeds_visited += 1;
-    if(*seeds_visited > evr_max_printed_search_results) {
+int evr_cli_search_visit_seed(void *_ctx, evr_claim_ref seed){
+    struct evr_cli_search_ctx *ctx = _ctx;
+    ctx->seeds_visited += 1;
+    if(ctx->cfg->limit != 0 && ctx->seeds_visited > ctx->cfg->limit) {
         return evr_end;
     }
     char buf[evr_claim_ref_str_len + 1];
@@ -1045,9 +1064,9 @@ int evr_cli_search_visit_seed(void *ctx, evr_claim_ref seed){
     return write_n(&f, buf, sizeof(buf));
 }
 
-int evr_cli_search_visit_attr(void *ctx, evr_claim_ref seed, char *key, char *val){
-    size_t *seeds_visited = ctx;
-    if(*seeds_visited > evr_max_printed_search_results) {
+int evr_cli_search_visit_attr(void *_ctx, evr_claim_ref seed, char *key, char *val){
+    struct evr_cli_search_ctx *ctx = _ctx;
+    if(ctx->cfg->limit != 0 && ctx->seeds_visited > ctx->cfg->limit) {
         return evr_ok;
     }
     size_t key_len = strlen(key);

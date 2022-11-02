@@ -18,7 +18,7 @@
 # python convenience.
 #
 # Provided functions you might care about are get_blob, get_verify,
-# post_file and watch.
+# post_file, watch and search.
 
 import subprocess
 
@@ -105,11 +105,17 @@ class SearchResult(object):
         self.seed = seed
         self.attrs = attrs
 
-def search(query):
+def search(query, limit=None):
+    """search is a wrapper around the 'evr search' shell command.
+
+limit is expected to be an integer.
+"""
     args = [
         'evr', 'search',
-        query,
     ]
+    if limit is not None:
+        args += ['--limit', str(limit)]
+    args.append(query)
     attrs = []
     for line in _evr(args, encoding=default_encoding):
         if line[0] == '\t':
