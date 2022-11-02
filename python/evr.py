@@ -63,10 +63,12 @@ def sign_put(data, flags=None):
 
 sign_put expects data string to be the signed and put buffer. The put
 blob's ref is returned.
+
+flags are the provided blob flags. Should be an integer.
     """
     args = ['evr', 'sign-put']
     if flags is not None:
-        args += ['-f', flags]
+        args += ['-f', str(flags)]
     return _read_ref(_evr(args, send=data, encoding=default_encoding))
 
 def _read_ref(lines):
