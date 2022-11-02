@@ -1,8 +1,13 @@
-* creating a claim from attr-index results should split screen        :emacs:
-so that the original search result and the newly edited claim can be seen
 * n/p-key navigation in evr.el's attr index search resuts should jump seeds :emacs:
 instead of jumping from claim ref to claim ref. it's quite annoying to
 jump from found seeds to claim references in attributes.
+* make evr search result limit adjustable
+right now the maximum number of seed search results is limited by the
+constant evr_max_printed_search_results in evr cli.
+
+the maximum number of search results should be specifyable as command
+line argument. the default should be 100. -1 should indicate no limit
+should be applied.
 * evr cli should validate put claim sets before upload
 validate claims with xsds or dtds before putting them into
 evr-glacier-storage.

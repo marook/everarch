@@ -103,9 +103,9 @@ The optional env argument may be the name of an environment from
 (defvar evr-attr-index-results-mode-map
   (let ((map (make-keymap)))
     (set-keymap-parent map special-mode-map)
-    (define-key map "p" 'evr-previous-claim-ref)
-    (define-key map " " 'evr-next-claim-ref)
-    (define-key map "n" 'evr-next-claim-ref)
+    (define-key map "p" 'evr-previous-seed-ref)
+    (define-key map " " 'evr-next-seed-ref)
+    (define-key map "n" 'evr-next-seed-ref)
     (define-key map "C" 'kill-current-buffer)
     (define-key map "r" 'isearch-backward)
     (define-key map "s" 'isearch-forward)
@@ -118,17 +118,18 @@ The optional env argument may be the name of an environment from
     map)
   "Local keymap for evr-attr-index-results-mode buffers.")
 
-(defun evr-previous-claim-ref ()
+(defun evr-previous-seed-ref ()
   (interactive)
-  (when (re-search-backward evr--claim-ref-pattern nil t)
+  (when (re-search-backward (concat "\n" evr--claim-ref-pattern) nil t)
+    (forward-char 1)
     (evr-follow-claim-ref-xml)))
 
-(defun evr-next-claim-ref ()
+(defun evr-next-seed-ref ()
   (interactive)
   (let ((point-before (point)))
     (unless (eobp)
       (forward-char 1))
-    (if (eq (re-search-forward evr--claim-ref-pattern nil t) nil)
+    (if (eq (re-search-forward (concat "\n" evr--claim-ref-pattern) nil t) nil)
         (goto-char point-before)
       (progn
         (re-search-backward evr--claim-ref-pattern)
@@ -365,6 +366,23 @@ should be appended and returns the query string."
           (insert string)
           (setq inhibit-read-only ro)
           (set-marker (process-mark proc) (point)))))))
+
+(defun evr-previous-claim-ref ()
+  (interactive)
+  (when (re-search-backward evr--claim-ref-pattern nil t)
+    (evr-follow-claim-ref-xml)))
+
+(defun evr-next-claim-ref ()
+  (interactive)
+  (let ((point-before (point)))
+    (unless (eobp)
+      (forward-char 1))
+    (if (eq (re-search-forward evr--claim-ref-pattern nil t) nil)
+        (goto-char point-before)
+      (progn
+        (re-search-backward evr--claim-ref-pattern)
+        (evr-follow-claim-ref-xml)
+        ))))
 
 (defvar evr-claims-for-seed-mode-map
   (let ((map (make-keymap)))
