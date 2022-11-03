@@ -45,9 +45,11 @@ everarch uses some linux and GNU libc APIs which makes it POSIX
 incompatible. So you might not be able to compilie it on Windows or
 BSD systems.
 
+Everarch is known to run at least on i686 and arm64 systems.
+
 Install the dependencies:
 
-$ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev libxslt1-dev flex bison texinfo elpa-helm fuse3 libfuse3-dev
+$ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev libxslt1-dev flex bison texinfo elpa-helm elpa-s elpa-seq fuse3 libfuse3-dev pkg-config libssl-dev make automake
 
 On linux you can execute the following within the everarch directory
 to build the application.
@@ -81,7 +83,11 @@ A detailed manual can be found in src/evr.texi.
 ------------------------------------------------------------------------
 Tests
 
-Executing the tests requires a GPG key usable for signing. If you
+Executing the tests requires more dependencies:
+
+$ apt install valgrind socat
+
+Executing the tests also requires a GPG key usable for signing. If you
 don't have one it can be created using:
 
 $ gpg --gen-key
