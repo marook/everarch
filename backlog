@@ -1,6 +1,23 @@
+* make evr-glacier-storage sqlite index path configurable
+right now the evr-glacier-storage sqlite index is placed right into
+the bucket-dir.
+
+this behavior should become the default. also it should be possible to
+configure an alternative path for the glacier index db.
+
+systems which store buckets on a hdd but also have a small ssd for the
+index may benefit from this.
 * evr cli should validate put claim sets before upload
-validate claims with xsds or dtds before putting them into
+validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
 evr-glacier-storage.
+
+validation should be a evr cli feature which is turned off by
+default. user must supply a relax ng spec. still relax ng spec should
+be stored in evr-glacier-storage.
+
+xml validation practically can't be executed in evr-glacier-storage
+because the relax ng spec would need to be universal for at least all
+past claims.
 * reserve .evr in root directory within evr-fs
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
