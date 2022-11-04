@@ -64,6 +64,7 @@ static char args_doc[] = "";
 #define arg_ssl_cert_path 257
 #define arg_ssl_key_path 258
 #define arg_auth_token 259
+#define arg_index_db 260
 
 static struct argp_option options[] = {
     {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
@@ -73,6 +74,7 @@ static struct argp_option options[] = {
     {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
     // TODO max-bucket-size
     {"bucket-dir", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted. Default path is " default_bucket_dir_path "."},
+    {"index-db", arg_index_db, "DB", 0, "Path to where the sqlite bucket index DB should be put. The default is to put the index db within the bucket-dir."},
     {0},
 };
 
@@ -83,6 +85,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         return ARGP_ERR_UNKNOWN;
     case 'd':
         evr_replace_str(cfg->bucket_dir_path, arg);
+        break;
+    case arg_index_db:
+        evr_replace_str(cfg->index_db_path, arg);
         break;
     case arg_host:
         evr_replace_str(cfg->host, arg);
@@ -220,6 +225,7 @@ int evr_load_glacier_storage_cfg(int argc, char **argv){
     memset(cfg->auth_token, 0, sizeof(cfg->auth_token));
     cfg->max_bucket_size = 1024 << 20;
     cfg->bucket_dir_path = strdup(default_bucket_dir_path);
+    cfg->index_db_path = NULL;
     if(!cfg->host || !cfg->port || !cfg->bucket_dir_path){
         evr_panic("Unable to allocate memory for configuration");
         return evr_error;

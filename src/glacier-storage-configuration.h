@@ -57,6 +57,13 @@ struct evr_glacier_storage_cfg {
      * %d is used to place the bucket index within the template.
      */
     char *bucket_dir_path;
+
+    /**
+     * index_db_path may specify an alternative path for the sqlite
+     * bucket index DB. The default path within the bucket directory
+     * should be used when pointing to NULL.
+     */
+    char *index_db_path;
 };
 
 void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg);

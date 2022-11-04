@@ -32,6 +32,7 @@ void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg){
         cfg->ssl_cert_path,
         cfg->ssl_key_path,
         cfg->bucket_dir_path,
+        cfg->index_db_path,
     };
     char **str_options_end = &str_options[static_len(str_options)];
     for(char **it = str_options; it != str_options_end; ++it){

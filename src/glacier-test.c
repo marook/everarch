@@ -298,6 +298,7 @@ struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *con
     memcpy(clone->auth_token, config->auth_token, sizeof(clone->auth_token));
     clone->max_bucket_size = config->max_bucket_size;
     clone->bucket_dir_path = clone_string(config->bucket_dir_path);
+    clone->index_db_path = clone_string(config->index_db_path);
     return clone;
 }
 

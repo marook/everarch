@@ -47,7 +47,7 @@
 // TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
 const char *glacier_dir_lock_file_path = "/lock";
-const char *glacier_dir_index_db_path = "/index.db";
+#define glacier_dir_index_db_path "/index.db"
 const size_t evr_read_buffer_size = 1*1024*1024;
 #define evr_bucket_file_ext "evb"
 #define evr_bucket_file_name_fmt "%05lx." evr_bucket_file_ext
@@ -562,16 +562,21 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
     return ret;
 }
 
-int evr_open_index_db(struct evr_glacier_storage_cfg *config, int sqliteFlags, sqlite3 **db){
+int evr_open_index_db(struct evr_glacier_storage_cfg *cfg, int sqliteFlags, sqlite3 **db){
     int ret = evr_error;
-    size_t glacier_file_path_max_size = strlen(config->bucket_dir_path) + 10;
-    char *glacier_file_path = alloca(glacier_file_path_max_size);
-    build_glacier_file_path(glacier_file_path, glacier_file_path_max_size, config->bucket_dir_path, glacier_dir_index_db_path);
+    char *db_path;
+    if(cfg->index_db_path){
+        db_path = cfg->index_db_path;
+    } else {
+        size_t db_path_max_size = strlen(cfg->bucket_dir_path) + 10;
+        db_path = alloca(db_path_max_size);
+        build_glacier_file_path(db_path, db_path_max_size, cfg->bucket_dir_path, glacier_dir_index_db_path);
+    }
     sqlite3 *_db;
-    int result = sqlite3_open_v2(glacier_file_path, &_db, sqliteFlags | SQLITE_OPEN_NOMUTEX, NULL);
+    int result = sqlite3_open_v2(db_path, &_db, sqliteFlags | SQLITE_OPEN_NOMUTEX, NULL);
     if(result != SQLITE_OK){
         const char *sqlite_error_msg = sqlite3_errmsg(*db);
-        log_error("glacier storage could not open %s sqlite database: %s", glacier_file_path, sqlite_error_msg);
+        log_error("glacier storage could not open %s sqlite database: %s", db_path, sqlite_error_msg);
         goto out;
     }
     if(sqlite3_busy_timeout(_db, evr_sqlite3_busy_timeout) != SQLITE_OK){
@@ -1027,25 +1032,26 @@ int evr_glacier_blob_check_data(void *ctx, const char *data, size_t data_size){
 
 int evr_glacier_reindex(struct evr_glacier_write_ctx *ctx);
 
-int evr_glacier_recreate_index_db(struct evr_glacier_storage_cfg *config){
+int evr_glacier_recreate_index_db(struct evr_glacier_storage_cfg *cfg){
     int ret = evr_error;
     log_info("Recreate glacier index.db");
     // delete index.db
     {
-        const size_t bucket_dir_path_len = strlen(config->bucket_dir_path);
-        const char index_file_name[] = "/index.db";
-        const size_t index_file_name_len = strlen(index_file_name);
-        char index_db_path[bucket_dir_path_len + index_file_name_len + 1];
-        memcpy(index_db_path, config->bucket_dir_path, bucket_dir_path_len);
-        memcpy(&index_db_path[bucket_dir_path_len], index_file_name, index_file_name_len);
-        index_db_path[bucket_dir_path_len + index_file_name_len] = '\0';
-        if(unlink(index_db_path) != 0){
-            log_error("Unable to delete %s", index_db_path);
+        char *db_path;
+        if(cfg->index_db_path){
+            db_path = cfg->index_db_path;
+        } else {
+            size_t db_path_max_size = strlen(cfg->bucket_dir_path) + 10;
+            db_path = alloca(db_path_max_size);
+            build_glacier_file_path(db_path, db_path_max_size, cfg->bucket_dir_path, glacier_dir_index_db_path);
+        }
+        if(unlink(db_path) != 0){
+            log_error("Unable to delete %s", db_path);
             goto out;
         }
     }
     struct evr_glacier_write_ctx *ctx;
-    if(evr_create_glacier_write_ctx(&ctx, config) != evr_ok){
+    if(evr_create_glacier_write_ctx(&ctx, cfg) != evr_ok){
         goto out;
     }
     if(evr_glacier_reindex(ctx) != evr_ok){
