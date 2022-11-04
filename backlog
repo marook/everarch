@@ -1,11 +1,3 @@
-* evr-attr-index integration tests must wait for stable index
-there are right now some sleep statements built into the integration
-test scripts. these sleep statements make sure that evr-attr-index has
-time to index the claims from evr-glacier-storage. as we all know
-sleep statements most of the time wait too long or not long enough.
-
-the sleep statements should be replaced with some kind of polling
-which waits until the indexing has stabilized.
 * evr cli should validate put claim sets before upload
 validate claims with xsds or dtds before putting them into
 evr-glacier-storage.

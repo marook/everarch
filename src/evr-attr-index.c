@@ -1506,6 +1506,13 @@ int evr_describe_index(struct evr_connection *ctx){
     if(evr_respond_status(ctx, 1, NULL) != evr_ok){
         return evr_error;
     }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_blob_ref_str index_ref_str;
+        evr_fmt_blob_ref(index_ref_str, index_ref);
+        log_debug("Worker %d reports index-ref %s", ctx->socket.get_fd(&ctx->socket), index_ref_str);
+    }
+#endif
     char index_ref_label[] = "index-ref: ";
     char buf[sizeof(index_ref_label) - 1 + evr_blob_ref_str_len + 1];
     struct evr_buf_pos bp;

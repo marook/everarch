@@ -115,8 +115,6 @@ done
 start_attr_index
 wait_for_attr_index
 
-sleep 1
-
 echo "Running test queries…"
 results=`query_attr_index 's tag=no-such-tag-exists'`
 if [[ "${results}" != "OK" ]]

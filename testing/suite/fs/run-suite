@@ -60,8 +60,6 @@ EOF
 start_attr_index
 wait_for_attr_index
 
-sleep 1
-
 evr_fs_opts='-T category'
 mount_evr_fs "${fs_xslt_ref}"
 
