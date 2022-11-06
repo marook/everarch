@@ -1,18 +1,19 @@
-* evr cli should validate put claim sets before upload
-validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
-evr-glacier-storage.
+* parallel evr-fs inode building
+right now evr-fs builds the inodes sequentially one seed by another.
 
-validation should be a evr cli feature which is turned off by
-default. user must supply a relax ng spec. still relax ng spec should
-be stored in evr-glacier-storage.
-
-xml validation practically can't be executed in evr-glacier-storage
-because the relax ng spec would need to be universal for at least all
-past claims.
+building inodes should be performed in parallel in n threads. n should
+probably be something like 4 so we don't open too many connections
+towards evr-attr-index.
+* evr-fs should watch the evr-attr-index
+evr-fs should watch the evr-attr-index and update it's file system
+representation on evr-attr-index changes.
 * reserve .evr in root directory within evr-fs
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
 with evr-fs during runtime.
+* document evr-fs in evr.texi
+especially the seed-description xml format and the efs:file-set xml
+format.
 * add has key operator to attr query language
 extend the attr query language to support searching for claims which
 have a certain key.
@@ -33,6 +34,17 @@ some-key!
 mapping the first example to sql would be quite easy because we could
 do "c.seed not in (…)". but how to map the braces part i'm not sure
 yet.
+* evr cli should validate put claim sets before upload
+validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
+evr-glacier-storage.
+
+validation should be a evr cli feature which is turned off by
+default. user must supply a relax ng spec. still relax ng spec should
+be stored in evr-glacier-storage.
+
+xml validation practically can't be executed in evr-glacier-storage
+because the relax ng spec would need to be universal for at least all
+past claims.
 * support xsl:import with blob ref in xslt
 evr uses xslt stylesheets when transforming claims in evr-attr-index
 and when producing file metadata in evr-fs.
@@ -45,12 +57,6 @@ right now the blob flags are untouched if the blob already
 exists. this situation can actually happend if a user by accident
 uploads a claim and misses the flags command line argument with evr
 cli. if the user retries the upload with flags they will not be set.
-* evr-fs should watch the evr-attr-index
-evr-fs should watch the evr-attr-index and update it's file system
-representation on evr-attr-index changes.
-* document evr-fs in evr.texi
-especially the seed-description xml format and the efs:file-set xml
-format.
 * show in emacs if query is still running :emacs:
 evr-attr-index commands like defun evr-attr-index-search-from-buffer
 don't indicate wether they are still running or completed.
