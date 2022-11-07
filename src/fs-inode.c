@@ -60,7 +60,7 @@ void evr_free_inode_and_children(struct evr_fs_inode *inodes, fuse_ino_t n){
     struct evr_fs_inode *nd = &inodes[n];
     switch(nd->type){
     default:
-        evr_panic("Unknown inode type %d discovered", nd->type);
+        evr_panic("Unknown inode type %d discovered with inode %u", nd->type, (unsigned int)n);
         break;
     case evr_fs_inode_type_dir:
         for(size_t i = 0; i < nd->data.dir.children_len; ++i){
@@ -224,7 +224,7 @@ void evr_inode_remove(struct evr_fs_inode *inodes, fuse_ino_t n){
     struct evr_fs_inode *np = &inodes[p];
     for(size_t i = 0; i < np->data.dir.children_len - 1; ++i){
         if(np->data.dir.children[i] == n){
-            np->data.dir.children[i] = np->data.dir.children[np->data.dir.children_len];
+            np->data.dir.children[i] = np->data.dir.children[np->data.dir.children_len - 1];
         }
     }
     if(np->data.dir.children_len <= 1){

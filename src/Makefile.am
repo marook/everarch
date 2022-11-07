@@ -257,7 +257,9 @@ fs_inode_test_SOURCES = \
 	basics.c \
 	fs-inode.c \
 	fs-inode-test.c \
+	keys.c \
 	logger.c
+fs_inode_test_LDADD = $(LIBGCRYPT_LIBS)
 
 glacier_benchmark_SOURCES = \
 	auth.c \

@@ -52,9 +52,11 @@ void test_inodes_with_file(){
     assert(is_str_eq(dir_node->name, "my-dir"));
     assert(dir_node->data.dir.children_len == 1);
     assert(dir_node->data.dir.children[0] == f1);
-    struct evr_fs_inode *file_node = &inodes[f1];
-    assert(file_node->type == evr_fs_inode_type_file);
-    assert(is_str_eq(file_node->name, "file.txt"));
+    struct evr_fs_inode *f1_node = &inodes[f1];
+    assert(f1_node->type == evr_fs_inode_type_file);
+    assert(is_str_eq(f1_node->name, "file.txt"));
+    const char first_seed[] = "sha3-224-10000000000000000000000000000000000000000000000000000000-0000";
+    assert(is_ok(evr_parse_claim_ref(f1_node->data.file.seed, first_seed)));
     // add second file
     name = strdup("my-dir/other.txt");
     assert(name);
@@ -65,6 +67,25 @@ void test_inodes_with_file(){
     assert(dir_node->data.dir.children_len == 2);
     assert(dir_node->data.dir.children[0] == f1);
     assert(dir_node->data.dir.children[1] == f2);
+    struct evr_fs_inode *f2_node = &inodes[f2];
+    const char second_seed[] = "sha3-224-20000000000000000000000000000000000000000000000000000000-0000";
+    assert(is_ok(evr_parse_claim_ref(f2_node->data.file.seed, second_seed)));
+    // remove first file
+    {
+        evr_claim_ref seed;
+        assert(is_ok(evr_parse_claim_ref(seed, first_seed)));
+        evr_inode_remove_by_seed(inodes, inodes_len, seed);
+    }
+    assert(root->data.dir.children_len == 1);
+    assert(dir_node->data.dir.children_len == 1);
+    assert(dir_node->data.dir.children[0] == f2);
+    // remove second file
+    {
+        evr_claim_ref seed;
+        assert(is_ok(evr_parse_claim_ref(seed, second_seed)));
+        evr_inode_remove_by_seed(inodes, inodes_len, seed);
+    }
+    assert(root->data.dir.children_len == 0);
     evr_free_inodes(inodes);
 }
 
