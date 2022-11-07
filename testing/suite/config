@@ -170,6 +170,20 @@ wait_for_port() {
     done
 }
 
+wait_for_file() {
+    local fn="$1"
+    sleep 0.1
+    while true
+    do
+        if [[ -e "${fn}" ]]
+        then
+            break
+        fi
+        echo "Waiting for file ${fn}…"
+        sleep 0.2
+    done
+}
+
 ensure_port_available() {
     port="$1"
     nc ${nc_opts} -z localhost "${port}" && occupied=1 || occupied=0

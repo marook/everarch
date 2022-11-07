@@ -44,6 +44,12 @@ void test_evr_parse_blob_ref(){
     assert(key[1] == 0x02);
     assert(key[2] == 0x03);
     assert(key[3] == 0xff);
+    // extra text after the ref should not be ignored
+    assert(is_err(evr_parse_blob_ref(key, "sha3-224-010203ff000000000000000000000000000000000000000000000000 ")));
+    assert(key[0] == 0x01);
+    assert(key[1] == 0x02);
+    assert(key[2] == 0x03);
+    assert(key[3] == 0xff);
 }
 
 void test_calc_blob_key(){

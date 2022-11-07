@@ -1436,6 +1436,9 @@ int evr_watch_index(struct evr_connection *ctx){
     if(!msgs){
         goto out;
     }
+    if(evr_respond_status(ctx, 1, NULL) != evr_ok){
+        return evr_error;
+    }
     struct evr_modified_seed mod_seed;
     char buf[evr_blob_ref_str_len + 1 + evr_claim_ref_str_len + 1 + (evr_max_time_iso8601_size - 1) + 1 + 1];
     struct evr_buf_pos bp;

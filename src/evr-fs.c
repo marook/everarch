@@ -112,6 +112,8 @@ struct evr_fs_cfg {
 
 struct evr_fs_cfg cfg;
 
+static int running = 1;
+
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glacier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
@@ -217,9 +219,23 @@ static xsltStylesheet *transformation;
 static struct evr_inode_set inode_set;
 static struct evr_open_file_set open_files;
 
+struct evr_index_watch_ctx {
+    struct evr_file c;
+    struct evr_buf_read *r;
+    /**
+     * updating mutex is locked when working of changed seed
+     * notifications started.
+     */
+    mtx_t working;
+    thrd_t worker;
+};
+
 int evr_connect_to_storage(struct evr_file *c, struct evr_fs_cfg *cfg, char *host, char *port);
 int evr_connect_to_index(struct evr_file *c, struct evr_buf_read **r, struct evr_fs_cfg *cfg, char *host, char *port);
 xsltStylesheet *load_transformation(struct evr_fs_cfg *cfg, struct evr_file *gc);
+int evr_start_index_watch(struct evr_index_watch_ctx *ctx);
+int evr_index_watch_unlock(struct evr_index_watch_ctx *ctx);
+int evr_free_index_watch(struct evr_index_watch_ctx *ctx);
 int evr_populate_inode_set(struct evr_buf_read *ir, struct evr_fs_cfg *cfg);
 int run_fuse(char *program, struct evr_fs_cfg *cfg);
 
@@ -273,16 +289,23 @@ int main(int argc, char *argv[]) {
     if(evr_init_inode_set(&inode_set) != evr_ok){
         goto out_with_free_transformation;
     }
+    struct evr_index_watch_ctx watch_ctx;
+    if(evr_start_index_watch(&watch_ctx) != evr_ok){
+        goto out_with_empty_inode_set;
+    }
     struct evr_file ic;
     struct evr_buf_read *ir = NULL;
     if(evr_connect_to_index(&ic, &ir, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
-        goto out_with_empty_inode_set;
+        goto out_with_free_index_watch;
     }
     if(evr_populate_inode_set(ir, &cfg) != evr_ok){
         goto out_with_close_ic;
     }
     if(evr_init_open_file_set(&open_files) != evr_ok){
         goto out_with_close_ic;
+    }
+    if(evr_index_watch_unlock(&watch_ctx) != evr_ok){
+        goto out_with_empty_open_file_set;
     }
     if(run_fuse(argv[0], &cfg) != 0){
         goto out_with_empty_open_file_set;
@@ -297,8 +320,13 @@ int main(int argc, char *argv[]) {
         evr_free_buf_read(ir);
         if(ic.close(&ic) != 0){
             evr_panic("Unable to close evr-attr-index connection");
-            ret = evr_error;
+            ret = 1;
         }
+    }
+ out_with_free_index_watch:
+    running = 0;
+    if(evr_free_index_watch(&watch_ctx) != evr_ok){
+        ret = 1;
     }
  out_with_empty_inode_set:
     evr_empty_inode_set(&inode_set);
@@ -406,12 +434,124 @@ xsltStylesheet *load_transformation(struct evr_fs_cfg *cfg, struct evr_file *gc)
     return style;
 }
 
-int evr_populate_inode_set_visit_seed(void *ctx, evr_claim_ref seed);
+int evr_index_watch_worker(void *_ctx);
+
+int evr_start_index_watch(struct evr_index_watch_ctx *ctx){
+    if(evr_connect_to_index(&ctx->c, &ctx->r, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
+        goto fail;
+    }
+    if(evr_attri_write_watch(&ctx->c) != evr_ok){
+        goto fail_with_close_c;
+    }
+    if(mtx_init(&ctx->working, mtx_plain) != thrd_success){
+        goto fail_with_close_c;
+    }
+    if(mtx_lock(&ctx->working) != thrd_success){
+        goto fail_with_free_working;
+    }
+    if(thrd_create(&ctx->worker, evr_index_watch_worker, ctx) != thrd_success){
+        goto fail_with_unlock_working;
+    }
+    return evr_ok;
+ fail_with_unlock_working:
+    if(mtx_unlock(&ctx->working) != thrd_success){
+        evr_panic("Unable to unlock index watch working mutex");
+    }
+ fail_with_free_working:
+    mtx_destroy(&ctx->working);
+ fail_with_close_c:
+    evr_free_buf_read(ctx->r);
+    if(ctx->c.close(&ctx->c) != 0){
+        evr_panic("Unable to close evr-attr-index connection");
+    }
+ fail:
+    return evr_error;
+}
+
+int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref, evr_claim_ref seed, evr_time last_modified);
+
+int evr_index_watch_worker(void *_ctx){
+    int ret = evr_error;
+    struct evr_index_watch_ctx *ctx = _ctx;
+    log_debug("Index watch worker started");
+    if(mtx_lock(&ctx->working) != thrd_success){
+        goto out;
+    }
+    log_debug("Start processing index watch responses");
+    if(evr_attri_read_watch(ctx->r, evr_index_watch_worker_visit_changed_seed, ctx) != evr_ok){
+        goto out_with_unlock_working;
+    }
+    log_debug("End processing index watch responses");
+    ret = evr_ok;
+ out_with_unlock_working:
+    if(mtx_unlock(&ctx->working) != thrd_success){
+        evr_panic("Unable to unlock index watch working lock");
+        ret = evr_error;
+    }
+ out:
+    log_debug("Index watch worker ended with result %d", ret);
+    return ret;
+}
 
 struct evr_populate_inode_set_ctx {
     struct evr_file ic;
     struct evr_buf_read *ir;
 };
+
+// TODO adjust name so that it better represents the fact that is is called from two different places
+int evr_populate_inode_set_visit_seed(void *ctx, evr_claim_ref seed);
+
+int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref, evr_claim_ref seed, evr_time last_modified){
+    int ret = evr_error;
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_claim_ref_str seed_str;
+        evr_fmt_claim_ref(seed_str, seed);
+        log_debug("Seed %s has changed in evr-attr-index", seed_str);
+    }
+#endif
+    struct evr_populate_inode_set_ctx inode_ctx;
+    inode_ctx.ir = NULL;
+    if(evr_connect_to_index(&inode_ctx.ic, &inode_ctx.ir, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
+        goto out;
+    }
+    if(evr_populate_inode_set_visit_seed(&inode_ctx, seed) != evr_ok){
+        goto out_with_close_ir;
+    }
+    ret = evr_ok;
+ out_with_close_ir:
+    if(inode_ctx.ir){
+        evr_free_buf_read(inode_ctx.ir);
+        if(inode_ctx.ic.close(&inode_ctx.ic) != 0){
+            evr_panic("Unable to close evr-attr-index connection");
+            ret = evr_error;
+        }
+    }
+ out:
+    return ret;
+}
+
+int evr_index_watch_unlock(struct evr_index_watch_ctx *ctx){
+    if(mtx_unlock(&ctx->working) != thrd_success){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+int evr_free_index_watch(struct evr_index_watch_ctx *ctx){
+    int worker_res;
+    if(thrd_join(ctx->worker, &worker_res) != thrd_success){
+        evr_panic("Unable to join index watch thread");
+        return evr_error;
+    }
+    mtx_destroy(&ctx->working);
+    evr_free_buf_read(ctx->r);
+    if(ctx->c.close(&ctx->c) != 0){
+        evr_panic("Unable to close evr-attr-index connection");
+        return evr_error;
+    }
+    return worker_res;
+}
 
 int evr_populate_inode_set(struct evr_buf_read *ir, struct evr_fs_cfg *cfg){
     int ret = evr_error;
@@ -467,6 +607,7 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
         ret = evr_ok;
         goto out_with_free_files_doc;
     }
+    evr_inode_remove_by_seed(inode_set.inodes, inode_set.inodes_len, seed);
     for(xmlNode *fn = evr_first_file_node(file_set); fn; fn = evr_next_file_node(fn)){
         struct evr_fs_file *f = evr_parse_fs_file(fn);
         if(!f){

@@ -200,6 +200,60 @@ int evr_attri_read_status(struct evr_buf_read *r){
     return evr_ok;
 }
 
+int evr_attri_write_watch(struct evr_file *c){
+    log_debug("Writing evr-attr-index watch command");
+    char cmd[] = "w\n";
+    return write_n(c, cmd, sizeof(cmd) - 1);
+}
+
+int evr_attri_read_watch(struct evr_buf_read *r, int (*visit_changed_seed)(void *ctx, evr_blob_ref index_ref, evr_claim_ref seed, evr_time last_modified), void *ctx){
+    if(evr_attri_read_status(r) != evr_ok){
+        return evr_error;
+    }
+    size_t nl_offset;
+    evr_blob_ref index_ref;
+    evr_claim_ref seed;
+    evr_time last_modified;
+    while(1) {
+        int res = evr_buf_read_read_until(r, '\n', &nl_offset);
+        if(res == evr_end){
+            return evr_ok;
+        } else if(res != evr_ok){
+            return evr_error;
+        }
+        char line[nl_offset + 1];
+        if(evr_buf_read_pop(r, line, sizeof(line)) != evr_ok){
+            return evr_error;
+        }
+        line[nl_offset] = '\0';
+        if(nl_offset <= evr_blob_ref_str_len + 1 + evr_claim_ref_str_len + 1 + 1){
+            log_error("evr-attr-index sent us watch response with invalid syntax: %s");
+            return evr_error;
+        }
+        struct evr_buf_pos bp;
+        evr_init_buf_pos(&bp, line);
+        bp.pos[evr_blob_ref_str_len] = '\0';
+        if(evr_parse_blob_ref(index_ref, bp.pos) != evr_ok){
+            return evr_error;
+        }
+        evr_inc_buf_pos(&bp, evr_blob_ref_str_len + 1);
+        bp.pos[evr_claim_ref_str_len] = '\0';
+        if(evr_parse_claim_ref(seed, bp.pos) != evr_ok){
+            return evr_error;
+        }
+        evr_inc_buf_pos(&bp, evr_claim_ref_str_len + 1);
+        if(evr_time_from_iso8601(&last_modified, bp.pos) != evr_ok){
+            return evr_error;
+        }
+        int visit_res = visit_changed_seed(ctx, index_ref, seed, last_modified);
+        if(visit_res == evr_end){
+            return evr_end;
+        } else if(visit_res != evr_ok){
+            return evr_error;
+        }
+    }
+}
+
 int evr_attri_write_describe_index(struct evr_file *f);
 
 int evr_attri_describe_index(struct evr_buf_read *r, evr_blob_ref *index_ref){

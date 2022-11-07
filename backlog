@@ -1,7 +1,4 @@
-* evr-fs should watch the evr-attr-index
-evr-fs should watch the evr-attr-index and update it's file system
-representation on evr-attr-index changes.
-* evr-attr-index shutdown with watch error
+* evr-attr-index shutdown with watch error :bug:
 output from a failed fs test suite run. the evr-fs watch on the
 evr-attr-index was interrupted by C-c.
 

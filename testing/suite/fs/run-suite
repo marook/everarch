@@ -95,4 +95,22 @@ then
     exit 1
 fi
 
+# update msg.txt -> new-msg.txt
+echo 'new message!' | evr post-file --seed "${msg_file_ref}" --title 'new-msg.txt'
+# sleep for one second because fuse attr and entry timeouts are set to
+# one second in evr-fs.c
+sleep 1
+wait_for_file 'mnt/test-subdir/cat-my-category/new-msg.txt'
+cat_msg=`cat mnt/test-subdir/cat-my-category/new-msg.txt`
+if [[ "${cat_msg}" != 'new message!' ]]
+then
+    echo "Unexpected mnt/test-subdir/new-msg.txt content: ${cat_msg}" >&2
+    exit 1
+fi
+if [[ -e 'mnt/test-subdir/cat-my-category/msg.txt' ]]
+then
+    echo "msg.txt should have been removed but still exists" >&2
+    exit 1
+fi
+
 echo "Stopping…"
