@@ -531,11 +531,11 @@ int evr_watch_index_claims_worker(void *arg){
         if(evr_read_watch_blobs_body(&cw, &body) != evr_ok){
             goto out_with_free_latest_spec;
         }
-#ifdef EVR_LOG_INFO
+#ifdef EVR_LOG_DEBUG
         do {
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
-            log_info("Checking index claim %s for attr-spec", fmt_key);
+            log_debug("Checking index claim %s for attr-spec", fmt_key);
         } while(0);
 #endif
         if(cs.get_fd(&cs) == -1){
