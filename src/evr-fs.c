@@ -972,7 +972,9 @@ int run_fuse(char *program, struct evr_fs_cfg *cfg){
     if(fuse_session_mount(se, cfg->mount_point) != 0) {
         goto out_with_free_signal_handlers;
     }
-    fuse_daemonize(cfg->foreground);
+    if(fuse_daemonize(cfg->foreground) != 0){
+        goto out_with_free_signal_handlers;
+    }
     if(cfg->single_thread) {
         ret = fuse_session_loop(se);
     } else {
