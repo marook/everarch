@@ -52,27 +52,37 @@ struct evr_notify_ctx *evr_create_notify_ctx(size_t observers_len, size_t msgs_l
 
 int evr_free_notify_ctx(struct evr_notify_ctx *nt){
     int ret = evr_error;
-    if(mtx_lock(&nt->lock) != thrd_success){
-        goto out;
-    }
-    struct evr_observer *end = &nt->observers[nt->observers_len];
-    for(struct evr_observer *it = nt->observers; it != end; ++it){
-        if(!it->messages){
-            continue;
+    // poll until all observers are gone
+    log_debug("Notify context %p is waiting until all observers are gone", nt);
+    while(1){
+        if(mtx_lock(&nt->lock) != thrd_success){
+            goto out;
         }
-        // the following evr_queue_end_producing and evr_free_queue
-        // ignore the fact that someone might still be consuming the
-        // queue. the caller of evr_free_notify must make sure this
-        // does not happend lol.
-        evr_queue_end_producing(it->messages);
-        if(evr_free_queue(it->messages, NULL) != evr_ok){
-            evr_panic("Unable to free messages queue");
-            goto out_with_free_lock;
+        int active_observer = 0;
+        struct evr_observer *end = &nt->observers[nt->observers_len];
+        for(struct evr_observer *it = nt->observers; it != end; ++it){
+            if(it->messages){
+                active_observer = 1;
+                break;
+            }
         }
-        it->messages = NULL;
+        if(active_observer == 0){
+            break;
+        }
+        if(mtx_unlock(&nt->lock) != thrd_success){
+            evr_panic("Unable to unlock notify context lock");
+            goto out;
+        }
+        struct timespec sleep_duration = {
+            0,
+            100000000
+        };
+        if(thrd_sleep(&sleep_duration, NULL) != 0){
+            goto out;
+        }
     }
+    log_debug("Notify context %p detected all observers are gone", nt);
     ret = evr_ok;
- out_with_free_lock:
     if(mtx_unlock(&nt->lock) != thrd_success){
         evr_panic("Unable to unlock notify lock");
         ret = evr_error;

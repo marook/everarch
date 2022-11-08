@@ -1,48 +1,10 @@
-* evr-attr-index shutdown with watch error :bug:
-output from a failed fs test suite run. the evr-fs watch on the
-evr-attr-index was interrupted by C-c.
-
-#+BEGIN_SRC
-2022-11-07T19:27:34 iI Shutting down
-2022-11-07T19:27:34 gD evr_persister_worker ending with result 0
-2022-11-07T19:27:34 iD Ended build index worker with result 0
-2022-11-07T19:27:34 gD evr persister stopped
-2022-11-07T19:27:34 iD Second SSL shutdown of socket 13 failed with SSL error
-2022-11-07T19:27:34 iD Second SSL shutdown of socket 3 failed with SSL error
-2022-11-07T19:27:34 iD Ended watch index claims worker with result 0
-2022-11-07T19:27:34 iD Second SSL shutdown of socket 8 failed with SSL error
-2022-11-07T19:27:34 iD Ended index sync worker with result 0
-2022-11-07T19:27:34 fD fuse getattr with inode 1
-2022-11-07T19:27:34 iD Ended connection worker 10 with result 0
-evr-attr-index: ../nptl/pthread_mutex_lock.c:81: __pthread_mutex_lock: Assertion `mutex->__data.__owner == 0' failed.
-2022-11-07T19:27:34 fD End processing index watch responses
-2022-11-07T19:27:34 fD Index watch worker ended with result 0
-../config: line 204: 214430 Aborted                 (core dumped) evr-attr-index
-2022-11-07T19:27:34 fD Second SSL shutdown of socket 5 failed with SSL error
-2022-11-07T19:27:34 fD Second SSL shutdown of socket 3 failed with SSL error
-../config: line 209: kill: (214332) - No such process
-#+END_SRC
-
-backtrace from the core dump:
-#+BEGIN_SRC
-(gdb) bt
-#0  __GI_raise (sig=sig@entry=6) at ../sysdeps/unix/sysv/linux/raise.c:50
-#1  0x00007fd732f64537 in __GI_abort () at abort.c:79
-#2  0x00007fd732f6440f in __assert_fail_base (fmt=0x7fd7330dc6a8 "%s%s%s:%u: %s%sAssertion `%s' failed.\n%n", assertion=0x7fd73312d62d "mutex->__data.__owner == 0", 
-    file=0x7fd73312d5fa "../nptl/pthread_mutex_lock.c", line=81, function=<optimized out>) at assert.c:92
-#3  0x00007fd732f73662 in __GI___assert_fail (assertion=assertion@entry=0x7fd73312d62d "mutex->__data.__owner == 0", 
-    file=file@entry=0x7fd73312d5fa "../nptl/pthread_mutex_lock.c", line=line@entry=81, 
-    function=function@entry=0x7fd73312d790 <__PRETTY_FUNCTION__.0> "__pthread_mutex_lock") at assert.c:101
-#4  0x00007fd733121904 in __GI___pthread_mutex_lock (mutex=mutex@entry=0x560855d58b50) at ../nptl/pthread_mutex_lock.c:81
-#5  0x00007fd73312b8e9 in mtx_lock (mutex=mutex@entry=0x560855d58b50) at mtx_lock.c:24
-#6  0x0000560854598dda in evr_notify_unregister (nt=0x560855d58b50, messages=messages@entry=0x7fd71c000fa0) at notify.c:145
-#7  0x00005608545954c9 in evr_watch_index (ctx=ctx@entry=0x7fd72efade80) at evr-attr-index.c:1495
-#8  0x0000560854595899 in evr_work_cmd (ctx=ctx@entry=0x7fd72efade80, line=line@entry=0x7fd72efaded0 "w") at evr-attr-index.c:1295
-#9  0x000056085459598c in evr_connection_worker (context=<optimized out>) at evr-attr-index.c:1242
-#10 0x00007fd73311ef5a in start_thread (arg=<optimized out>) at pthread_create.c:474
-#11 0x00007fd73303eaef in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95
-#+END_SRC
+* evr-fs should rebuild seed if referenced seeds are changed
+a seed description set may contine extra seed descriptions beside the
+entry seed. if an extra seed is changed in evr-attr-index this should
+also rebuild the corresponding entry seeds.
 * evr-fs should recreate inodes on evr-attr-index current index change
+right now only seed changes are applied to the inode set. if the index
+ref changes the whole inode set must be rebuilt.
 * reserve .evr in root directory within evr-fs
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
