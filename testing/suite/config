@@ -6,6 +6,9 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PATH="${script_dir}/../../src:${PATH}"
 export PYTHONPATH="${script_dir}/../../python:${PYTHONPATH}"
 
+# timeout of waits in seconds
+evr_wait_timeout=20
+
 glacier_storage_port=2461
 glacier_storage_bucket_dir=storage
 glacier_storage_pid=
@@ -149,8 +152,7 @@ mount_evr_fs() {
     rm -rf -- "${evr_fs_mnt_dir}"
     mkdir -p -- "${evr_fs_mnt_dir}"
     echo "Mounting evr-fs…"
-    evr-fs -f "xslt:blob:${xslt_ref}" ${evr_fs_opts} "${evr_fs_mnt_dir}" &
-    sleep 1
+    evr-fs "xslt:blob:${xslt_ref}" ${evr_fs_opts} "${evr_fs_mnt_dir}"
 }
 
 umount_evr_fs() {
@@ -160,18 +162,24 @@ umount_evr_fs() {
 }
 
 wait_for_port() {
-    port="$1"
+    local port="$1"
+    SECONDS=0
     sleep 0.1
     while true
     do
         nc ${nc_opts} -q 0 localhost "${port}" < /dev/null && break
-        echo "Waiting for port ${port}…"
+        if [[ "${SECONDS}" -ge "${evr_wait_timeout}" ]]
+        then
+            echo "Giving up waiting for port ${port}" >&2
+            exit 1
+        fi
         sleep 0.2
     done
 }
 
 wait_for_file() {
     local fn="$1"
+    SECONDS=0
     sleep 0.1
     while true
     do
@@ -179,7 +187,11 @@ wait_for_file() {
         then
             break
         fi
-        echo "Waiting for file ${fn}…"
+        if [[ "${SECONDS}" -ge "${evr_wait_timeout}" ]]
+        then
+            echo "Giving up waiting for file ${fn}" >&2
+            exit 1
+        fi
         sleep 0.2
     done
 }
