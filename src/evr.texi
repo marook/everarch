@@ -39,6 +39,7 @@ archive.
 * Claims::     Details about the central data structure in everarch.
 * evr-attr-index::  How indexing and finding claims works.
 * Query Language::  Explains the claim query language.
+* evr-fs:: Access everarch content from the file system.
 * Backup:: How to backup everarch content.
 * Index::      Complete index.
 @end menu
@@ -451,6 +452,29 @@ reported.
 
 @c TODO offset 0 limit 100
 
+@node evr-fs
+@chapter evr-fs
+Everarch stores it's data within the evr-glacier-storage server. Data
+within evr-glacier-storage can be accessed from the command line via
+the evr application. An alternative way of accessing data from within
+evr-glacier-storage is evr-fs. It's a virtual file system for
+representing content from within evr-glacier-storage in a user defined
+hierarchical way.
+
+Using evr-fs involves usually the following steps:
+
+@itemize
+@item
+Post files using evr application into evr-glacier-storage
+@item
+Configure evr-attr-index to index the posted files
+@item
+Write an evr-fs XSLT transformation to convert seeds from the
+evr-attr-index into file metadata
+@item
+Mount evr-fs using the evr-fs XSLT
+@end itemize
+
 @node Backup
 @chapter Backup
 everarch should make backups quick and painless. This chapter lists
@@ -477,9 +501,10 @@ blobs. Don't forget to also backup them:
 
 @itemize
 @item
-Your GPG keys used for signing and validation must als be backed
-up. The GPG manpage describes how to back them up using the --export
-and --export-secret-keys.
+Your GPG keys used for validation must als be backed up. The GPG
+manpage describes how to back them up using the --export. You don't
+have to backup the secret keys. If you loose tke keys create new ones
+and add them to the list of accepted GPG keys.
 @item
 Optionally the everarch configuration files should also be backed
 up. Especially your SSL private key may otherwise not be recoverable.
