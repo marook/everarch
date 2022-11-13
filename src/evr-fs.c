@@ -764,7 +764,7 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
         struct evr_inode *cnd = &inode_set.inodes[*c];
         evr_add_direntry(cnd->name, *c);
     }
-    if(off >= buf->size_used){
+    if((size_t)off >= buf->size_used){
         if(fuse_reply_buf(req, NULL, 0) != 0){
             goto failed_reply;
         }

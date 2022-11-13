@@ -153,7 +153,7 @@ int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep){
     }
     const size_t s_size = strlen(s) + 1;
     char *s_end = &s[s_size];
-    int fi = 0;
+    size_t fi = 0;
     fragments[fi++] = s;
     for(char *cs = s; cs != s_end; ++cs){
         if(*cs == sep){

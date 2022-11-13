@@ -99,7 +99,7 @@ void test_grow_inode_set(){
     const size_t initial_inode_set_len = s.inodes_len;
     char path[32];
     for(size_t i = 0; i < initial_inode_set_len + 1; ++i){
-        assert(snprintf(path, sizeof(path), "%zu", i) < sizeof(path));
+        assert(snprintf(path, sizeof(path), "%zu", i) < (int)sizeof(path));
         fuse_ino_t ino = evr_inode_set_create_file(&s, path);
         assert_msg(ino != 0, "Failed to insert node #%zu", i);
         struct evr_inode *nd = &s.inodes[ino];

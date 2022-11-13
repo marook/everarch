@@ -32,7 +32,7 @@
 int status_mock_ret;
 int status_mock_expected_exists;
 int status_mock_expected_flags;
-int status_mock_expected_blob_size;
+size_t status_mock_expected_blob_size;
 
 int status_mock(void *arg, int exists, int flags, size_t blob_size);
 int store_into_dynamic_array(void *arg, const char *data, size_t data_len);

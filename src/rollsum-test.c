@@ -62,7 +62,7 @@ void test_zero_input_rollsum(){
     memmove(&buffer[12], &buffer[13], buffer_size - 13);
     size_t splits2[max_splits];
     memset(splits2, 0, sizeof(size_t) * max_splits);
-    size_t splits2_len = print_splits(buffer, buffer_size, splits2);
+    int splits2_len = print_splits(buffer, buffer_size, splits2);
 
     assert(splits0_len == splits1_len);
     assert(splits0_len == splits2_len);

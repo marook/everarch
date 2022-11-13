@@ -1,4 +1,3 @@
-* turn on compiler flags -Wextra -Wpedantic
 * logger should support dumping logs into file
 especially with evr-fs for after daemonizing.
 * evr-fs integration test which restarts evr-attr-index

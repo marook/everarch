@@ -199,7 +199,7 @@ int evr_glacier_read_blob(struct evr_glacier_read_ctx *ctx, const evr_blob_ref k
         ret = evr_error;
         goto end_with_open_bucket;
     }
-    for(ssize_t bytes_read = 0; bytes_read < blob_size;){
+    for(size_t bytes_read = 0; bytes_read < blob_size;){
         ssize_t buffer_bytes_read = read(bucket_f, ctx->read_buffer, min(evr_read_buffer_size, blob_size - bytes_read));
         if(buffer_bytes_read == -1){
             goto end_with_open_bucket;
@@ -628,7 +628,7 @@ void build_glacier_file_path(char *glacier_file_path, size_t glacier_file_path_s
     char *end = &(glacier_file_path[glacier_file_path_size-1]);
     char *p = &glacier_file_path[strlen(glacier_file_path)];
     size_t path_suffix_len = strlen(path_suffix);
-    if(end - p < path_suffix_len){
+    if((size_t)(end - p) < path_suffix_len){
         // not enough space to create the path_suffix
         glacier_file_path[0] = '\0';
         return;
@@ -868,7 +868,7 @@ int evr_glacier_check_random_blobs(struct evr_glacier_write_ctx *ctx);
 
 int evr_glacier_check_index_db(struct evr_glacier_write_ctx *ctx){
     int ret = evr_error;
-    int bucket_end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
+    off_t bucket_end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
     if(bucket_end_offset == -1){
         goto out;
     }
@@ -898,7 +898,7 @@ int evr_glacier_check_index_db(struct evr_glacier_write_ctx *ctx){
         ret = evr_glacier_index_db_corrupt;
         goto out_with_reset_find_bucket_end_offset_stmt;
     }
-    if(ctx->current_bucket_pos != bucket_end_offset){
+    if(ctx->current_bucket_pos != (size_t)bucket_end_offset){
         log_info("Bucket " evr_bucket_file_name_fmt "'s end pointer (%d) and file end offset (%ld) don't match in glacier directory %s. It looks like evr-glacier-storage terminated not gracafully while writing a blob.", ctx->current_bucket_index, ctx->current_bucket_pos, bucket_end_offset, ctx->config->bucket_dir_path);
     }
     int blobs_check_res = evr_glacier_check_random_blobs(ctx);

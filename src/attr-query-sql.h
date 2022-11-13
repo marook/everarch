@@ -91,7 +91,7 @@ struct evr_attr_selector *evr_build_attr_selector(int type);
 struct evr_attr_query {
     struct evr_attr_selector *selector;
     struct evr_attr_query_node *root;
-    evr_time effective_time;;
+    evr_time effective_time;
     int limit;
     int offset;
 };

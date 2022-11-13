@@ -127,7 +127,7 @@ int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
 int read_n(struct evr_file *f, char *buffer, size_t bytes, int (*side_effect)(void *ctx, char *buf, size_t size), void *ctx){
     size_t remaining = bytes;
     while(remaining > 0){
-        size_t nbytes = f->read(f, buffer, remaining);
+        ssize_t nbytes = f->read(f, buffer, remaining);
         if(nbytes < 0){
             return evr_error;
         }
@@ -144,9 +144,10 @@ int read_n(struct evr_file *f, char *buffer, size_t bytes, int (*side_effect)(vo
 }
 
 int write_n(struct evr_file *f, const void *buffer, size_t size){
+    char *buf = buffer;
     size_t remaining = size;
     while(remaining > 0){
-        ssize_t written = f->write(f, buffer, remaining);
+        ssize_t written = f->write(f, buf, remaining);
         if(written <= 0){
             if(errno == EPIPE){
                 log_debug("write_n detected a broken pipe with file %d", f->get_fd(f));
@@ -154,7 +155,7 @@ int write_n(struct evr_file *f, const void *buffer, size_t size){
             }
             return evr_error;
         }
-        buffer += written;
+        buf += written;
         remaining -= written;
     }
     return evr_ok;
@@ -200,7 +201,7 @@ int dump_n(struct evr_file *f, size_t bytes, int (*side_effect)(void *ctx, char 
     char buf[min(bytes, 4096)];
     size_t remaining = bytes;
     while(remaining > 0){
-        size_t nbytes = f->read(f, buf, min(sizeof(buf), remaining));
+        ssize_t nbytes = f->read(f, buf, min(sizeof(buf), remaining));
         if(nbytes < 0){
             return evr_error;
         }
@@ -228,7 +229,7 @@ struct chunk_set *read_into_chunks(struct evr_file *f, size_t size, int (*side_e
         goto out;
     }
     size_t remaining = size;
-    for(int i = 0; i < chunks_len; ++i){
+    for(size_t i = 0; i < chunks_len; ++i){
         size_t chunk_read_size = min(remaining, evr_chunk_size);
         if(read_n(f, cs->chunks[i], chunk_read_size, side_effect, ctx) != evr_ok){
             goto out_free_cs;

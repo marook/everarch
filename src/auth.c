@@ -31,7 +31,7 @@ int evr_parse_auth_token(evr_auth_token t, evr_auth_token_str s){
     }
     char buf[3];
     buf[2] = '\0';
-    int v;
+    unsigned int v;
     for(size_t i = 0; i < sizeof(evr_auth_token); ++i){
         buf[0] = s[2 * i];
         buf[1] = s[2 * i + 1];

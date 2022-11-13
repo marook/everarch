@@ -179,7 +179,7 @@ int evr_chunk_setify(struct chunk_set *cs, char *buf, size_t size){
         goto out;
     }
     cs->size_used = size;
-    for(int i = 0; i < cs->chunks_len; ++i){
+    for(size_t i = 0; i < cs->chunks_len; ++i){
         cs->chunks[i] = buf + i * evr_chunk_size;
     }
     ret = evr_ok;

@@ -1,4 +1,16 @@
-AM_CFLAGS = -Wall -Werror $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS)
+# CFLAGS_WARN contains the cflags related to compiler errors and
+# warnings.
+CFLAGS_WARN=\
+	-Wall \
+	-Werror \
+	-Wextra \
+	-Wpedantic \
+	-Wno-discarded-qualifiers \
+	-Wno-missing-field-initializers \
+	-Wno-unused-parameter \
+	-Wno-variadic-macros
+
+AM_CFLAGS = $(CFLAGS_WARN) $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS)
 BUILT_SOURCES = \
 	attr-query-parser.h \
 	attr_index_db_test-attr-query-lexer.c \

@@ -100,7 +100,7 @@ void test_allocate_chunk_set(){
     assert(cs->chunks_len == 3);
     // write into every byte of the chunk set to force an error in
     // valgrind if too less memory was allocated.
-    for(int i = 0; i < cs->chunks_len; i++){
+    for(size_t i = 0; i < cs->chunks_len; i++){
         char *c = cs->chunks[i];
         memset(c, 42, evr_chunk_size);
     }

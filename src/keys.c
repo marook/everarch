@@ -50,14 +50,14 @@ int evr_parse_blob_ref(evr_blob_ref key, const char *fmt_key){
     }
     char buffer[3];
     buffer[2] = '\0';
-    int v;
-    for(int i = 0; i < evr_blob_ref_size; ++i){
+    unsigned int v;
+    for(size_t i = 0; i < evr_blob_ref_size; ++i){
         buffer[0] = p[0];
         buffer[1] = p[1];
         if(sscanf(buffer, "%02x", &v) != 1){
             return evr_error;
         }
-        if(v < 0 || v > 255){
+        if(v > 255){
             return evr_error;
         }
         key[i] = v;
@@ -148,7 +148,7 @@ int evr_parse_claim_ref(evr_claim_ref cref, const char *fmt_ref){
         goto out;
     }
     s += evr_claim_ref_str_separator_len;
-    int index_ref;
+    unsigned int index_ref;
     if(sscanf(s, "%04x", &index_ref) != 1){
         goto out;
     }

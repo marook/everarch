@@ -87,7 +87,8 @@ void test_pass_path_to_subprocess(){
     assert(close(sp.stdin) == 0);
     char sp_path[4096];
     ssize_t bytes_read = read(sp.stdout, sp_path, sizeof(sp_path));
-    sp_path[min(bytes_read, sizeof(sp_path)) - 1] = '\0';
+    assert(bytes_read >= 0);
+    sp_path[min((size_t)bytes_read, sizeof(sp_path)) - 1] = '\0';
     assert(strncmp(my_path, sp_path, sizeof(sp_path) - 1) == 0);
     assert(close(sp.stdout) == 0);
     assert(close(sp.stderr) == 0);

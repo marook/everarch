@@ -48,7 +48,7 @@ void test_file_claim_with_filename(){
     slice.size = 1;
     const struct evr_file_claim claim = {
         0,
-        {},
+        { 0 },
         "test.txt",
         1,
         &slice,
@@ -62,7 +62,7 @@ void test_file_claim_with_null_filename(){
     slice.size = 1;
     const struct evr_file_claim claim = {
         0,
-        {},
+        { 0 },
         NULL,
         1,
         &slice,
@@ -76,7 +76,7 @@ void test_file_claim_with_empty_filename(){
     slice.size = 1;
     const struct evr_file_claim claim = {
         0,
-        {},
+        { 0 },
         "",
         1,
         &slice,
@@ -90,7 +90,7 @@ void test_file_claim_with_seed(){
     slice.size = 1;
     const struct evr_file_claim claim = {
         1,
-        {},
+        { 0 },
         NULL,
         1,
         &slice,

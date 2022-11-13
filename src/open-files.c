@@ -34,7 +34,7 @@ int evr_open_file_read(struct evr_open_file *f, char *buf, size_t *size, off_t o
     }
     for(size_t si = 0; si < f->claim->slices_len; ++si){
         struct evr_file_slice *s = &f->claim->slices[si];
-        if(off < slices_off + s->size){
+        if((size_t)off < slices_off + s->size){
             if(f->cached_slice_buf == NULL || f->cached_slice_index != si){
                 if(evr_open_file_cache_slice(f, si) != evr_ok){
                     goto out_with_unlock;
