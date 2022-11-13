@@ -27,6 +27,8 @@
 #include "files.h"
 #include "signatures.h"
 
+#define evr_seed_desc_ns "https://evr.ma300k.de/seed-description/"
+
 int evr_seed_desc_build(xmlDoc **doc, struct evr_buf_read *c, evr_claim_ref seed, size_t traces_len, char **traces);
 
 int evr_seed_desc_create_doc(xmlDoc **doc, xmlNode **set_node, evr_claim_ref entry_seed);

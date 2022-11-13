@@ -255,6 +255,7 @@ files_test_LDADD = $(EVERARCH_LIBS)
 fs_inode_test_SOURCES = \
 	assert.c \
 	basics.c \
+	dyn-mem.c \
 	fs-inode.c \
 	fs-inode-test.c \
 	keys.c \

@@ -113,4 +113,26 @@ then
     exit 1
 fi
 
+# change dependant seed
+now=`date -u '+%Y-%m-%dT%H:%M:%S'`
+evr sign-put -f 1 <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="${now}.999999Z"
+    >
+  <attr seed="${category_ref}-0000">
+    <a op="=" k="title" v="new-category"/>
+  </attr>
+</claim-set>
+EOF
+wait_for_file 'mnt/test-subdir/cat-new-category/new-msg.txt'
+cat_msg=`cat mnt/test-subdir/cat-new-category/new-msg.txt`
+if [[ "${cat_msg}" != 'new message!' ]]
+then
+    echo "Unexpected mnt/test-subdir/new-msg.txt content: ${cat_msg}" >&2
+    exit 1
+fi
+
 echo "Stopping…"

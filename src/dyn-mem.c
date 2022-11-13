@@ -250,6 +250,7 @@ int evr_llbuf_s_append(struct evr_llbuf_s *llb, void **child){
     }
     size_t blk_child_index = llb->child_count % llb->block_child_count;
     *child = &((char*)llb->last->data)[blk_child_index * llb->child_size];
+    ++llb->child_count;
     return evr_ok;
 }
 

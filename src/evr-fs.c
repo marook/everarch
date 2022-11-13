@@ -455,6 +455,8 @@ int evr_populate_inode_set(struct evr_buf_read *ir, struct evr_fs_cfg *cfg){
 
 xmlDoc *evr_seed_desc_to_file_set(xmlDoc *doc, evr_claim_ref seed);
 
+int evr_collect_dependent_seeds(xmlDoc *doc, size_t *dependent_seeds_len, evr_claim_ref **dependent_seeds, evr_claim_ref seed);
+
 int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     int ret = evr_error;
     struct evr_populate_inode_set_ctx *ctx = _ctx;
@@ -483,8 +485,23 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
         ret = evr_ok;
         goto out_with_free_files_doc;
     }
+    size_t dependent_seeds_len = 0;
+    evr_claim_ref *dependent_seeds = NULL;
+    if(evr_collect_dependent_seeds(desc_doc, &dependent_seeds_len, &dependent_seeds, seed) != evr_ok){
+        goto out_with_free_files_doc;
+    }
+    // TODO lock inodes???
     evr_inode_remove_by_seed(inode_set.inodes, inode_set.inodes_len, seed);
+    evr_claim_ref *ds = NULL;
     for(xmlNode *fn = evr_first_file_node(file_set); fn; fn = evr_next_file_node(fn)){
+        if(dependent_seeds_len > 0){
+            size_t size = evr_claim_ref_size * dependent_seeds_len;
+            ds = malloc(size);
+            if(!ds){
+                goto out_with_free_dependent_seeds;
+            }
+            memcpy(ds, dependent_seeds, size);
+        }
         struct evr_fs_file *f = evr_parse_fs_file(fn);
         if(!f){
             evr_claim_ref_str seed_str;
@@ -492,7 +509,8 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
             char *fn_str = evr_format_xml_node(fn);
             log_error("Unable to parse XML file node based on seed %s: %s", seed_str, fn_str);
             free(fn_str);
-            goto out_with_free_files_doc;
+            free(ds);
+            goto out_with_free_dependent_seeds;
         }
 #ifdef EVR_LOG_DEBUG
         {
@@ -506,23 +524,97 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
         fuse_ino_t ino = evr_inode_set_create_file(&inode_set, f->path);
         if(ino == 0){
             evr_free_fs_file(f);
-            goto out_with_free_files_doc;
+            free(ds);
+            goto out_with_free_dependent_seeds;
         }
-        struct evr_fs_inode *nd = &inode_set.inodes[ino];
+        struct evr_inode *nd = &inode_set.inodes[ino];
         nd->created = f->created;
         nd->last_modified = f->last_modified;
         nd->data.file.file_size = f->size;
         memcpy(nd->data.file.file_ref, f->file_ref, evr_claim_ref_size);
         memcpy(nd->data.file.seed, seed, evr_claim_ref_size);
+        nd->data.file.dependent_seeds_len = dependent_seeds_len;
+        nd->data.file.dependent_seeds = ds;
         evr_free_fs_file(f);
     }
     ret = evr_ok;
+ out_with_free_dependent_seeds:
+    free(dependent_seeds);
  out_with_free_files_doc:
     xmlFreeDoc(files_doc);
  out_with_free_desc_doc:
     xmlFreeDoc(desc_doc);
  out:
     return ret;
+}
+
+int evr_collect_dependent_seeds(xmlDoc *doc, size_t *_dependent_seeds_len, evr_claim_ref **_dependent_seeds, evr_claim_ref seed){
+    xmlNode *sds = xmlDocGetRootElement(doc);
+    if(!evr_is_evr_element(sds, "seed-description-set", evr_seed_desc_ns)){
+        goto fail;
+    }
+    size_t dependent_seeds_len = 0;
+    xmlNode *sd = sds->children;
+    while(1){
+        sd = evr_find_next_element(sd, "seed-description", evr_seed_desc_ns);
+        if(!sd){
+            break;
+        }
+        char *seed_val = (char*)xmlGetProp(sd, BAD_CAST "seed");
+        if(!seed_val){
+            goto fail;
+        }
+        evr_claim_ref sd_seed;
+        int parse_res = evr_parse_claim_ref(sd_seed, seed_val);
+        xmlFree(seed_val);
+        if(parse_res != evr_ok){
+            goto fail;
+        }
+        if(evr_cmp_claim_ref(seed, sd_seed) != 0){
+            ++dependent_seeds_len;
+        }
+        sd = sd->next;
+    }
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_claim_ref_str seed_str;
+        evr_fmt_claim_ref(seed_str, seed);
+        log_debug("Found %zu dependent seeds for seed %s", dependent_seeds_len, seed_str);
+    }
+#endif
+    size_t next_dependent_seed_index = 0;
+    evr_claim_ref *dependent_seeds = malloc(evr_claim_ref_size * dependent_seeds_len);
+    if(!dependent_seeds){
+        goto fail;
+    }
+    sd = sds->children;
+    while(1){
+        sd = evr_find_next_element(sd, "seed-description", evr_seed_desc_ns);
+        if(!sd){
+            break;
+        }
+        char *seed_val = (char*)xmlGetProp(sd, BAD_CAST "seed");
+        if(!seed_val){
+            goto fail_with_free_dependent_seeds;
+        }
+        evr_claim_ref sd_seed;
+        int parse_res = evr_parse_claim_ref(sd_seed, seed_val);
+        xmlFree(seed_val);
+        if(parse_res != evr_ok){
+            goto fail_with_free_dependent_seeds;
+        }
+        if(evr_cmp_claim_ref(seed, sd_seed) != 0){
+            memcpy(&dependent_seeds[next_dependent_seed_index++], sd_seed, evr_claim_ref_size);
+        }
+        sd = sd->next;
+    }
+    *_dependent_seeds_len = dependent_seeds_len;
+    *_dependent_seeds = dependent_seeds;
+    return evr_ok;
+ fail_with_free_dependent_seeds:
+    free(dependent_seeds);
+ fail:
+    return evr_error;
 }
 
 xmlDoc *evr_seed_desc_to_file_set(xmlDoc *seed_desc_doc, evr_claim_ref seed){
@@ -555,26 +647,26 @@ static const struct fuse_lowlevel_ops evr_fs_oper = {
     .read = evr_fs_read,
 };
 
-struct evr_fs_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
+struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino);
 
 static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
     log_debug("fuse lookup with parent inode %d the name %s", (int)parent, name);
-    struct evr_fs_inode *pnd = evr_get_inode(req, parent);
+    struct evr_inode *pnd = evr_get_inode(req, parent);
     if(!pnd){
         return;
     }
-    if(pnd->type != evr_fs_inode_type_dir){
+    if(pnd->type != evr_inode_type_dir){
         log_error("Inode %d is not a directory", (int)parent);
         if(fuse_reply_err(req, ENOTDIR) != 0){
             evr_panic("Unable to report lookup ENOTDIR error for name %s", name);
         }
         return;
     }
-    struct evr_fs_inode_dir *dir = &pnd->data.dir;
+    struct evr_inode_dir *dir = &pnd->data.dir;
     fuse_ino_t *c_end = &dir->children[dir->children_len];
     for(fuse_ino_t *c = dir->children; c != c_end; ++c){
-        struct evr_fs_inode *cnd = &inode_set.inodes[*c];
+        struct evr_inode *cnd = &inode_set.inodes[*c];
         if(strcmp(name, cnd->name) != 0){
             continue;
         }
@@ -607,7 +699,7 @@ static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info
 }
 
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
-    struct evr_fs_inode *nd = evr_get_inode(req, ino);
+    struct evr_inode *nd = evr_get_inode(req, ino);
     if(!nd){
         // error has been reported by evr_get_inode
         return evr_error;
@@ -617,11 +709,11 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
     default:
         evr_panic("Unknown node type %d", nd->type);
         return evr_error;
-    case evr_fs_inode_type_dir:
+    case evr_inode_type_dir:
         st->st_mode = S_IFDIR | 0555;
         st->st_nlink = 1;
         break;
-    case evr_fs_inode_type_file:
+    case evr_inode_type_file:
         st->st_mode = S_IFREG | 0444;
         st->st_nlink = 1;
         st->st_size = nd->data.file.file_size;
@@ -652,8 +744,8 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
 static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
     int err = EINVAL;
     log_debug("fuse readdir with inode %d (size %zu, off %zu)", (int)ino, size, off);
-    struct evr_fs_inode *nd = evr_get_inode(req, ino);
-    if(nd->type != evr_fs_inode_type_dir){
+    struct evr_inode *nd = evr_get_inode(req, ino);
+    if(nd->type != evr_inode_type_dir){
         log_error("Inode %d is not a directory", (int)ino);
         err = ENOTDIR;
         goto fail;
@@ -666,10 +758,10 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
     memset(&st, 0, sizeof(st));
     evr_add_direntry(".", ino);
     evr_add_direntry("..", nd->parent);
-    struct evr_fs_inode_dir *dir = &nd->data.dir;
+    struct evr_inode_dir *dir = &nd->data.dir;
     fuse_ino_t *c_end = &dir->children[dir->children_len];
     for(fuse_ino_t *c = dir->children; c != c_end; ++c){
-        struct evr_fs_inode *cnd = &inode_set.inodes[*c];
+        struct evr_inode *cnd = &inode_set.inodes[*c];
         evr_add_direntry(cnd->name, *c);
     }
     if(off >= buf->size_used){
@@ -700,8 +792,8 @@ struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref cl
 static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
     int err = EINVAL;
     log_debug("fuse open inode %d", (int)ino);
-    struct evr_fs_inode *nd = evr_get_inode(req, ino);
-    if(nd->type != evr_fs_inode_type_file){
+    struct evr_inode *nd = evr_get_inode(req, ino);
+    if(nd->type != evr_inode_type_file){
         log_error("Inode %d is not a file", (int)ino);
         err = EISDIR;
         goto fail;
@@ -808,13 +900,13 @@ static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, 
     }
 }
 
-struct evr_fs_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
+struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
     if(ino < FUSE_ROOT_ID || ino >= inode_set.inodes_len){
         log_debug("readdir failed because inode %d out of bounds", (int)ino);
         goto fail_with_enoent;
     }
-    struct evr_fs_inode *nd = &inode_set.inodes[ino];
-    if(nd->type == evr_fs_inode_type_unlinked){
+    struct evr_inode *nd = &inode_set.inodes[ino];
+    if(nd->type == evr_inode_type_unlinked){
         log_debug("readdir failed because inode %d is unlinked", (int)ino);
         goto fail_with_enoent;
     }
@@ -915,6 +1007,8 @@ int evr_index_watch_worker(void *_ctx){
     return ret;
 }
 
+int evr_collect_affected_seeds(struct evr_llbuf_s *affected_seeds, evr_claim_ref seed);
+
 int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref, evr_claim_ref seed, evr_time last_modified){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG
@@ -924,13 +1018,26 @@ int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref,
         log_debug("Seed %s has changed in evr-attr-index", seed_str);
     }
 #endif
+    struct evr_llbuf_s affected_seeds;
+    evr_init_llbuf_s(&affected_seeds, evr_claim_ref_size);
+    if(evr_collect_affected_seeds(&affected_seeds, seed) != evr_ok){
+        goto out;
+    }
     struct evr_populate_inode_set_ctx inode_ctx;
     inode_ctx.ir = NULL;
     if(evr_connect_to_index(&inode_ctx.ic, &inode_ctx.ir, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
-        goto out;
+        goto out_with_free_affected_seeds;
     }
-    if(evr_populate_inode_set_visit_seed(&inode_ctx, seed) != evr_ok){
-        goto out_with_close_ir;
+    struct evr_llbuf_s_iter s_it;
+    evr_init_llbuf_s_iter(&s_it, &affected_seeds);
+    while(1){
+        evr_claim_ref *s = evr_llbuf_s_iter_next(&s_it);
+        if(!s){
+            break;
+        }
+        if(evr_populate_inode_set_visit_seed(&inode_ctx, *s) != evr_ok){
+            goto out_with_close_ir;
+        }
     }
     ret = evr_ok;
  out_with_close_ir:
@@ -941,6 +1048,51 @@ int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref,
             ret = evr_error;
         }
     }
+ out_with_free_affected_seeds:
+    evr_llbuf_s_empty(&affected_seeds, NULL);
+ out:
+    return ret;
+}
+
+int evr_collect_affected_seeds(struct evr_llbuf_s *affected_seeds, evr_claim_ref seed){
+    int ret = evr_error;
+    struct evr_llbuf_s affected_inodes;
+    evr_init_llbuf_s(&affected_inodes, sizeof(fuse_ino_t));
+    if(evr_collect_affected_inodes(&affected_inodes, &inode_set, seed) != evr_ok){
+        goto out;
+    }
+    struct evr_claim_ref_tiny_set *seed_set = evr_create_claim_ref_tiny_set(128);
+    if(!seed_set){
+        goto out_with_free_affected_inodes;
+    }
+    struct evr_llbuf_s_iter ino_it;
+    evr_init_llbuf_s_iter(&ino_it, &affected_inodes);
+    evr_claim_ref *s;
+    while(1){
+        fuse_ino_t *ino = evr_llbuf_s_iter_next(&ino_it);
+        if(!ino){
+            break;
+        }
+        struct evr_inode *nd = &inode_set.inodes[*ino];
+        int add_res = evr_claim_ref_tiny_set_add(seed_set, nd->data.file.seed);
+        if(add_res == evr_exists){
+            continue;
+        }
+        // else if add_res == evr_ok or evr_error we just continue. in
+        // the case of evr_error we will add the seed multiple
+        // times. that's not a big issue right now because it will
+        // just lead to multiple inode recreations for that that
+        // multiple seed.
+        if(evr_llbuf_s_append(affected_seeds, (void**)&s) != evr_ok){
+            goto out_with_free_seed_set;
+        }
+        memcpy(*s, nd->data.file.seed, evr_claim_ref_size);
+    }
+    ret = evr_ok;
+ out_with_free_seed_set:
+    evr_free_claim_ref_tiny_set(seed_set);
+ out_with_free_affected_inodes:
+    evr_llbuf_s_empty(&affected_inodes, NULL);
  out:
     return ret;
 }

@@ -126,12 +126,27 @@ struct evr_claim_ref_tiny_set {
     char hash_set[256];
 };
 
+/**
+ * evr_create_claim_ref_tiny_set creates a set of evr_claim_refs.
+ *
+ * Returns NULL if the set could not be allocated.
+ *
+ * A nice value for refs_len is 128 because the built set will fit
+ * into one page.
+ */
 struct evr_claim_ref_tiny_set *evr_create_claim_ref_tiny_set(size_t refs_len);
 
 #define evr_free_claim_ref_tiny_set(set) free(set)
 
 void evr_reset_claim_ref_tiny_set(struct evr_claim_ref_tiny_set *set);
 
+/**
+ * Adds the given ref to set.
+ *
+ * Returns evr_exists if the ref is already part of set. Returns
+ * evr_ok if the ref was added. Returns evr_error if there is no more
+ * space left in the set for adding ref.
+ */
 int evr_claim_ref_tiny_set_add(struct evr_claim_ref_tiny_set *set, evr_claim_ref ref);
 
 #endif

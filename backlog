@@ -1,7 +1,11 @@
-* evr-fs should rebuild seed if referenced seeds are changed
-a seed description set may contine extra seed descriptions beside the
-entry seed. if an extra seed is changed in evr-attr-index this should
-also rebuild the corresponding entry seeds.
+* turn on compiler flags -Wextra -Wpedantic
+* logger should support dumping logs into file
+especially with evr-fs for after daemonizing.
+* evr-fs integration test which restarts evr-attr-index
+evr-fs should work just like before the restart.
+* evr-fs integration test which restarts evr-glacier-storage
+evr-fs should work just like before the restart. restart should maybe
+occur while a file within evr-fs is open.
 * evr-fs should recreate inodes on evr-attr-index current index change
 right now only seed changes are applied to the inode set. if the index
 ref changes the whole inode set must be rebuilt.

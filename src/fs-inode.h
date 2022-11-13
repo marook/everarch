@@ -26,49 +26,54 @@
 
 #include "basics.h"
 #include "keys.h"
+#include "dyn-mem.h"
 
-#define evr_fs_inode_type_unlinked 0
-#define evr_fs_inode_type_dir 1
-#define evr_fs_inode_type_file 2
+#define evr_inode_type_unlinked 0
+#define evr_inode_type_dir 1
+#define evr_inode_type_file 2
 
-// TODO drop _fs from name
-struct evr_fs_inode_dir {
+struct evr_inode_dir {
     size_t children_len;
     fuse_ino_t *children;
 };
 
-// TODO drop _fs from name
-struct evr_fs_inode_file {
+struct evr_inode_file {
     size_t file_size;
     evr_claim_ref file_ref;
     evr_claim_ref seed;
+    size_t dependent_seeds_len;
+    /**
+     * dependent_seeds is an array of seeds which influence the
+     * mapping of this file. The mapping of this file may change if
+     * one of these seeds changes. This array does not contain the
+     * file's own seed which is stored in the sibling seed attribute.
+     */
+    evr_claim_ref *dependent_seeds;
 };
 
-// TODO drop _fs from name
-union evr_fs_inode_data {
-    struct evr_fs_inode_dir dir;
-    struct evr_fs_inode_file file;
+union evr_inode_data {
+    struct evr_inode_dir dir;
+    struct evr_inode_file file;
 };
 
-// TODO drop _fs from name
-struct evr_fs_inode {
+struct evr_inode {
     fuse_ino_t parent;
     char *name;
     evr_time created;
     evr_time last_modified;
     int type;
-    union evr_fs_inode_data data;
+    union evr_inode_data data;
 };
 
-struct evr_fs_inode *evr_create_inodes(size_t inodes_len);
+struct evr_inode *evr_create_inodes(size_t inodes_len);
 
-void evr_free_inodes(struct evr_fs_inode *inodes);
+void evr_free_inodes(struct evr_inode *inodes);
 
 /**
  * evr_inode_remove_by_seed calls evr_inode_remove on every inode with
  * the given seed.
  */
-void evr_inode_remove_by_seed(struct evr_fs_inode *inodes, size_t inodes_len, evr_claim_ref seed);
+void evr_inode_remove_by_seed(struct evr_inode *inodes, size_t inodes_len, evr_claim_ref seed);
 
 /**
  * evr_inode_create_file creates a file inode and all missing parent
@@ -79,16 +84,16 @@ void evr_inode_remove_by_seed(struct evr_fs_inode *inodes, size_t inodes_len, ev
  *
  * Returns 0 on error. Otherwise the created inode.
  */
-fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_len, char *file_path);
+fuse_ino_t evr_inode_create_file(struct evr_inode **inodes, size_t *inodes_len, char *file_path);
 
 /**
  * evr_inode_remove removes the inode n and all parent inodes which
  * become childless except the root inode 1.
  */
-void evr_inode_remove(struct evr_fs_inode *inodes, fuse_ino_t n);
+void evr_inode_remove(struct evr_inode *inodes, fuse_ino_t n);
 
 struct evr_inode_set {
-    struct evr_fs_inode *inodes;
+    struct evr_inode *inodes;
     size_t inodes_len;
 };
 
@@ -103,5 +108,11 @@ int evr_init_inode_set(struct evr_inode_set *s);
  * Returns 0 on error. Otherwise the created inode.
  */
 #define evr_inode_set_create_file(s, file_path) evr_inode_create_file(&(s)->inodes, &(s)->inodes_len, file_path)
+
+/**
+ * evr_collect_affected_inodes collects fuse_ino_t inodes which are
+ * built using attributes from the given seed.
+ */
+int evr_collect_affected_inodes(struct evr_llbuf_s *affected_inodes, struct evr_inode_set *s, evr_claim_ref seed);
 
 #endif

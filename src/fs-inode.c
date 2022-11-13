@@ -23,63 +23,64 @@
 #include "logger.h"
 #include "errors.h"
 
-struct evr_fs_inode *evr_create_inodes(size_t inodes_len){
+struct evr_inode *evr_create_inodes(size_t inodes_len){
     if(inodes_len <= FUSE_ROOT_ID){
         evr_panic("inodes_len must be greater than %u", FUSE_ROOT_ID);
         return NULL;
     }
-    struct evr_fs_inode *inodes = malloc(sizeof(struct evr_fs_inode) * inodes_len);
+    struct evr_inode *inodes = malloc(sizeof(struct evr_inode) * inodes_len);
     if(!inodes){
         return NULL;
     }
-    struct evr_fs_inode *root = &inodes[FUSE_ROOT_ID];
+    struct evr_inode *root = &inodes[FUSE_ROOT_ID];
     root->parent = FUSE_ROOT_ID;
     root->name = NULL;
     evr_now(&root->created);
     root->last_modified = root->created;
-    root->type = evr_fs_inode_type_dir;
+    root->type = evr_inode_type_dir;
     root->data.dir.children_len = 0;
     root->data.dir.children = NULL;
     for(fuse_ino_t n = FUSE_ROOT_ID + 1; n < inodes_len; ++n){
-        inodes[n].type = evr_fs_inode_type_unlinked;
+        inodes[n].type = evr_inode_type_unlinked;
     }
     return inodes;
 }
 
 
-void evr_free_inode_and_children(struct evr_fs_inode *inodes, fuse_ino_t n);
+void evr_free_inode_and_children(struct evr_inode *inodes, fuse_ino_t n);
 
-void evr_free_inodes(struct evr_fs_inode *inodes){
+void evr_free_inodes(struct evr_inode *inodes){
     if(inodes){
         evr_free_inode_and_children(inodes, FUSE_ROOT_ID);
         free(inodes);
     }
 }
 
-void evr_free_inode_and_children(struct evr_fs_inode *inodes, fuse_ino_t n){
-    struct evr_fs_inode *nd = &inodes[n];
+void evr_free_inode_and_children(struct evr_inode *inodes, fuse_ino_t n){
+    struct evr_inode *nd = &inodes[n];
     switch(nd->type){
     default:
         evr_panic("Unknown inode type %d discovered with inode %u", nd->type, (unsigned int)n);
         break;
-    case evr_fs_inode_type_dir:
+    case evr_inode_type_dir:
         for(size_t i = 0; i < nd->data.dir.children_len; ++i){
             evr_free_inode_and_children(inodes, nd->data.dir.children[i]);
         }
         free(nd->data.dir.children);
         break;
-    case evr_fs_inode_type_file:
+    case evr_inode_type_file:
+        free(nd->data.file.dependent_seeds);
         break;
     }
     free(nd->name);
-    nd->type = evr_fs_inode_type_unlinked;
+    nd->type = evr_inode_type_unlinked;
 }
 
-void evr_inode_remove_by_seed(struct evr_fs_inode *inodes, size_t inodes_len, evr_claim_ref seed){
-    struct evr_fs_inode *it;
+void evr_inode_remove_by_seed(struct evr_inode *inodes, size_t inodes_len, evr_claim_ref seed){
+    struct evr_inode *it;
     for(fuse_ino_t n = FUSE_ROOT_ID + 1; n < inodes_len; ++n){
         it = &inodes[n];
-        if(it->type != evr_fs_inode_type_file){
+        if(it->type != evr_inode_type_file){
             continue;
         }
         if(evr_cmp_claim_ref(seed, it->data.file.seed) != 0){
@@ -89,13 +90,13 @@ void evr_inode_remove_by_seed(struct evr_fs_inode *inodes, size_t inodes_len, ev
     }
 }
 
-fuse_ino_t evr_inode_append_dir(struct evr_fs_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name);
+fuse_ino_t evr_inode_append_dir(struct evr_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name);
 
-fuse_ino_t evr_inode_append_file(struct evr_fs_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name);
+fuse_ino_t evr_inode_append_file(struct evr_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name);
 
-fuse_ino_t evr_inode_get_child_dir(struct evr_fs_inode *inodes, fuse_ino_t parent, char *name);
+fuse_ino_t evr_inode_get_child_dir(struct evr_inode *inodes, fuse_ino_t parent, char *name);
 
-fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_len, char *file_path){
+fuse_ino_t evr_inode_create_file(struct evr_inode **inodes, size_t *inodes_len, char *file_path){
     char *name = file_path;
     char *p_it = name;
     fuse_ino_t n = FUSE_ROOT_ID;
@@ -124,12 +125,12 @@ fuse_ino_t evr_inode_create_file(struct evr_fs_inode **inodes, size_t *inodes_le
     }
 }
 
-fuse_ino_t evr_inode_get_child_dir(struct evr_fs_inode *inodes, fuse_ino_t parent, char *name){
-    struct evr_fs_inode *p = &inodes[parent];
+fuse_ino_t evr_inode_get_child_dir(struct evr_inode *inodes, fuse_ino_t parent, char *name){
+    struct evr_inode *p = &inodes[parent];
     fuse_ino_t *c_end = &p->data.dir.children[p->data.dir.children_len];
     for(fuse_ino_t *cino = p->data.dir.children; cino != c_end; ++cino){
-        struct evr_fs_inode *c = &inodes[*cino];
-        if(c->type != evr_fs_inode_type_dir){
+        struct evr_inode *c = &inodes[*cino];
+        if(c->type != evr_inode_type_dir){
             continue;
         }
         if(strcmp(name, c->name) != 0){
@@ -140,11 +141,11 @@ fuse_ino_t evr_inode_get_child_dir(struct evr_fs_inode *inodes, fuse_ino_t paren
     return 0;
 }
 
-fuse_ino_t evr_inode_get_available(struct evr_fs_inode **inodes, size_t *inodes_len);
+fuse_ino_t evr_inode_get_available(struct evr_inode **inodes, size_t *inodes_len);
 
-int evr_inode_add_child(struct evr_fs_inode *inodes, fuse_ino_t parent, fuse_ino_t child);
+int evr_inode_add_child(struct evr_inode *inodes, fuse_ino_t parent, fuse_ino_t child);
 
-fuse_ino_t evr_inode_append_dir(struct evr_fs_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name){
+fuse_ino_t evr_inode_append_dir(struct evr_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name){
     fuse_ino_t n = evr_inode_get_available(inodes, inodes_len);
     if(n == 0){
         return 0;
@@ -152,19 +153,19 @@ fuse_ino_t evr_inode_append_dir(struct evr_fs_inode **inodes, size_t *inodes_len
     if(evr_inode_add_child(*inodes, parent, n) != evr_ok){
         return 0;
     }
-    struct evr_fs_inode *nd = &(*inodes)[n];
+    struct evr_inode *nd = &(*inodes)[n];
     nd->parent = parent;
     nd->name = strdup(name);
     if(!nd->name){
         return 0;
     }
-    nd->type = evr_fs_inode_type_dir;
+    nd->type = evr_inode_type_dir;
     nd->data.dir.children_len = 0;
     nd->data.dir.children = NULL;
     return n;
 }
 
-fuse_ino_t evr_inode_append_file(struct evr_fs_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name){
+fuse_ino_t evr_inode_append_file(struct evr_inode **inodes, size_t *inodes_len, fuse_ino_t parent, char *name){
     fuse_ino_t n = evr_inode_get_available(inodes, inodes_len);
     if(n == 0){
         return 0;
@@ -172,38 +173,38 @@ fuse_ino_t evr_inode_append_file(struct evr_fs_inode **inodes, size_t *inodes_le
     if(evr_inode_add_child(*inodes, parent, n) != evr_ok){
         return 0;
     }
-    struct evr_fs_inode *nd = &(*inodes)[n];
+    struct evr_inode *nd = &(*inodes)[n];
     nd->parent = parent;
     nd->name = strdup(name);
     if(!nd->name){
         return 0;
     }
-    nd->type = evr_fs_inode_type_file;
+    nd->type = evr_inode_type_file;
     return n;
 }
 
-fuse_ino_t evr_inode_get_available(struct evr_fs_inode **inodes, size_t *inodes_len){
+fuse_ino_t evr_inode_get_available(struct evr_inode **inodes, size_t *inodes_len){
     for(fuse_ino_t n = FUSE_ROOT_ID + 1; n < *inodes_len; ++n){
-        if((*inodes)[n].type == evr_fs_inode_type_unlinked){
+        if((*inodes)[n].type == evr_inode_type_unlinked){
             return n;
         }
     }
     const size_t old_inodes_len = *inodes_len;
     size_t new_inodes_len = *inodes_len * 2;
-    struct evr_fs_inode *new_inodes = realloc(*inodes, sizeof(struct evr_fs_inode) * new_inodes_len);
+    struct evr_inode *new_inodes = realloc(*inodes, sizeof(struct evr_inode) * new_inodes_len);
     if(!new_inodes){
         return 0;
     }
     for(fuse_ino_t n = old_inodes_len; n < new_inodes_len; ++n){
-        new_inodes[n].type = evr_fs_inode_type_unlinked;
+        new_inodes[n].type = evr_inode_type_unlinked;
     }
     *inodes = new_inodes;
     *inodes_len = new_inodes_len;
     return old_inodes_len;
 }
 
-int evr_inode_add_child(struct evr_fs_inode *inodes, fuse_ino_t parent, fuse_ino_t child){
-    struct evr_fs_inode *nd = &inodes[parent];
+int evr_inode_add_child(struct evr_inode *inodes, fuse_ino_t parent, fuse_ino_t child){
+    struct evr_inode *nd = &inodes[parent];
     fuse_ino_t *new_children = realloc(nd->data.dir.children, sizeof(fuse_ino_t) * (nd->data.dir.children_len + 1));
     if(!new_children){
         return evr_error;
@@ -214,14 +215,14 @@ int evr_inode_add_child(struct evr_fs_inode *inodes, fuse_ino_t parent, fuse_ino
     return evr_ok;
 }
 
-void evr_inode_remove(struct evr_fs_inode *inodes, fuse_ino_t n){
+void evr_inode_remove(struct evr_inode *inodes, fuse_ino_t n){
     if(n == FUSE_ROOT_ID){
         // the root node will always stay even if empty
         return;
     }
     evr_free_inode_and_children(inodes, n);
     fuse_ino_t p = inodes[n].parent;
-    struct evr_fs_inode *np = &inodes[p];
+    struct evr_inode *np = &inodes[p];
     for(size_t i = 0; i < np->data.dir.children_len - 1; ++i){
         if(np->data.dir.children[i] == n){
             np->data.dir.children[i] = np->data.dir.children[np->data.dir.children_len - 1];
@@ -243,11 +244,42 @@ void evr_inode_remove(struct evr_fs_inode *inodes, fuse_ino_t n){
 
 int evr_init_inode_set(struct evr_inode_set *s){
     const size_t inodes_len = 1024;
-    struct evr_fs_inode *ino = evr_create_inodes(inodes_len);
+    struct evr_inode *ino = evr_create_inodes(inodes_len);
     if(!ino){
         return evr_error;
     }
     s->inodes_len = inodes_len;
     s->inodes = ino;
+    return evr_ok;
+}
+
+int evr_collect_affected_inodes(struct evr_llbuf_s *affected_inodes, struct evr_inode_set *s, evr_claim_ref seed){
+    int collect;
+    fuse_ino_t *ino;
+    struct evr_inode *nd_end = &s->inodes[s->inodes_len];
+    for(struct evr_inode *nd = &s->inodes[FUSE_ROOT_ID]; nd != nd_end; ++nd){
+        if(nd->type != evr_inode_type_file){
+            continue;
+        }
+        collect = 0;
+        if(evr_cmp_claim_ref(seed, nd->data.file.seed) == 0){
+            collect = 1;
+        } else {
+            evr_claim_ref *ds_end = &nd->data.file.dependent_seeds[nd->data.file.dependent_seeds_len];
+            for(evr_claim_ref *ds = nd->data.file.dependent_seeds; ds != ds_end; ++ds){
+                if(evr_cmp_claim_ref(seed, *ds) == 0){
+                    collect = 1;
+                    break;
+                }
+            }
+        }
+        if(!collect){
+            continue;
+        }
+        if(evr_llbuf_s_append(affected_inodes, (void**)&ino) != evr_ok){
+            return evr_error;
+        }
+        *ino = nd - s->inodes;
+    }
     return evr_ok;
 }

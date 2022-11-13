@@ -22,8 +22,6 @@
 #include "evr-attr-index-client.h"
 #include "logger.h"
 
-#define evr_seed_desc_ns "https://evr.ma300k.de/seed-description/"
-
 struct evr_seed_desc_backlog_item {
     evr_claim_ref seed;
     size_t traces_len;

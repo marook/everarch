@@ -151,11 +151,13 @@ void test_empty_llbuf_s(){
 void test_filled_llbuf_s(){
     struct evr_llbuf_s llb;
     evr_init_llbuf_s(&llb, sizeof(struct a_child));
+    assert_msg(llb.block_count == 0, "But was %zu", llb.block_count);
+    assert(llb.child_count == 0);
     struct a_child *c;
     assert(is_ok(evr_llbuf_s_append(&llb, (void**)&c)));
     assert(c);
-    assert(llb.block_count = 1);
-    assert(llb.child_count = 1);
+    assert(llb.block_count == 1);
+    assert(llb.child_count == 1);
     c->i = 42;
     c->c = 'x';
     struct evr_llbuf_s_iter it;
