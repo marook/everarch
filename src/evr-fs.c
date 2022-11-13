@@ -58,6 +58,7 @@ static char args_doc[] = "TRANSFORMATION MOUNT_POINT";
 #define arg_index_port 261
 #define arg_accepted_gpg_key 262
 #define arg_allow_other 263
+#define arg_log_path 264
 
 #define max_traces_len 64
 
@@ -108,6 +109,8 @@ struct evr_fs_cfg {
      * gid of the owner of the virtual files and directories.
      */
     gid_t gid;
+
+    char *log_path;
 };
 
 struct evr_fs_cfg cfg;
@@ -126,6 +129,7 @@ static struct argp_option options[] = {
     {"single-thread", 's', NULL, 0, "The fuse layer will be single threaded."},
     {"oallow-other", arg_allow_other, NULL, 0, "The file system will be accessible by other users. Requires the user_allow_other option to be set in the global fuse configuration."},
     {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
+    {"log", arg_log_path, "FILE", 0, "A file to which log output messages will be appended. By default logs are written to stdout."},
     {0},
 };
 
@@ -188,6 +192,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         evr_push_n(&bp, arg, arg_size);
         break;
     }
+    case arg_log_path:
+        evr_replace_str(cfg->log_path, arg);
+        break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
         default:
@@ -256,6 +263,7 @@ int main(int argc, char *argv[]) {
     cfg.verify_ctx = NULL;
     cfg.uid = getuid();
     cfg.gid = getgid();
+    cfg.log_path = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -266,6 +274,9 @@ int main(int argc, char *argv[]) {
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, &cfg);
+    if(evr_setup_log(cfg.log_path) != evr_ok){
+        goto out_with_free_cfg;
+    }
     cfg.verify_ctx = evr_build_verify_ctx(cfg.accepted_gpg_fprs);
     if(!cfg.verify_ctx){
         goto out_with_free_cfg;
@@ -333,6 +344,7 @@ int main(int argc, char *argv[]) {
             cfg.index_port,
             cfg.transformation,
             cfg.mount_point,
+            cfg.log_path,
         };
         void **tbfree_end = &tbfree[static_len(tbfree)];
         for(void **it = tbfree; it != tbfree_end; ++it){
@@ -351,6 +363,9 @@ int main(int argc, char *argv[]) {
     xsltCleanupGlobals();
     xmlCleanupParser();
     evr_tls_free();
+    if(evr_teardown_log() != evr_ok){
+        ret = 1;
+    }
     return ret;
 }
 

@@ -24,11 +24,34 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
+
+#include "errors.h"
 
 int evr_log_fd = STDOUT_FILENO;
 char *evr_log_app = "";
 
 const char *log_date_format = "%Y-%m-%dT%H:%M:%S";
+
+int evr_setup_log(char *log_file){
+    if(log_file){
+        int fd = open(log_file, O_WRONLY | O_APPEND);
+        if(fd < 0){
+            return evr_error;
+        }
+        evr_log_fd = fd;
+    }
+    return evr_ok;
+}
+
+int evr_teardown_log(){
+    if(evr_log_fd > 2){
+        if(close(evr_log_fd) != 0){
+            return evr_error;
+        }
+    }
+    return evr_ok;
+}
 
 void evr_log_va(const char *level, const char *fmt, va_list args);
 
