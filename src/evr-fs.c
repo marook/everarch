@@ -223,6 +223,7 @@ static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
 }
 
 static xsltStylesheet *transformation;
+static mtx_t inode_set_lock;
 static struct evr_inode_set inode_set;
 static struct evr_open_file_set open_files;
 
@@ -297,8 +298,11 @@ int main(int argc, char *argv[]) {
     if(!transformation){
         goto out_with_free_cfg;
     }
-    if(evr_init_inode_set(&inode_set) != evr_ok){
+    if(mtx_init(&inode_set_lock, mtx_recursive) != thrd_success){
         goto out_with_free_transformation;
+    }
+    if(evr_init_inode_set(&inode_set) != evr_ok){
+        goto out_with_destroy_inode_set_lock;
     }
     {
         struct evr_file ic;
@@ -331,6 +335,8 @@ int main(int argc, char *argv[]) {
     }
  out_with_empty_inode_set:
     evr_empty_inode_set(&inode_set);
+ out_with_destroy_inode_set_lock:
+    mtx_destroy(&inode_set_lock);
  out_with_free_transformation:
     if(transformation){
         xsltFreeStylesheet(transformation);
@@ -505,7 +511,9 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     if(evr_collect_dependent_seeds(desc_doc, &dependent_seeds_len, &dependent_seeds, seed) != evr_ok){
         goto out_with_free_files_doc;
     }
-    // TODO lock inodes???
+    if(mtx_lock(&inode_set_lock) != thrd_success){
+        goto out_with_free_dependent_seeds;
+    }
     evr_inode_remove_by_seed(inode_set.inodes, inode_set.inodes_len, seed);
     evr_claim_ref *ds = NULL;
     for(xmlNode *fn = evr_first_file_node(file_set); fn; fn = evr_next_file_node(fn)){
@@ -513,7 +521,7 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
             size_t size = evr_claim_ref_size * dependent_seeds_len;
             ds = malloc(size);
             if(!ds){
-                goto out_with_free_dependent_seeds;
+                goto out_with_unlock_inode_set_lock;
             }
             memcpy(ds, dependent_seeds, size);
         }
@@ -525,7 +533,7 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
             log_error("Unable to parse XML file node based on seed %s: %s", seed_str, fn_str);
             free(fn_str);
             free(ds);
-            goto out_with_free_dependent_seeds;
+            goto out_with_unlock_inode_set_lock;
         }
 #ifdef EVR_LOG_DEBUG
         {
@@ -540,7 +548,7 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
         if(ino == 0){
             evr_free_fs_file(f);
             free(ds);
-            goto out_with_free_dependent_seeds;
+            goto out_with_unlock_inode_set_lock;
         }
         struct evr_inode *nd = &inode_set.inodes[ino];
         nd->created = f->created;
@@ -553,6 +561,11 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
         evr_free_fs_file(f);
     }
     ret = evr_ok;
+ out_with_unlock_inode_set_lock:
+    if(mtx_unlock(&inode_set_lock) != thrd_success){
+        evr_panic("Unable to unlock inode_set_lock");
+        ret = evr_error;
+    }
  out_with_free_dependent_seeds:
     free(dependent_seeds);
  out_with_free_files_doc:
@@ -662,21 +675,27 @@ static const struct fuse_lowlevel_ops evr_fs_oper = {
     .read = evr_fs_read,
 };
 
+void evr_lock_inode_set_or_panic();
+void evr_unlock_inode_set_or_panic();
 struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino);
 
 static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
     log_debug("fuse lookup with parent inode %d the name %s", (int)parent, name);
+    evr_lock_inode_set_or_panic();
     struct evr_inode *pnd = evr_get_inode(req, parent);
     if(!pnd){
-        return;
+        if(fuse_reply_err(req, ENOENT) != 0){
+            evr_panic("Unable to report error on get inode %d", (int)parent);
+        }
+        goto out_with_unlock_inode_set;
     }
     if(pnd->type != evr_inode_type_dir){
         log_error("Inode %d is not a directory", (int)parent);
         if(fuse_reply_err(req, ENOTDIR) != 0){
             evr_panic("Unable to report lookup ENOTDIR error for name %s", name);
         }
-        return;
+        goto out_with_unlock_inode_set;
     }
     struct evr_inode_dir *dir = &pnd->data.dir;
     fuse_ino_t *c_end = &dir->children[dir->children_len];
@@ -690,33 +709,45 @@ static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
         e.ino = *c;
         e.attr_timeout = 1.0;
         e.entry_timeout = 1.0;
+        // TODO we should call a version of evr_fs_stat here which
+        // does not lock inode_set_lock itself. inode_set_lock is
+        // already locked by us. if we achieve this we may make the
+        // inode_set_lock mtx_plain again instead of mtx_recursive.
         if(evr_fs_stat(req, &e.attr, *c) != evr_ok){
             // error has been reported by evr_fs_stat
-            return;
+            goto out_with_unlock_inode_set;
         }
         fuse_reply_entry(req, &e);
-        return;
+        goto out_with_unlock_inode_set;
     }
     if(fuse_reply_err(req, ENOENT) != 0){
         evr_panic("Unable to report lookup ENOENT error for name %s", name);
     }
+ out_with_unlock_inode_set:
+    evr_unlock_inode_set_or_panic();
 }
 
 static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
     log_debug("fuse getattr with inode %d", (int)ino);
+    evr_lock_inode_set_or_panic();
     struct stat st;
     if(evr_fs_stat(req, &st, ino) != evr_ok){
-        return;
+        // error has been reported by evr_fs_stat
+        goto out_with_unlock_inode_set;
     }
     if(fuse_reply_attr(req, &st, 1.0) != 0){
         evr_panic("Unable to report reply for attr with inode %d", (int)ino);
     }
+ out_with_unlock_inode_set:
+    evr_unlock_inode_set_or_panic();
 }
 
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
     struct evr_inode *nd = evr_get_inode(req, ino);
     if(!nd){
-        // error has been reported by evr_get_inode
+        if(fuse_reply_err(req, ENOENT) != 0){
+            evr_panic("Unable to report error on get inode %d", (int)ino);
+        }
         return evr_error;
     }
     memset(st, 0, sizeof(*st));
@@ -759,6 +790,7 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
 static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
     int err = EINVAL;
     log_debug("fuse readdir with inode %d (size %zu, off %zu)", (int)ino, size, off);
+    evr_lock_inode_set_or_panic();
     struct evr_inode *nd = evr_get_inode(req, ino);
     if(nd->type != evr_inode_type_dir){
         log_error("Inode %d is not a directory", (int)ino);
@@ -789,14 +821,17 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
         }
     }
     free(buf);
+    evr_unlock_inode_set_or_panic();
     return;
  fail:
     if(fuse_reply_err(req, err) != 0){
         evr_panic("Unable to report error %d on readdir", err);
     }
+    evr_unlock_inode_set_or_panic();
     return;
  failed_reply:
     free(buf);
+    evr_unlock_inode_set_or_panic();
     evr_panic("Failed to reply readdir for inode %d", (int)ino);
 }
 
@@ -807,12 +842,17 @@ struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref cl
 static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
     int err = EINVAL;
     log_debug("fuse open inode %d", (int)ino);
+    evr_lock_inode_set_or_panic();
     struct evr_inode *nd = evr_get_inode(req, ino);
     if(nd->type != evr_inode_type_file){
         log_error("Inode %d is not a file", (int)ino);
         err = EISDIR;
+        evr_unlock_inode_set_or_panic();
         goto fail;
     }
+    evr_claim_ref file_ref;
+    memcpy(file_ref, nd->data.file.file_ref, evr_claim_ref_size);
+    evr_unlock_inode_set_or_panic();
     if(evr_allocate_open_file(&open_files, &fi->fh) != evr_ok){
         goto fail;
     }
@@ -821,7 +861,7 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
         log_error("Unable to connect to glacier when opening file with inode %d", (int)ino);
         goto fail_with_close_open_file;
     }
-    of->claim = evr_fetch_file_claim(&of->gc, nd->data.file.file_ref);
+    of->claim = evr_fetch_file_claim(&of->gc, file_ref);
     if(!of->claim){
         log_error("Unable to fetch file claim for inode %d", (int)ino);
         goto fail_with_close_open_file;
@@ -837,6 +877,18 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
  fail:
     if(fuse_reply_err(req, err) != 0){
         evr_panic("Unable to report error %d on open", err);
+    }
+}
+
+void evr_lock_inode_set_or_panic(){
+    if(mtx_lock(&inode_set_lock) != thrd_success){
+        evr_panic("Unable to lock inode set");
+    }
+}
+
+void evr_unlock_inode_set_or_panic(){
+    if(mtx_unlock(&inode_set_lock) != thrd_success){
+        evr_panic("Unable to unlock inode set.");
     }
 }
 
@@ -918,19 +970,14 @@ static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, 
 struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
     if(ino < FUSE_ROOT_ID || ino >= inode_set.inodes_len){
         log_debug("readdir failed because inode %d out of bounds", (int)ino);
-        goto fail_with_enoent;
+        return NULL;
     }
     struct evr_inode *nd = &inode_set.inodes[ino];
     if(nd->type == evr_inode_type_unlinked){
         log_debug("readdir failed because inode %d is unlinked", (int)ino);
-        goto fail_with_enoent;
+        return NULL;
     }
     return nd;
- fail_with_enoent:
-    if(fuse_reply_err(req, ENOENT) != 0){
-        evr_panic("Unable to report error on get inode %d", (int)ino);
-    }
-    return NULL;
 }
 
 int run_fuse(char *program, struct evr_fs_cfg *cfg){
@@ -1073,7 +1120,12 @@ int evr_collect_affected_seeds(struct evr_llbuf_s *affected_seeds, evr_claim_ref
     int ret = evr_error;
     struct evr_llbuf_s affected_inodes;
     evr_init_llbuf_s(&affected_inodes, sizeof(fuse_ino_t));
-    if(evr_collect_affected_inodes(&affected_inodes, &inode_set, seed) != evr_ok){
+    if(mtx_lock(&inode_set_lock) != thrd_success){
+        goto out;
+    }
+    int collect_res = evr_collect_affected_inodes(&affected_inodes, &inode_set, seed);
+    evr_unlock_inode_set_or_panic();
+    if(collect_res != evr_ok){
         goto out;
     }
     struct evr_claim_ref_tiny_set *seed_set = evr_create_claim_ref_tiny_set(128);
