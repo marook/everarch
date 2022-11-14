@@ -247,6 +247,7 @@ int main(int argc, char *argv[]) {
     evr_init_basics();
     evr_tls_init();
     xmlInitParser();
+    gcry_check_version(EVR_GCRY_MIN_VERSION);
     evr_init_signatures();
     cfg.storage_host = strdup(evr_glacier_storage_host);
     cfg.storage_port = strdup(to_string(evr_glacier_storage_port));
