@@ -149,10 +149,10 @@ EOF
 
 mount_evr_fs() {
     xslt_ref="$1"
-    rm -rf -- "${evr_fs_mnt_dir}"
+    rm -rf -- "${evr_fs_mnt_dir}" evr-fs.log
     mkdir -p -- "${evr_fs_mnt_dir}"
     echo "Mounting evr-fs…"
-    evr-fs "xslt:blob:${xslt_ref}" ${evr_fs_opts} "${evr_fs_mnt_dir}"
+    evr-fs --log evr-fs.log "xslt:blob:${xslt_ref}" ${evr_fs_opts} "${evr_fs_mnt_dir}"
 }
 
 umount_evr_fs() {
