@@ -574,6 +574,11 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
  out_with_free_desc_doc:
     xmlFreeDoc(desc_doc);
  out:
+    {
+        evr_claim_ref_str seed_str;
+        evr_fmt_claim_ref(seed_str, seed);
+        log_debug("Populated inodes with seed %s and result %d", seed_str, ret);
+    }
     return ret;
 }
 
@@ -682,19 +687,19 @@ struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino);
 
 static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
-    log_debug("fuse lookup with parent inode %d the name %s", (int)parent, name);
+    log_debug("fuse request %p lookup with parent inode %d the name %s", req, (int)parent, name);
     evr_lock_inode_set_or_panic();
     struct evr_inode *pnd = evr_get_inode(req, parent);
     if(!pnd){
         if(fuse_reply_err(req, ENOENT) != 0){
-            evr_panic("Unable to report error on get inode %d", (int)parent);
+            evr_panic("fuse request %p unable to report error on get inode %d", req, (int)parent);
         }
         goto out_with_unlock_inode_set;
     }
     if(pnd->type != evr_inode_type_dir){
-        log_error("Inode %d is not a directory", (int)parent);
+        log_error("fuse request %p detected inode %d is not a directory", req, (int)parent);
         if(fuse_reply_err(req, ENOTDIR) != 0){
-            evr_panic("Unable to report lookup ENOTDIR error for name %s", name);
+            evr_panic("fuse request %p unable to report lookup ENOTDIR error for name %s", req, name);
         }
         goto out_with_unlock_inode_set;
     }
@@ -718,11 +723,13 @@ static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
             // error has been reported by evr_fs_stat
             goto out_with_unlock_inode_set;
         }
+        log_debug("fuse request %p responds child inode %d", req, (int)*c);
         fuse_reply_entry(req, &e);
         goto out_with_unlock_inode_set;
     }
+    log_debug("fuse request %p did not find matching child", req);
     if(fuse_reply_err(req, ENOENT) != 0){
-        evr_panic("Unable to report lookup ENOENT error for name %s", name);
+        evr_panic("fuse request %p unable to report lookup ENOENT error for name %s", req, name);
     }
  out_with_unlock_inode_set:
     evr_unlock_inode_set_or_panic();
@@ -970,12 +977,12 @@ static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, 
 
 struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
     if(ino < FUSE_ROOT_ID || ino >= inode_set.inodes_len){
-        log_debug("readdir failed because inode %d out of bounds", (int)ino);
+        log_debug("fuse request %p readdir failed because inode %d out of bounds", req, (int)ino);
         return NULL;
     }
     struct evr_inode *nd = &inode_set.inodes[ino];
     if(nd->type == evr_inode_type_unlinked){
-        log_debug("readdir failed because inode %d is unlinked", (int)ino);
+        log_debug("fuse request %p readdir failed because inode %d is unlinked", req, (int)ino);
         return NULL;
     }
     return nd;
