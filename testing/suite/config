@@ -186,6 +186,7 @@ wait_for_port() {
 
 wait_for_file() {
     local fn="$1"
+    echo "Waiting for file ${fn}…"
     SECONDS=0
     sleep 0.1
     while true
@@ -201,6 +202,7 @@ wait_for_file() {
         fi
         sleep 0.2
     done
+    echo "Got file ${fn}"
 }
 
 ensure_port_available() {
