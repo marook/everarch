@@ -33,6 +33,13 @@ then
     . "${script_dir}/config.local"
 fi
 
+# evr_now prints the current timestamp in a format as it can be used
+# in claim-set creation attributes. for example
+# 2022-11-14T19:11:16.347354Z.
+evr_now() {
+    date -u '+%Y-%m-%dT%H:%M:%S.%N' | sed 's/\(.*\.[0-9]\{6\}\)[0-9]*/\1Z/'
+}
+
 allocate_ports() {
     ensure_port_available "${glacier_storage_port}"
     ensure_port_available "${secondary_glacier_storage_port}"

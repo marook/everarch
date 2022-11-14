@@ -31,13 +31,13 @@ EOF
 fs_xslt_ref=`evr put < fs.xslt`
 msg_file_ref=`echo 'hello world!' | evr post-file --title 'msg.txt'`
 dd bs=4000 count=300 if=/dev/urandom | evr post-file --title 'little-random.bin'
-now=`date -u '+%Y-%m-%dT%H:%M:%S'`
+now=`evr_now`
 category_ref=`evr sign-put -f 1 <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
     xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="${now}.999999Z"
+    dc:created="${now}"
     >
   <attr>
     <a op="=" k="title" v="my-category"/>
@@ -49,7 +49,7 @@ evr sign-put -f 1 <<EOF
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
     xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="${now}.999999Z"
+    dc:created="${now}"
     >
   <attr seed="${msg_file_ref}">
     <a op="=" k="category" v="${category_ref}-0000"/>
@@ -114,13 +114,13 @@ then
 fi
 
 # change dependant seed
-now=`date -u '+%Y-%m-%dT%H:%M:%S'`
+now=`evr_now`
 evr sign-put -f 1 <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <claim-set
     xmlns="https://evr.ma300k.de/claims/"
     xmlns:dc="http://purl.org/dc/terms/"
-    dc:created="${now}.999999Z"
+    dc:created="${now}"
     >
   <attr seed="${category_ref}-0000">
     <a op="=" k="title" v="new-category"/>
