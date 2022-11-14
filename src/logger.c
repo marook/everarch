@@ -35,7 +35,7 @@ const char *log_date_format = "%Y-%m-%dT%H:%M:%S";
 
 int evr_setup_log(char *log_file){
     if(log_file){
-        int fd = open(log_file, O_WRONLY | O_CREAT | O_APPEND);
+        int fd = open(log_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
         if(fd < 0){
             return evr_error;
         }
