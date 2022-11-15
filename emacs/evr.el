@@ -121,8 +121,7 @@ The optional env argument may be the name of an environment from
 (defun evr-previous-seed-ref ()
   (interactive)
   (when (re-search-backward (concat "\n" evr--claim-ref-pattern) nil t)
-    (forward-char 1)
-    (evr-follow-claim-ref-xml)))
+    (forward-char 1)))
 
 (defun evr-next-seed-ref ()
   (interactive)
@@ -132,9 +131,7 @@ The optional env argument may be the name of an environment from
     (if (eq (re-search-forward (concat "\n" evr--claim-ref-pattern) nil t) nil)
         (goto-char point-before)
       (progn
-        (re-search-backward evr--claim-ref-pattern)
-        (evr-follow-claim-ref-xml)
-        ))))
+        (re-search-backward evr--claim-ref-pattern)))))
 
 (defface evr-claim-ref
   '((t (:inherit link)))
