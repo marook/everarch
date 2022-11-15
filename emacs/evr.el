@@ -561,6 +561,15 @@ This function is expected to be used with templar templates."
        )
       )
      )
+    ("archive"
+     (
+      (;; vars
+       )
+      (;; template
+       "<archive" ,(evr-put-seed-attr) "/>"
+       )
+      )
+     )
     )
   "evr-claim-templates references all templar templates which
 produce claims.
