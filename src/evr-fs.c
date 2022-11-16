@@ -1124,6 +1124,13 @@ int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref,
  out_with_free_affected_seeds:
     evr_llbuf_s_empty(&affected_seeds, NULL);
  out:
+#ifdef EVR_LOG_DEBUG
+    {
+        evr_claim_ref_str seed_str;
+        evr_fmt_claim_ref(seed_str, seed);
+        log_debug("Seed %s update ended with status %d", seed_str, ret);
+    }
+#endif
     return ret;
 }
 
