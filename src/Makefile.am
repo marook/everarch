@@ -182,6 +182,7 @@ evr_fs_SOURCES = \
 	basics.c \
 	claims.c \
 	configp.c \
+	daemon.c \
 	dyn-mem.c \
 	evr-attr-index-client.c \
 	evr-fs.c \

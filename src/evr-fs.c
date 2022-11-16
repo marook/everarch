@@ -39,6 +39,7 @@
 #include "seed-desc.h"
 #include "claims.h"
 #include "open-files.h"
+#include "daemon.h"
 
 #define program_name "evr-fs"
 
@@ -1010,8 +1011,10 @@ int run_fuse(char *program, struct evr_fs_cfg *cfg){
     if(fuse_session_mount(se, cfg->mount_point) != 0) {
         goto out_with_free_signal_handlers;
     }
-    if(fuse_daemonize(cfg->foreground) != 0){
-        goto out_with_session_unmount;
+    if(!cfg->foreground){
+        if(evr_daemonize() != evr_ok){
+            goto out_with_session_unmount;
+        }
     }
     struct evr_index_watch_ctx watch_ctx;
     if(evr_start_index_watch(&watch_ctx) != evr_ok){
