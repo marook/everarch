@@ -59,7 +59,7 @@ int evr_daemonize(){
         goto out_with_close_null_fd;
     }
     {
-        char buf;
+        char buf = 1;
         if(write(waiter_fd[1], &buf, sizeof(buf)) != sizeof(buf)){
             log_error("Unable to signal fork completion to original process");
             goto out_with_close_null_fd;
