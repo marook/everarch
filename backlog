@@ -1,9 +1,3 @@
-* evr-tls should have unit tests
-there should be a unit test which opens a tls secured sever on some
-random port. then a connection to that same port should be opened.
-
-valgrind should validate some of the SSL context ref counting
-assumptions made in the code.
 * evr-fs crash during live updates                                      :bug:
 systemd output
 #+BEGIN_SRC

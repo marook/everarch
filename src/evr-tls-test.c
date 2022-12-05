@@ -64,28 +64,40 @@ int server_worker(void *context){
     SSL_CTX *ssl_ctx = evr_create_ssl_server_ctx("../testing/tls/glacier-cert.pem", "../testing/tls/glacier-key.pem");
     assert(ssl_ctx);
     struct evr_file c;
-    assert(is_ok(evr_tls_accept(&c, s, ssl_ctx)));
-    char buf[strlen(test_payload_a)];
-    log_debug("tls server reading");
-    assert(is_ok(read_n(&c, buf, strlen(test_payload_a), NULL, NULL)));
-    assert(memcmp(buf, test_payload_a, strlen(test_payload_a)) == 0);
-    log_debug("tls server writing");
-    assert(is_ok(write_n(&c, test_payload_b, strlen(test_payload_b))));
-    log_debug("tls server closing");
-    assert(c.close(&c) == 0);
+    for(int i = 0; i < 2; ++i){
+        assert(is_ok(evr_tls_accept(&c, s, ssl_ctx)));
+        char buf[strlen(test_payload_a)];
+        log_debug("tls server reading");
+        assert(is_ok(read_n(&c, buf, strlen(test_payload_a), NULL, NULL)));
+        assert(memcmp(buf, test_payload_a, strlen(test_payload_a)) == 0);
+        log_debug("tls server writing");
+        assert(is_ok(write_n(&c, test_payload_b, strlen(test_payload_b))));
+        log_debug("tls server closing");
+        assert(c.close(&c) == 0);
+    }
     SSL_CTX_free(ssl_ctx);
     assert(close(s) == 0);
     return evr_ok;
 }
 
+void client_worker_tls_connect(struct evr_cert_cfg *ssl_cfg);
+void client_worker_tls_connect_once(struct evr_cert_cfg *ssl_cfg);
+
 int client_worker(void *context){
     struct client_server_ctx *ctx = context;
     struct evr_cert_cfg *ssl_cfg = NULL;
     assert(is_ok(evr_push_cert(&ssl_cfg, "localhost", tls_test_port, "../testing/tls/glacier-cert.pem")));
-    SSL_CTX *ssl_ctx = evr_create_ssl_client_ctx("localhost", tls_test_port, ssl_cfg);
-    evr_free_cert_chain(ssl_cfg);
-    assert(ssl_ctx);
     assert(mtx_lock(&ctx->server_ready) == thrd_success);
+    client_worker_tls_connect(ssl_cfg);
+    client_worker_tls_connect_once(ssl_cfg);
+    evr_free_cert_chain(ssl_cfg);
+    assert(mtx_unlock(&ctx->server_ready) == thrd_success);
+    return evr_ok;
+}
+
+void client_worker_tls_connect(struct evr_cert_cfg *ssl_cfg){
+    SSL_CTX *ssl_ctx = evr_create_ssl_client_ctx("localhost", tls_test_port, ssl_cfg);
+    assert(ssl_ctx);
     struct evr_file c;
     log_debug("tls client connecting");
     assert(is_ok(evr_tls_connect(&c, "localhost", tls_test_port, ssl_ctx)));
@@ -98,8 +110,19 @@ int client_worker(void *context){
     log_debug("tls client closing");
     assert(c.close(&c) == 0);
     SSL_CTX_free(ssl_ctx);
-    assert(mtx_unlock(&ctx->server_ready) == thrd_success);
-    return evr_ok;
+}
+
+void client_worker_tls_connect_once(struct evr_cert_cfg *cert_cfg){
+    struct evr_file c;
+    assert(is_ok(evr_tls_connect_once(&c, "localhost", tls_test_port, cert_cfg)));
+    log_debug("tls client writing");
+    assert(is_ok(write_n(&c, test_payload_a, strlen(test_payload_a))));
+    log_debug("tls client reading");
+    char buf[strlen(test_payload_b)];
+    assert(is_ok(read_n(&c, buf, strlen(test_payload_b), NULL, NULL)));
+    assert(memcmp(buf, test_payload_b, strlen(test_payload_b)) == 0);
+    log_debug("tls client closing");
+    assert(c.close(&c) == 0);
 }
 
 void test_evr_cert_cfg(){
