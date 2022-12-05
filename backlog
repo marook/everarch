@@ -1,7 +1,3 @@
-* evr-fs redirect stdout and stderr to log file
-right now evr-fs output is redirected to /dev/null on daemonize. if a
-log file is specified the output should be redirected to the log file
-instead.
 * evr-tls should have unit tests
 there should be a unit test which opens a tls secured sever on some
 random port. then a connection to that same port should be opened.
