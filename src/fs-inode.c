@@ -162,6 +162,8 @@ fuse_ino_t evr_inode_append_dir(struct evr_inode **inodes, size_t *inodes_len, f
     nd->type = evr_inode_type_dir;
     nd->data.dir.children_len = 0;
     nd->data.dir.children = NULL;
+    nd->last_modified = 0;
+    nd->created = 0;
     return n;
 }
 
