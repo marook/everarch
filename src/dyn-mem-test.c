@@ -24,6 +24,7 @@
 #include "assert.h"
 #include "dyn-mem.h"
 #include "test.h"
+#include "logger.h"
 
 int is_ignored(int c);
 
@@ -170,6 +171,23 @@ void test_filled_llbuf_s(){
     evr_llbuf_s_empty(&llb, NULL);
 }
 
+void test_llbuf_s_grow(){
+    struct evr_llbuf_s llb;
+    evr_init_llbuf_s(&llb, sizeof(struct a_child));
+    assert_msg(llb.block_count == 0, "But was %zu", llb.block_count);
+    assert(llb.child_count == 0);
+    struct a_child *c;
+    for(size_t i = 0; i < llb.block_child_count + 1; ++i){
+        assert(is_ok(evr_llbuf_s_append(&llb, (void**)&c)));
+        assert(c);
+        c->i = i;
+        c->c = 'x';
+    }
+    assert(llb.child_count > 0);
+    log_debug("Produced %zu children", llb.child_count);
+    evr_llbuf_s_empty(&llb, NULL);
+}
+
 int main(){
     evr_init_basics();
     run_test(test_fill_dynamic_array);
@@ -182,5 +200,6 @@ int main(){
     run_test(test_llbuf);
     run_test(test_empty_llbuf_s);
     run_test(test_filled_llbuf_s);
+    run_test(test_llbuf_s_grow);
     return 0;
 }

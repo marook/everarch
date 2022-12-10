@@ -236,7 +236,7 @@ int evr_llbuf_s_append(struct evr_llbuf_s *llb, void **child){
     if(llb->child_count + 1 >= llb->block_count * llb->block_child_count){
         // grow llbuf
         struct evr_buf_pos bp;
-        struct evr_llbuf *blk = evr_create_llbuf(&bp, llb->child_size);
+        struct evr_llbuf *blk = evr_create_llbuf(&bp, llb->block_child_count * llb->child_size);
         if(!blk){
             return evr_error;
         }
