@@ -77,6 +77,27 @@ $4 = 8
 (gdb) p nb
 $5 = 32
 #+END_SRC
+
+valgrind says:
+#+BEGIN_SRC
+==1962059== Invalid write of size 8
+==1962059==    at 0x1126F5: evr_collect_affected_seeds (evr-fs.c:1188)
+==1962059==    by 0x1127AE: evr_index_watch_worker_visit_changed_seed (evr-fs.c:1096)
+==1962059==    by 0x110625: evr_attri_read_watch (evr-attr-index-client.c:248)
+==1962059==    by 0x110CC3: evr_index_watch_worker (evr-fs.c:1073)
+==1962059==    by 0x48CFF59: start_thread (pthread_create.c:474)
+==1962059==    by 0x50D1AEE: clone (clone.S:95)
+==1962059==  Address 0x9c7c99e is 0 bytes after a block of size 46 alloc'd
+==1962059==    at 0x483877F: malloc (vg_replace_malloc.c:307)
+==1962059==    by 0x10FF05: evr_create_llbuf (dyn-mem.c:191)
+==1962059==    by 0x10FF05: evr_llbuf_s_append (dyn-mem.c:239)
+==1962059==    by 0x11260F: evr_collect_affected_seeds (evr-fs.c:1162)
+==1962059==    by 0x1127AE: evr_index_watch_worker_visit_changed_seed (evr-fs.c:1096)
+==1962059==    by 0x110625: evr_attri_read_watch (evr-attr-index-client.c:248)
+==1962059==    by 0x110CC3: evr_index_watch_worker (evr-fs.c:1073)
+==1962059==    by 0x48CFF59: start_thread (pthread_create.c:474)
+==1962059==    by 0x50D1AEE: clone (clone.S:95)
+#+END_SRC
 * evr-fs integration test which restarts evr-attr-index
 evr-fs should work just like before the restart.
 * evr-fs integration test which restarts evr-glacier-storage
