@@ -135,4 +135,7 @@ then
     exit 1
 fi
 
+echo 'live content' | evr post-file --title "new-live-file.txt"
+wait_for_file 'mnt/test-subdir/new-live-file.txt'
+
 echo "Stopping…"

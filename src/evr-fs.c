@@ -1150,6 +1150,17 @@ int evr_collect_affected_seeds(struct evr_llbuf_s *affected_seeds, evr_claim_ref
     if(!seed_set){
         goto out_with_free_affected_inodes;
     }
+    { // add root seed
+        int add_res = evr_claim_ref_tiny_set_add(seed_set, seed);
+        if(add_res != evr_ok){
+            goto out_with_free_seed_set;
+        }
+        evr_claim_ref *s;
+        if(evr_llbuf_s_append(affected_seeds, (void**)&s) != evr_ok){
+            goto out_with_free_seed_set;
+        }
+        memcpy(*s, seed, evr_claim_ref_size);
+    }
     struct evr_llbuf_s_iter ino_it;
     evr_init_llbuf_s_iter(&ino_it, &affected_inodes);
     evr_claim_ref *s;
