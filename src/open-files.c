@@ -179,6 +179,7 @@ int evr_allocate_open_file(struct evr_open_file_set *ofs, uint64_t *fh){
         }
         f->open = 1;
         *fh = f - ofs->files;
+        evr_file_unbound(&f->gc);
         ret = evr_ok;
         break;
     }
@@ -205,6 +206,7 @@ int evr_close_open_file(struct evr_open_file_set *ofs, uint64_t fh){
     f->claim = NULL;
     free(f->cached_slice_buf);
     f->cached_slice_buf = NULL;
+    f->open = 0;
     ret = evr_ok;
  out_with_unlock:
     if(mtx_unlock(&f->lock) != thrd_success){

@@ -863,6 +863,7 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
     memcpy(file_ref, nd->data.file.file_ref, evr_claim_ref_size);
     evr_unlock_inode_set_or_panic();
     if(evr_allocate_open_file(&open_files, &fi->fh) != evr_ok){
+        log_error("Unable to allocate file handle for inode %d", (int)ino);
         goto fail;
     }
     struct evr_open_file *of = &open_files.files[fi->fh];
@@ -878,6 +879,7 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
     if(fuse_reply_open(req, fi) != 0){
         goto fail_with_close_open_file;
     }
+    log_debug("opened file handle %u for inode %d", (unsigned int)fi->fh, (int)ino);
     return;
  fail_with_close_open_file:
     if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
@@ -887,6 +889,7 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
     if(fuse_reply_err(req, err) != 0){
         evr_panic("Unable to report error %d on open", err);
     }
+    log_debug("fuse open inode %d failed with error %d", err);
 }
 
 void evr_lock_inode_set_or_panic(){

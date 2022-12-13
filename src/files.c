@@ -99,6 +99,23 @@ int evr_file_fd_close(struct evr_file *f){
     return close(evr_file_get_fd(f));
 }
 
+int evr_file_unbound_close(struct evr_file *f);
+
+void evr_file_unbound(struct evr_file *f){
+    f->ctx.i = -1;
+    f->get_fd = evr_file_fd_get_fd;
+    f->wait_for_data = evr_file_select;
+    f->pending = evr_file_fd_pending;
+    f->received_shutdown = evr_file_fd_received_shutdown;
+    f->read = evr_file_fd_read;
+    f->write = evr_file_fd_write;
+    f->close = evr_file_unbound_close;
+}
+
+int evr_file_unbound_close(struct evr_file *f){
+    return 0;
+}
+
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size) {
     size_t total_read = 0;
     while(1){

@@ -91,6 +91,8 @@ struct evr_file {
 
 void evr_file_bind_fd(struct evr_file *f, int fd);
 
+void evr_file_unbound(struct evr_file *f);
+
 int evr_file_select(struct evr_file *f, int timeout);
 
 int read_fd(struct dynamic_array **buffer, int fd, size_t max_size);

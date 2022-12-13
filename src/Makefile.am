@@ -42,6 +42,7 @@ evr_c_unit_tests = \
 	glacier-test \
 	keys-test \
 	notify-test \
+	open-files-test \
 	queue-test \
 	rollsum-test \
 	seed-desc-test \
@@ -330,6 +331,17 @@ notify_test_SOURCES = \
 	notify.c \
 	notify-test.c \
 	queue.c
+
+open_files_test_SOURCES = \
+	assert.c \
+	basics.c \
+	dyn-mem.c \
+	files.c \
+	keys.c \
+	logger.c \
+	open-files.c \
+	open-files-test.c
+open_files_test_LDADD = $(LIBGCRYPT_LIBS)
 
 queue_test_SOURCES = \
 	assert.c \
