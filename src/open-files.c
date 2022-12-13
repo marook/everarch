@@ -201,7 +201,7 @@ int evr_close_open_file(struct evr_open_file_set *ofs, uint64_t fh){
         evr_panic("Unable to close open file glacier connection for %u", (long int)fh);
         goto out_with_unlock;
     }
-    evr_file_bind_fd(&f->gc, 0);
+    evr_file_unbound(&f->gc);
     free(f->claim);
     f->claim = NULL;
     free(f->cached_slice_buf);
