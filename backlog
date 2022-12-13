@@ -1,3 +1,86 @@
+* deadlock when opening many files via evr-fs :bug:
+opening and closing many files leads do a deadlock.
+
+evr-fs output filtered just for the open and release logs:
+#+BEGIN_SRC
+2022-12-13T20:08:10 fD fuse open inode 53
+2022-12-13T20:08:11 fD fuse release file handle 0 for inode 53
+2022-12-13T20:08:12 fD fuse open inode 91
+2022-12-13T20:08:13 fD fuse release file handle 1 for inode 91
+2022-12-13T20:08:13 fD fuse open inode 90
+2022-12-13T20:08:15 fD fuse release file handle 2 for inode 90
+2022-12-13T20:08:15 fD fuse open inode 89
+2022-12-13T20:08:15 fD fuse release file handle 3 for inode 89
+2022-12-13T20:08:16 fD fuse open inode 88
+2022-12-13T20:08:17 fD fuse release file handle 4 for inode 88
+2022-12-13T20:08:17 fD fuse open inode 87
+2022-12-13T20:08:18 fD fuse release file handle 5 for inode 87
+2022-12-13T20:08:18 fD fuse open inode 86
+2022-12-13T20:08:19 fD fuse release file handle 6 for inode 86
+2022-12-13T20:08:20 fD fuse open inode 85
+2022-12-13T20:08:21 fD fuse release file handle 7 for inode 85
+2022-12-13T20:08:21 fD fuse open inode 84
+2022-12-13T20:08:21 fD fuse release file handle 8 for inode 84
+2022-12-13T20:08:22 fD fuse open inode 83
+2022-12-13T20:08:23 fD fuse release file handle 9 for inode 83
+2022-12-13T20:08:24 fD fuse open inode 82
+2022-12-13T20:08:24 fD fuse open inode 61
+2022-12-13T20:08:24 fD fuse release file handle 10 for inode 82
+2022-12-13T20:08:31 fD fuse release file handle 11 for inode 61
+2022-12-13T20:08:31 fD fuse open inode 79
+#+END_SRC
+
+successful open of inode 83
+#+BEGIN_SRC
+2022-12-13T20:08:22 fD fuse open inode 83
+2022-12-13T20:08:22 fD Use SSL cert /home/animation/.config/everarch/evr-glacier-storage-cert.pem for localhost:2561
+2022-12-13T20:08:22 fD Sending get sha3-224-edef8c2df3e1d13bd351ae697f31bc4f31ae6a4ef4a738f6118b2603 command to server
+2022-12-13T20:08:22 fD Storage responded with status code 0x20 and body size 69828
+2022-12-13T20:08:22 fD fuse read 32768 bytes from file handle 9 on inode 83 at offset 0
+2022-12-13T20:08:22 fD Sending get sha3-224-e4e36b921d7068286842d93bb03b4356ac50e1a6424c59a397a6d22b command to server
+2022-12-13T20:08:22 fD Storage responded with status code 0x20 and body size 118637
+2022-12-13T20:08:22 fD Read 32768 bytes at offset 0 from slice 0
+2022-12-13T20:08:22 fD fuse read 8192 bytes from file handle 9 on inode 83 at offset 228974592
+2022-12-13T20:08:22 fD Sending get sha3-224-bd1fce03752372244eb2aecdcb2ab0988df370103b82b74c2c17b0d4 command to server
+2022-12-13T20:08:22 fD Storage responded with status code 0x20 and body size 591592
+2022-12-13T20:08:22 fD Read 8192 bytes at offset 147038 from slice 701
+2022-12-13T20:08:22 fD fuse read 32768 bytes from file handle 9 on inode 83 at offset 228982784
+2022-12-13T20:08:22 fD Read 32768 bytes at offset 155230 from slice 701
+2022-12-13T20:08:22 fD fuse read 131072 bytes from file handle 9 on inode 83 at offset 229015552
+2022-12-13T20:08:22 fD Read 131072 bytes at offset 187998 from slice 701
+2022-12-13T20:08:22 fD fuse read 131072 bytes from file handle 9 on inode 83 at offset 229146624
+2022-12-13T20:08:22 fD Read 131072 bytes at offset 319070 from slice 701
+2022-12-13T20:08:22 fD fuse read 131072 bytes from file handle 9 on inode 83 at offset 229277696
+2022-12-13T20:08:22 fD Read 131072 bytes at offset 450142 from slice 701
+2022-12-13T20:08:22 fD fuse read 131072 bytes from file handle 9 on inode 83 at offset 229408768
+2022-12-13T20:08:22 fD Read 10377 bytes at offset 581214 from slice 701
+2022-12-13T20:08:22 fD Sending get sha3-224-f16b06ad790cdac4a7e32cad1b222a58ad4a050f058f5a2b86bc2421 command to server
+2022-12-13T20:08:22 fD Storage responded with status code 0x20 and body size 322176
+2022-12-13T20:08:22 fD Read 120695 bytes at offset 0 from slice 702
+2022-12-13T20:08:22 fD fuse read 131072 bytes from file handle 9 on inode 83 at offset 229539840
+2022-12-13T20:08:22 fD Read 131072 bytes at offset 120695 from slice 702
+2022-12-13T20:08:22 fD fuse read 73728 bytes from file handle 9 on inode 83 at offset 229670912
+2022-12-13T20:08:22 fD Read 70408 bytes at offset 251767 from slice 702
+2022-12-13T20:08:22 fD fuse read 81920 bytes from file handle 9 on inode 83 at offset 32768
+2022-12-13T20:08:22 fD Sending get sha3-224-e4e36b921d7068286842d93bb03b4356ac50e1a6424c59a397a6d22b command to server
+2022-12-13T20:08:22 fD Storage responded with status code 0x20 and body size 118637
+2022-12-13T20:08:22 fD Read 81920 bytes at offset 32768 from slice 0
+2022-12-13T20:08:22 fD fuse read 8192 bytes from file handle 9 on inode 83 at offset 72376320
+2022-12-13T20:08:22 fD Sending get sha3-224-77845935078af9eae2c1d9d656fd55d263e153b10161fdfc10f0f14e command to server
+2022-12-13T20:08:22 fD Storage responded with status code 0x20 and body size 787600
+2022-12-13T20:08:23 fD Read 8192 bytes at offset 478931 from slice 233
+2022-12-13T20:08:23 fD fuse read 65536 bytes from file handle 9 on inode 83 at offset 72384512
+2022-12-13T20:08:23 fD Read 65536 bytes at offset 487123 from slice 233
+2022-12-13T20:08:23 fD fuse release file handle 9 for inode 83
+#+END_SRC
+
+deadlocked open of inode 79
+#+BEGIN_SRC
+2022-12-13T20:08:31 fD fuse open inode 79
+2022-12-13T20:08:31 fD Use SSL cert /home/animation/.config/everarch/evr-glacier-storage-cert.pem for localhost:2561
+2022-12-13T20:08:31 fD Sending get sha3-224-8b9ab810bacc6fd2b59ba79a9272a44330654623a85f3161d7a4c672 command to server
+2022-12-13T20:08:31 fD Storage responded with status code 0x20 and body size 69063
+#+END_SRC
 * evr-fs integration test which restarts evr-attr-index
 evr-fs should work just like before the restart.
 * evr-fs integration test which restarts evr-glacier-storage
