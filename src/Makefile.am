@@ -51,7 +51,8 @@ evr_c_unit_tests = \
 
 check_PROGRAMS = \
 	$(evr_c_unit_tests) \
-	glacier-benchmark
+	glacier-benchmark \
+	zipper
 
 TESTS = $(evr_c_unit_tests)
 
@@ -384,3 +385,7 @@ subprocess_test_SOURCES = \
 	logger.c \
 	subprocess.c \
 	subprocess-test.c
+
+zipper_SOURCES = \
+	logger.c \
+	zipper.c

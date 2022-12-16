@@ -138,4 +138,11 @@ fi
 echo 'live content' | evr post-file --title "new-live-file.txt"
 wait_for_file 'mnt/test-subdir/new-live-file.txt'
 
+mixed=`zipper 'mnt/test-subdir/cat-new-category/new-msg.txt' 'mnt/test-subdir/new-live-file.txt'`
+if [[ "${mixed}" != "nleiwv em ecsosnatgeen!t" ]]
+then
+    echo "Unexpected zipper new-msg.txt new-live-file.txt output: ${mixed}" >&2
+    exit 1
+fi
+
 echo "Stopping…"

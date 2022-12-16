@@ -4,6 +4,7 @@
 /evr-fs
 /evr-glacier-storage
 /evr-glacier-tool
+/zipper
 
 # generate code
 /attr_index_db_test-attr-query-lexer.c
