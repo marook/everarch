@@ -28,9 +28,7 @@ int evr_req_cmd_get_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_h
     return evr_error;
 }
 
-#include "logger.h"
-
-void test_open_close_many_files(){
+void test_open_close_many_files_sequentially(){
     struct evr_open_file_set set;
     assert(is_ok(evr_init_open_file_set(&set)));
     uint64_t fh;
@@ -38,12 +36,26 @@ void test_open_close_many_files(){
         assert_msg(is_ok(evr_allocate_open_file(&set, &fh)), "Unable to open for the %zu time", i + 1);
         assert(is_ok(evr_close_open_file(&set, fh)));
     }
-    // TODO
+    assert(is_ok(evr_empty_open_file_set(&set)));
+}
+
+void test_open_close_two_files_parallel(){
+    struct evr_open_file_set set;
+    assert(is_ok(evr_init_open_file_set(&set)));
+    const size_t fh_len = 2;
+    uint64_t fh[fh_len];
+    for(size_t i = 0; i < fh_len; ++i){
+        assert(is_ok(evr_allocate_open_file(&set, &fh[i])));
+    }
+    for(size_t i = 0; i < fh_len; ++i){
+        assert(is_ok(evr_close_open_file(&set, fh[i])));
+    }
     assert(is_ok(evr_empty_open_file_set(&set)));
 }
 
 int main(){
     evr_init_basics();
-    run_test(test_open_close_many_files);
+    run_test(test_open_close_many_files_sequentially);
+    run_test(test_open_close_two_files_parallel);
     return 0;
 }
