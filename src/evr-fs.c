@@ -945,13 +945,20 @@ struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref cl
 static void evr_fs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
     log_debug("fuse release file handle %u for inode %d", (unsigned int)fi->fh, (int)ino);
     if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
+        goto fail_with_reply_error;
+    }
+    if(fuse_reply_err(req, 0) != 0){
+        evr_panic("Unable to report successful release of file handle %u", (unsigned int)fi->fh);
         goto fail;
     }
+    log_debug("fuse file handle %u released", (unsigned int)fi->fh);
     return;
- fail:
+ fail_with_reply_error:
     if(fuse_reply_err(req, EINVAL) != 0){
         evr_panic("Unable to report error on release");
     }
+ fail:
+    log_debug("fuse release file handle %u failed", (unsigned int)fi->fh);
 }
 
 static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
