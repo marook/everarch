@@ -129,7 +129,7 @@ void test_llbuf(){
 }
 
 struct a_child {
-    int i;
+    size_t i;
     char c;
 };
 
@@ -154,19 +154,25 @@ void test_filled_llbuf_s(){
     evr_init_llbuf_s(&llb, sizeof(struct a_child));
     assert_msg(llb.block_count == 0, "But was %zu", llb.block_count);
     assert(llb.child_count == 0);
+    assert(llb.block_child_count > 0);
+    log_debug("llb.block_child_count %zu", llb.block_child_count);
     struct a_child *c;
-    assert(is_ok(evr_llbuf_s_append(&llb, (void**)&c)));
-    assert(c);
-    assert(llb.block_count == 1);
-    assert(llb.child_count == 1);
-    c->i = 42;
-    c->c = 'x';
+    for(size_t i = 0; i < llb.block_child_count + 1; ++i){
+        assert(is_ok(evr_llbuf_s_append(&llb, (void**)&c)));
+        assert(c);
+        assert(llb.child_count == i + 1);
+        c->i = i;
+        c->c = 'x';
+    }
+    assert(llb.block_count == 2);
     struct evr_llbuf_s_iter it;
     evr_init_llbuf_s_iter(&it, &llb);
-    c = evr_llbuf_s_iter_next(&it);
-    assert(c);
-    assert(c->i == 42);
-    assert(c->c == 'x');
+    for(size_t i = 0; i < llb.block_child_count + 1; ++i){
+        c = evr_llbuf_s_iter_next(&it);
+        assert(c);
+        assert_msg(c->i == i, "But %zu != %zu", c->i, i);
+        assert(c->c == 'x');
+    }
     assert(evr_llbuf_s_iter_next(&it) == NULL);
     evr_llbuf_s_empty(&llb, NULL);
 }

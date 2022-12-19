@@ -152,7 +152,7 @@ struct evr_llbuf_s {
     size_t block_count;
 
     /**
-     * block_child_count stores the number of childer store in one
+     * block_child_count stores the number of children stored in one
      * block.
      */
     size_t block_child_count;
@@ -214,7 +214,7 @@ inline void *evr_llbuf_s_iter_next(struct evr_llbuf_s_iter *iter){
     }
     iter->remaining_children -= 1;
     void *ret = iter->child;
-    void *end = &((char*)iter->block->data)[iter->llb->block_child_count];
+    void *end = &((char*)iter->block->data)[iter->llb->block_child_count * iter->llb->child_size];
     iter->child += iter->llb->child_size;
     if(iter->child == end){
         iter->block = iter->block->next;
