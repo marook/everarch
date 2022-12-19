@@ -1,5 +1,3 @@
-* evr-fs integration test with same inode zipper
-zipper should open the same file twice in parallel.
 * evr-glacier-storage should detect if the lock file is from before a reboot
 right now evr-glacier-storage will deny to start after a blackout
 because the former lock file still exists.
