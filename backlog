@@ -1,10 +1,3 @@
-* evr-glacier-storage should detect if the lock file is from before a reboot
-right now evr-glacier-storage will deny to start after a blackout
-because the former lock file still exists.
-
-evr-glacier-storage should start after a blackout.
-
-maybe putting it in /var/lock will help?
 * evr-fs integration test which restarts evr-attr-index
 evr-fs should work just like before the restart.
 * evr-fs integration test which restarts evr-glacier-storage

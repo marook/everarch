@@ -161,6 +161,7 @@ struct evr_glacier_write_ctx {
     unsigned long current_bucket_index;
     int current_bucket_f;
     size_t current_bucket_pos;
+    int lock_fd;
     sqlite3 *db;
     sqlite3_stmt *insert_blob_stmt;
     sqlite3_stmt *insert_bucket_stmt;

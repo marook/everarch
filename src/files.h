@@ -191,4 +191,20 @@ int evr_buf_read_read_until(struct evr_buf_read *br, char sentinel, size_t *offs
  */
 int evr_buf_read_pop(struct evr_buf_read *br, char *buf, size_t bytes);
 
+/**
+ * evr_acquire_process_lock creates an empty file at lock_path and
+ * puts a exclusive flock lock on it.
+ *
+ * Returns evr_ok if the file exists after the call and the exclusive
+ * lock was placed. Returns evr_error if the lock file can't be
+ * created or another process already owns the lock.
+ */
+int evr_acquire_process_lock(int *lock_fd, char *lock_path);
+
+/**
+ * evr_release_process_lock releases the flock lock. The file created
+ * using evr_acquire_process_lock will not be removed.
+ */
+int evr_release_process_lock(int lock_fd);
+
 #endif

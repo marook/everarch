@@ -58,8 +58,6 @@ int evr_open_index_db(struct evr_glacier_storage_cfg *config, int sqliteFlags, s
 
 int evr_close_index_db(struct evr_glacier_storage_cfg *config, sqlite3 *db);
 
-int unlink_lock_file(struct evr_glacier_write_ctx *ctx);
-
 int evr_create_index_db(struct evr_glacier_write_ctx *ctx);
 
 int move_to_last_bucket(struct evr_glacier_write_ctx *ctx);
@@ -330,17 +328,7 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
         if(glacier_file_path[0] == '\0'){
             goto fail_free;
         }
-        int lock_f = open(glacier_file_path, O_CREAT | O_EXCL, 0600);
-        if(lock_f < 0){
-            if(EEXIST == errno){
-                log_error("glacier storage lock file %s already exists", glacier_file_path);
-                goto fail_free;
-            }
-            log_error("glacier storage could not create lock file %s", glacier_file_path);
-            goto fail_free;
-        }
-        if(close(lock_f) != 0){
-            evr_panic("Unable to close lock file");
+        if(evr_acquire_process_lock(&ctx->lock_fd, glacier_file_path) != evr_ok){
             goto fail_free;
         }
     }
@@ -400,7 +388,10 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
     sqlite3_finalize(ctx->insert_bucket_stmt);
     sqlite3_finalize(ctx->insert_blob_stmt);
     sqlite3_close(ctx->db);
-    unlink_lock_file(ctx);
+    if(evr_release_process_lock(ctx->lock_fd) != evr_ok){
+        evr_panic("Unable to release lock file handle %d", ctx->lock_fd);
+        ret = evr_error;
+    }
  fail_free:
     free(ctx);
  fail:
@@ -553,7 +544,8 @@ int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx){
     if(evr_close_index_db(ctx->config, ctx->db)){
         goto end;
     }
-    if(unlink_lock_file(ctx)){
+    if(evr_release_process_lock(ctx->lock_fd) != evr_ok){
+        evr_panic("Unable to release lock file handle %d", ctx->lock_fd);
         goto end;
     }
     ret = 0;
@@ -605,19 +597,6 @@ int evr_close_index_db(struct evr_glacier_storage_cfg *config, sqlite3 *db){
         const char *sqlite_error_msg = sqlite3_errmsg(db);
         log_error("glacier storage %s could not close sqlite index database: %s", config->bucket_dir_path, sqlite_error_msg);
         return 1;
-    }
-    return 0;
-}
-
-int unlink_lock_file(struct evr_glacier_write_ctx *ctx){
-    size_t bucket_dir_path_size = strlen(ctx->config->bucket_dir_path) + 10;
-    char *lock_file_path = alloca(bucket_dir_path_size);
-    build_glacier_file_path(lock_file_path, bucket_dir_path_size, ctx->config->bucket_dir_path, glacier_dir_lock_file_path);
-    if(lock_file_path[0] != '\0'){
-        if(unlink(lock_file_path)){
-            log_error("Can not unlink lock file %s", lock_file_path);
-            return 1;
-        }
     }
     return 0;
 }

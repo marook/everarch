@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -465,5 +466,38 @@ int evr_buf_read_pop(struct evr_buf_read *br, char *buf, size_t bytes){
         buf[i] = evr_buf_read_peek(br, i);
     }
     br->read_i = (br->read_i + bytes) & (br->buf_size - 1);
+    return evr_ok;
+}
+
+int evr_acquire_process_lock(int *lock_fd, char *lock_path){
+    int fd = open(lock_path, O_CREAT | O_WRONLY, 0600);
+    if(fd < 0){
+        log_error("Unable to open or create lock file %s", lock_path);
+        goto fail;
+    }
+    if(flock(fd, LOCK_EX | LOCK_NB) != 0){
+        log_error("Unable to lock %s", lock_path);
+        goto fail_with_close_fd;
+    }
+    log_debug("locked %s via file handle %d", lock_path, fd);
+    *lock_fd = fd;
+    return evr_ok;
+ fail_with_close_fd:
+    if(close(fd) != 0){
+        evr_panic("Unable to close lock file %s", lock_path);
+    }
+ fail:
+    return evr_error;
+}
+
+int evr_release_process_lock(int lock_fd){
+    if(flock(lock_fd, LOCK_UN) != 0){
+        log_error("Unable to unlock lock file handle %d", lock_fd);
+        return evr_error;
+    }
+    if(close(lock_fd) != 0){
+        evr_panic("Unable to close lock file handle %d", lock_fd);
+        return evr_error;
+    }
     return evr_ok;
 }

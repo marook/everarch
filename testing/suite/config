@@ -230,10 +230,10 @@ stop_everarch_servers() {
         kill -s sigint "${glacier_storage_pid}"
         wait "${glacier_storage_pid}" || true
         glacier_storage_pid=
+        # test lock to make sure evr-glacier-storage has released lock
         if [[ -e "${glacier_storage_bucket_dir}/lock" ]]
         then
-            echo "${glacier_storage_bucket_dir}/lock still existing after storage quit" >&2
-            exit 1
+            flock -n "${glacier_storage_bucket_dir}/lock" true
         fi
     fi
     if [[ -n "${secondary_glacier_storage_pid}" ]]
@@ -241,10 +241,10 @@ stop_everarch_servers() {
         kill -s sigint "${secondary_glacier_storage_pid}"
         wait "${secondary_glacier_storage_pid}" || true
         secondary_glacier_storage_pid=
+        # test lock to make sure evr-glacier-storage has released lock
         if [[ -e "${secondary_glacier_storage_bucket_dir}/lock" ]]
         then
-            echo "${secondary_glacier_storage_bucket_dir}/lock still existing after storage quit" >&2
-            exit 1
+            flock -n "${secondary_glacier_storage_bucket_dir}/lock" true
         fi
     fi
 }
