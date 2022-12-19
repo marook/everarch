@@ -112,6 +112,21 @@ void test_claim_ref_tiny_set(){
     evr_free_claim_ref_tiny_set(set);
 }
 
+void test_fill_claim_ref_tiny_set(){
+    const size_t refs_len = 16;
+    struct evr_claim_ref_tiny_set *set = evr_create_claim_ref_tiny_set(refs_len);
+    assert(set);
+    evr_claim_ref ref;
+    memset(ref, 0, evr_claim_ref_size);
+    for(size_t i = 0; i < refs_len; ++i){
+        ref[0] = (char)i;
+        assert(is_ok(evr_claim_ref_tiny_set_add(set, ref)));
+    }
+    ref[0] = (char)refs_len;
+    assert(evr_claim_ref_tiny_set_add(set, ref) == evr_error);
+    evr_free_claim_ref_tiny_set(set);
+}
+
 int main(){
     evr_init_basics();
     run_test(test_evr_fmt_key_into);
@@ -120,5 +135,6 @@ int main(){
     run_test(test_build_fmt_claim_ref);
     run_test(test_parse_fmt_claim_ref);
     run_test(test_claim_ref_tiny_set);
+    run_test(test_fill_claim_ref_tiny_set);
     return 0;
 }
