@@ -137,6 +137,15 @@ start_attr_index() {
     attr_index_pid=$!
 }
 
+stop_attr_index() {
+    if [[ -n "${attr_index_pid}" ]]
+    then
+        kill -s sigint "${attr_index_pid}"
+        wait "${attr_index_pid}" || true
+        attr_index_pid=
+    fi
+}
+
 wait_for_attr_index() {
     wait_for_port "${attr_index_port}"
     # query the index metadata. this will block until the first index
@@ -219,12 +228,7 @@ ensure_port_available() {
 # trap stop_everarch_servers EXIT
 stop_everarch_servers() {
     umount_evr_fs
-    if [[ -n "${attr_index_pid}" ]]
-    then
-        kill -s sigint "${attr_index_pid}"
-        wait "${attr_index_pid}" || true
-        attr_index_pid=
-    fi
+    stop_attr_index
     if [[ -n "${glacier_storage_pid}" ]]
     then
         kill -s sigint "${glacier_storage_pid}"

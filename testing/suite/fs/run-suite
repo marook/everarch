@@ -154,4 +154,15 @@ then
     exit 1
 fi
 
+# restart evr-attr-index
+stop_attr_index
+start_attr_index
+wait_for_attr_index
+
+# wait for evr-fs to reconnect to evr-attr-index :/
+sleep 3
+
+echo 'after evr-attr-index restart' | evr post-file --title "after-evr-attr-index-restart.txt"
+wait_for_file 'mnt/test-subdir/after-evr-attr-index-restart.txt'
+
 echo "Stopping…"

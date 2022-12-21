@@ -242,8 +242,6 @@ void evr_time_to_iso8601(char *s, size_t sn, const evr_time *t);
         *(t) += ms;                             \
     } while(0)
 
-#endif
-
 /**
  * evr_split_n will separate s into fragments by replacing sep in s
  * with '\0' and return pointers to each fragment.
@@ -259,3 +257,17 @@ int evr_strpcmp(char **l, char **r);
         "/etc/everarch/" program_name ".conf",             \
         NULL,                                              \
 }
+
+/**
+ * evr_back_off_delay blocks for an exponentially growing amount of
+ * time based on the number of failed retries.
+ *
+ * running can optionally return if the back off should be ended
+ * early. evr_back_off_delay returns evr_end if running indicates an
+ * early end. running may be NULL if no early end is intended.
+ *
+ * Returns evr_ok if the delay was performed. evr_error otherwise.
+ */
+int evr_back_off_delay(int failed_retries, int (*running)());
+
+#endif

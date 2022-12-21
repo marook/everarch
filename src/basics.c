@@ -21,6 +21,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <threads.h>
 
 #include "logger.h"
 #include "errors.h"
@@ -175,4 +176,23 @@ int evr_split_n(char **fragments, size_t fragments_len, char *s, char sep){
 
 int evr_strpcmp(char **l, char **r){
     return strcmp(*l, *r);
+}
+
+int evr_back_off_delay(int failed_retries, int (*running)()){
+    for(int i = 1 << min(8, failed_retries); i > 0; --i){
+        if(running && !running()){
+            return evr_end;
+        }
+        struct timespec sleep_duration = {
+            0,
+            250000000
+        };
+        if(thrd_sleep(&sleep_duration, NULL) != 0){
+            return evr_error;
+        }
+    }
+    if(running && !running()){
+        return evr_end;
+    }
+    return evr_ok;
 }

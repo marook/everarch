@@ -1076,18 +1076,54 @@ int evr_start_index_watch(struct evr_index_watch_ctx *ctx){
 
 int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref, evr_claim_ref seed, evr_time last_modified);
 
+int is_running();
+
 int evr_index_watch_worker(void *_ctx){
     int ret = evr_error;
     struct evr_index_watch_ctx *ctx = _ctx;
     log_debug("Start processing index watch responses");
-    if(evr_attri_read_watch(ctx->r, evr_index_watch_worker_visit_changed_seed, ctx) != evr_ok){
-        goto out;
+    while(running){
+        if(evr_attri_read_watch(ctx->r, evr_index_watch_worker_visit_changed_seed, ctx) != evr_ok){
+            goto out;
+        }
+        if(running){
+            log_error("evr-attr-index watch connection lost");
+        }
+        int failed_retries = 0;
+        while(running){
+            int delay_res = evr_back_off_delay(failed_retries, is_running);
+            if(delay_res == evr_end){
+                break;
+            } else if(delay_res != evr_ok){
+                goto out;
+            }
+            log_debug("evr-attr-index watch reconnect try %d", failed_retries);
+            if(evr_connect_to_index(&ctx->c, &ctx->r, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
+                log_debug("evr-attr-index watch reconnect try %d connect failed", failed_retries);
+                ++failed_retries;
+                continue;
+            }
+            if(evr_attri_write_watch(&ctx->c) != evr_ok){
+                log_debug("evr-attr-index watch reconnect try %d watch failed", failed_retries);
+                ++failed_retries;
+                if(ctx->c.close(&ctx->c) != 0){
+                    evr_panic("Unable to close evr-attr-index connection");
+                }
+                continue;
+            }
+            log_info("evr-attr-index watch reconnected");
+            break;
+        }
     }
     log_debug("End processing index watch responses");
     ret = evr_ok;
  out:
     log_debug("Index watch worker ended with result %d", ret);
     return ret;
+}
+
+int is_running(){
+    return running;
 }
 
 int evr_collect_affected_seeds(struct evr_llbuf_s *affected_seeds, evr_claim_ref seed);
