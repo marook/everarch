@@ -1,13 +1,41 @@
-* evr-fs integration test which restarts evr-glacier-storage
-evr-fs should work just like before the restart. restart should maybe
-occur while a file within evr-fs is open.
-* evr-fs should recreate inodes on evr-attr-index current index change
-right now only seed changes are applied to the inode set. if the index
-ref changes the whole inode set must be rebuilt.
 * reserve .evr in root directory within evr-fs
 .evr should always be an empty directory. event if a efs:file mapps to
 .evr. it should be like a reserved namespace for future interaction
 with evr-fs during runtime.
+* evr-fs .evr/online should state if evr-fs is connected
+the online file should contain 1 if evr-fs is connected and watching
+evr-attr-index. otherwise the file should contain 0.
+
+fs/run-suite right now contains a 'sleep 3' which should be replace
+with polling the online file.
+* evr cli should validate put claim sets before upload
+validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
+evr-glacier-storage.
+
+validation should be a evr cli feature which is turned off by
+default. user must supply a relax ng spec. still relax ng spec should
+be stored in evr-glacier-storage.
+
+xml validation practically can't be executed in evr-glacier-storage
+because the relax ng spec would need to be universal for at least all
+past claims.
+* parallel evr-fs inode building
+right now evr-fs builds the inodes sequentially one seed by another.
+
+building inodes should be performed in parallel in n threads. n should
+probably be something like 4 so we don't open too many connections
+towards evr-attr-index.
+* validate random blobs every 24 hours
+so that basic sanity checks on servers with seldom reboots won't
+happend seldom.
+
+probably we should trigger the random blob validation via a command
+sent to evr-glacier-storage. that way admins can set up a cron to
+perform the check at a pleasant time. also checks can be triggered
+manually on demand.
+* evr-fs should recreate inodes on evr-attr-index current index change
+right now only seed changes are applied to the inode set. if the index
+ref changes the whole inode set must be rebuilt.
 * document evr-fs in evr.texi
 especially the seed-description xml format and the efs:file-set xml
 format.
@@ -31,17 +59,6 @@ some-key!
 mapping the first example to sql would be quite easy because we could
 do "c.seed not in (…)". but how to map the braces part i'm not sure
 yet.
-* evr cli should validate put claim sets before upload
-validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
-evr-glacier-storage.
-
-validation should be a evr cli feature which is turned off by
-default. user must supply a relax ng spec. still relax ng spec should
-be stored in evr-glacier-storage.
-
-xml validation practically can't be executed in evr-glacier-storage
-because the relax ng spec would need to be universal for at least all
-past claims.
 * support xsl:import with blob ref in xslt
 evr uses xslt stylesheets when transforming claims in evr-attr-index
 and when producing file metadata in evr-fs.
@@ -61,12 +78,6 @@ don't indicate wether they are still running or completed.
 the user should be informed if the command completed. either by
 showing a status like the emacs compile command or maybe a final line
 in the buffer.
-* parallel evr-fs inode building
-right now evr-fs builds the inodes sequentially one seed by another.
-
-building inodes should be performed in parallel in n threads. n should
-probably be something like 4 so we don't open too many connections
-towards evr-attr-index.
 * evr sync should utilize the blob's last modified timestamp
 right now evr sync walks through all blob refs and compares them
 inbetween two evr-glacier-storage instances.
@@ -86,15 +97,15 @@ buffer only to report a slice of at an the end.
 the off parameter should be used to communicate which inodes should
 be read. probably the off parameter should be the directory child's
 index from struct evr_fs_inode_dir.
+* evr-fs integration test which restarts evr-glacier-storage
+evr-fs should work just like before the restart. restart should maybe
+occur while a file within evr-fs is open.
 * improve query error messages if at least bison 3.6 is available
 bison before 3.6 does not support "%define parse.error
 detailed". that's why everarch right now uses the value "verbose".
 
 the configure script should detect the bison version and use
 "detailed" if at least bison 3.6 is available.
-* validate random blobs every 24 hours
-so that basic sanity checks on servers with seldom reboots won't
-happend seldom.
 * open bucket file descriptor constant for uninitialized
 glacier opens bucket files in a lazy way. the value for identifiying a
 not yet opened bucket file should be a constant instead of just -1.
