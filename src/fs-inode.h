@@ -31,6 +31,7 @@
 #define evr_inode_type_unlinked 0
 #define evr_inode_type_dir 1
 #define evr_inode_type_file 2
+#define evr_inode_type_status_online 3
 
 struct evr_inode_dir {
     size_t children_len;

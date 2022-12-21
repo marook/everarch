@@ -117,6 +117,7 @@ struct evr_fs_cfg {
 struct evr_fs_cfg cfg;
 
 static int running = 1;
+static int online = 0;
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
@@ -239,6 +240,7 @@ int evr_connect_to_index(struct evr_file *c, struct evr_buf_read **r, struct evr
 xsltStylesheet *load_transformation(struct evr_fs_cfg *cfg, struct evr_file *gc);
 int evr_start_index_watch(struct evr_index_watch_ctx *ctx);
 int evr_free_index_watch(struct evr_index_watch_ctx *ctx);
+int evr_add_status_dir_inode(struct evr_inode_set *inode_set);
 int evr_populate_inode_set(struct evr_buf_read *ir, struct evr_fs_cfg *cfg);
 int run_fuse(char *program, struct evr_fs_cfg *cfg);
 
@@ -305,6 +307,9 @@ int main(int argc, char *argv[]) {
     }
     if(evr_init_inode_set(&inode_set) != evr_ok){
         goto out_with_destroy_inode_set_lock;
+    }
+    if(evr_add_status_dir_inode(&inode_set) != evr_ok){
+        goto out_with_empty_inode_set;
     }
     {
         struct evr_file ic;
@@ -442,6 +447,17 @@ xsltStylesheet *load_transformation(struct evr_fs_cfg *cfg, struct evr_file *gc)
         return NULL;
     }
     return style;
+}
+
+int evr_add_status_dir_inode(struct evr_inode_set *inode_set){
+    char online_path[] = ".evr/online";
+    fuse_ino_t online_ino = evr_inode_set_create_file(inode_set, online_path);
+    if(online_ino == 0){
+        return evr_error;
+    }
+    struct evr_inode *online_nd = &inode_set->inodes[online_ino];
+    online_nd->type = evr_inode_type_status_online;
+    return evr_ok;
 }
 
 struct evr_populate_inode_set_ctx {
@@ -773,6 +789,11 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
         st->st_nlink = 1;
         st->st_size = nd->data.file.file_size;
         break;
+    case evr_inode_type_status_online:
+        st->st_mode = S_IFREG | 0444;
+        st->st_nlink = 1;
+        st->st_size = 1;
+        break;
     }
     st->st_ino = ino;
     st->st_uid = cfg.uid;
@@ -848,20 +869,44 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
 
 struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref);
 
+static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, evr_claim_ref file_ref);
+
 static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
     int err = EINVAL;
     log_debug("fuse open inode %d", (int)ino);
     evr_lock_inode_set_or_panic();
     struct evr_inode *nd = evr_get_inode(req, ino);
-    if(nd->type != evr_inode_type_file){
+    switch(nd->type){
+    default:
         log_error("Inode %d is not a file", (int)ino);
         err = EISDIR;
         evr_unlock_inode_set_or_panic();
         goto fail;
+    case evr_inode_type_file: {
+        evr_claim_ref file_ref;
+        memcpy(file_ref, nd->data.file.file_ref, evr_claim_ref_size);
+        evr_unlock_inode_set_or_panic();
+        if(evr_fs_open_file(req, ino, fi, file_ref) != evr_ok){
+            goto fail;
+        }
+        break;
     }
-    evr_claim_ref file_ref;
-    memcpy(file_ref, nd->data.file.file_ref, evr_claim_ref_size);
-    evr_unlock_inode_set_or_panic();
+    case evr_inode_type_status_online:
+        evr_unlock_inode_set_or_panic();
+        if(fuse_reply_open(req, fi) != 0){
+            goto fail;
+        }
+        break;
+    }
+    return;
+ fail:
+    if(fuse_reply_err(req, err) != 0){
+        evr_panic("Unable to report error %d on open", err);
+    }
+    log_debug("fuse open inode %d failed with error %d", err);
+}
+
+static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, evr_claim_ref file_ref){
     if(evr_allocate_open_file(&open_files, &fi->fh) != evr_ok){
         log_error("Unable to allocate file handle for inode %d", (int)ino);
         goto fail;
@@ -880,16 +925,13 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
         goto fail_with_close_open_file;
     }
     log_debug("opened file handle %u for inode %d", (unsigned int)fi->fh, (int)ino);
-    return;
+    return evr_ok;
  fail_with_close_open_file:
     if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
         evr_panic("Unable to close file with inode %d on failed open", (int)ino);
     }
  fail:
-    if(fuse_reply_err(req, err) != 0){
-        evr_panic("Unable to report error %d on open", err);
-    }
-    log_debug("fuse open inode %d failed with error %d", err);
+    return evr_error;
 }
 
 void evr_lock_inode_set_or_panic(){
@@ -942,28 +984,101 @@ struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref cl
     return ret;
 }
 
+static int evr_fs_release_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
+
 static void evr_fs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
     log_debug("fuse release file handle %u for inode %d", (unsigned int)fi->fh, (int)ino);
-    if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
-        goto fail_with_reply_error;
-    }
-    if(fuse_reply_err(req, 0) != 0){
-        evr_panic("Unable to report successful release of file handle %u", (unsigned int)fi->fh);
+    evr_lock_inode_set_or_panic();
+    struct evr_inode *nd = evr_get_inode(req, ino);
+    switch(nd->type){
+    default:
+        evr_unlock_inode_set_or_panic();
+        evr_panic("Unexpected inode type %d on release", nd->type);
         goto fail;
+    case evr_inode_type_file:
+        evr_unlock_inode_set_or_panic();
+        if(evr_fs_release_file(req, ino, fi) != evr_ok){
+            goto fail;
+        }
+        break;
+    case evr_inode_type_status_online:
+        evr_unlock_inode_set_or_panic();
+        if(fuse_reply_err(req, 0) != 0){
+            goto fail;
+        }
+        break;
     }
     log_debug("fuse file handle %u released", (unsigned int)fi->fh);
     return;
- fail_with_reply_error:
+ fail:
     if(fuse_reply_err(req, EINVAL) != 0){
         evr_panic("Unable to report error on release");
     }
- fail:
     log_debug("fuse release file handle %u failed", (unsigned int)fi->fh);
 }
+
+static int evr_fs_release_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
+    if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
+        return evr_error;
+    }
+    if(fuse_reply_err(req, 0) != 0){
+        evr_panic("Unable to report successful release of file handle %u", (unsigned int)fi->fh);
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+static int evr_fs_read_file(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
+
+static int evr_fs_read_status_online(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
 
 static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
     int err = EINVAL;
     log_debug("fuse read %zu bytes from file handle %u on inode %d at offset %zu", size, (unsigned int)fi->fh, (int)ino, (size_t)off);
+    evr_lock_inode_set_or_panic();
+    struct evr_inode *nd = evr_get_inode(req, ino);
+    switch(nd->type){
+    default:
+        evr_unlock_inode_set_or_panic();
+        evr_panic("Unexpected inode type %d on release", nd->type);
+        goto fail;
+    case evr_inode_type_file:
+        evr_unlock_inode_set_or_panic();
+        if(evr_fs_read_file(req, ino, size, off, fi) != evr_ok){
+            goto fail;
+        }
+        break;
+    case evr_inode_type_status_online:
+        evr_unlock_inode_set_or_panic();
+        if(evr_fs_read_status_online(req, ino, size, off, fi) != evr_ok){
+            goto fail;
+        }
+        break;
+    }
+    return;
+ fail:
+    if(fuse_reply_err(req, err) != 0){
+        evr_panic("Unable to report error %d on read file handle %u on inode %d", err, (unsigned int)fi->fh, (int)ino);
+    }
+    log_debug("fuse read file handle %u on inode %d failed", (unsigned int)fi->fh, (int)ino);
+}
+
+static int evr_fs_read_status_online(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
+    if(off == 0){
+        char buf[1];
+        buf[0] = online ? '1' : '0';
+        if(fuse_reply_buf(req, buf, sizeof(buf)) != 0){
+            return evr_error;
+        }
+    } else {
+        if(fuse_reply_buf(req, NULL, 0) != 0){
+            return evr_error;
+        }
+    }
+    return evr_ok;
+}
+
+static int evr_fs_read_file(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
     char *buf = malloc(size);
     if(!buf){
         goto fail;
@@ -977,13 +1092,11 @@ static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, 
         goto fail_with_free_buf;
     }
     free(buf);
-    return;
+    return evr_ok;
  fail_with_free_buf:
     free(buf);
  fail:
-    if(fuse_reply_err(req, err) != 0){
-        evr_panic("Unable to report error %d on read file handle %u", err, (unsigned int)fi->fh);
-    }
+    return evr_error;
 }
 
 struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
@@ -1061,6 +1174,7 @@ int evr_start_index_watch(struct evr_index_watch_ctx *ctx){
     if(evr_attri_write_watch(&ctx->c) != evr_ok){
         goto fail_with_close_c;
     }
+    online = 1;
     if(thrd_create(&ctx->worker, evr_index_watch_worker, ctx) != thrd_success){
         goto fail_with_close_c;
     }
@@ -1083,7 +1197,9 @@ int evr_index_watch_worker(void *_ctx){
     struct evr_index_watch_ctx *ctx = _ctx;
     log_debug("Start processing index watch responses");
     while(running){
-        if(evr_attri_read_watch(ctx->r, evr_index_watch_worker_visit_changed_seed, ctx) != evr_ok){
+        int watch_res = evr_attri_read_watch(ctx->r, evr_index_watch_worker_visit_changed_seed, ctx);
+        online = 0;
+        if(watch_res != evr_ok){
             goto out;
         }
         if(running){
@@ -1111,6 +1227,7 @@ int evr_index_watch_worker(void *_ctx){
                 }
                 continue;
             }
+            online = 1;
             log_info("evr-attr-index watch reconnected");
             break;
         }

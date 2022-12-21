@@ -214,6 +214,33 @@ wait_for_file() {
     echo "Got file ${fn}"
 }
 
+wait_for_content() {
+    local fn="$1"
+    local expected_content="$2"
+    echo "Waiting for file content ${fn}…"
+    SECONDS=0
+    sleep 0.1
+    while true
+    do
+        echo ">>> ${fn}"
+        if [[ -e "${fn}" ]]
+        then
+            local content=`cat "${fn}"`
+            if [[ "${content}" == "${expected_content}" ]]
+            then
+                break
+            fi
+        fi
+        if [[ "${SECONDS}" -ge "${evr_wait_timeout}" ]]
+        then
+            echo "Giving up waiting for file ${fn}" >&2
+            exit 1
+        fi
+        sleep 0.2
+    done
+    echo "Got file content ${fn}"
+}
+
 ensure_port_available() {
     port="$1"
     nc ${nc_opts} -z localhost "${port}" && occupied=1 || occupied=0

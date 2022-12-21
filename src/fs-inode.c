@@ -71,6 +71,8 @@ void evr_free_inode_and_children(struct evr_inode *inodes, fuse_ino_t n){
     case evr_inode_type_file:
         free(nd->data.file.dependent_seeds);
         break;
+    case evr_inode_type_status_online:
+        break;
     }
     free(nd->name);
     nd->type = evr_inode_type_unlinked;

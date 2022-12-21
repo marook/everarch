@@ -65,12 +65,21 @@ mount_evr_fs "${fs_xslt_ref}"
 
 find_mnt=`find mnt`
 if [[ "${find_mnt}" != 'mnt
+mnt/.evr
+mnt/.evr/online
 mnt/test-subdir
 mnt/test-subdir/little-random.bin
 mnt/test-subdir/cat-my-category
 mnt/test-subdir/cat-my-category/msg.txt' ]]
 then
     echo "Unexpected find mnt: ${find_mnt}" >&2
+    exit 1
+fi
+
+online=`cat mnt/.evr/online`
+if [[ "${online}" != '1' ]]
+then
+    echo "Expected evr-fs to be online but was: ${online}" >&2
     exit 1
 fi
 
@@ -156,11 +165,10 @@ fi
 
 # restart evr-attr-index
 stop_attr_index
+wait_for_content "mnt/.evr/online" '0'
 start_attr_index
 wait_for_attr_index
-
-# wait for evr-fs to reconnect to evr-attr-index :/
-sleep 3
+wait_for_content "mnt/.evr/online" '1'
 
 echo 'after evr-attr-index restart' | evr post-file --title "after-evr-attr-index-restart.txt"
 wait_for_file 'mnt/test-subdir/after-evr-attr-index-restart.txt'

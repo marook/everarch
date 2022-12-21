@@ -1,13 +1,3 @@
-* reserve .evr in root directory within evr-fs
-.evr should always be an empty directory. event if a efs:file mapps to
-.evr. it should be like a reserved namespace for future interaction
-with evr-fs during runtime.
-* evr-fs .evr/online should state if evr-fs is connected
-the online file should contain 1 if evr-fs is connected and watching
-evr-attr-index. otherwise the file should contain 0.
-
-fs/run-suite right now contains a 'sleep 3' which should be replace
-with polling the online file.
 * evr cli should validate put claim sets before upload
 validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
 evr-glacier-storage.
