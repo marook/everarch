@@ -17,6 +17,7 @@ data. The goals of everarch are:
 - store your tiny and GB sized files
 - provide a customized index over your data
 - make backups complete and fast
+- access your files via a virtual file system
 - store your data in a format which you still can read in 20 years in
   _future programming language_
 - store your data in a way that allows you to easily adopt new data
@@ -49,7 +50,9 @@ Everarch is known to run at least on i686 and arm64 systems.
 
 Install the dependencies:
 
-$ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev libxslt1-dev flex bison texinfo elpa-helm elpa-s elpa-seq fuse3 libfuse3-dev pkg-config libssl-dev make automake
+$ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev \
+    libxslt1-dev flex bison texinfo elpa-helm elpa-s elpa-seq fuse3 \
+    libfuse3-dev pkg-config libssl-dev make automake
 
 On linux you can execute the following within the everarch directory
 to build the application.
