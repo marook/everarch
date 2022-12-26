@@ -2,13 +2,67 @@
 validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
 evr-glacier-storage.
 
-validation should be a evr cli feature which is turned off by
-default. user must supply a relax ng spec. still relax ng spec should
-be stored in evr-glacier-storage.
+validation rules must be stored with the attr-spec claim. that way the
+index defines potential claims it should accept.
+
+evr cli right now provides the sign-put command for uploading
+claims. a caller must manually identify a claim by setting the flags
+to 1. a new command put-claim must be added to evr cli. put-claim
+should fetch the current active index from evr-attr-index, load the
+rng grammar from the index's attr-spec and validade the put xml. after
+successful validation the same steps as with sign-put must be
+performed.
+
+an example attr-spec might look like this:
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="1970-01-01T00:00:07.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="tag" type="str"/>
+    <transformation type="xslt" blob="sha3-224-00000000000000000000000000000000000000000000000000000000"/>
+    <schema type="rng">
+        <grammar xmlns="http://relaxng.org/ns/structure/1.0">
+            <!-- a rng grammar definition -->
+        </grammar>
+    </schema>
+  </attr-spec>
+</claim-set>
+#+END_SRC
+
+the doc/claims/attr-spec.xml example must be updatet to show an
+example schema.
+
+the put-claim command must set the evr cli flags argument implicitly
+to 1. if the flags have been explicitly set to a value unequal to 1
+the put-claim command must fail.
 
 xml validation practically can't be executed in evr-glacier-storage
 because the relax ng spec would need to be universal for at least all
 past claims.
+* add get-rnc command to evr cli
+evr-attr-index in queried for the current active index. the attr-spec
+is fetched for that index from evr-glacier-storage. the rng grammar is
+extracted from the attr-spec if it exists. the rng grammar is
+converted into a rnc grammar. the rng grammar is cached using the
+index ref as file name. the rnc grammar is piped to stdout.
+
+the rng to rnc conversion can probably be performed using
+[[https://github.com/oleg-pavliv/emacs/blob/master/xsl/RngToRnc-1_4/RngToRncText.xsl][RngToRncText.xsl from oleg-pavliv]].
+* evr emacs mode should load attr-spec rng validation
+the minor mode evr-claim-set-mode must load the rng and load it for
+the current buffer. this involves the following steps.
+
+get the rnc via get-rnc into a buffer. parse the rnc from that buffer
+and apply it to the current buffer.
+
+the emacs lisp function rng-set-schema-file-1 shows how to load a rnc
+schema and activate it for the current file. the function
+rng-c-parse-file shows how to load rnc content into a buffer and parse
+it.
 * parallel evr-fs inode building
 right now evr-fs builds the inodes sequentially one seed by another.
 
