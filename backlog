@@ -1,3 +1,102 @@
+* define tasks for evr-attr-ui
+the implementation will follow a model-view-controller approach. for
+the beginning we allow two kinds of models. a single seed model and a
+seed array model. the views must choose one kind of model they
+support. the application is providing a model instance to the view
+after creation.
+
+initially we want to implement a form view. it will be used to show
+the attributes for a single seed and later will be able to save user
+entered attributes as a claim.
+
+an example ui for creating a contact claim:
+#+BEGIN_SRC xml
+<attr-ui-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <root>
+    <!--
+      we most likely want one (or more) roots… ther are most likely
+      windows? so call them windows?
+
+      maybe we should think also in a browser direction?
+    -->
+    <form>
+      <claim-transformation>
+        <!--
+          contains an xslt to convert an attr claim as defined within
+          https://evr.ma300k.de/claims/ into the user defined output
+          claim.
+        -->
+      </claim-transformation>
+
+      <text k="first-name">
+        <required/>
+      </text>
+      <date k="birthday" year-optional="true"/>
+      <seed-ref k="social-child-of" count="0..2">
+        <seed-filter>class=contact</seed-filter>
+      </seed-ref>
+    </form>
+  </root>
+</attr-ui-spec>
+#+END_SRC
+
+another initial view should allow showing kanban like boards. a board
+contains multiple columns which may contain multiple cards.
+
+the card widget controls the visual representation of a single
+card. the card widget must use a single seed model.
+
+initially we want to provide a title-card widget which just shows a
+seed attribute value. the box around the card is provided by the board
+widget.
+
+an example ui for showing a shopping list kanban board:
+#+BEGIN_SRC xml
+<attr-ui-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <root>
+    <board
+        list-ordinal-key="ordinal"
+        card-ordinal-key="shopping-list-ordinal"
+      >
+      <board-model query="class=board && board-id=offline-shopping"/>
+      <list-model query="class=offline-shop"/>
+      <card-model query="class=shopping-list-item && list={seed-ref}" />
+
+      <card>
+        <title-card k="title"></title-card>
+      </card>
+    </board>
+  </root>
+</attr-ui-spec>
+#+END_SRC
+
+an example ui for showing a task kanban board:
+#+BEGIN_SRC xml
+<attr-ui-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <root>
+    <board
+        list-ordinal-key="ordinal"
+        card-ordinal-key="todo-ordinal"
+      >
+      <board-model query="class=board && board-id=todo"/>
+      <list-model query="class=todo-list && board-ref={seed-ref}"/>
+      <card-model query="class=todo-task && task-state={title}" />
+
+      <card>
+        <title-card k="title"></title-card>
+      </card>
+    </board>
+  </root>
+</attr-ui-spec>
+#+END_SRC
+
+the *-model queries may reference the parent model's attributes using
+{…} braces. the text within the braces is the attribute key. there is
+one special attribute key "seed-ref" which references the seed-ref of
+the parent model.
+
+the board widget uses the set-ordinal claim defined in
+https://evr.ma300k.de/attr-ui/ to apply an ordinal to a card or list.
 * evr cli should validate put claim sets before upload
 validate claims with [[https://relaxng.org/#validators][relax ng]] before putting them into
 evr-glacier-storage.
