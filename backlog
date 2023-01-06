@@ -1,3 +1,16 @@
+* show empty window when running evr-attr-ui
+application should quit when window is closed
+* add attr-ui-spec command line argument to evr-attr-ui
+the argument must have the prefix xslt:blob: followed by a blob
+ref. evr-attr-ui must download the blob ref and parse it as xml.
+* xslt transform attr-ui-spec into gtk interface xml
+transformation should produce a single hello world label
+initially. the produced interface xml should be parsend and replace
+the code which shows the initial demo window. the xslt transformation
+is part of the evr source and should be placed somewhere below /usr.
+* add dc:title attribute to attr-ui-spec as window title
+a dc:title attribute on attr-ui-spec should set the human readable
+window title of evr-attr-ui
 * define tasks for evr-attr-ui
 the implementation will follow a model-view-controller approach. for
 the beginning we allow two kinds of models. a single seed model and a
