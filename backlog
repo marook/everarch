@@ -1,8 +1,22 @@
-* show empty window when running evr-attr-ui
-application should quit when window is closed
 * add attr-ui-spec command line argument to evr-attr-ui
 the argument must have the prefix xslt:blob: followed by a blob
 ref. evr-attr-ui must download the blob ref and parse it as xml.
+
+[[https://github.com/perror/gtk-boilerplate/blob/master/src/gtk-boilerplate.c][gtk-boilerplate.c]] shows how to add custom command line arguments to
+gtk applications.
+
+#+BEGIN_SRC c
+    g_signal_connect (G_APPLICATION (app), "handle-local-options",
+                      G_CALLBACK (handle_local_options), NULL);
+
+    /* Adding custom options to command-line */
+    const GOptionEntry options[] = {
+        {"version", 'V', 0, G_OPTION_ARG_NONE, NULL,
+         "Show application's version", NULL},
+        {NULL}
+    };
+    g_application_add_main_option_entries(G_APPLICATION (app), options);
+#+END_SRC
 * xslt transform attr-ui-spec into gtk interface xml
 transformation should produce a single hello world label
 initially. the produced interface xml should be parsend and replace

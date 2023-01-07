@@ -10,7 +10,7 @@ CFLAGS_WARN=\
 	-Wno-unused-parameter \
 	-Wno-variadic-macros
 
-AM_CFLAGS = $(CFLAGS_WARN) $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS)
+AM_CFLAGS = $(CFLAGS_WARN) $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS) $(GTK_CFLAGS)
 BUILT_SOURCES = \
 	attr-query-parser.h \
 	attr_index_db_test-attr-query-lexer.c \
@@ -21,6 +21,7 @@ info_TEXINFOS = evr.texi
 
 bin_PROGRAMS = \
 	evr-attr-index \
+	evr-attr-ui \
 	evr \
 	evr-fs \
 	evr-glacier-storage \
@@ -159,6 +160,10 @@ evr_attr_index_SOURCES = \
 	subprocess.c
 evr_attr_index_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
+
+evr_attr_ui_SOURCES = \
+	evr-attr-ui.c
+evr_attr_ui_LDADD = $(GTK_LIBS)
 
 evr_SOURCES = \
 	auth.c \

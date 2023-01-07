@@ -84,6 +84,8 @@ PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9])
 PKG_CHECK_MODULES([XSLT], [libxslt >= 1.1])
 PKG_CHECK_MODULES([SSL], [libssl >= 1.1 libcrypto >= 1.1])
 
+AM_PATH_GTK_3_0([3.24.0], , AC_MSG_ERROR([Gtk+ 3.24.0 or higher required.]))
+
 AC_DEFINE(FUSE_USE_VERSION, 34, Fuse target API version.)
 PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0])
 

@@ -52,7 +52,7 @@ Install the dependencies:
 
 $ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev \
     libxslt1-dev flex bison texinfo elpa-helm elpa-s elpa-seq fuse3 \
-    libfuse3-dev pkg-config libssl-dev make automake
+    libfuse3-dev pkg-config libssl-dev make automake libgtk-3-dev
 
 On linux you can execute the following within the everarch directory
 to build the application.
