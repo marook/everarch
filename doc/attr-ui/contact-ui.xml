@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<attr-ui-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <root>
+    <form>
+      <claim-transformation>
+        <!--
+          TODO contains an xslt to convert an attr claim as defined
+          within https://evr.ma300k.de/claims/ into the user defined
+          output claim.
+        -->
+      </claim-transformation>
+
+      <text k="first-name">
+        <required/>
+      </text>
+      <date k="birthday" year-optional="true"/>
+      <seed-ref k="social-child-of" count="0..2">
+        <seed-filter>class=contact</seed-filter>
+      </seed-ref>
+    </form>
+  </root>
+</attr-ui-spec>

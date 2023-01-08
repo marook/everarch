@@ -162,8 +162,20 @@ evr_attr_index_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LI
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_attr_ui_SOURCES = \
-	evr-attr-ui.c
-evr_attr_ui_LDADD = $(GTK_LIBS)
+	auth.c \
+	basics.c \
+	claims.c \
+	configp.c \
+	dyn-mem.c \
+	evr-attr-ui.c \
+	evr-glacier-client.c \
+	evr-tls.c \
+	files.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c \
+	signatures.c
+evr_attr_ui_LDADD = $(GTK_LIBS) $(XML_LIBS) $(XSLT_LIBS) $(SSL_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS)
 
 evr_SOURCES = \
 	auth.c \
