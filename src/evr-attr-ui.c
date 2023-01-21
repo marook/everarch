@@ -22,6 +22,7 @@
 #include <gtk/gtk.h>
 #include <libxml/parser.h>
 #include <libxslt/xsltInternals.h>
+#include <libxslt/transform.h>
 
 #include "basics.h"
 #include "configp.h"
@@ -30,6 +31,7 @@
 #include "evr-tls.h"
 #include "logger.h"
 #include "evr-glacier-client.h"
+#include "claims.h"
 
 #define program_name "evr-attr-ui"
 
@@ -59,6 +61,7 @@ struct evr_attr_ui_cfg {
 };
 
 struct evr_attr_ui_cfg cfg;
+static xmlDoc *ui_spec = NULL;
 
 static struct argp_option options[] = {
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
@@ -124,8 +127,7 @@ static error_t parse_opt_adapter(int key, char *arg, struct argp_state *state){
 }
 
 static int evr_fetch_ui_spec(xmlDoc **doc);
-
-static void activate_main_widget(GApplication * app);
+static void activate_main_widget(GApplication *app);
 
 int main(int argc, char *argv[]){
     int ret = 1;
@@ -152,7 +154,6 @@ int main(int argc, char *argv[]){
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, &cfg);
-    xmlDoc *ui_spec = NULL;
     if(evr_fetch_ui_spec(&ui_spec) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -244,8 +245,100 @@ static int evr_connect_to_storage(struct evr_file *c){
     return evr_ok;
 }
 
+static int evr_build_ui(GApplication *app, xmlDoc *ui_spec);
+
 static void activate_main_widget(GApplication *app){
-    GtkWidget *main_win = gtk_application_window_new(GTK_APPLICATION(app));
-    // TODO
-    gtk_widget_show_all(main_win);
+    if(evr_build_ui(app, ui_spec) != evr_ok){
+        evr_panic("Building the UI failed");
+    }
+}
+
+static int evr_load_interface_xslt(xsltStylesheet **style);
+
+static int evr_build_ui(GApplication *app, xmlDoc *ui_spec){
+    int ret = evr_error;
+    xsltStylesheet *interface_style = NULL;
+    if(evr_load_interface_xslt(&interface_style) != evr_ok){
+        log_error("Unable to load UI to interface XSLT");
+        goto out;
+    }
+    const char *xslt_params[] = {
+        NULL
+    };
+    xmlDoc *interface_doc = xsltApplyStylesheet(interface_style, ui_spec, xslt_params);
+    if(!interface_doc){
+        goto out_with_free_interface_style;
+    }
+    char *interface_str = NULL;
+    int interface_str_size;
+    xmlDocDumpMemoryEnc(interface_doc, (xmlChar**)&interface_str, &interface_str_size, "UTF-8");
+    if(!interface_str){
+        goto out_with_free_interface_doc;
+    }
+    log_debug("Transformed gtk interface: %s", interface_str);
+    GtkBuilder *bld = gtk_builder_new_from_string(interface_str, interface_str_size);
+    if(!bld){
+        // not sure if this situation can occur. the
+        // gtk_builder_new_from_string doc says: "if there is an error
+        // parsing string then the program will be aborted."
+        goto out_with_free_interface_str;
+    }
+    GObject* root_widget = gtk_builder_get_object(bld, "root");
+    if(!root_widget){
+        log_error("Missing window widget with id=root in interface");
+        goto out_with_free_bld;
+    }
+    gtk_application_add_window(GTK_APPLICATION(app), GTK_WINDOW(root_widget));
+    ret = evr_ok;
+ out_with_free_bld:
+    g_object_unref(G_OBJECT(bld));
+ out_with_free_interface_str:
+    xmlFree(interface_str);
+ out_with_free_interface_doc:
+    xmlFreeDoc(interface_doc);
+ out_with_free_interface_style:
+    xsltFreeStylesheet(interface_style);
+ out:
+    return ret;
+}
+
+static int evr_load_interface_xslt(xsltStylesheet **style){
+    int ret = evr_error;
+    struct dynamic_array *buf = alloc_dynamic_array(16*1024);
+    if(!buf){
+        goto out;
+    }
+    char *interface_xslt_paths[] = evr_resource_paths("attr-ui-spec-interface.xslt");
+    int f = evr_open_res(interface_xslt_paths);
+    if(f < 0){
+        free(buf);
+        goto out;
+    }
+    int read_res = read_fd(&buf, f, 1*1024*1024);
+    if(close(f) != 0){
+        evr_panic("Unable to close interface file");
+        free(buf);
+        goto out;
+    }
+    // read_res must be evr_end because that means the max_read size
+    // was big enough for the whole content.
+    if(read_res != evr_end){
+        free(buf);
+        goto out;
+    }
+    xmlDoc *doc = NULL;
+    int parse_res = evr_parse_xml(&doc, buf->data, buf->size_used);
+    free(buf);
+    if(parse_res != evr_ok){
+        goto out;
+    }
+    xsltStylesheet *s = xsltParseStylesheetDoc(doc);
+    if(!s){
+        xmlFreeDoc(doc);
+        goto out;
+    }
+    *style = s;
+    ret = evr_ok;
+ out:
+    return ret;
 }

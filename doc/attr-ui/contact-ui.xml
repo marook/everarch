@@ -10,13 +10,15 @@
         -->
       </claim-transformation>
 
-      <text k="first-name">
-        <required/>
-      </text>
-      <date k="birthday" year-optional="true"/>
-      <seed-ref k="social-child-of" count="0..2">
-        <seed-filter>class=contact</seed-filter>
-      </seed-ref>
+      <fields>
+        <text k="first-name">
+          <required/>
+        </text>
+        <date k="birthday" year-optional="true"/>
+        <seed-ref k="social-child-of" count="0..2">
+          <seed-filter>class=contact</seed-filter>
+        </seed-ref>
+      </fields>
     </form>
   </root>
 </attr-ui-spec>

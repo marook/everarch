@@ -24,6 +24,14 @@
 #include "dyn-mem.h"
 
 /**
+ * evr_open_res walks along the res_paths until it can open the file
+ * read only or hits NULL.
+ *
+ * Returns a file handle or -1 if the resource could not be opened.
+ */
+int evr_open_res(char **res_paths);
+
+/**
  * union evr_file_ctx is used by struct evr_file so a void pointer OR
  * a simple integer can easily be stored in the evr_file struct. You
  * probably guessed that simple file descriptor instances can use the

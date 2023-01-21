@@ -19,6 +19,9 @@ AM_YFLAGS = -d
 
 info_TEXINFOS = evr.texi
 
+resdir = $(prefix)/share/everarch
+dist_res_DATA = attr-ui-spec-interface.xslt
+
 bin_PROGRAMS = \
 	evr-attr-index \
 	evr-attr-ui \

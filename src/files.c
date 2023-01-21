@@ -33,6 +33,22 @@
 #include "rollsum.h"
 #include "logger.h"
 
+int evr_open_res(char **res_paths){
+    for(char **p = res_paths; *p; ++p){
+        int f = open(*p, O_RDONLY);
+        if(f < 0){
+            if(errno == ENOENT){
+                continue;
+            }
+            log_error("Unable to open resource file %s", *p);
+            return -1;
+        }
+        log_debug("Opened file %s", *p);
+        return f;
+    }
+    return -1;
+}
+
 int evr_file_fd_get_fd(struct evr_file *f);
 size_t evr_file_fd_pending(struct evr_file *f);
 int evr_file_fd_received_shutdown(struct evr_file *f);

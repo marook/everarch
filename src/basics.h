@@ -258,6 +258,13 @@ int evr_strpcmp(char **l, char **r);
         NULL,                                              \
 }
 
+#define evr_resource_paths(res) {             \
+        res,                                  \
+        EVR_PREFIX "/share/everarch/" res,  \
+        "/usr/share/everarch/" res,             \
+        NULL,                                 \
+}
+
 /**
  * evr_back_off_delay blocks for an exponentially growing amount of
  * time based on the number of failed retries.
