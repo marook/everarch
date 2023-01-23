@@ -1,8 +1,103 @@
+* evr-attr-index indexing crash
+#+BEGIN_SRC
+Jan 17 17:45:05 mammut systemd[1]: Started evr-attr-index for animations.
+Jan 17 17:45:05 mammut evr-attr-index[121762]: 2023-01-17T17:45:05 iI Listening on 0.0.0.0:2562
+Jan 17 17:45:08 mammut evr-attr-index[121762]: 2023-01-17T17:45:08 iI Start building attr index for sha3-224-7f9610c711b56629f8b5a7fab0d80ff89bf671de409eaea8dad79a7a
+Jan 17 17:45:08 mammut evr-attr-index[121762]: 2023-01-17T17:45:08 iE Failed building attr index for sha3-224-7f9610c711b56629f8b5a7fab0d80ff89bf671de409eaea8dad79a7a
+Jan 17 17:45:08 mammut evr-attr-index[121762]: 2023-01-17T17:45:08 iP Ended build index worker with result 1
+Jan 17 17:45:08 mammut systemd[1]: animation-index.service: Main process exited, code=exited, status=1/FAILURE
+Jan 17 17:45:08 mammut systemd[1]: animation-index.service: Failed with result 'exit-code'.
+Jan 17 17:45:09 mammut systemd[1]: animation-index.service: Scheduled restart job, restart counter is at 4.
+Jan 17 17:45:09 mammut systemd[1]: Stopped evr-attr-index for animations.
+Jan 17 17:45:09 mammut systemd[1]: Started evr-attr-index for animations.
+Jan 17 17:45:09 mammut evr-attr-index[121828]: 2023-01-17T17:45:09 iI Listening on 0.0.0.0:2562
+Jan 17 17:45:11 mammut evr-attr-index[121828]: 2023-01-17T17:45:11 iI Start building attr index for sha3-224-7f9610c711b56629f8b5a7fab0d80ff89bf671de409eaea8dad79a7a
+Jan 17 17:45:12 mammut evr-attr-index[121828]: 2023-01-17T17:45:12 iE Failed building attr index for sha3-224-7f9610c711b56629f8b5a7fab0d80ff89bf671de409eaea8dad79a7a
+Jan 17 17:45:12 mammut evr-attr-index[121828]: 2023-01-17T17:45:12 iP Ended build index worker with result 1
+Jan 17 17:45:12 mammut systemd[1]: animation-index.service: Main process exited, code=exited, status=1/FAILURE
+Jan 17 17:45:12 mammut systemd[1]: animation-index.service: Failed with result 'exit-code'.
+#+END_SRC
+
+maybe we just need more logs for now :/
+* evr-glacier-storage should fork when started
+that way systemd can wait for the fork and start dependencies
+correctly. right now the blob validation during evr-glacier-storage
+startup can make the evr-attr-index start up much quicker than
+evr-glacier-storage.
+
+forking after initialization is already implemented in evr-fs.
+* plan how can we handle repeating fields like social-child-of?
+update the backlog for evr-attr-ui. how can we produce multiple copies
+of the widget for repeating attributes?
+
+how to update ye-social-child-of-combo-box after list is loaded?
 * xslt transform attr-ui-spec into gtk interface xml
 transformation should produce a single hello world label
 initially. the produced interface xml should be parsend and replace
 the code which shows the initial demo window. the xslt transformation
 is part of the evr source and should be placed somewhere below /usr.
+* single seed models
+a single seed model implements a key/value string pair. values must be
+lookupable by key. values must be settable by key.
+
+change listeners on keys must be registerable.
+
+seed model has a flag + callback if data for the model is currently
+loading.
+
+model access must be thread safe. this should synchronize population
+from a background thread and read/write access from the widgets.
+
+multiple seed models must be held in a ui model. models are lookupable
+by a string id.
+* seed list models
+a seed list model is an array of seeds with attributes. the attributes
+are not modifyable.
+
+seed list models must also be heldable by the ui model.
+* xslt transform attr-ui-spec into model spec
+every view below the root element has an model slot. view and model
+are associated via their index in the attr-ui-spec below the root
+element.
+
+a model spec for one form view followed by a master/detail view might
+look like this:
+
+#+BEGIN_SRC xml
+<model-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <seed id="ye-form"/> <!-- model for form -->
+  <seed-list id="de-md-list">
+    <!-- model for master/detail list -->
+    <populate query="class=contact"/>
+  </seed-list>
+  <seed id="ye-md-detail"/> <!-- model for master/detail detail form -->
+</model-spec>
+#+END_SRC
+
+populate the ui model struct with the models from the spec.
+* xslt transform attr-ui-spec into controller spec
+a controller spec for one form view followed by a master/detail view
+might look like this:
+#+BEGIN_SRC xml
+<controller-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <widget-controller model="ye-form">
+    <entry-bind k="first-name" widget="ye-first-name-widget-id"/>
+    <entry-bind k="date" widget="ye-date-widget-id"/>
+    <combo-box-bind k="social-child-of" widget="ye-social-child-of-combo-box"/>
+  </widget-controller>
+  <list-controller
+      model="ye-md-list"
+      widget="ye-social-child-of-combo-box"/>
+  <combo-box-seed-bind
+      model="ye-form"
+      k="social-child-of"
+      target-model="ye-md-detail" />
+  <seed-
+  <widget-controller model="ye-md-detail">
+    <!-- … -->
+  </widget-controller>
+</controller-spec>
+#+END_SRC
 * add dc:title attribute to attr-ui-spec as window title
 a dc:title attribute on attr-ui-spec should set the human readable
 window title of evr-attr-ui
@@ -44,6 +139,22 @@ an example ui for creating a contact claim:
         <seed-filter>class=contact</seed-filter>
       </seed-ref>
     </form>
+  </root>
+</attr-ui-spec>
+#+END_SRC
+
+an example ui for creating a master/detail view:
+
+#+BEGIN_SRC xml
+<attr-ui-spec xmlns="https://evr.ma300k.de/attr-ui/">
+  <root>
+    <master-detail query="class=contact">
+      <detail>
+        <form>
+          <!-- … -->
+        </form>
+      <detail>
+    </master-detail>
   </root>
 </attr-ui-spec>
 #+END_SRC
@@ -387,17 +498,6 @@ able to define them somehow in blobs.
 #+BEGIN_SRC
 (tag=todo || tag=backlog) tag=howto
 #+END_SRC
-* evr-glacier-storage should notify systemd when ready
-the systemd service type notify uses a notification approach provided
-by libsystemd-daemon.so so the service can tell systemd it's
-ready. this notifications should be performed after
-evr-glacier-storage is listening on the socket for incomming
-connections.
-
-the configure.ac scripts should detect if systemd support is
-available. maybe it the libsystemd-daemos.so or something is
-present. if it is not found evr-glacier-storage must be compiled
-without any systemd dependency.
 * user PRI macros in format strings for integers
 right now many places use for example %d or %ld for printing integers
 with defined sizes like int64_t. the PRI* macros from [[https://cplusplus.com/reference/cinttypes/][inttypes.h]]
