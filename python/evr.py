@@ -107,6 +107,9 @@ class SearchResult(object):
         self.seed = seed
         self.attrs = attrs
 
+    def __str__(self):
+        return f'{self.seed} {self.attrs}'
+
 def search(query, limit=None):
     """search is a wrapper around the 'evr search' shell command.
 
