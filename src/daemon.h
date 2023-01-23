@@ -24,7 +24,10 @@
 /**
  * evr_daemonize forks this process into a daemon. This process will
  * exit after the fork.
+ *
+ * If pid_path is unequal NULL then evr_daemonize will write the pid
+ * of the forked process into a file at pid_path.
  */
-int evr_daemonize();
+int evr_daemonize(char *pid_path);
 
 #endif

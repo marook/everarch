@@ -53,6 +53,8 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
         cfg->ssl_key_path,
         cfg->storage_host,
         cfg->storage_port,
+        cfg->log_path,
+        cfg->pid_path,
     };
     char **str_options_end = &str_options[static_len(str_options)];
     for(char **it = str_options; it != str_options_end; ++it){

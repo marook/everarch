@@ -60,6 +60,7 @@ static char args_doc[] = "TRANSFORMATION MOUNT_POINT";
 #define arg_accepted_gpg_key 262
 #define arg_allow_other 263
 #define arg_log_path 264
+#define arg_pid_path 265
 
 #define max_traces_len 64
 
@@ -112,6 +113,7 @@ struct evr_fs_cfg {
     gid_t gid;
 
     char *log_path;
+    char *pid_path;
 };
 
 struct evr_fs_cfg cfg;
@@ -132,6 +134,7 @@ static struct argp_option options[] = {
     {"oallow-other", arg_allow_other, NULL, 0, "The file system will be accessible by other users. Requires the user_allow_other option to be set in the global fuse configuration."},
     {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
     {"log", arg_log_path, "FILE", 0, "A file to which log output messages will be appended. By default logs are written to stdout."},
+    {"pid", arg_pid_path, "FILE", 0, "A file to which the daemon's pid is written."},
     {0},
 };
 
@@ -196,6 +199,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     }
     case arg_log_path:
         evr_replace_str(cfg->log_path, arg);
+        break;
+    case arg_pid_path:
+        evr_replace_str(cfg->pid_path, arg);
         break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
@@ -269,6 +275,7 @@ int main(int argc, char *argv[]) {
     cfg.uid = getuid();
     cfg.gid = getgid();
     cfg.log_path = NULL;
+    cfg.pid_path = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -358,6 +365,7 @@ int main(int argc, char *argv[]) {
             cfg.transformation,
             cfg.mount_point,
             cfg.log_path,
+            cfg.pid_path,
         };
         void **tbfree_end = &tbfree[static_len(tbfree)];
         for(void **it = tbfree; it != tbfree_end; ++it){
@@ -1135,7 +1143,7 @@ int run_fuse(char *program, struct evr_fs_cfg *cfg){
         goto out_with_free_signal_handlers;
     }
     if(!cfg->foreground){
-        if(evr_daemonize() != evr_ok){
+        if(evr_daemonize(cfg->pid_path) != evr_ok){
             goto out_with_session_unmount;
         }
     }

@@ -41,10 +41,11 @@
 #include "handover.h"
 #include "evr-tls.h"
 #include "notify.h"
+#include "daemon.h"
 
 #define program_name "evr-attr-index"
 
-const char *argp_program_version = " " VERSION;
+const char *argp_program_version = program_name " " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
 static char doc[] = program_name " provides an index over a evr-glacier-storage server.";
@@ -64,6 +65,8 @@ static char args_doc[] = "";
 #define arg_storage_auth_token 262
 #define arg_auth_token 263
 #define arg_gpg_key 264
+#define arg_log_path 265
+#define arg_pid_path 266
 
 static struct argp_option options[] = {
     {"state-dir", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
@@ -77,6 +80,9 @@ static struct argp_option options[] = {
     {"storage-auth-token", arg_storage_auth_token, "TOKEN", 0, "An authorization token which is presented to the storage server so our requests are accepted. The authorization token must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret."},
     {"ssl-cert", arg_ssl_cert, "HOST:PORT:FILE", 0, "The hostname, port and path to the pem file which contains the public SSL certificate of remote servers. This option can be specified multiple times. Default entry is " evr_glacier_storage_host ":" to_string(evr_glacier_storage_port) ":" default_storage_ssl_cert_path "."},
     {"accepted-gpg-key", arg_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
+    {"foreground", 'f', NULL, 0, "The process will not demonize. It will stay in the foreground instead."},
+    {"log", arg_log_path, "FILE", 0, "A file to which log output messages will be appended. By default logs are written to stdout."},
+    {"pid", arg_pid_path, "FILE", 0, "A file to which the daemon's pid is written."},
     {0},
 };
 
@@ -93,6 +99,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case 'p':
         evr_replace_str(cfg->port, arg);
+        break;
+    case 'f':
+        cfg->foreground = 1;
+        break;
+    case arg_log_path:
+        evr_replace_str(cfg->log_path, arg);
+        break;
+    case arg_pid_path:
+        evr_replace_str(cfg->pid_path, arg);
         break;
     case arg_ssl_cert_path:
         evr_replace_str(cfg->ssl_cert_path, arg);
@@ -272,6 +287,11 @@ int main(int argc, char **argv){
     if(evr_init_index_handover_ctx(&index_handover_ctx) != evr_ok){
         goto out_with_free_attr_spec_handover_ctx;
     }
+    if(!cfg->foreground){
+        if(evr_daemonize(cfg->pid_path) != evr_ok){
+            goto out_with_free_index_handover_ctx;
+        }
+    }
     thrd_t watch_index_claims_thrd;
     if(thrd_create(&watch_index_claims_thrd, evr_watch_index_claims_worker, &attr_spec_handover_ctx) != thrd_success){
         goto out_with_free_index_handover_ctx;
@@ -392,6 +412,9 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     cfg->storage_auth_token_set = 0;
     cfg->accepted_gpg_fprs = NULL;
     cfg->verify_ctx = NULL;
+    cfg->foreground = 0;
+    cfg->log_path = NULL;
+    cfg->pid_path = NULL;
     if(!cfg->state_dir_path || !cfg->host || !cfg->port || !cfg->storage_host || !cfg->storage_port){
         evr_panic("Unable to allocate memory for configuration.");
         // TODO free memory allocated in this function even if program terminates after returning evr_error here
@@ -413,6 +436,9 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, cfg);
+    if(evr_setup_log(cfg->log_path) != evr_ok){
+        return evr_error;
+    }
     evr_single_expand_property(cfg->state_dir_path, panic);
     if(cfg->auth_token_set == 0){
         log_error("Setting an auth-token is mandatory. Call " program_name " --help for details how to set the auth-token.");

@@ -146,6 +146,7 @@ evr_attr_index_SOURCES = \
 	claims.c \
 	configurations.c \
 	configp.c \
+	daemon.c \
 	db.c \
 	dyn-mem.c \
 	evr-attr-index.c \
@@ -226,6 +227,7 @@ evr_glacier_storage_SOURCES = \
 	concurrent-glacier.c \
 	configurations.c \
 	configp.c \
+	daemon.c \
 	db.c \
 	dyn-mem.c \
 	evr-glacier-storage.c \

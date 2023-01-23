@@ -64,6 +64,15 @@ struct evr_glacier_storage_cfg {
      * should be used when pointing to NULL.
      */
     char *index_db_path;
+
+    /**
+     * foreground's indicates if the process should stay in the
+     * started process or fork into a daemon.
+     */
+    int foreground;
+
+    char *log_path;
+    char *pid_path;
 };
 
 void evr_free_glacier_storage_cfg(struct evr_glacier_storage_cfg *cfg);

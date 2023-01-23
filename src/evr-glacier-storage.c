@@ -45,6 +45,7 @@
 #include "configp.h"
 #include "evr-tls.h"
 #include "queue.h"
+#include "daemon.h"
 
 #define program_name "evr-glacier-storage"
 
@@ -65,6 +66,8 @@ static char args_doc[] = "";
 #define arg_ssl_key_path 258
 #define arg_auth_token 259
 #define arg_index_db 260
+#define arg_log_path 261
+#define arg_pid_path 262
 
 static struct argp_option options[] = {
     {"host", arg_host, "HOST", 0, "The network interface at which the attr index server will listen on. The default is " default_host "."},
@@ -75,6 +78,9 @@ static struct argp_option options[] = {
     // TODO max-bucket-size
     {"bucket-dir", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted. Default path is " default_bucket_dir_path "."},
     {"index-db", arg_index_db, "DB", 0, "Path to where the sqlite bucket index DB should be put. The default is to put the index db within the bucket-dir."},
+    {"foreground", 'f', NULL, 0, "The process will not demonize. It will stay in the foreground instead."},
+    {"log", arg_log_path, "FILE", 0, "A file to which log output messages will be appended. By default logs are written to stdout."},
+    {"pid", arg_pid_path, "FILE", 0, "A file to which the daemon's pid is written."},
     {0},
 };
 
@@ -94,6 +100,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case 'p':
         evr_replace_str(cfg->port, arg);
+        break;
+    case 'f':
+        cfg->foreground = 1;
+        break;
+    case arg_log_path:
+        evr_replace_str(cfg->log_path, arg);
+        break;
+    case arg_pid_path:
+        evr_replace_str(cfg->pid_path, arg);
         break;
     case arg_ssl_cert_path:
         evr_replace_str(cfg->ssl_cert_path, arg);
@@ -186,6 +201,11 @@ int main(int argc, char **argv){
         log_error("Glacier quick check failed");
         goto out_with_free_ssl_ctx;
     }
+    if(!cfg->foreground){
+        if(evr_daemonize(cfg->pid_path) != evr_ok){
+            goto out_with_free_ssl_ctx;
+        }
+    }
     if(evr_persister_start(cfg) != evr_ok){
         log_error("Failed to start glacier persister thread");
         goto out_with_free_ssl_ctx;
@@ -226,6 +246,9 @@ int evr_load_glacier_storage_cfg(int argc, char **argv){
     cfg->max_bucket_size = 1024 << 20;
     cfg->bucket_dir_path = strdup(default_bucket_dir_path);
     cfg->index_db_path = NULL;
+    cfg->foreground = 0;
+    cfg->log_path = NULL;
+    cfg->pid_path = NULL;
     if(!cfg->host || !cfg->port || !cfg->bucket_dir_path){
         evr_panic("Unable to allocate memory for configuration");
         return evr_error;
@@ -240,6 +263,9 @@ int evr_load_glacier_storage_cfg(int argc, char **argv){
     }
     struct argp argp = { options, parse_opt_adapter, args_doc, doc };
     argp_parse(&argp, argc, argv, 0, 0, cfg);
+    if(evr_setup_log(cfg->log_path) != evr_ok){
+        return evr_error;
+    }
     evr_single_expand_property(cfg->bucket_dir_path, panic);
     if(cfg->auth_token_set == 0){
         log_error("Setting an auth-token is mandatory. Call " program_name " --help for details how to set the auth-token.");

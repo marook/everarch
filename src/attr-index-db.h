@@ -73,6 +73,15 @@ struct evr_attr_index_cfg {
     struct evr_llbuf *accepted_gpg_fprs;
 
     struct evr_verify_ctx *verify_ctx;
+
+    /**
+     * foreground's indicates if the process should stay in the
+     * started process or fork into a daemon.
+     */
+    int foreground;
+
+    char *log_path;
+    char *pid_path;
 };
 
 void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg);

@@ -10,3 +10,4 @@ secondary-storage
 attr-index
 
 *.log
+*.pid

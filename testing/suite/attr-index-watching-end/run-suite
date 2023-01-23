@@ -36,8 +36,6 @@ mount_evr_fs "${fs_xslt_ref}"
 
 sleep 0.5
 
-kill -s sigint "${attr_index_pid}"
-wait "${attr_index_pid}" || true
-attr_index_pid=
+stop_attr_index
 
 echo "Stopping…"

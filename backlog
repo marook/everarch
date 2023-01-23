@@ -19,13 +19,6 @@ Jan 17 17:45:12 mammut systemd[1]: animation-index.service: Failed with result '
 #+END_SRC
 
 maybe we just need more logs for now :/
-* evr-glacier-storage should fork when started
-that way systemd can wait for the fork and start dependencies
-correctly. right now the blob validation during evr-glacier-storage
-startup can make the evr-attr-index start up much quicker than
-evr-glacier-storage.
-
-forking after initialization is already implemented in evr-fs.
 * plan how can we handle repeating fields like social-child-of?
 update the backlog for evr-attr-ui. how can we produce multiple copies
 of the widget for repeating attributes?

@@ -299,6 +299,9 @@ struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *con
     clone->max_bucket_size = config->max_bucket_size;
     clone->bucket_dir_path = clone_string(config->bucket_dir_path);
     clone->index_db_path = clone_string(config->index_db_path);
+    clone->foreground = config->foreground;
+    clone->log_path = clone_string(config->log_path);
+    clone->pid_path = clone_string(config->pid_path);
     return clone;
 }
 

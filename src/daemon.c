@@ -20,11 +20,14 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 #include "errors.h"
 #include "logger.h"
 
-int evr_daemonize(){
+int evr_write_pid_file(char *path);
+
+int evr_daemonize(char *pid_path){
     int ret = evr_error;
     int waiter_fd[2];
     if(pipe(waiter_fd) != 0){
@@ -41,6 +44,9 @@ int evr_daemonize(){
         }
         _exit(0);
         goto out;
+    }
+    if(pid_path && evr_write_pid_file(pid_path) != evr_ok){
+        goto out_with_close_waiter_fd;
     }
     if(setsid() == -1){
         goto out_with_close_waiter_fd;
@@ -78,6 +84,33 @@ int evr_daemonize(){
     }
     if(close(waiter_fd[1]) != 0){
         evr_panic("Unable to close waiter_fd[1]");
+        ret = evr_error;
+    }
+ out:
+    return ret;
+}
+
+int evr_write_pid_file(char *path){
+    int ret = evr_error;
+    pid_t pid = getpid();
+    char buf[32];
+    int size = snprintf(buf, sizeof(buf), "%lu", (unsigned long)pid);
+    if(size < 0 || size >= (int)sizeof(buf)){
+        goto out;
+    }
+    int f = open(path, O_WRONLY | O_CREAT, 0744);
+    if(f < 0){
+        log_error("Unable to open pid file %s", path);
+        goto out;
+    }
+    ssize_t written = write(f, buf, size);
+    if(written != size){
+        goto out_with_close_f;
+    }
+    ret = evr_ok;
+ out_with_close_f:
+    if(close(f) != 0){
+        evr_panic("Unable to close pid file %s", path);
         ret = evr_error;
     }
  out:
