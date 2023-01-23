@@ -254,6 +254,13 @@ static void activate_main_widget(GApplication *app){
 }
 
 static int evr_load_interface_xslt(xsltStylesheet **style);
+static void evr_signal_connect(GtkBuilder *builder,
+                               GObject *object,
+                               const gchar *signal_name,
+                               const gchar *handler_name,
+                               GObject *connect_object,
+                               GConnectFlags flags,
+                               gpointer user_data);
 
 static int evr_build_ui(GApplication *app, xmlDoc *ui_spec){
     int ret = evr_error;
@@ -283,6 +290,7 @@ static int evr_build_ui(GApplication *app, xmlDoc *ui_spec){
         // parsing string then the program will be aborted."
         goto out_with_free_interface_str;
     }
+    gtk_builder_connect_signals_full(bld, evr_signal_connect, NULL);
     GObject* root_widget = gtk_builder_get_object(bld, "root");
     if(!root_widget){
         log_error("Missing window widget with id=root in interface");
@@ -300,6 +308,29 @@ static int evr_build_ui(GApplication *app, xmlDoc *ui_spec){
     xsltFreeStylesheet(interface_style);
  out:
     return ret;
+}
+
+static void evr_a_callback(GtkButton *button, gpointer user_data);
+
+static void evr_signal_connect(GtkBuilder *builder,
+                              GObject *object,
+                              const gchar *signal_name,
+                              const gchar *handler_name,
+                              GObject *connect_object,
+                              GConnectFlags flags,
+                              gpointer user_data){
+    log_debug(">>> connecting %s to %s via %p", signal_name, handler_name, connect_object);
+
+    GCallback handler = G_CALLBACK(evr_a_callback); // TODO handler_funcs[i];
+    if(connect_object) {
+        g_signal_connect_object(object, signal_name, handler, connect_object, flags);
+    } else {
+        g_signal_connect_data(object, signal_name, handler, user_data, NULL, flags);
+    }
+}
+
+static void evr_a_callback(GtkButton *button, gpointer user_data){
+    log_debug(">>> clicky");
 }
 
 static int evr_load_interface_xslt(xsltStylesheet **style){
