@@ -1,0 +1,47 @@
+# evr-fs user service for system.
+#
+# Copy this file to ~/.config/systemd/user
+#
+# You must perform the following adjustments in this file before it can
+# work reasonably:
+# - Configure your evr-fs XSLT ref below at 'ExecStart'
+# - Add your trace options to the 'ExecStart' option below
+# - Make sure that /mnt/evr exists or change the path at the 'ExecStart'
+#   and 'ExecStop' options
+#
+# Enable and start the service:
+#
+# $ systemd --user enable evr-fs.service
+# $ systemd --user start evr-fs.service
+
+[Unit]
+Description=evr-fs for animations
+Documentation=info:evr
+Requires=evr-glacier-storage.service
+Requires=evr-attr-index.service
+After=evr-glacier-storage.service
+After=evr-attr-index.service
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+# You may want to add certain options to the evr-fs command.
+#
+# Appending '--log server.log' will write the evr-fs logs into a file.
+# This is feasible because evr-fs will fork and drop all logs instead.
+ExecStart=/usr/local/bin/evr-fs xslt:blob:sha3-224-TODO /mnt/evr
+
+ExecStop=fusermount -u /mnt/evr
+TimeoutStartSec=300
+Type=forking
+Restart=on-failure
+RestartSec=10
+LimitCORE=infinity
+
+# Hardening
+#SystemCallArchitectures=native
+#MemoryDenyWriteExecute=true
+#NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

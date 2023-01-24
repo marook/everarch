@@ -15,9 +15,17 @@ StartLimitIntervalSec=60
 StartLimitBurst=4
 
 [Service]
+# You may want to add certain options to the evr-attr-index command.
+#
+# Appending '--log server.log' will write the evr-attr-index logs into a
+# file. This is feasible because evr-attr-index will fork
+# and drop all logs instead.
 ExecStart=/usr/local/bin/evr-attr-index
+
+Type=forking
 Restart=on-failure
-RestartSec=1
+RestartSec=30
+TimeoutStartSec=60
 
 # Hardening
 SystemCallArchitectures=native
