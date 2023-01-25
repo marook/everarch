@@ -8,17 +8,17 @@ AC_PROG_CC
 AC_PROG_LEX
 if test "x$LEX" == "x:"
 then
-  AC_MSG_ERROR(flex was not found.)
+  AC_MSG_ERROR([flex was not found.])
 fi
 
 AC_PROG_YACC
 PKG_PROG_PKG_CONFIG
 AM_PATH_PYTHON([3.0])
 
-AC_DEFINE(_DEFAULT_SOURCE, 1, This macro can be defined to ensure that the "default" definitions are provided.)
-AC_DEFINE(_POSIX_C_SOURCE, 200809L, We want to use for example strnlen)
-AC_DEFINE(_GNU_SOURCE, 1, We use for example fcntl's F_GETSIG)
-AC_DEFINE(EVR_GCRY_MIN_VERSION, "1.8.0", Minimum version required for libgrcy)
+AC_DEFINE(_DEFAULT_SOURCE, [1], [This macro can be defined to ensure that the "default" definitions are provided.])
+AC_DEFINE(_POSIX_C_SOURCE, [200809L], [We want to use for example strnlen])
+AC_DEFINE(_GNU_SOURCE, [1], [We use for example fcntl's F_GETSIG])
+AC_DEFINE(EVR_GCRY_MIN_VERSION, ["1.8.0"], [Minimum version required for libgrcy])
 
 AC_ARG_ENABLE(
   [futile-claim-set-tracking],
@@ -52,7 +52,7 @@ fi
 AC_DEFINE_UNQUOTED([EVR_PREFIX], ["${prefix}"], [Path prefix where everarch will be installed])
 
 AC_STDC_HEADERS
-AC_HAVE_HEADERS(string.h)
+AC_HAVE_HEADERS([string.h])
 
 AC_FUNC_ALLOCA
 
@@ -69,7 +69,7 @@ AC_CHECK_FUNCS_ONCE([mkdtemp])
 AX_PTHREAD
 
 m4_ifdef([AM_PATH_LIBGCRYPT],[
-    AM_PATH_LIBGCRYPT("1.8.0", , [AC_MSG_ERROR([gcrypt was not found in a sufficient version.])])
+    AM_PATH_LIBGCRYPT([1.8.0], , [AC_MSG_ERROR([gcrypt was not found in a sufficient version.])])
   ],
   AC_MSG_ERROR([automake gcrypt support is missing.])
 )
@@ -78,7 +78,7 @@ PKG_CHECK_MODULES([EVERARCH], [
     sqlite3
 ])
 
-AM_PATH_GPGME(1, , AC_MSG_ERROR(GnuPG Made Easy library not found))
+AM_PATH_GPGME([1], , AC_MSG_ERROR([GnuPG Made Easy library not found]))
 
 PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9])
 PKG_CHECK_MODULES([XSLT], [libxslt >= 1.1])
@@ -86,7 +86,7 @@ PKG_CHECK_MODULES([SSL], [libssl >= 1.1 libcrypto >= 1.1])
 
 AM_PATH_GTK_3_0([3.24.0], , AC_MSG_ERROR([Gtk+ 3.24.0 or higher required.]))
 
-AC_DEFINE(FUSE_USE_VERSION, 34, Fuse target API version.)
+AC_DEFINE(FUSE_USE_VERSION, [34], [Fuse target API version.])
 PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0])
 
 AM_PATH_LISPDIR()
