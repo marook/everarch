@@ -795,6 +795,7 @@ int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec){
     filter.flags_filter = evr_blob_flag_claim;
     filter.last_modified_after = apply_watch_overlap(last_indexed_claim_ts);
     if(evr_req_cmd_watch_blobs(&cw, &filter) != evr_ok){
+        log_error("Unable to request watch claims on evr-glacier-storage");
         goto out_with_free_style;
     }
     struct evr_watch_blobs_body wbody;
