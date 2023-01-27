@@ -98,9 +98,13 @@ flags and last_modified_after are expected to be integers.
         args += ['--last-modified-after', str(last_modified_after)]
     if blobs_sort_order is not None:
         args += ['--blobs-sort-order', blobs_sort_order]
-    for line in _evr(args, encoding=default_encoding):
-        seed_ref, last_modified, watch_flags = line.split(' ')
-        yield ModifiedBlob(seed_ref, int(last_modified), int(watch_flags))
+    p = subprocess.Popen(args, stdin=None, stdout=subprocess.PIPE, encoding=default_encoding)
+    try:
+        for line in p.stdout:
+            seed_ref, last_modified, watch_flags = line.split(' ')
+            yield ModifiedBlob(seed_ref, int(last_modified), int(watch_flags))
+    finally:
+        p.terminate()
 
 class SearchResult(object):
     def __init__(self, seed, attrs):
