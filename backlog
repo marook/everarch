@@ -1,3 +1,81 @@
+* evr-glacier-storage hangs randomly
+evr-glacier-storage sometimes stopps persisting blobs during huge data
+imports.
+
+a core dump of the running evr-glacier-storage process indicates that
+8 threads are waiting for a scheduled persist task to be
+finished. they wait for the release of the task done lock in in
+evr_persister_wait_for_task().
+
+the persister thread crashed which is indicated via the logs:
+
+#+BEGIN_SRC
+2023-02-04T12:05:15 gD evr_persister_worker ending with result 1
+#+END_SRC
+
+the log statements leading to the persister crash are:
+
+#+BEGIN_SRC
+2023-02-04T12:05:15 gD Worker 19 retrieved cmd 0x02 with body size 1074
+2023-02-04T12:05:15 gD Worker 19 retrieved cmd put sha3-224-f6633db69d0a8216422a18e7a9686a03a015d3a3a1f40ff9d8d1bcb4 with flags 0x01 and 1045 bytes blob
+2023-02-04T12:05:15 gD Connection from 0.0.0.0:48276 accepted (will be worker 32)
+2023-02-04T12:05:15 gD Started worker 32
+2023-02-04T12:05:15 gD Client successfully authenticated
+2023-02-04T12:05:15 gD Worker 21 retrieved cmd 0x01 with body size 28
+2023-02-04T12:05:15 gD Worker 21 retrieved cmd get sha3-224-75af0d8feaf76f3b20f0657c03fc92af8ecdddd35edeccce53843c83
+2023-02-04T12:05:15 gD db duration step_stmt 17910ns raw select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?
+2023-02-04T12:05:15 gD db duration step_stmt 17910ns exp select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = x'75af0d8feaf76f3b20f0657c03fc92af8ecdddd35edeccce53843c83'
+2023-02-04T12:05:15 gD Worker 21 ends because of remote termination
+2023-02-04T12:05:15 gD First SSL shutdown of socket 21 failed with SSL error -1
+2023-02-04T12:05:15 gD Ended worker 21 with result 0
+2023-02-04T12:05:15 gD Connection from 0.0.0.0:48288 accepted (will be worker 21)
+2023-02-04T12:05:15 gD Started worker 21
+2023-02-04T12:05:15 gD Client successfully authenticated
+2023-02-04T12:05:15 gD Connection from 0.0.0.0:48292 accepted (will be worker 22)
+2023-02-04T12:05:15 gD Worker 24 retrieved cmd 0x03 with body size 28
+2023-02-04T12:05:15 gD Worker 24 retrieved cmd stat sha3-224-9578c07eec755973f3641f5708eba598384daa35fb3c7f33ac21ea75
+2023-02-04T12:05:15 gD Worker 24 creates a glacier read ctx
+2023-02-04T12:05:15 gD Prepare sqlite statement: select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?
+2023-02-04T12:05:15 gD Prepare sqlite statement: select key, flags, last_modified from blob_position where last_modified >= ? order by last_modified
+2023-02-04T12:05:15 gD Prepare sqlite statement: select key, flags, last_modified from blob_position where last_modified >= ? order by key
+2023-02-04T12:05:15 gD db duration step_stmt 9994ns raw select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = ?
+2023-02-04T12:05:15 gD db duration step_stmt 9994ns exp select flags, bucket_index, bucket_blob_offset, blob_size from blob_position where key = x'9578c07eec755973f3641f5708eba598384daa35fb3c7f33ac21ea75'
+2023-02-04T12:05:15 gD Worker 24 retrieved cmd 0x02 with body size 160358
+2023-02-04T12:05:15 gD Worker 24 retrieved cmd put sha3-224-9578c07eec755973f3641f5708eba598384daa35fb3c7f33ac21ea75 with flags 0x00 and 160329 bytes blob
+2023-02-04T12:05:15 gD glacier duration blob_fsync 1367304ns
+2023-02-04T12:05:15 gD glacier duration write_bucket_end_offset 623296ns
+2023-02-04T12:05:15 gD glacier duration blob_disk_write 2018400ns
+2023-02-04T12:05:15 gD db duration step_stmt 24899ns raw insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size, last_modified) values (?, ?, ?, ?, ?, ?)
+2023-02-04T12:05:15 gD db duration step_stmt 24899ns exp insert into blob_position (key, flags, bucket_index, bucket_blob_offset, blob_size, last_modified) values (x'f6633db69d0a8216422a18e7a9686a03a015d3a3a1f40ff9d8d1bcb4', 1, 35, 1019364251, 1045, 1675508715214)
+2023-02-04T12:05:15 gD db duration step_stmt 9117ns raw update bucket set end_offset = ? where bucket_index = ?
+2023-02-04T12:05:15 gD db duration step_stmt 9117ns exp update bucket set end_offset = 1019365296 where bucket_index = 35
+2023-02-04T12:05:15 gD Wrote blob with key sha3-224-f6633db69d0a8216422a18e7a9686a03a015d3a3a1f40ff9d8d1bcb4 to glacier
+2023-02-04T12:05:15 gE Persister failed to notify watchers about modified blob sha3-224-f6633db69d0a8216422a18e7a9686a03a015d3a3a1f40ff9d8d1bcb4
+2023-02-04T12:05:15 gD evr_persister_worker ending with result 1
+#+END_SRC
+
+as the log indicates that the persister failed to notify the watchers
+i assume the following happend. the notify watchers queue ran full
+because new blobs got added quicker than the watcher could unload them
+to it's peer via the network connection. on the first try to add an
+item to a full queue the queue changes it's status to
+evr_temporary_occupied and the notification for that item is
+ignored. when later trying to add another item to the queue which is
+no longer is status evr_ok the evr_queue_put operation returns an
+evr_error. that leads to the persister thread being ended.
+
+reading from the watch notification queue is performed in
+evr_work_watch_blobs(). it's calling evr_queue_take() to retrieve a
+notification. evr_queue_take fails if the queue is in a state !=
+evr_ok.
+
+the following things should be changed the avoid the described issue.
+
+evr_queue_put should return evr_temporary_occupied if the status of
+the queue is evr_temporary_occupied.
+
+ending evr_persister_worker with a result != evr_ok should panic and
+stop the server.
 * evr-attr-index indexing crash
 #+BEGIN_SRC
 Jan 17 17:45:05 mammut systemd[1]: Started evr-attr-index for animations.

@@ -139,6 +139,8 @@ int evr_queue_put(struct evr_queue *q, void *entry){
         goto out;
     }
     if(q->status != evr_ok){
+        // do not add more entries to the queue while the queue is in
+        // a broken state from a former operation.
         goto out_with_unlock;
     }
     size_t next_writing_i = (q->writing_i + 1) & (q->items_len - 1);
