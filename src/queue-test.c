@@ -42,6 +42,8 @@ void test_overflow_queue(){
     assert(q->status == evr_ok);
     assert(evr_queue_put(q, &a) == evr_temporary_occupied);
     assert(q->status == evr_temporary_occupied);
+    assert(evr_queue_put(q, &a) == evr_temporary_occupied);
+    assert(q->status == evr_temporary_occupied);
     evr_queue_end_producing(q);
     int status = evr_ok;
     assert(is_ok(evr_free_queue(q, &status)));

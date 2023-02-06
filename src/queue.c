@@ -138,6 +138,11 @@ int evr_queue_put(struct evr_queue *q, void *entry){
     if(mtx_lock(&q->lock) != thrd_success){
         goto out;
     }
+    if(q->status == evr_temporary_occupied){
+        // the queue was completely full at some point in time.
+        ret = evr_temporary_occupied;
+        goto out_with_unlock;
+    }
     if(q->status != evr_ok){
         // do not add more entries to the queue while the queue is in
         // a broken state from a former operation.

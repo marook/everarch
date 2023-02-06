@@ -233,7 +233,11 @@ int evr_persister_worker(void *context){
         result = evr_error;
     }
  out:
-    log_debug("evr_persister_worker ending with result %d", result);
+    if(result != evr_ok){
+        evr_panic("evr_persister_worker ending with result %d", result);
+    } else {
+        log_debug("evr_persister_worker ending with result %d", result);
+    }
     return result;
 }
 

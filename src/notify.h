@@ -50,6 +50,14 @@ struct evr_notify_ctx {
     size_t msg_size;
 };
 
+/**
+ * evr_create_notify_ctx creates a new context for performing
+ * notifications.
+ *
+ * msgs_len_exp defines is the exponent to the base of 2 which defines
+ * how many messages can be kept in the notifications context for each
+ * observer at max.
+ */
 struct evr_notify_ctx *evr_create_notify_ctx(size_t observers_len, size_t msgs_len_exp, size_t msg_size);
 
 int evr_free_notify_ctx(struct evr_notify_ctx *nt);
