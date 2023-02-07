@@ -31,6 +31,11 @@
 #include "attr-index-db.h"
 #include "files.h"
 
+// the following declarations are "private" functions from
+// attr-index-db.c which we want to test in this file, despite they
+// are not part of the public api.
+int evr_move_claims(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name);
+
 #define permutations 4
 #define merge_attrs_len 4
 
@@ -688,6 +693,104 @@ int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr
     return evr_ok;
 }
 
+xmlNode *evr_append_claim_set(xmlDoc *doc);
+
+void test_move_claims_without_claimsets(){
+    xmlDoc *src = xmlNewDoc(BAD_CAST "1.0");
+    assert(src);
+    xmlDoc *dst = xmlNewDoc(BAD_CAST "1.0");
+    assert(dst);
+    assert(evr_move_claims(dst, src, "ye-dst", "ye-src") == evr_error);
+    evr_append_claim_set(dst);
+    assert(evr_move_claims(dst, src, "ye-dst", "ye-src") == evr_error);
+    xmlFreeDoc(dst);
+    xmlFreeDoc(src);
+}
+
+size_t evr_count_claims(xmlNode *cs);
+
+void test_move_claims_with_one_claim(){
+    xmlDoc *src = xmlNewDoc(BAD_CAST "1.0");
+    assert(src);
+    xmlDoc *dst = xmlNewDoc(BAD_CAST "1.0");
+    assert(dst);
+    xmlNode *scs = evr_append_claim_set(src);
+    xmlNode *dcs = evr_append_claim_set(dst);
+    // merge two empty claim-sets
+    assert(is_ok(evr_move_claims(dst, src, "ye-dst", "ye-src")));
+    assert(evr_first_claim(scs) == NULL);
+    assert(evr_first_claim(dcs) == NULL);
+    // add one claim to source and merge
+    xmlNode *c = xmlNewNode(NULL, BAD_CAST "attr");
+    assert(c);
+    assert(xmlAddChild(scs, c));
+    assert(evr_count_claims(scs) == 1);
+    assert(evr_count_claims(dcs) == 0);
+    assert(is_ok(evr_move_claims(dst, src, "ye-dst", "ye-src")));
+    assert(evr_count_claims(scs) == 0);
+    assert(evr_count_claims(dcs) == 1);
+    xmlFreeDoc(dst);
+    xmlFreeDoc(src);
+}
+
+void test_move_claims_with_two_claims(){
+    size_t count;
+    xmlDoc *src = xmlNewDoc(BAD_CAST "1.0");
+    assert(src);
+    xmlDoc *dst = xmlNewDoc(BAD_CAST "1.0");
+    assert(dst);
+    xmlNode *scs = evr_append_claim_set(src);
+    xmlNode *dcs = evr_append_claim_set(dst);
+    char buf[2];
+    int res;
+    const int claim_count = 2;
+    for(int i = 0; i < claim_count; ++i){
+        xmlNode *c = xmlNewNode(NULL, BAD_CAST "attr");
+        assert(c);
+        res = snprintf(buf, sizeof(buf), "%d", i);
+        assert(res >= 0 && res < (int)sizeof(buf));
+        assert(xmlSetProp(c, BAD_CAST "index", BAD_CAST buf));
+        assert(xmlAddChild(scs, c));
+    }
+    assert(evr_count_claims(scs) == claim_count);
+    assert(evr_count_claims(dcs) == 0);
+    assert(is_ok(evr_move_claims(dst, src, "ye-dst", "ye-src")));
+    count = evr_count_claims(scs);
+    assert_msg(count == 0, "But was %zu", count);
+    assert(evr_count_claims(dcs) == claim_count);
+    xmlNode *c = evr_first_claim(dcs);
+    for(int i = 0; i < claim_count; ++i){
+        assert(c);
+        char *index = (char*)xmlGetProp(c, BAD_CAST "index");
+        assert(index);
+        res = snprintf(buf, sizeof(buf), "%d", i);
+        assert(res >= 0 && res < (int)sizeof(buf));
+        assert_msg(strcmp(index, buf) == 0, "But %s != %s", index, buf);
+        xmlFree(index);
+        c = evr_next_claim(c);
+    }
+    xmlFreeDoc(dst);
+    xmlFreeDoc(src);
+}
+
+size_t evr_count_claims(xmlNode *cs){
+    size_t count = 0;
+    for(xmlNode *it = evr_first_claim(cs); it; it = evr_next_claim(it)){
+        ++count;
+    }
+    return count;
+}
+
+xmlNode *evr_append_claim_set(xmlDoc *doc){
+    xmlNode *cs = xmlNewNode(NULL, BAD_CAST "claim-set");
+    assert(cs);
+    xmlDocSetRootElement(doc, cs);
+    xmlNs *ns = xmlNewNs(cs, BAD_CAST evr_claims_ns, NULL);
+    assert(ns);
+    xmlSetNs(cs, ns);
+    return cs;
+}
+
 int main(){
     evr_init_basics();
     run_test(test_open_new_attr_index_db_twice);
@@ -701,5 +804,8 @@ int main(){
     run_test(test_attr_value_type_self_claim_ref);
     run_test(test_attr_type_claim_ref_invalid_value);
     run_test(test_failed_transformation);
+    run_test(test_move_claims_without_claimsets);
+    run_test(test_move_claims_with_one_claim);
+    run_test(test_move_claims_with_two_claims);
     return 0;
 }

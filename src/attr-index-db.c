@@ -708,7 +708,7 @@ struct evr_append_attr_factory_claims_worker_ctx {
 
 int evr_append_attr_factory_claims_worker(void *context);
 
-int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name);
+int evr_move_claims(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name);
 
 int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_claim_set_doc, struct evr_attr_spec_claim *spec, evr_blob_ref claim_set_ref){
     int ret = evr_ok; // BIG OTHER WAY ROUND WARNING!
@@ -760,7 +760,7 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
                 ret = evr_error;
                 continue;
             }
-            if(evr_merge_claim_set_docs(raw_claim_set_doc, c->built_doc, "original", "dynamic") != evr_ok){
+            if(evr_move_claims(raw_claim_set_doc, c->built_doc, "original", "dynamic") != evr_ok){
                 evr_blob_ref_str claim_set_ref_str;
                 evr_fmt_blob_ref(claim_set_ref_str, c->claim_set_ref);
                 evr_blob_ref_str attr_factory_str;
@@ -905,7 +905,7 @@ int evr_ensure_attr_factory_exe_ready(struct evr_attr_index_db *db, evr_blob_ref
     return evr_ok;
 }
 
-int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name){
+int evr_move_claims(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name){
     xmlNode *dcs = evr_get_root_claim_set(dest);
     if(!dcs){
         log_error("No claim-set found in %s document", dest_name);
@@ -919,25 +919,23 @@ int evr_merge_claim_set_docs(xmlDocPtr dest, xmlDocPtr src, char *dest_name, cha
     }
     xmlNode *sc = evr_first_claim(scs);
     while(sc){
-        sc = evr_find_next_element(sc, NULL, NULL);
-        if(!sc){
-            break;
-        }
-        if(xmlDOMWrapAdoptNode(NULL, src, sc, dest, dcs, 0)){
+        xmlNode *cur = sc;
+        xmlNode *next = sc->next;
+        if(xmlDOMWrapAdoptNode(NULL, src, cur, dest, dcs, 0)){
             return evr_error;
         }
         if(d_last_claim){
-            d_last_claim = xmlAddNextSibling(d_last_claim, sc);
+            d_last_claim = xmlAddNextSibling(d_last_claim, cur);
             if(!d_last_claim){
                 return evr_error;
             }
         } else {
-            d_last_claim = xmlAddChild(dcs, sc);
+            d_last_claim = xmlAddChild(dcs, cur);
             if(!d_last_claim){
                 return evr_error;
             }
         }
-        sc = sc->next;
+        sc = evr_find_next_element(next, NULL, NULL);
     }
     return evr_ok;
 }
