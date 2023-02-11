@@ -1,0 +1,114 @@
+#!/bin/bash
+set -e
+set -o pipefail
+. ../config
+
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
+
+start_glacier_storage
+wait_for_glacier_storage
+
+echo "Uploading basic attr-spec…"
+basic_xslt_ref=`evr put < basic.xslt`
+evr -f 3 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:00:00.000000Z"
+    >
+  <attr-spec>
+    <attr-def k="title" type="str"/>
+    <transformation type="xslt" blob="${basic_xslt_ref}"/>
+  </attr-spec>
+</claim-set>
+EOF
+
+first_claim_set=`evr -f 1 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:01:00.000000Z"
+    >
+  <attr>
+    <a op="=" k="title" v="first"/>
+  </attr>
+</claim-set>
+EOF
+`
+first_claim="${first_claim_set}-0000"
+
+second_claim_set=`evr -f 1 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:02:00.000000Z"
+    >
+  <attr>
+    <a op="=" k="title" v="second"/>
+  </attr>
+</claim-set>
+EOF
+`
+second_claim="${second_claim_set}-0000"
+
+start_attr_index
+wait_for_attr_index
+
+results=`query_attr_index 's '`
+if [[ "${results}" != "OK
+${second_claim}
+${first_claim}" ]]
+then
+    echo "Unexpected result from query: ${results}" >&2
+    exit 1
+fi
+
+# archive 'second' claim
+evr -f 1 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:02:00.000000Z"
+    >
+  <archive seed="${second_claim}"/>
+</claim-set>
+EOF
+
+sleep 1
+wait_for_attr_index
+
+results=`query_attr_index 's '`
+if [[ "${results}" != "OK
+${first_claim}" ]]
+then
+    echo "Unexpected result from query: ${results}" >&2
+    exit 1
+fi
+
+# archive 'first' claim
+evr -f 1 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:03:00.000000Z"
+    >
+  <archive seed="${first_claim}"/>
+</claim-set>
+EOF
+
+sleep 1
+wait_for_attr_index
+
+results=`query_attr_index 's '`
+if [[ "${results}" != "OK" ]]
+then
+    echo "Unexpected result from query: ${results}" >&2
+    exit 1
+fi

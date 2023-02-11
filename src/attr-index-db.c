@@ -632,8 +632,14 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
                 evr_fmt_blob_ref(ref_str, claim_set_ref);
                 log_error("Transformed claim-set for blob with ref %s produced more than %zu seed references.", ref_str, visited_seed_set->refs_len);
                 free(arch);
+                if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
+                    evr_panic("Failed to reset archive_claim statement");
+                }
                 goto out_with_reset_archive_claim;
             }
+        }
+        if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
+            evr_panic("Failed to reset archive_claim statement");
         }
         free(arch);
         c_node = c_node->next;
