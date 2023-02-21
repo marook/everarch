@@ -161,6 +161,7 @@ struct evr_attr_index_db *evr_init_attr_index_db(struct evr_attr_index_db *db){
     db->update_claim_set_failed = NULL;
     db->reset_claim_set_failed = NULL;
     db->find_reindexable_claim_sets = NULL;
+    db->find_claim_archived = NULL;
     db->archive_claim = NULL;
     db->insert_claim_set = NULL;
     db->update_attr_valid_until = NULL;
@@ -230,6 +231,7 @@ int evr_free_attr_index_db(struct evr_attr_index_db *db){
     evr_finalize_stmt(update_claim_set_failed);
     evr_finalize_stmt(insert_claim_set);
     evr_finalize_stmt(archive_claim);
+    evr_finalize_stmt(find_claim_archived);
     evr_finalize_stmt(insert_claim);
     evr_finalize_stmt(insert_attr);
     evr_finalize_stmt(find_future_attr_siblings);
@@ -304,6 +306,9 @@ int evr_setup_attr_index_db(struct evr_attr_index_db *db, struct evr_attr_spec_c
         "create table attr (seed blob not null, key text not null, val_str text, val_int integer, valid_from integer not null, valid_until integer, trunc integer not null)",
         "create index attr_seed_key on attr (seed, key)",
         "create table claim (ref blob primary key not null, seed blob not null)",
+        // claim_archive tracks until when a seed exists. no entry in
+        // the table indicates that the seed was not yet archived and
+        // exists indefinit.
         "create table claim_archive (seed blob primary key not null, valid_until integer not null)",
         "create table state (key integer primary key, value integer not null)",
         "insert into state (key, value) values (" to_string(evr_state_key_last_indexed_claim_ts) ", 0)",
@@ -616,38 +621,70 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
             log_debug("Merging archive seed %s", seed_str);
         }
 #endif
-        if(sqlite3_bind_blob(db->archive_claim, 1, arch->seed, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
-            goto out_with_reset_archive_claim;
+        int seed_already_archived;
+        sqlite3_int64 already_archived_at;
+        if(sqlite3_bind_blob(db->find_claim_archived, 1, arch->seed, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+            if(sqlite3_reset(db->find_claim_archived) != SQLITE_OK){
+                evr_panic("Unable to reset find_claim_archived after error");
+            }
+            goto out_with_free_arch;
         }
-        if(sqlite3_bind_int64(db->archive_claim, 2, (sqlite3_int64)created) != SQLITE_OK){
-            goto out_with_reset_archive_claim;
+        int find_archived_res = evr_step_stmt(db->db, db->find_claim_archived);
+        if(find_archived_res == SQLITE_DONE){
+            seed_already_archived = 0;
+        } else if(find_archived_res == SQLITE_ROW) {
+            seed_already_archived = 1;
+            already_archived_at = sqlite3_column_int64(db->find_claim_archived, 0);
+#ifdef EVR_LOG_DEBUG
+            evr_claim_ref_str seed_str;
+            evr_fmt_claim_ref(seed_str, arch->seed);
+            log_debug("Archive seed %s is already archived at " evr_time_fmt, seed_str, created);
+#endif
+        } else {
+            if(sqlite3_reset(db->find_claim_archived) != SQLITE_OK){
+                evr_panic("Unable to reset find_claim_archived after error");
+            }
+            goto out_with_free_arch;
         }
-        if(evr_step_stmt(db->db, db->archive_claim) != SQLITE_DONE){
-            goto out_with_reset_archive_claim;
+        if(sqlite3_reset(db->find_claim_archived) != SQLITE_OK){
+            evr_panic("Unable to reset find_claim_archived");
+            goto out_with_free_arch;
         }
+        sqlite3_int64 this_archived_at = (sqlite3_int64)created;
+        if(!seed_already_archived || this_archived_at < already_archived_at){
+            if(sqlite3_bind_blob(db->archive_claim, 1, arch->seed, evr_claim_ref_size, SQLITE_TRANSIENT) != SQLITE_OK){
+                goto out_with_reset_archive_claim;
+            }
+            if(sqlite3_bind_int64(db->archive_claim, 2, (sqlite3_int64)created) != SQLITE_OK){
+                goto out_with_reset_archive_claim;
+            }
+            if(evr_step_stmt(db->db, db->archive_claim) != SQLITE_DONE){
+                goto out_with_reset_archive_claim;
+            }
+            if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
+                evr_panic("Failed to reset archive_claim statement");
+            }
+            goto continue_after_reset_archive_claim;
+        out_with_reset_archive_claim:
+            if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
+                evr_panic("Failed to reset archive_claim statement after error");
+            }
+            goto out_with_free_arch;
+        }
+    continue_after_reset_archive_claim:
         if(visited_seed_set){
             int add_res = evr_claim_ref_tiny_set_add(visited_seed_set, arch->seed);
             if(add_res != evr_ok && add_res != evr_exists){
                 evr_blob_ref_str ref_str;
                 evr_fmt_blob_ref(ref_str, claim_set_ref);
                 log_error("Transformed claim-set for blob with ref %s produced more than %zu seed references.", ref_str, visited_seed_set->refs_len);
-                free(arch);
-                if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
-                    evr_panic("Failed to reset archive_claim statement");
-                }
-                goto out_with_reset_archive_claim;
+                goto out_with_free_arch;
             }
-        }
-        if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
-            evr_panic("Failed to reset archive_claim statement");
         }
         free(arch);
         c_node = c_node->next;
         continue;
-    out_with_reset_archive_claim:
-        if(sqlite3_reset(db->archive_claim) != SQLITE_OK){
-            evr_panic("Failed to reset archive_claim statement");
-        }
+    out_with_free_arch:
         free(arch);
         goto out_with_free_claim_set_doc;
     }
@@ -1143,7 +1180,10 @@ int evr_prepare_attr_index_db(struct evr_attr_index_db *db){
     if(evr_prepare_stmt(db->db, "insert into claim (ref, seed) values (?, ?)", &db->insert_claim) != evr_ok){
         goto out;
     }
-    if(evr_prepare_stmt(db->db, "insert into claim_archive (seed, valid_until) values (?, ?)", &db->archive_claim) != evr_ok){
+    if(evr_prepare_stmt(db->db, "select valid_until from claim_archive where seed = ?", &db->find_claim_archived) != evr_ok){
+        goto out;
+    }
+    if(evr_prepare_stmt(db->db, "insert or replace into claim_archive (seed, valid_until) values (?, ?)", &db->archive_claim) != evr_ok){
         goto out;
     }
     if(evr_prepare_stmt(db->db, "insert into claim_set (ref, created) values (?, ?)", &db->insert_claim_set) != evr_ok){

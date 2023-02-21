@@ -112,3 +112,37 @@ then
     echo "Unexpected result from query: ${results}" >&2
     exit 1
 fi
+
+# first claim should still exist at that time
+results=`query_attr_index 's at 2022-03-01T00:02:30.000000Z'`
+if [[ "${results}" != "OK
+${first_claim}" ]]
+then
+    echo "Unexpected result from query: ${results}" >&2
+    exit 1
+fi
+
+echo 'Archive first claim once more but earlier in time'
+
+# archive 'first' claim once more but earlier in time
+evr -f 1 sign-put <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set
+    xmlns="https://evr.ma300k.de/claims/"
+    xmlns:dc="http://purl.org/dc/terms/"
+    dc:created="2022-03-01T00:02:00.000000Z"
+    >
+  <archive seed="${first_claim}"/>
+</claim-set>
+EOF
+
+sleep 1
+wait_for_attr_index
+
+# first claim should no longer exist at that time
+results=`query_attr_index 's at 2022-03-01T00:02:30.000000Z'`
+if [[ "${results}" != "OK" ]]
+then
+    echo "Unexpected result from query: ${results}" >&2
+    exit 1
+fi
