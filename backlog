@@ -1,3 +1,23 @@
+* evr-attr-index crash on archive_claim statement reset :bug:
+#+BEGIN_SRC
+2023-02-15T17:49:16 iI Start building attr index for sha3-224-cdba6d1ffa6ebe4e4aac3435582e028c24fed9f3cd68cca5a3f98761
+2023-02-15T17:49:17 iE Failed to step statement: UNIQUE constraint failed: claim_archive.seed
+2023-02-15T17:49:17 iP Failed to reset archive_claim statement
+#+END_SRC
+* parallel evr-fs inode building
+right now evr-fs builds the inodes sequentially one seed by another.
+
+building inodes should be performed in parallel in n threads. n should
+probably be something like 4 so we don't open too many connections
+towards evr-attr-index.
+* validate random blobs every 24 hours
+so that basic sanity checks on servers with seldom reboots won't
+happend seldom.
+
+probably we should trigger the random blob validation via a command
+sent to evr-glacier-storage. that way admins can set up a cron to
+perform the check at a pleasant time. also checks can be triggered
+manually on demand.
 * plan how can we handle repeating fields like social-child-of?
 update the backlog for evr-attr-ui. how can we produce multiple copies
 of the widget for repeating attributes?
@@ -253,20 +273,6 @@ the emacs lisp function rng-set-schema-file-1 shows how to load a rnc
 schema and activate it for the current file. the function
 rng-c-parse-file shows how to load rnc content into a buffer and parse
 it.
-* parallel evr-fs inode building
-right now evr-fs builds the inodes sequentially one seed by another.
-
-building inodes should be performed in parallel in n threads. n should
-probably be something like 4 so we don't open too many connections
-towards evr-attr-index.
-* validate random blobs every 24 hours
-so that basic sanity checks on servers with seldom reboots won't
-happend seldom.
-
-probably we should trigger the random blob validation via a command
-sent to evr-glacier-storage. that way admins can set up a cron to
-perform the check at a pleasant time. also checks can be triggered
-manually on demand.
 * evr-fs should recreate inodes on evr-attr-index current index change
 right now only seed changes are applied to the inode set. if the index
 ref changes the whole inode set must be rebuilt.
