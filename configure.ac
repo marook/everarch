@@ -97,6 +97,8 @@ AC_CONFIG_FILES([
     src/Makefile
     python/Makefile
     emacs/Makefile
+    etc/Makefile
+    etc/poke-pickles/Makefile
 ])
 
 AC_OUTPUT
