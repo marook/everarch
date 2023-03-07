@@ -114,11 +114,13 @@ struct evr_buf_pos {
         (bp)->pos += size;                      \
     } while(0)
 
-#define evr_map_struct(bp, struct_ptr)                  \
-    do {                                                \
-        size_t size = sizeof(typeof(*struct_ptr));      \
-        struct_ptr = (typeof(struct_ptr))(bp)->pos;     \
-        evr_inc_buf_pos(bp, size);                      \
+#define evr_map_struct(bp, struct_ptr) evr_map_struct_n(bp, struct_ptr, 1)
+
+#define evr_map_struct_n(bp, struct_ptr, len)                   \
+    do {                                                        \
+        size_t size = sizeof(typeof(*struct_ptr)) * len;        \
+        struct_ptr = (typeof(struct_ptr))(bp)->pos;             \
+        evr_inc_buf_pos(bp, size);                              \
     } while(0)
 
 #define evr_pull_as(bp, val, type)              \

@@ -1,0 +1,61 @@
+* attr merge operations
+evr-attr-index applies the merge operations set (op =), add (op +) and
+remove (op -) to the sqlite attr table which is part of the
+index. this document describes how the operations must be applied onto
+different preexisting states of the attr table.
+
+The first example starts with the following preexisting attr table:
+
+|-----+-------+-------+------------+----------|
+| key | value | trunc | valid_from | valid_to |
+|-----+-------+-------+------------+----------|
+| k0  | v1    |     0 |          0 |          |
+|-----+-------+-------+------------+----------|
+
+The rm all merge attr at t=1 is:
+
+#+BEGIN_SRC xml
+<attr op="-" key="k0"/>
+#+END_SRC
+
+The table should contain the following contents after the merge:
+
+|-----+-------+-------+------------+----------|
+| key | value | trunc | valid_from | valid_to |
+|-----+-------+-------+------------+----------|
+| k0  | v1    |     0 | 0          |        1 |
+| k0  |       |     1 | 1          |          |
+|-----+-------+-------+------------+----------|
+
+The same op applied to an empty attr table should produce the
+following:
+
+|-----+-------+-------+------------+----------|
+| key | value | trunc | valid_from | valid_to |
+|-----+-------+-------+------------+----------|
+| k0  |       |     1 |          1 |          |
+|-----+-------+-------+------------+----------|
+
+Based on the preexisting attr table the one value rm merge is applied
+at t=1:
+
+#+BEGIN_SRC xml
+<attr op="-" key="k0" v="v1"/>
+#+END_SRC
+
+The table should contain the following contents after the merge:
+
+|-----+-------+-------+------------+----------|
+| key | value | trunc | valid_from | valid_to |
+|-----+-------+-------+------------+----------|
+| k0  | v1    |     0 | 0          |        1 |
+|-----+-------+-------+------------+----------|
+
+The same op applied to an empty attr table should produce the
+following:
+
+|-----+-------+-------+------------+----------|
+| key | value | trunc | valid_from | valid_to |
+|-----+-------+-------+------------+----------|
+| k0  | v1    |     0 |            |        1 |
+|-----+-------+-------+------------+----------|

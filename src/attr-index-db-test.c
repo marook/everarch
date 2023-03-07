@@ -31,12 +31,27 @@
 #include "attr-index-db.h"
 #include "files.h"
 
+#define ts_str(t) "1970-01-01T00:00:" to_string(t) ".000000Z"
+
 // the following declarations are "private" functions from
 // attr-index-db.c which we want to test in this file, despite they
 // are not part of the public api.
 int evr_move_claims(xmlDocPtr dest, xmlDocPtr src, char *dest_name, char *src_name);
 
-#define permutations 4
+struct evr_query_claim_result {
+    evr_claim_ref seed;
+    struct evr_attr_tuple *attrs;
+    size_t attrs_len;
+};
+
+/**
+ * evr_find_seeds performes the given query on the given db and
+ * appends all found results to the results llbuf.
+ */
+void evr_find_seeds(struct evr_llbuf_s *results, struct evr_attr_index_db *db, char *query);
+
+void evr_empty_llbuf_query_claim_result(struct evr_llbuf_s *llb);
+
 #define merge_attrs_len 4
 
 int found_tag_a = 0;
@@ -57,6 +72,7 @@ struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_cf
 int asserting_claims_visitor_calls;
 evr_claim_ref asserting_claims_visitor_expected_ref;
 int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
+int denying_claim_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 
 xsltStylesheetPtr create_attr_mapping_stylesheet();
 
@@ -94,6 +110,7 @@ void test_open_new_attr_index_db_twice(){
     };
 #undef ns
 #undef hdr
+#define permutations 4
     evr_time t00, t10, t15, t20, t25, t30, t35, t45;
     assert(is_ok(evr_time_from_iso8601(&t00, tstr(0))));
     assert(is_ok(evr_time_from_iso8601(&t10, tstr(10))));
@@ -212,9 +229,7 @@ void test_open_new_attr_index_db_twice(){
         }
         evr_free_attr_index_cfg(cfg);
     }
-#undef t0_str
-#undef t1_str
-#undef t2_str
+#undef permutations
     xsltFreeStylesheet(style);
 }
 
@@ -667,10 +682,19 @@ xmlDocPtr create_xml_doc(char *content){
 
 void assert_query_no_result(struct evr_attr_index_db *db, char *query){
     log_info("Asserting query '%s' has no results", query);
-    asserting_claims_visitor_calls = 0;
-    memset(asserting_claims_visitor_expected_ref, 0, evr_claim_ref_size);
-    assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, asserting_claims_visitor, NULL)));
-    assert_msg(asserting_claims_visitor_calls == 0, "Claims found but expected none for query: %s", query);
+    assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, denying_claim_visitor, NULL)));
+}
+
+int denying_claim_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
+    // we should never have been called if the test was right
+    evr_claim_ref_str ref_str;
+    evr_fmt_claim_ref(ref_str, ref);
+    log_error("Unexpected call of denying_claim_visitor for seed %s with %zu attributes", ref_str, attrs_len);
+    for(size_t i = 0; i < attrs_len; ++i){
+        log_error("  %s=%s", attrs[i].key, attrs[i].value);
+    }
+    fail();
+    return evr_error;
 }
 
 void assert_query_one_result(struct evr_attr_index_db *db, char *query, evr_claim_ref expected_ref){
@@ -791,6 +815,336 @@ xmlNode *evr_append_claim_set(xmlDoc *doc){
     return cs;
 }
 
+struct evr_simple_attr_claim {
+    char *created;
+    /**
+     * op should be =, + or -.
+     */
+    char *op;
+    char *value;
+};
+
+void evr_test_db_with_attrs(struct evr_simple_attr_claim *claims, size_t claims_len, void (*assert_db)(struct evr_attr_index_db *db, evr_claim_ref seed));
+
+void assert_test_replace_attr(struct evr_attr_index_db *db, evr_claim_ref seed);
+
+void test_replace_attr(){
+    struct evr_simple_attr_claim attrs[] = {
+        { ts_str(10), "=", "v1" },
+        { ts_str(20), "=", "v2" },
+    };
+    evr_test_db_with_attrs(attrs, static_len(attrs), assert_test_replace_attr);
+}
+
+void assert_test_replace_attr(struct evr_attr_index_db *db, evr_claim_ref seed){
+    struct evr_llbuf_s found_seeds;
+    struct evr_llbuf_s_iter found_seed_it;
+    struct evr_query_claim_result *seed_res;
+    evr_init_llbuf_s(&found_seeds, sizeof(struct evr_query_claim_result));
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v1 at " ts_str(15));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 1);
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert(is_str_eq(seed_res->attrs[0].value, "v1"));
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v2 at " ts_str(25));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 1);
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert(is_str_eq(seed_res->attrs[0].value, "v2"));
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+}
+
+void assert_test_replace_added_attr(struct evr_attr_index_db *db, evr_claim_ref seed);
+
+void test_replace_added_attr(){
+    struct evr_simple_attr_claim attrs[] = {
+        { ts_str(10), "+", "v1" },
+        { ts_str(20), "=", "v2" },
+    };
+    evr_test_db_with_attrs(attrs, static_len(attrs), assert_test_replace_added_attr);
+}
+
+void assert_test_replace_added_attr(struct evr_attr_index_db *db, evr_claim_ref seed){
+    struct evr_llbuf_s found_seeds;
+    struct evr_llbuf_s_iter found_seed_it;
+    struct evr_query_claim_result *seed_res;
+    evr_init_llbuf_s(&found_seeds, sizeof(struct evr_query_claim_result));
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v1 at " ts_str(15));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 1);
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert(is_str_eq(seed_res->attrs[0].value, "v1"));
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v2 at " ts_str(25));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 1);
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert(is_str_eq(seed_res->attrs[0].value, "v2"));
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+}
+
+void assert_test_remove_trunc_attr(struct evr_attr_index_db *db, evr_claim_ref seed);
+
+void test_remove_trunc_attr(){
+    struct evr_simple_attr_claim attrs[] = {
+        { ts_str(10), "=", "v0" },
+        { ts_str(20), "+", "v+" },
+        { ts_str(30), "-", "v0" },
+    };
+    evr_test_db_with_attrs(attrs, static_len(attrs), assert_test_remove_trunc_attr);
+}
+
+void assert_test_remove_trunc_attr(struct evr_attr_index_db *db, evr_claim_ref seed){
+    struct evr_llbuf_s found_seeds;
+    struct evr_llbuf_s_iter found_seed_it;
+    struct evr_query_claim_result *seed_res;
+    evr_init_llbuf_s(&found_seeds, sizeof(struct evr_query_claim_result));
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v0 at " ts_str(15));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 1);
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert(is_str_eq(seed_res->attrs[0].value, "v0"));
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v0 at " ts_str(25));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 2);
+        // TODO the following assertions enforce a certain value order which is actually not defined
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert(is_str_eq(seed_res->attrs[0].value, "v0"));
+        assert(is_str_eq(seed_res->attrs[1].key, "k"));
+        assert(is_str_eq(seed_res->attrs[1].value, "v+"));
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+    {
+        evr_find_seeds(&found_seeds, db, "select * where k=v0 at " ts_str(35));
+        evr_init_llbuf_s_iter(&found_seed_it, &found_seeds);
+        seed_res = evr_llbuf_s_iter_next(&found_seed_it);
+        assert(seed_res);
+        assert(evr_cmp_claim_ref(seed, seed_res->seed) == 0);
+        assert(seed_res->attrs_len == 1);
+        assert(is_str_eq(seed_res->attrs[0].key, "k"));
+        assert_msg(is_str_eq(seed_res->attrs[0].value, "v+"), "But was %s", seed_res->attrs[0].value);
+    }
+    evr_empty_llbuf_query_claim_result(&found_seeds);
+}
+
+struct evr_attr_merge_permutations {
+    size_t **index_map;
+    size_t index_map_len;
+};
+
+struct evr_attr_merge_permutations *evr_build_attr_merge_permutations(size_t attr_len);
+
+void evr_test_db_with_attrs(struct evr_simple_attr_claim *claims, size_t claims_len, void (*assert_db)(struct evr_attr_index_db *db, evr_claim_ref seed)){
+    struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
+    struct evr_attr_merge_permutations *permutations = evr_build_attr_merge_permutations(claims_len);
+    struct evr_attr_spec_claim spec;
+    spec.attr_def_len = 0;
+    spec.attr_def = NULL;
+    spec.attr_factories_len = 0;
+    spec.attr_factories = NULL;
+    memset(spec.transformation_blob_ref, 0, evr_blob_ref_size);
+    xsltStylesheetPtr style = create_attr_mapping_stylesheet();
+    for(size_t pi = 0; pi < permutations->index_map_len; ++pi){
+        log_info("Permutation %zu…", pi);
+        size_t *p = permutations->index_map[pi];
+        struct evr_attr_index_db *db = evr_open_attr_index_db(cfg, "ye-db", never_called_blob_file_writer, NULL);
+        assert(db);
+        assert(is_ok(evr_setup_attr_index_db(db, &spec)));
+        assert(is_ok(evr_prepare_attr_index_db(db)));
+        evr_blob_ref cs_ref;
+        memset(cs_ref, 0, evr_blob_ref_size);
+        cs_ref[0] = 0x0c;
+        // cs_ref_counter just points somewhere inside the blob ref. so we
+        // can easily produce different blob refs.
+        size_t *cs_ref_counter = (size_t*)&cs_ref[1];
+        const char *seed_str = "sha3-224-c0000000000000000000000000000000000000000000000000000000-0000";
+        evr_claim_ref seed;
+        assert(is_ok(evr_parse_claim_ref(seed, seed_str)));
+        char buf[2048];
+        struct evr_buf_pos bp;
+        evr_init_buf_pos(&bp, buf);
+        for(size_t i = 0; i < claims_len; ++i){
+            struct evr_simple_attr_claim *claim = &claims[p[i]];
+            *cs_ref_counter = p[i];
+            evr_reset_buf_pos(&bp);
+            evr_push_concat(&bp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<claim-set xmlns=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" dc:created=\"");
+            evr_push_concat(&bp, claim->created);
+            evr_push_concat(&bp, "\"><attr seed=\"");
+            evr_push_concat(&bp, seed_str);
+            evr_push_concat(&bp, "\"><a op=\"");
+            evr_push_concat(&bp, claim->op);
+            evr_push_concat(&bp, "\" k=\"k\"");
+            if(claim->value){
+                evr_push_concat(&bp, " v=\"");
+                evr_push_concat(&bp, claim->value);
+                evr_push_concat(&bp, "\"");
+            }
+            evr_push_concat(&bp, "/></attr></claim-set>");
+            evr_push_eos(&bp);
+            xmlDoc *claim_set_doc = create_xml_doc(buf);
+            assert(is_ok(evr_merge_attr_index_claim_set(db, &spec, style, 0, cs_ref, claim_set_doc, 0, NULL)));
+            xmlFreeDoc(claim_set_doc);
+        }
+        assert_db(db, seed);
+        assert(is_ok(evr_free_attr_index_db(db)));
+    }
+    xsltFreeStylesheet(style);
+    free(permutations);
+    evr_free_attr_index_cfg(cfg);
+}
+
+struct evr_attr_merge_permutations *evr_build_attr_merge_permutations(size_t attr_len){
+    size_t index_map_len;
+    switch(attr_len){
+    default:
+        fail_msg("The test did not assume you will use %zu attributes", attr_len);
+        return NULL;
+    case 2:
+        index_map_len = 2;
+        break;
+    case 3:
+        index_map_len = 6;
+        break;
+    }
+    char *buf = malloc(sizeof(struct evr_attr_merge_permutations) + index_map_len * sizeof(size_t*) + attr_len * index_map_len * sizeof(size_t));
+    assert(buf);
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    struct evr_attr_merge_permutations *ret;
+    evr_map_struct(&bp, ret);
+    ret->index_map = (size_t**)bp.pos;
+    evr_inc_buf_pos(&bp, index_map_len * sizeof(size_t*));
+    for(size_t pi = 0; pi < index_map_len; ++pi){
+        ret->index_map[pi] = (size_t*)bp.pos;
+        evr_inc_buf_pos(&bp, attr_len * sizeof(size_t));
+    }
+    switch(attr_len){
+    case 2:
+        ret->index_map[0][0] = 0;
+        ret->index_map[0][1] = 1;
+
+        ret->index_map[1][0] = 1;
+        ret->index_map[1][1] = 0;
+        break;
+    case 3:
+        ret->index_map[0][0] = 0;
+        ret->index_map[0][1] = 1;
+        ret->index_map[0][2] = 2;
+
+        ret->index_map[1][0] = 0;
+        ret->index_map[1][1] = 2;
+        ret->index_map[1][2] = 1;
+
+        ret->index_map[2][0] = 1;
+        ret->index_map[2][1] = 0;
+        ret->index_map[2][2] = 2;
+
+        ret->index_map[3][0] = 1;
+        ret->index_map[3][1] = 2;
+        ret->index_map[3][2] = 0;
+
+        ret->index_map[4][0] = 2;
+        ret->index_map[4][1] = 0;
+        ret->index_map[4][2] = 1;
+
+        ret->index_map[5][0] = 2;
+        ret->index_map[5][1] = 1;
+        ret->index_map[5][2] = 0;
+        break;
+    }
+    ret->index_map_len = index_map_len;
+    return ret;
+}
+
+/**
+ * evr_collecting_claim_visitor collects all visited seeds with their
+ * attributes into a struct evr_llbuf_s which contains struct
+ * evr_query_claim_result children.
+ *
+ * ctx must point to a struct evr_llbuf_s instance.
+ */
+int evr_collecting_claim_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
+
+void evr_find_seeds(struct evr_llbuf_s *results, struct evr_attr_index_db *db, char *query){
+    log_debug("evr_find_seeds: %s", query);
+    assert(is_ok(evr_attr_query_claims(db, query, claims_status_ok, evr_collecting_claim_visitor, results)));
+}
+
+int evr_collecting_claim_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
+    struct evr_llbuf_s *llb = ctx;
+    struct evr_query_claim_result *r;
+    assert(is_ok(evr_llbuf_s_append(llb, (void**)&r)));
+    memcpy(r->seed, ref, evr_claim_ref_size);
+    r->attrs_len = attrs_len;
+    if(attrs_len == 0){
+        r->attrs = NULL;
+    } else {
+        size_t attrs_string_size_sum = 0;
+        struct evr_attr_tuple *attrs_end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *it = attrs; it != attrs_end; ++it){
+            attrs_string_size_sum += strlen(it->key) + 1;
+            attrs_string_size_sum += strlen(it->value) + 1;
+        }
+        void *buf = malloc(attrs_len * sizeof(struct evr_attr_tuple) + attrs_string_size_sum);
+        assert(buf);
+        struct evr_buf_pos bp;
+        evr_init_buf_pos(&bp, buf);
+        evr_map_struct_n(&bp, r->attrs, attrs_len);
+        struct evr_attr_tuple *dst = r->attrs;
+        for(struct evr_attr_tuple *src = attrs; src != attrs_end;){
+            dst->key = bp.pos;
+            evr_push_n(&bp, src->key, strlen(src->key) + 1);
+            dst->value = bp.pos;
+            evr_push_n(&bp, src->value, strlen(src->value) + 1);
+            ++src;
+            ++dst;
+        }
+    }
+    return evr_ok;
+}
+
+void evr_free_llbuf_query_claim_result_item(void *item);
+
+void evr_empty_llbuf_query_claim_result(struct evr_llbuf_s *llb){
+    evr_llbuf_s_empty(llb, evr_free_llbuf_query_claim_result_item);
+}
+
+void evr_free_llbuf_query_claim_result_item(void *item){
+    struct evr_query_claim_result *r = item;
+    free(r->attrs);
+}
+
 int main(){
     evr_init_basics();
     run_test(test_open_new_attr_index_db_twice);
@@ -807,5 +1161,8 @@ int main(){
     run_test(test_move_claims_without_claimsets);
     run_test(test_move_claims_with_one_claim);
     run_test(test_move_claims_with_two_claims);
+    run_test(test_replace_attr);
+    run_test(test_replace_added_attr);
+    // TODO run_test(test_remove_trunc_attr);
     return 0;
 }

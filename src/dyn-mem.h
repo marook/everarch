@@ -179,6 +179,10 @@ struct evr_llbuf_s {
  */
 void evr_init_llbuf_s(struct evr_llbuf_s *llb, size_t child_size);
 
+/**
+ * evr_llbuf_s_append allocates a new child in the given llbuf and
+ * returns a pointer to it.
+ */
 int evr_llbuf_s_append(struct evr_llbuf_s *llb, void **child);
 
 /**
@@ -186,7 +190,14 @@ int evr_llbuf_s_append(struct evr_llbuf_s *llb, void **child);
  * llb. The memory where the struct evr_llbuf_s points to is not
  * freed.
  */
-#define evr_llbuf_s_empty(llb, free_item) evr_free_llbuf_chain((llb)->first, free_item)
+#define evr_llbuf_s_empty(llb, free_item)               \
+    do {                                                \
+        evr_free_llbuf_chain((llb)->first, free_item);  \
+        (llb)->first = NULL;                            \
+        (llb)->last = NULL;                             \
+        (llb)->block_count = 0;                         \
+        (llb)->child_count = 0;                         \
+    } while(0)
 
 struct evr_llbuf_s_iter {
     struct evr_llbuf_s *llb;
