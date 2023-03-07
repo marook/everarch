@@ -1,3 +1,71 @@
+* op - not applied in evr-attr-index                                    :bug:
+the evr-attr-index sqlite db contains the following attributes for the
+affected seed. the valid_from and valid_until dates where simplified
+to be more simple to read.
+
+#+BEGIN_SRC
+sqlite> select key, val_str, valid_from, valid_until, trunc from attr where seed = x'08662E524D0F03C366AEBE368679DCFC6CFB758FA59FFB988DAF36C60000' and key = 'presenter' order by valid_from ;
++-----------+----------------+------------+-------------+-------+
+|    key    |    val_str     | valid_from | valid_until | trunc |
++-----------+----------------+------------+-------------+-------+
+| presenter | Johne Campbell | 1          | 3           | 0     |
+| presenter | John Campbell  | 2          | 3           | 0     |
+| presenter | Johne Campbell | 3          | 4           | 1     |
+| presenter | Johne Campbell | 4          | 5           | 1     |
+| presenter | John Campbell  | 4          |             | 0     |
+| presenter | Johne Campbell | 5          |             | 1     |
++-----------+----------------+------------+-------------+-------+
+#+END_SRC
+
+the original claim or claim xslt transformation seem not to be the
+issue because the transformed claim contains the op -:
+
+#+BEGIN_SRC xml
+<?xml version="1.0" encoding="UTF-8"?>
+<evr:claim-set xmlns:evr="https://evr.ma300k.de/claims/" xmlns:dc="http://purl.org/dc/terms/" xmlns:ani="https://ma300k.de/animations/claims/" dc:created="2023-02-23T19:49:19.154000Z">
+  <evr:attr index-seed="0" seed="sha3-224-08662e524d0f03c366aebe368679dcfc6cfb758fa59ffb988daf36c6-0000">
+    <evr:a op="+" k="class" v="talk"/>
+    <evr:a op="-" k="presenter" v="Johne Campbell"/>
+  </evr:attr>
+  <evr:attr index-seed="1" seed="sha3-224-08662e524d0f03c366aebe368679dcfc6cfb758fa59ffb988daf36c6-0000">
+    <evr:a op="=" k="review" v="done"/>
+  </evr:attr>
+</evr:claim-set>
+#+END_SRC
+
+the transformed claim was produced by the following command:
+
+#+BEGIN_SRC
+evr get-verify sha3-224-5f47a85240ec6fc2fd63129c120b7d256287d1380c99a46fae047190 | xsltproc animation.xslt - | xmllint --format -
+#+END_SRC
+
+the evr_merge_attr_index_attr_* functions seem to not fully support
+remove operations. the merge functions may differentiate between the
+following merge situations: set, add, rm x, rm all
+
+these operations may be applied to the following example rows from the
+attr table:
+
+|-------+------------+-------------+--------------+-------------+------------|
+| value | valid_from | valid_until | trunc_before | trunc_after | created by |
+|-------+------------+-------------+--------------+-------------+------------|
+| v0    |          0 |             |            1 |             | set        |
+| v1    |          0 |             |            0 |             | add        |
+|       |            |          10 |              |           1 | rm all     |
+| v2    |            |          10 |              |           0 | rm x       |
+| v0    |          0 |          10 |            1 |           0 | set + rm x |
+|-------+------------+-------------+--------------+-------------+------------|
+
+here's an overview what needs to be done in each situation:
+
+** TODO set
+existing index attrs starting in the past:
+  update valid_until
+removed index attrs starting in the past with same value:
+  update valid_from and trunc
+** TODO add
+** TODO rm x
+** TODO rm all
 * parallel evr-fs inode building
 right now evr-fs builds the inodes sequentially one seed by another.
 
