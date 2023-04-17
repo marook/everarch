@@ -25,6 +25,7 @@
 #include <string.h>
 #include <libxslt/xsltInternals.h>
 #include <libxslt/transform.h>
+#include <libxslt/extra.h>
 #include <unistd.h>
 
 #include "basics.h"
@@ -256,6 +257,7 @@ int main(int argc, char *argv[]) {
     evr_init_basics();
     evr_tls_init();
     xmlInitParser();
+    xsltRegisterAllExtras();
     gcry_check_version(EVR_GCRY_MIN_VERSION);
     evr_init_signatures();
     cfg.storage_host = strdup(evr_glacier_storage_host);
