@@ -64,8 +64,55 @@ existing index attrs starting in the past:
 removed index attrs starting in the past with same value:
   update valid_from and trunc
 ** TODO add
+existing index attrs starting in the past with same value:
+  update valid_until
 ** TODO rm x
 ** TODO rm all
+* evr-fs unable to connect to glacier                                   :bug:
+from the evr-fs log
+#+BEGIN_SRC
+2023-03-07T21:36:56 fE Unable to connect to localhost:2561
+2023-03-07T21:36:56 fE Failed to connect to evr-glacier-storage server localhost:2561
+2023-03-07T21:36:56 fE Unable to connect to glacier when opening file with inode 2015
+2023-03-07T21:39:05 fE Unable to connect to localhost:2561
+2023-03-07T21:39:05 fE Failed to connect to evr-glacier-storage server localhost:2561
+2023-03-07T21:39:05 fE Unable to connect to glacier when opening file with inode 2149
+2023-03-07T21:39:07 fE Unable to connect to localhost:2561
+2023-03-07T21:39:07 fE Failed to connect to evr-glacier-storage server localhost:2561
+2023-03-07T21:39:07 fE Unable to connect to glacier when opening file with inode 2129
+2023-03-07T21:40:10 fE Unable to connect to localhost:2561
+2023-03-07T21:40:10 fE Failed to connect to evr-glacier-storage server localhost:2561
+2023-03-07T21:40:10 fE Unable to connect to glacier when opening file with inode 2129
+2023-03-07T21:40:43 fE Unable to connect to localhost:2561
+2023-03-07T21:40:43 fE Failed to connect to evr-glacier-storage server localhost:2561
+2023-03-07T21:40:43 fE Unable to connect to glacier when opening file with inode 2927
+2023-03-07T21:44:40 fE Unable to connect to localhost:2561
+2023-03-07T21:44:40 fE Failed to connect to evr-glacier-storage server localhost:2561
+#+END_SRC
+
+evr-fs should log the reason why the connection to evr-glacier-storage
+failed.
+
+evr-glacier-storage should log when it rejects a connection and the
+reason why it did so.
+* evr-fs crash on invalid efs:file
+evr-fs will not start if an efs:file can't be parsed during
+startup. an invalid efs:file during runtime will just be ignored.
+
+an not parseable efs:file during startup should be logged and ignored.
+
+the following log message happend during startup with an invalid
+efs:file:
+
+#+BEGIN_SRC
+2023-04-15T19:05:57 fE Unable to parse XML file node based on seed sha3-224-0aeec15e324f0c6258e92352ca37354b90ad03d461374d40b8df66b2-0000: <?xml version="1.0" encoding="UTF-8"?>
+<efs:file xmlns:efs="https://evr.ma300k.de/files/"
+  path="Talks/nach Name/clt23-4-deu-Neues_von_LilyPond_hd (2023-03-17)."
+  size=""
+  file-ref=""
+  created=""
+  last-modified=""/>
+#+END_SRC
 * parallel evr-fs inode building
 right now evr-fs builds the inodes sequentially one seed by another.
 
