@@ -325,6 +325,19 @@ own self defined claims. In order to make them searchable you must
 provide an XSLT stylesheet which converts your claim into attr
 claims.
 
+The archive claim is beside the attr claims another built in claim
+type. Archive claims are used to indicate that a seed is archived at a
+certain point in time and should not be shown in future searches.
+
+Archive claims may look like this:
+
+@example
+<archive
+    xmlns="https://evr.ma300k.de/claims/"
+    seed="sha3-224-00000000000000000000000000000000000000000000000000000000-0000"
+  />
+@end example
+
 @c TODO Also a file claim is supported which defines blobs which make up the pieces of a bigger file.
 
 @node evr-attr-index
