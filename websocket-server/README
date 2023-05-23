@@ -1,0 +1,37 @@
+evr-websocket-server - a websocket adapter for everarch
+
+1) Introduction
+2) Installation
+3) Run
+
+
+------------------------------------------------------------------------
+Introduction
+
+evr-websocket-server listens for websocket connections. Each
+connection can perform a subset of the evr cli commands after
+authentication.
+
+
+------------------------------------------------------------------------
+Installation
+
+$ npm install
+
+
+------------------------------------------------------------------------
+Run
+
+evr-websocket-server is configured via a JSON file. The configuration
+file might look like this:
+
+{
+    "port": 8030,
+    "user": {
+        "test": {
+            "password": "pazz"
+        }
+    }
+}
+
+$ node . evr-websocket-server.conf.json
