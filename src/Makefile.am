@@ -10,11 +10,8 @@ CFLAGS_WARN=\
 	-Wno-unused-parameter \
 	-Wno-variadic-macros
 
-AM_CFLAGS = $(CFLAGS_WARN) $(EVERARCH_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS) $(GTK_CFLAGS)
-BUILT_SOURCES = \
-	attr-query-parser.h \
-	attr_index_db_test-attr-query-lexer.c \
-	evr_attr_index-attr-query-lexer.c
+AM_CFLAGS = $(CFLAGS_WARN) $(SQLITE_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS) $(GTK_CFLAGS)
+BUILT_SOURCES =
 AM_YFLAGS = -d
 
 info_TEXINFOS = evr.texi
@@ -23,12 +20,26 @@ resdir = $(prefix)/share/everarch
 dist_res_DATA = attr-ui-spec-interface.xslt
 
 bin_PROGRAMS = \
-	evr-attr-index \
-	evr-attr-ui \
 	evr \
-	evr-fs \
 	evr-glacier-storage \
 	evr-glacier-tool
+
+if HAS_LEX
+bin_PROGRAMS += evr-attr-index
+
+BUILT_SOURCES += \
+	attr-query-parser.h \
+	attr_index_db_test-attr-query-lexer.c \
+	evr_attr_index-attr-query-lexer.c
+endif
+
+if HAS_GTK
+bin_PROGRAMS += evr-attr-ui
+endif
+
+if HAS_FUSE
+bin_PROGRAMS += evr-fs
+endif
 
 evr_c_unit_tests = \
 	attr-index-db-test \
@@ -80,7 +91,7 @@ attr_index_db_test_SOURCES = \
 	keys.c \
 	logger.c \
 	subprocess.c
-attr_index_db_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
+attr_index_db_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) -lm $(SSL_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 auth_test_SOURCES = \
@@ -119,7 +130,7 @@ concurrent_glacier_test_SOURCES = \
 	logger.c \
 	notify.c \
 	queue.c
-concurrent_glacier_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+concurrent_glacier_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
 
 configp_test_SOURCES = \
 	assert.c \
@@ -134,7 +145,7 @@ dyn_mem_test_SOURCES = \
 	dyn-mem.c \
 	dyn-mem-test.c \
 	logger.c
-dyn_mem_test_LDADD = $(EVERARCH_LIBS)
+dyn_mem_test_LDADD = $(SQLITE_LIBS)
 
 evr_attr_index_SOURCES = \
 	attr-index-db.c \
@@ -162,7 +173,7 @@ evr_attr_index_SOURCES = \
 	server.c \
 	signatures.c \
 	subprocess.c
-evr_attr_index_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) -lm $(SSL_LIBS)
+evr_attr_index_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 
 evr_attr_ui_SOURCES = \
@@ -179,7 +190,7 @@ evr_attr_ui_SOURCES = \
 	keys.c \
 	logger.c \
 	signatures.c
-evr_attr_ui_LDADD = $(GTK_LIBS) $(XML_LIBS) $(XSLT_LIBS) $(SSL_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS)
+evr_attr_ui_LDADD = $(GTK_LIBS) $(XML_LIBS) $(SSL_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS)
 
 evr_SOURCES = \
 	auth.c \
@@ -198,7 +209,7 @@ evr_SOURCES = \
 	logger.c \
 	seed-desc.c \
 	signatures.c
-evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(XSLT_LIBS) $(SSL_LIBS)
+evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
 
 evr_fs_SOURCES = \
 	auth.c \
@@ -219,7 +230,7 @@ evr_fs_SOURCES = \
 	open-files.c \
 	seed-desc.c \
 	signatures.c
-evr_fs_LDADD = $(FUSE_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+evr_fs_LDADD = $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	auth.c \
@@ -241,7 +252,7 @@ evr_glacier_storage_SOURCES = \
 	notify.c \
 	queue.c \
 	server.c
-evr_glacier_storage_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
+evr_glacier_storage_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
 
 evr_glacier_tool_SOURCES = \
 	basics.c \
@@ -253,7 +264,7 @@ evr_glacier_tool_SOURCES = \
 	glacier.c \
 	keys.c \
 	logger.c
-evr_glacier_tool_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+evr_glacier_tool_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
 
 evr_attr_index_client_test_SOURCES = \
 	assert.c \
@@ -287,7 +298,7 @@ files_test_SOURCES = \
 	files.c \
 	files-test.c \
 	logger.c
-files_test_LDADD = $(EVERARCH_LIBS)
+files_test_LDADD = $(SQLITE_LIBS)
 
 fs_inode_test_SOURCES = \
 	assert.c \
@@ -313,7 +324,7 @@ glacier_benchmark_SOURCES = \
 	keys.c \
 	logger.c \
 	signatures.c
-glacier_benchmark_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
+glacier_benchmark_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
 
 glacier_cmd_test_SOURCES = \
 	assert.c \
@@ -322,7 +333,7 @@ glacier_cmd_test_SOURCES = \
 	glacier-cmd-test.c \
 	keys.c \
 	logger.c
-glacier_cmd_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+glacier_cmd_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
 
 glacier_test_SOURCES = \
 	assert.c \
@@ -337,7 +348,7 @@ glacier_test_SOURCES = \
 	glacier-test.c \
 	keys.c \
 	logger.c
-glacier_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+glacier_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
 
 keys_test_SOURCES = \
 	assert.c \
@@ -345,7 +356,7 @@ keys_test_SOURCES = \
 	keys.c \
 	keys-test.c \
 	logger.c
-keys_test_LDADD = $(EVERARCH_LIBS) $(LIBGCRYPT_LIBS)
+keys_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
 
 notify_test_SOURCES = \
 	assert.c \
@@ -388,7 +399,7 @@ seed_desc_test_SOURCES = \
 	logger.c \
 	seed-desc.c \
 	seed-desc-test.c
-seed_desc_test_LDADD = $(XML_LIBS) $(XSLT_LIBS) $(LIBGCRYPT_LIBS)
+seed_desc_test_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS)
 
 signatures_test_SOURCES = \
 	assert.c \

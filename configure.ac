@@ -5,16 +5,6 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC
 
-AC_PROG_LEX
-if test "x$LEX" == "x:"
-then
-  AC_MSG_ERROR([flex was not found.])
-fi
-
-AC_PROG_YACC
-PKG_PROG_PKG_CONFIG
-AM_PATH_PYTHON([3.0])
-
 AC_DEFINE(_DEFAULT_SOURCE, [1], [This macro can be defined to ensure that the "default" definitions are provided.])
 AC_DEFINE(_POSIX_C_SOURCE, [200809L], [We want to use for example strnlen])
 AC_DEFINE(_GNU_SOURCE, [1], [We use for example fcntl's F_GETSIG])
@@ -66,6 +56,8 @@ AC_CHECK_DECLS([be32toh htobe32], [], [],
 
 AC_CHECK_FUNCS_ONCE([mkdtemp])
 
+PKG_PROG_PKG_CONFIG
+
 AX_PTHREAD
 
 m4_ifdef([AM_PATH_LIBGCRYPT],[
@@ -74,22 +66,37 @@ m4_ifdef([AM_PATH_LIBGCRYPT],[
   AC_MSG_ERROR([automake gcrypt support is missing.])
 )
 
-PKG_CHECK_MODULES([EVERARCH], [
-    sqlite3
-])
-
 AM_PATH_GPGME([1], , AC_MSG_ERROR([GnuPG Made Easy library not found]))
 
-PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9])
-PKG_CHECK_MODULES([XSLT], [libxslt >= 1.1])
+PKG_CHECK_MODULES([SQLITE], [sqlite3])
+PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9 libxslt >= 1.1])
 PKG_CHECK_MODULES([SSL], [libssl >= 1.1 libcrypto >= 1.1])
 
-AM_PATH_GTK_3_0([3.24.0], , AC_MSG_ERROR([Gtk+ 3.24.0 or higher required.]))
+AC_PROG_LEX
+AC_PROG_YACC
+if test "x$LEX" == "x:"
+then
+  has_lex=false
+else
+  has_lex=true
+fi
+AM_CONDITIONAL([HAS_LEX], [test x$has_lex = xtrue])
+
+AM_PATH_PYTHON([3.0], has_python=true, has_python=false)
+AM_CONDITIONAL([HAS_PYTHON], [test x$has_python = xtrue])
+
+PKG_CHECK_MODULES([GTK], [gtk+-3.0], has_gtk=true, has_gtk=false)
+AM_CONDITIONAL([HAS_GTK], [test x$has_gtk = xtrue])
 
 AC_DEFINE(FUSE_USE_VERSION, [34], [Fuse target API version.])
-PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0])
+PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0], has_fuse=true, has_fuse=false)
+AM_CONDITIONAL([HAS_FUSE], [test x$has_fuse = xtrue])
 
 AM_PATH_LISPDIR()
+AM_CONDITIONAL([HAS_EMACS], [test x$lispdir != x])
+
+AC_CHECK_PROG(has_poke, [poke], true, false)
+AM_CONDITIONAL([HAS_POKE], [test x$has_poke = xtrue])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([

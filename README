@@ -48,11 +48,31 @@ BSD systems.
 
 Everarch is known to run at least on i686 and arm64 systems.
 
-Install the dependencies:
+Install at least the minimal required dependencies:
 
-$ apt install libgpgme-dev libgcrypt-dev libsqlite3-dev libxml2-dev \
-    libxslt1-dev flex bison texinfo elpa-helm elpa-s elpa-seq fuse3 \
-    libfuse3-dev pkg-config libssl-dev make automake libgtk-3-dev
+$ apt install make automake pkg-config libtool texinfo libxml2-dev \
+    libxslt1-dev libssl-dev libgpgme-dev libgcrypt-dev libsqlite3-dev
+
+The minimum required dependencies will just build the
+evr-glacier-storage server. Usually you also want to build
+evr-attr-index which requires the following extra dependencies:
+
+$ apt install flex bison
+
+evr-fs let's you access everarch content from the file system instead
+of just via the evr command line interface. You need the following
+extra dependencies if you want te bouild evr-fs:
+
+$ apt install fuse3 libfuse3-dev
+
+Install the following if you want to use the emacs integration:
+
+$ apt install emacs elpa-helm elpa-s elpa-seq
+
+Install the following if you want to build the unfinished and
+experimental evr-attr-ui:
+
+$ apt install libgtk-3-dev
 
 On linux you can execute the following within the everarch directory
 to build the application.
