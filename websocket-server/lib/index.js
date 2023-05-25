@@ -123,42 +123,43 @@ function handleSocket(config, connection, connectionId){
                                     sendUnauthenticated(msg.ch);
                                     break;
                                 }
-                                return watch(msg.lastModifiedAfter || 0)
+                                return watch(msg.lastModifiedAfter || 0, msg.flags)
                                     .pipe(
+                                        buildModifiedClaimSetFilter(msg.filter),
                                         tap(modifiedClaimSet => {
                                             send({
                                                 ch: msg.ch,
-                                                status: 'claim-set-modified',
+                                                status: 'blob-modified',
                                                 ...modifiedClaimSet,
                                             });
                                         }),
                                     );
-                            case 'get-claim-set':
+                            case 'get-verify':
                                 if(!authenticatedUser){
                                     sendUnauthenticated(msg.ch);
                                     break;
                                 }
-                                return getClaimSet(msg.ref)
+                                return getAndVerify(msg.ref)
                                     .pipe(
-                                        tap(claimSet => {
+                                        tap(content => {
                                             send({
                                                 ch: msg.ch,
-                                                status: 'claim-set',
-                                                claimSet: claimSet.toString(),
+                                                status: 'get',
+                                                body: content.toString(),
                                             });
                                         }),
                                     );
-                            case 'put-claim-set':
+                            case 'sign-put':
                                 if(!authenticatedUser){
                                     sendUnauthenticated(msg.ch);
                                     break;
                                 }
-                                return putClaimSet(msg.claimSet)
+                                return signAndPut(msg.body)
                                     .pipe(
                                         tap(ref => {
                                             send({
                                                 ch: msg.ch,
-                                                status: 'claim-set-put',
+                                                status: 'put',
                                                 ref,
                                             });
                                         }),
@@ -203,8 +204,15 @@ function getClientAddress(request){
     return request.socket.remoteAddress;
 }
 
-function watch(lastModifiedAfter){
-    return evr(['watch', `--last-modified-after=${lastModifiedAfter}`, '--flags=1'])
+function watch(lastModifiedAfter=0, flags=undefined){
+    let args = [
+        'watch',
+        `--last-modified-after=${lastModifiedAfter}`,
+    ];
+    if(flags){
+        args.push(`--flags=${flags}`);
+    }
+    return evr(args)
         .pipe(
             switchMap(proc => new Observable(observer => {
                 let rl = readline.createInterface({
@@ -235,7 +243,27 @@ function watch(lastModifiedAfter){
         );
 }
 
-function getClaimSet(ref){
+function buildModifiedClaimSetFilter(filterDesc){
+    if(!filterDesc){
+        return tap(() => {});
+    }
+    if(filterDesc.type !== 'namespace'){
+        throw new Error(`Unknown filter type ${filterDesc.type}`);
+    }
+    if(!filterDesc.ns){
+        throw new Error(`namespace filter requires ns property with namespace`);
+    }
+    return mergeMap(modifiedClaimSet => getAndVerify(modifiedClaimSet.ref).pipe(
+        switchMap(claimSet => {
+            if(claimSet.indexOf(filterDesc.ns) !== -1){
+                return of(modifiedClaimSet);
+            }
+            return EMPTY;
+        }),
+    ), undefined, 1);
+}
+
+function getAndVerify(ref){
     return evr(['get-verify', ref])
         .pipe(
             readProcessStdout(),
@@ -243,7 +271,7 @@ function getClaimSet(ref){
         );
 }
 
-function putClaimSet(claimSet){
+function signAndPut(claimSet){
     return evr(['sign-put', '--flags=1'])
         .pipe(
             switchMap(proc => merge(

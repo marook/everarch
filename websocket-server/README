@@ -3,6 +3,7 @@ evr-websocket-server - a websocket adapter for everarch
 1) Introduction
 2) Installation
 3) Run
+4) Interface
 
 
 ------------------------------------------------------------------------
@@ -35,3 +36,98 @@ file might look like this:
 }
 
 $ node . evr-websocket-server.conf.json
+
+
+------------------------------------------------------------------------
+Interface
+
+evr-websocket-server will listen on the configured port for
+connections following the WebSocket protocol as defined in RFC
+6455. All sent and received messages are expected to be text messages
+which contain JSON. The client sends commands which are responded by
+the server. The client must provide a channel identifier with every
+command. The server responses will use the same channel number so that
+the response can be related to a command from the client.
+
+The first command must be an authentication command.
+
+{
+    "ch": 123,
+    "cmd": "auth",
+    "type": "basic",
+    "user": "mr-x",
+    "password": "pazz"
+}
+
+After the authentication command any of the following commands can
+follow.
+
+The watch command tells the server to watch for modified blobs.
+
+{
+    "ch": 123,
+    "cmd": "watch",
+    "lastModifiedAfter": 1684012031,
+    "flags": 1,
+    "filter": {
+        "type": "namespace",
+        "ns": "https://evr.ma300k.de/claims/"
+    }
+}
+
+The lastModifiedAfter property is optional. The default value is
+0. The meaning of lastModifiedAfter is defined by the
+--last-modified-after argument for the evr cli. See evr --help for
+more details.
+
+The flags property is optional. The default value is that no flags are
+used. The meaning of flags is defined by the --flags argument for the
+evr cli.
+
+The filter property is optional. The default value is no filtering. It
+specifies filters which are applied to the found blobs before
+reporting them to the client. Right now only a namespace filter is
+supported. It filters blobs which do not use the given namespace.
+
+Responses from the server to the watch command might look like this:
+
+{
+    "ch": 123,
+    "status": "blob-modified",
+    "ref": "sha3-224-…",
+    "lastModified": 1684012032
+}
+
+The get-claim-set command tells the server to respond a claim set's
+content.
+
+{
+    "ch": 123,
+    "cmd": "get-verify",
+    "ref": "sha3-224-…"
+}
+
+Responses from the server might look like this:
+
+{
+    "ch": 123,
+    "status": "get",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>…"
+}
+
+The put-claim-set command tells the server to store a provided claim
+set.
+
+{
+    "ch": 123,
+    "cmd": "sign-put",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>…"
+}
+
+Responses from the server might look like this:
+
+{
+    "ch": 123,
+    "status": "put",
+    "ref": "sha3-224-…"
+}
