@@ -17,7 +17,7 @@
  */
 (function(){
     let { EMPTY, fromEvent, merge, of, ReplaySubject, Subject } = rxjs;
-    let { first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
+    let { distinctUntilChanged, first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
     let { webSocket } = rxjs.webSocket;
 
     let xmlNamespaces = new Map([
@@ -105,6 +105,27 @@
                         }),
                     );
             },
+        ),
+        stats.pipe(
+            map(stats => {
+                let earliest = null;
+                let latest = null;
+                for(let ns of Object.keys(stats.claims)){
+                    let nsObj = stats.claims[ns];
+                    for(let name of Object.keys(nsObj)){
+                        let nameObj = nsObj[name];
+                        if(earliest === null || nameObj.earliestCreated < earliest){
+                            earliest = nameObj.earliestCreated;
+                        }
+                        if(latest === null || nameObj.latestCreated > latest){
+                            latest = nameObj.latestCreated;
+                        }
+                    }
+                }
+                let dt = (latest.getTime() - earliest.getTime()) / (24*60*60*1000);
+                return (stats.claimSetCount / dt).toFixed(1);
+            }),
+            writeTextContent('.stats-claims-per-day'),
         ),
     )
     // TODO catch errors
@@ -232,6 +253,7 @@
             let elements = parent.querySelectorAll(selector);
             return observer
                 .pipe(
+                    distinctUntilChanged(),
                     tap(value => {
                         for(let el of elements){
                             el.textContent = value;

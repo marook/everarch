@@ -61,6 +61,6 @@ table td {
     display: none;
 }
 
-.number-slot, .stats-claim-set-count {
+.number-slot, .stats-claim-set-count, .stats-claims-per-day {
     font-variant-numeric: tabular-nums;
 }
