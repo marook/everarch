@@ -1,0 +1,22 @@
+{
+    "name": "evr-claim-stats",
+    "version": "0.1.0",
+    "keywords": [
+        "evr",
+        "everarch",
+        "statistics"
+    ],
+    "license": "AGPL-3.0-or-later",
+    "author": {
+        "name": "Markus Peröbner",
+        "email": "markus.peroebner@gmail.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/marook/everarch.git",
+        "directory": "claim-stats"
+    },
+    "dependencies": {
+        "rxjs": "^7.8.1"
+    }
+}

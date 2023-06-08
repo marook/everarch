@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!--
+ * everarch - the hopefully ever lasting archive
+ * Copyright (C) 2021-2023  Markus Peröbner
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"/>
+    <title>evr-claim-stats</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="claim-stats.css"/>
+  </head>
+  <body>
+    <h1>evr-claim-stats</h1>
+    <p>
+      evr-claim-stats connects to a evr-websocket-server and
+      calculates several statistics about the target
+      evr-glacier-storage server's claims.
+    </p>
+    
+    <h2>target</h2>
+    <form name="target">
+      <div class="form-control">
+        <label>
+          evr-websocket-server url
+        </label>
+        <input
+          name="evrWebsocketServerUrl"
+          type="text"
+          placeholder="ws://localhost:8030"
+          />
+      </div>
+      <div class="form-control">
+        <label>
+          evr-websocket-server user
+        </label>
+        <input
+          name="evrWebsocketServerUser"
+          type="text"
+          placeholder="user"
+          />
+      </div>
+      <div class="form-control">
+        <label>
+          evr-websocket-server password
+        </label>
+        <input
+          name="evrWebsocketServerPassword"
+          type="text"
+          placeholder="password"
+          />
+      </div>
+      <div class="form-actions">
+        <button
+          type="submit"
+          title="generates the stats for the configured target"
+          >
+          run
+        </button>
+      </div>
+    </form>
+
+    <article id="stats" class="hidden">
+      <h2>stats</h2>
+      <p>
+        Scanning <span class="stats-claim-set-count"></span>
+        claim-sets since <span class="stats-start-time"></span>.
+      </p>
+    </article>
+
+    <script src="node_modules/rxjs/dist/bundles/rxjs.umd.js"></script>
+    <script src="claim-stats.js"></script>
+  </body>
+</html>
