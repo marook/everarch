@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 (function(){
-    let { EMPTY, fromEvent, merge, of, ReplaySubject, Subject } = rxjs;
+    let { combineLatest, EMPTY, fromEvent, merge, of, ReplaySubject, Subject } = rxjs;
     let { distinctUntilChanged, first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
     let { webSocket } = rxjs.webSocket;
 
@@ -142,6 +142,21 @@
             map(claimSetsPerDay => (365*claimSetsPerDay).toFixed(0)),
             writeTextContent('.stats-claims-per-year'),
         ),
+        combineLatest([
+            stats,
+            claimSetsPerDay,
+        ])
+            .pipe(
+                map(([stats, claimSetsPerDay]) => {
+                    if(stats.oneHundredClaimSetsTime === null){
+                        return 'a not yet known amount of';
+                    }
+                    let dt = (stats.oneHundredClaimSetsTime.getTime() - stats.startTime.getTime()) / (60*1000);
+                    let claimSetsPerYear = claimSetsPerDay * 365;
+                    return (dt / 100 * claimSetsPerYear).toFixed(0);
+                }),
+                writeTextContent('.stats-one-year-scan-duration'),
+            ),
     )
     // TODO catch errors
         .subscribe();
@@ -151,6 +166,7 @@
         let ws = webSocket(config.server.url);
         let stats = {
             startTime: new Date(),
+            oneHundredClaimSetsTime: null,
             claimSetCount: 0,
             claims: {},
         };
@@ -203,6 +219,9 @@
                         ...stats,
                     };
                     stats.claimSetCount += 1;
+                    if(stats.claimSetCount === 100){
+                        stats.oneHundredClaimSetsTime = new Date();
+                    }
                     let claimSet = findClaimSet(blob.doc);
                     if(claimSet){
                         let createdAttr = claimSet.getAttributeNS(xmlNamespaces.get('dc'), 'created');

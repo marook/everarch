@@ -61,6 +61,6 @@ table td {
     display: none;
 }
 
-.number-slot, .stats-claim-set-count, .stats-claims-per-day, .stats-claims-per-year {
+.number-slot, .stats-claim-set-count, .stats-claims-per-day, .stats-claims-per-year, .stats-one-year-scan-duration {
     font-variant-numeric: tabular-nums;
 }
