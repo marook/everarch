@@ -39,7 +39,7 @@
         </label>
         <input
           name="evrWebsocketServerUrl"
-          type="text"
+          type="url"
           placeholder="ws://localhost:8030"
           />
       </div>
@@ -59,7 +59,7 @@
         </label>
         <input
           name="evrWebsocketServerPassword"
-          type="text"
+          type="password"
           placeholder="password"
           />
       </div>
@@ -75,10 +75,25 @@
 
     <article id="stats" class="hidden">
       <h2>stats</h2>
+
       <p>
         Scanning <span class="stats-claim-set-count"></span>
         claim-sets since <span class="stats-start-time"></span>.
       </p>
+
+      <h3>claims</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>name</th>
+            <th>namespace</th>
+            <th>count</th>
+            <th>earliest</th>
+            <th>latest</th>
+          </tr>
+        </thead>
+        <tbody id="stats-claims"></tbody>
+      </table>
     </article>
 
     <script src="node_modules/rxjs/dist/bundles/rxjs.umd.js"></script>

@@ -20,6 +20,11 @@
     let { first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
     let { webSocket } = rxjs.webSocket;
 
+    let xmlNamespaces = new Map([
+        ['evr', 'https://evr.ma300k.de/claims/'],
+        ['dc', 'http://purl.org/dc/terms/'],
+    ]);
+
     let stats = fromEvent(document.forms.target, 'submit')
         .pipe(
             map(event => {
@@ -52,8 +57,54 @@
             writeTextContent('.stats-claim-set-count'),
         ),
         stats.pipe(
-            map(stats => '' + stats.startTime),
+            map(stats => stats.startTime.toLocaleString()),
             writeTextContent('.stats-start-time'),
+        ),
+        stats.pipe(
+            observable => {
+                let tbody = document.getElementById('stats-claims');
+                let rows = new Map();
+                return observable
+                    .pipe(
+                        tap(stats => {
+                            let surplus = new Set(rows.keys());
+                            for(let ns of Object.keys(stats.claims)){
+                                let nsObj = stats.claims[ns];
+                                for(let name of Object.keys(nsObj)){
+                                    let nameObj = nsObj[name];
+                                    let rowKey = `${name}:${ns}`;
+                                    surplus.delete(rowKey);
+                                    let row = rows.get(rowKey);
+                                    if(!row){
+                                        let rowEl = document.createElement('tr');
+                                        row = {
+                                            rowEl,
+                                        };
+                                        for(let k of ['name', 'namespace', 'count', 'earliest', 'latest']){
+                                            let el = document.createElement('td');
+                                            rowEl.appendChild(el);
+                                            row[k] = el;
+                                        }
+                                        for(let k of ['count', 'earliest', 'latest']){
+                                            row[k].classList.add('number-slot');
+                                        }
+                                        row.name.textContent = name;
+                                        row.namespace.textContent = ns;
+                                        rows.set(rowKey, row);
+                                        tbody.appendChild(rowEl);
+                                    }
+                                    row.count.textContent = '' + nameObj.count;
+                                    row.earliest.textContent = nameObj.earliestCreated.toLocaleString();
+                                    row.latest.textContent = nameObj.latestCreated.toLocaleString();
+                                }
+                            }
+                            for(let rowKey of surplus){
+                                tbody.removeChild(rows.get(rowKey).rowEl);
+                                rows.delete(rowKey);
+                            }
+                        }),
+                    );
+            },
         ),
     )
     // TODO catch errors
@@ -65,6 +116,7 @@
         let stats = {
             startTime: new Date(),
             claimSetCount: 0,
+            claims: {},
         };
         let scannedRefs = new Subject();
         ws.next({
@@ -115,6 +167,41 @@
                         ...stats,
                     };
                     stats.claimSetCount += 1;
+                    let claimSet = findClaimSet(blob.doc);
+                    if(claimSet){
+                        let createdAttr = claimSet.getAttributeNS(xmlNamespaces.get('dc'), 'created');
+                        if(createdAttr){
+                            let created = new Date(createdAttr);
+                            // TODO validate created
+                            for(let claim of queryXPath(blob.doc, '*', claimSet)){
+                                let ns = claim.namespaceURI;
+                                let name = claim.localName;
+                                let nsObj = stats.claims[ns];
+                                if(!nsObj){
+                                    nsObj = {};
+                                    stats.claims[ns] = nsObj;
+                                }
+                                let nameObj = nsObj[name];
+                                if(nameObj){
+                                    nameObj.count += 1;
+                                    if(nameObj.earliestCreated > created){
+                                        nameObj.earliestCreated = created;
+                                    }
+                                    if(nameObj.latestCreated < created){
+                                        nameObj.latestCreated = created;
+                                    }
+                                } else {
+                                    nameObj = {
+                                        count: 1,
+                                        earliestCreated: created,
+                                        latestCreated: created,
+                                    };
+                                    nsObj[name] = nameObj;
+                                }
+                            }
+
+                        }
+                    }
                     return stats;
                 }),
             );
@@ -152,5 +239,24 @@
                     }),
                 );
         };
+    }
+
+    function findClaimSet(doc){
+        return queryXPath(doc, '/evr:claim-set').next()?.value;
+    }
+
+    function* queryXPath(doc, xpath, context=undefined){
+        let it = doc.evaluate(xpath, context || doc, resolveXmlPrefix, XPathResult.UNORDERED_NODE_ITERATOR_TYPE);
+        while(true){
+            let node = it.iterateNext();
+            if(!node){
+                break;
+            }
+            yield node;
+        }
+    }
+
+    function resolveXmlPrefix(prefix){
+        return xmlNamespaces.get(prefix) || null;
     }
 }());

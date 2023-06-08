@@ -38,10 +38,29 @@ form .form-actions {
     gap: 0.5rem;
 }
 
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table th, table td {
+    text-align: start;
+    vertical-align: top;
+    padding-left: 1rem;
+}
+
+table th:first-child, table td:first-child {
+    padding-left: 0;
+}
+
+table td {
+    padding-top: 0.25rem;
+}
+
 .hidden {
     display: none;
 }
 
-.stats-claim-set-count {
+.number-slot, .stats-claim-set-count {
     font-variant-numeric: tabular-nums;
 }
