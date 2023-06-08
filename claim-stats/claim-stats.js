@@ -47,6 +47,34 @@
             }),
         );
 
+    let claimSetsPerDay = stats
+        .pipe(
+            map(stats => {
+                let earliest = null;
+                let latest = null;
+                for(let ns of Object.keys(stats.claims)){
+                    let nsObj = stats.claims[ns];
+                    for(let name of Object.keys(nsObj)){
+                        let nameObj = nsObj[name];
+                        if(earliest === null || nameObj.earliestCreated < earliest){
+                            earliest = nameObj.earliestCreated;
+                        }
+                        if(latest === null || nameObj.latestCreated > latest){
+                            latest = nameObj.latestCreated;
+                        }
+                    }
+                }
+                let dt = (latest.getTime() - earliest.getTime()) / (24*60*60*1000);
+                return stats.claimSetCount / dt;
+            }),
+            share({
+                connector: () => new ReplaySubject(1),
+                resetOnError: true,
+                resetOnComplete: true,
+                resetOnRefCountZero: true,
+            }),
+        );
+
     merge(
         stats.pipe(
             first(),
@@ -106,26 +134,13 @@
                     );
             },
         ),
-        stats.pipe(
-            map(stats => {
-                let earliest = null;
-                let latest = null;
-                for(let ns of Object.keys(stats.claims)){
-                    let nsObj = stats.claims[ns];
-                    for(let name of Object.keys(nsObj)){
-                        let nameObj = nsObj[name];
-                        if(earliest === null || nameObj.earliestCreated < earliest){
-                            earliest = nameObj.earliestCreated;
-                        }
-                        if(latest === null || nameObj.latestCreated > latest){
-                            latest = nameObj.latestCreated;
-                        }
-                    }
-                }
-                let dt = (latest.getTime() - earliest.getTime()) / (24*60*60*1000);
-                return (stats.claimSetCount / dt).toFixed(1);
-            }),
+        claimSetsPerDay.pipe(
+            map(claimSetsPerDay => claimSetsPerDay.toFixed(1)),
             writeTextContent('.stats-claims-per-day'),
+        ),
+        claimSetsPerDay.pipe(
+            map(claimSetsPerDay => (365*claimSetsPerDay).toFixed(0)),
+            writeTextContent('.stats-claims-per-year'),
         ),
     )
     // TODO catch errors
