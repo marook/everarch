@@ -36,6 +36,7 @@
                         user: form.evrWebsocketServerUser.value,
                         password: form.evrWebsocketServerPassword.value,
                     },
+                    namespaceFilter: form.namespaceFilter.value,
                 };
             }),
             switchMap(config => collectStats(config)),
@@ -178,12 +179,19 @@
             user: config.server.user,
             password: config.server.password,
         });
-        ws.next({
+        let watchCmd = {
             ch: nextCh++,
             cmd: 'watch',
             lastModifiedAfter: 0,
             flags: 1,
-        });
+        };
+        if(config.namespaceFilter){
+            watchCmd.filter = {
+                type: 'namespace',
+                ns: config.namespaceFilter,
+            };
+        }
+        ws.next(watchCmd);
         let scan = scannedRefs
             .pipe(
                 mergeMap(ref => {
