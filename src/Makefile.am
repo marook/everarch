@@ -91,7 +91,7 @@ attr_index_db_test_SOURCES = \
 	keys.c \
 	logger.c \
 	subprocess.c
-attr_index_db_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) -lm $(SSL_LIBS)
+attr_index_db_test_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) -lm $(SSL_LIBS) $(XML_LIBS)
 attr_index_db_test_LFLAGS = --header-file=attr-query-lexer.h
 
 auth_test_SOURCES = \
