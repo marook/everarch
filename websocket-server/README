@@ -98,6 +98,25 @@ Responses from the server to the watch command might look like this:
     "lastModified": 1684012032
 }
 
+If something goes wrong the server might respond with an error status:
+
+{
+    "ch": 123,
+    "status": "error",
+    "errorCode": 1
+}
+
+The error code 1 is a general no further specified error. Could be
+anything like someone stumbled over the network cable or your dog ate
+the homework.
+
+The meaning of the other error codes is defined by the evr cli
+program. It's exit code is reported as the error code. The most
+important ones are 2 for 'not found' and 5 for 'user data invalid'.
+
+This kind off errors can also be reported for the further commands
+described below.
+
 The get-claim-set command tells the server to respond a claim set's
 content.
 

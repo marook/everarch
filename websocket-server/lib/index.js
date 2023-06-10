@@ -126,6 +126,7 @@ function handleSocket(config, connection, connectionId){
                                 return watch(msg.lastModifiedAfter || 0, msg.flags)
                                     .pipe(
                                         buildModifiedClaimSetFilter(msg.filter),
+                                        sendErrorOnError(msg),
                                         tap(modifiedClaimSet => {
                                             send({
                                                 ch: msg.ch,
@@ -141,6 +142,7 @@ function handleSocket(config, connection, connectionId){
                                 }
                                 return getAndVerify(msg.ref)
                                     .pipe(
+                                        sendErrorOnError(msg),
                                         tap(content => {
                                             send({
                                                 ch: msg.ch,
@@ -156,6 +158,7 @@ function handleSocket(config, connection, connectionId){
                                 }
                                 return signAndPut(msg.body)
                                     .pipe(
+                                        sendErrorOnError(msg),
                                         tap(ref => {
                                             send({
                                                 ch: msg.ch,
@@ -176,6 +179,29 @@ function handleSocket(config, connection, connectionId){
         send({
             ch,
             status: 'unauthenticated',
+        });
+    }
+
+    function sendErrorOnError(msg){
+        return catchError(err => {
+            if(err instanceof ChildProcessError){
+                if(err.exitCode !== 2 && err.exitCode !== 5){
+                    log(`Child process failed with exit code ${err.exitCode}: ${err.stderr}`);
+                }
+                send({
+                    ch: msg.ch,
+                    status: 'error',
+                    errorCode: err.exitCode,
+                });
+            } else {
+                log('Error while processing command:', err);
+                send({
+                    ch: msg.ch,
+                    status: 'error',
+                    errorCode: 1,
+                });
+            }
+            return EMPTY;
         });
     }
 
@@ -322,6 +348,14 @@ function evr(args){
     return spawn('evr', args);
 }
 
+class ChildProcessError extends Error{
+    constructor(exitCode, stderr){
+        super(`Child process failed with exit code ${exitCode}: ${stderr}`);
+        this.exitCode = exitCode;
+        this.stderr = stderr;
+    }
+}
+
 function spawn(cmd, args=[]){
     return new Observable(observer => {
         let proc = childProcess.spawn(cmd, args);
@@ -333,9 +367,9 @@ function spawn(cmd, args=[]){
             }
             errout.push(data);
         }
-        proc.on('close', code => {
-            if(code){
-                observer.error(`Command ${cmd} ${JSON.stringify(args)} failed with exit code ${code}: ${errout.join('')}`);
+        proc.on('close', exitCode => {
+            if(exitCode){
+                observer.error(new ChildProcessError(exitCode, errout.join('')));
             } else {
                 observer.complete();
             }
