@@ -608,8 +608,10 @@ int evr_cli_get_verify(struct cli_cfg *cfg){
         goto out;
     }
     xmlDocPtr doc = NULL;
-    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref) != evr_ok){
+    int fetch_res = evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref);
+    if(fetch_res != evr_ok){
         log_error("No validly signed XML found for ref %s", cfg->key);
+        ret = fetch_res;
         goto out_with_close_c;
     }
     char *doc_str = NULL;

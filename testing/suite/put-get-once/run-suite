@@ -47,6 +47,17 @@ fwpid=$!
 ( evr watch --flags-filter 1 --last-modified-after 0 > claims-watch.actual.log ) &
 cwpid=$!
 
+set +e
+evr get-verify sha3-224-01234567890123456789012345678901234567890123456789012345
+evr_exit=$?
+set -e
+# exit code 2 indicates not found
+if [[ "${evr_exit}" != '2' ]]
+then
+    echo "Expected evr exit code 2 but got ${evr_exit}" >&2
+    exit 1
+fi
+
 # test unauthorized request has no measurable impact on storage
 echo 'Test unauthorized access...'
 echo 'unauthorized value' | evr --auth-token "localhost:${glacier_storage_port}:00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff" put && exit 1 || true

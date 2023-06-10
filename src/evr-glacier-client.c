@@ -78,8 +78,8 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
     if(resp.status_code != evr_status_code_ok){
         evr_blob_ref_str fmt_key;
         evr_fmt_blob_ref(fmt_key, key);
-        log_error("Failed to read blob %s. Responded status code was 0x%02x", resp.status_code);
-        return evr_error;
+        log_error("Failed to read blob %s. Responded status code was 0x%02x", fmt_key, resp.status_code);
+        return evr_not_found;
     }
     char *buf = NULL;
     if(evr_read_cmd_get_resp_blob(&buf, f, resp.body_size, key) != evr_ok){
