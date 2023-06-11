@@ -112,7 +112,8 @@ the homework.
 
 The meaning of the other error codes is defined by the evr cli
 program. It's exit code is reported as the error code. The most
-important ones are 2 for 'not found' and 5 for 'user data invalid'.
+important ones are 2 for 'not found' and 5 for 'user data
+invalid'. For a complete list look at the source file src/errors.h.
 
 This kind off errors can also be reported for the further commands
 described below.

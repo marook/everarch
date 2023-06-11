@@ -54,8 +54,9 @@ const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 #define sort_order_blob_ref_key "blob-ref"
 
 static char doc[] =
-    program_name " is a command line client for interacting with evr-glacier-storage servers.\n\n"
-    "Possible commands are get, put, sign-put, post-file or watch.\n\n"
+    program_name " is a command line client for interacting with evr-glacier-storage and evr-attr-index servers.\n\n"
+    "The concrete operation is specified by a set of possible commands listed in brief below.\n\n"
+    // commands start here
     "The get command expects the key of the to be fetched blob as second argument. The blob content will be written to stdout.\n\n"
     "The get-verify command expects the key of the to be fetched claim-set blob as second argument. The claim-set XML will be written to stdout.\n\n"
     "The get-claim command expects the key of the to be fetched claim as second argument. The claim will be written to stdout.\n\n"
@@ -66,7 +67,9 @@ static char doc[] =
     "The search command executes the given query on the default evr-attr-index server. The results are written to stdout.\n\n"
     "The desc-seed command provides a seed description for the given seed. Expects the seed ref as argument.\n\n"
     "The watch command prints modified blob keys.\n\n"
-    "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST:SRC_PORT DST_HOST:DST_PORT after the sync argument."
+    "The sync command synchronizes the blobs of two evr-glacier-storage instances either in one or in both directions. Expects the arguments SRC_HOST:SRC_PORT DST_HOST:DST_PORT after the sync argument.\n\n"
+    // exit code starts here
+    "The program's exit code indicates success or failure. The exit code 0 represents a successful execution. The exit code 1 indicates a general no further specificed error. The exit code 2 indicates that the requested data was not found. The exit code 5 indicates that the operation failed because it stumbled over syntactically invalid data once provided by the user."
     ;
 
 static char args_doc[] = "CMD";
