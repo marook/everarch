@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 (function(){
-    let { combineLatest, EMPTY, fromEvent, merge, of, ReplaySubject, Subject } = rxjs;
+    let { combineLatest, EMPTY, fromEvent, merge, of, ReplaySubject, Subject, throwError } = rxjs;
     let { distinctUntilChanged, first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
     let { webSocket } = rxjs.webSocket;
 
@@ -24,6 +24,10 @@
         ['evr', 'https://evr.ma300k.de/claims/'],
         ['dc', 'http://purl.org/dc/terms/'],
     ]);
+
+    let errorCodes = {
+        userDataInvalid: 5,
+    };
 
     let stats = fromEvent(document.forms.target, 'submit')
         .pipe(
@@ -204,21 +208,28 @@
                     return ws
                         .pipe(
                             mergeMap(msg => {
-                                if(msg.status !== 'get'){
-                                    return EMPTY;
-                                }
                                 if(msg.ch !== ch){
                                     return EMPTY;
                                 }
-                                return of(msg.body);
+                                return of(msg);
                             }),
                             first(),
-                            map(claimSetStr => {
-                                let doc = new DOMParser().parseFromString(claimSetStr, 'text/xml');
-                                return {
+                            switchMap(msg => {
+                                if(msg.status === 'error'){
+                                    if(msg.errorCode === errorCodes.userDataInvalid){
+                                        // TODO count claim sets with invalid user data in stats
+                                        return EMPTY;
+                                    }
+                                    return throwError(msg);
+                                }
+                                if(msg.status !== 'get'){
+                                    return throwError(`Unexpected command with message: ${JSON.stringify(msg)}`);
+                                }
+                                let doc = new DOMParser().parseFromString(msg.body, 'text/xml');
+                                return of({
                                     ref,
                                     doc,
-                                };
+                                });
                             }),
                         );
                 }, undefined, 1),
@@ -280,6 +291,8 @@
                         scannedRefs.next(msg.ref);
                         return EMPTY;
                     case 'get':
+                        return EMPTY;
+                    case 'error':
                         return EMPTY;
                     }
                 }),
