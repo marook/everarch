@@ -16,8 +16,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 (function(){
+    let { connect } = evrWebsocketClient;
     let { combineLatest, EMPTY, fromEvent, merge, of, ReplaySubject, Subject, throwError } = rxjs;
-    let { distinctUntilChanged, first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
+    let { auditTime, catchError, distinctUntilChanged, first, map, mergeMap, share, switchMap, tap } = rxjs.operators;
     let { webSocket } = rxjs.webSocket;
 
     let xmlNamespaces = new Map([
@@ -44,6 +45,7 @@
                 };
             }),
             switchMap(config => collectStats(config)),
+            auditTime(1000/10),
             share({
                 connector: () => new ReplaySubject(1),
                 resetOnError: true,
@@ -167,8 +169,6 @@
         .subscribe();
 
     function collectStats(config){
-        let nextCh = 1;
-        let ws = webSocket(config.server.url);
         let stats = {
             startTime: new Date(),
             oneHundredClaimSetsTime: null,
@@ -176,131 +176,76 @@
             claims: {},
         };
         let scannedRefs = new Subject();
-        ws.next({
-            ch: nextCh++,
-            cmd: 'auth',
-            type: 'basic',
-            user: config.server.user,
-            password: config.server.password,
-        });
-        let watchCmd = {
-            ch: nextCh++,
-            cmd: 'watch',
-            lastModifiedAfter: 0,
-            flags: 1,
-        };
-        if(config.namespaceFilter){
-            watchCmd.filter = {
-                type: 'namespace',
-                ns: config.namespaceFilter,
-            };
-        }
-        ws.next(watchCmd);
-        let scan = scannedRefs
+        return connect(config.server)
             .pipe(
-                mergeMap(ref => {
-                    let ch = nextCh++;
-                    ws.next({
-                        ch,
-                        cmd: 'get-verify',
-                        ref,
-                    });
-                    return ws
+                switchMap(con => {
+                    let watchOpts = {
+                        lastModifiedAfter: 0,
+                        flags: 1,
+                    };
+                    if(config.namespaceFilter){
+                        watchOpts.filter = {
+                            type: 'namespace',
+                            ns: config.namespaceFilter,
+                        };
+                    }
+                    return con.watchClaims(watchOpts, catchError(err => {
+                        if(err?.status === 'error' && err.errorCode === errorCodes.userDataInvalid){
+                            // TODO count claim sets with invalid user data in stats
+                            return EMPTY;
+                        }
+                        return throwError(err);
+                    }))
                         .pipe(
-                            mergeMap(msg => {
-                                if(msg.ch !== ch){
-                                    return EMPTY;
+                            map(blob => {
+                                stats = {
+                                    ...stats,
+                                };
+                                stats.claimSetCount += 1;
+                                if(stats.claimSetCount === 100){
+                                    stats.oneHundredClaimSetsTime = new Date();
                                 }
-                                return of(msg);
-                            }),
-                            first(),
-                            switchMap(msg => {
-                                if(msg.status === 'error'){
-                                    if(msg.errorCode === errorCodes.userDataInvalid){
-                                        // TODO count claim sets with invalid user data in stats
-                                        return EMPTY;
+                                let doc = new DOMParser().parseFromString(blob.body, 'text/xml');
+                                let claimSet = findClaimSet(doc);
+                                if(claimSet){
+                                    let createdAttr = claimSet.getAttributeNS(xmlNamespaces.get('dc'), 'created');
+                                    if(createdAttr){
+                                        let created = new Date(createdAttr);
+                                        // TODO validate created
+                                        for(let claim of queryXPath(doc, '*', claimSet)){
+                                            let ns = claim.namespaceURI;
+                                            let name = claim.localName;
+                                            let nsObj = stats.claims[ns];
+                                            if(!nsObj){
+                                                nsObj = {};
+                                                stats.claims[ns] = nsObj;
+                                            }
+                                            let nameObj = nsObj[name];
+                                            if(nameObj){
+                                                nameObj.count += 1;
+                                                if(nameObj.earliestCreated > created){
+                                                    nameObj.earliestCreated = created;
+                                                }
+                                                if(nameObj.latestCreated < created){
+                                                    nameObj.latestCreated = created;
+                                                }
+                                            } else {
+                                                nameObj = {
+                                                    count: 1,
+                                                    earliestCreated: created,
+                                                    latestCreated: created,
+                                                };
+                                                nsObj[name] = nameObj;
+                                            }
+                                        }
+
                                     }
-                                    return throwError(msg);
                                 }
-                                if(msg.status !== 'get'){
-                                    return throwError(`Unexpected command with message: ${JSON.stringify(msg)}`);
-                                }
-                                let doc = new DOMParser().parseFromString(msg.body, 'text/xml');
-                                return of({
-                                    ref,
-                                    doc,
-                                });
+                                return stats;
                             }),
                         );
-                }, undefined, 1),
-                map(blob => {
-                    stats = {
-                        ...stats,
-                    };
-                    stats.claimSetCount += 1;
-                    if(stats.claimSetCount === 100){
-                        stats.oneHundredClaimSetsTime = new Date();
-                    }
-                    let claimSet = findClaimSet(blob.doc);
-                    if(claimSet){
-                        let createdAttr = claimSet.getAttributeNS(xmlNamespaces.get('dc'), 'created');
-                        if(createdAttr){
-                            let created = new Date(createdAttr);
-                            // TODO validate created
-                            for(let claim of queryXPath(blob.doc, '*', claimSet)){
-                                let ns = claim.namespaceURI;
-                                let name = claim.localName;
-                                let nsObj = stats.claims[ns];
-                                if(!nsObj){
-                                    nsObj = {};
-                                    stats.claims[ns] = nsObj;
-                                }
-                                let nameObj = nsObj[name];
-                                if(nameObj){
-                                    nameObj.count += 1;
-                                    if(nameObj.earliestCreated > created){
-                                        nameObj.earliestCreated = created;
-                                    }
-                                    if(nameObj.latestCreated < created){
-                                        nameObj.latestCreated = created;
-                                    }
-                                } else {
-                                    nameObj = {
-                                        count: 1,
-                                        earliestCreated: created,
-                                        latestCreated: created,
-                                    };
-                                    nsObj[name] = nameObj;
-                                }
-                            }
-
-                        }
-                    }
-                    return stats;
                 }),
             );
-        let processMessages = ws
-            .pipe(
-                mergeMap(msg => {
-                    switch(msg.status){
-                    default:
-                        throw new Error(`Unknown message status with message: ${JSON.stringify(msg)}`);
-                    case 'authenticated':
-                        return EMPTY;
-                    case 'blob-modified':
-                        scannedRefs.next(msg.ref);
-                        return EMPTY;
-                    case 'get':
-                        return EMPTY;
-                    case 'error':
-                        return EMPTY;
-                    }
-                }),
-            );
-        return merge(
-            scan,
-            processMessages,
-        );
     }
 
     function writeTextContent(selector, parent=document){

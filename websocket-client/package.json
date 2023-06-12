@@ -1,23 +1,29 @@
 {
-    "name": "evr-claim-stats",
+    "name": "evr-websocket-client",
     "version": "0.1.0",
     "keywords": [
         "evr",
         "everarch",
-        "statistics"
+        "websocket"
     ],
     "license": "AGPL-3.0-or-later",
     "author": {
         "name": "Markus Peröbner",
         "email": "markus.peroebner@gmail.com"
     },
+    "scripts":{
+        "prepare": "mkdir -p dist && uglifyjs --comments '/@license/' -o dist/evr-websocket-client.dist.js lib/index.js"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/marook/everarch.git",
-        "directory": "claim-stats"
+        "directory": "websocket-client"
     },
+    "main": "lib",
     "dependencies": {
-        "evr-websocket-client": "../websocket-client",
         "rxjs": "^7.8.1"
+    },
+    "devDependencies": {
+        "uglify-js": "^3.17.4"
     }
 }
