@@ -962,7 +962,7 @@ struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref cl
     int claim_index;
     evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
     xmlDoc *doc = NULL;
-    if(evr_fetch_signed_xml(&doc, cfg.verify_ctx, c, blob_ref) != evr_ok){
+    if(evr_fetch_signed_xml(&doc, cfg.verify_ctx, c, blob_ref, NULL) != evr_ok){
         evr_claim_ref_str claim_ref_str;
         evr_fmt_claim_ref(claim_ref_str, claim_ref);
         log_error("No validly signed XML found for ref %s", claim_ref_str);

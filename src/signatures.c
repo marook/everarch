@@ -120,7 +120,7 @@ struct evr_verify_ctx* evr_init_verify_ctx(char **accepted_fprs, size_t accepted
 
 int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s);
 
-int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen){
+int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen, struct evr_file *meta){
     int ret = evr_error;
     gpgme_ctx_t gpg_ctx;
     if(evr_signatures_build_ctx(&gpg_ctx) != evr_ok){
@@ -141,6 +141,13 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
     gpgme_verify_result_t res = gpgme_op_verify_result(gpg_ctx);
     if(res == NULL){
         goto out_with_release_out;
+    }
+    if(meta){
+        for(gpgme_signature_t s = res->signatures; s; s = s->next){
+            if(evr_meta_write_str(meta, evr_meta_signed_by, s->fpr) != evr_ok){
+                goto out_with_release_out;
+            }
+        }
     }
     if(evr_is_signature_accepted(ctx, res->signatures) != evr_ok){
         ret = evr_user_data_invalid;

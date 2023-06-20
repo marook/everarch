@@ -168,6 +168,7 @@ evr_attr_index_SOURCES = \
 	handover.c \
 	keys.c \
 	logger.c \
+	metadata.c \
 	notify.c \
 	queue.c \
 	server.c \
@@ -189,6 +190,7 @@ evr_attr_ui_SOURCES = \
 	glacier-cmd.c \
 	keys.c \
 	logger.c \
+	metadata.c \
 	signatures.c
 evr_attr_ui_LDADD = $(GTK_LIBS) $(XML_LIBS) $(SSL_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS)
 
@@ -207,6 +209,7 @@ evr_SOURCES = \
 	handover.c \
 	keys.c \
 	logger.c \
+	metadata.c \
 	seed-desc.c \
 	signatures.c
 evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
@@ -227,6 +230,7 @@ evr_fs_SOURCES = \
 	glacier-cmd.c \
 	keys.c \
 	logger.c \
+	metadata.c \
 	open-files.c \
 	seed-desc.c \
 	signatures.c
@@ -323,6 +327,7 @@ glacier_benchmark_SOURCES = \
 	glacier-cmd.c \
 	keys.c \
 	logger.c \
+	metadata.c \
 	signatures.c
 glacier_benchmark_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
 
@@ -405,7 +410,10 @@ signatures_test_SOURCES = \
 	assert.c \
 	basics.c \
 	dyn-mem.c \
+	file-mem.c \
+	files.c \
 	logger.c \
+	metadata.c \
 	signatures.c \
 	signatures-test.c
 signatures_test_LDADD = $(GPGME_LIBS)

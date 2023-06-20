@@ -84,6 +84,7 @@ static char args_doc[] = "CMD";
 #define arg_signing_gpg_key 263
 #define arg_index_host 264
 #define arg_index_port 265
+#define arg_metadata_file 266
 
 #define max_traces_len 64
 
@@ -107,6 +108,7 @@ static struct argp_option options[] = {
     {"accepted-gpg-key", arg_accepted_gpg_key, "FINGERPRINT", 0, "A GPG key fingerprint of claim signatures which will be accepted as valid. Can be specified multiple times to accept multiple keys. You can call 'gpg --list-public-keys' to see your known keys."},
     {"signing-gpg-key", arg_signing_gpg_key, "FINGERPRINT", 0, "Fingerprint of the GPG key which is used for signing claims. You can call 'gpg --list-secret-keys' to see your known keys."},
     {"limit", 'l', "LIMIT", 0, "Sets an upper limit for the maximum number results for evr-attr-index search queries. A value of 0 will not limit the number of results. Default is " to_string(default_limit) "."},
+    {"meta", arg_metadata_file, "FILE", 0, "Appends metadata obtained via processing the get command into the given file. Some data might be written to the file even if the evr process fails."},
     {0}
 };
 
@@ -169,6 +171,9 @@ struct cli_cfg {
 
     char *query;
     size_t limit;
+
+    char *meta_path;
+    struct evr_file *meta;
 };
 
 int evr_replace_host_port(char **host, char **port, char *host_port_expr);
@@ -276,6 +281,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     }
     case arg_signing_gpg_key:
         evr_replace_str(cfg->signing_gpg_fpr, arg);
+        break;
+    case arg_metadata_file:
+        evr_replace_str(cfg->meta_path, arg);
         break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
@@ -468,6 +476,8 @@ int main(int argc, char **argv){
     cfg.signing_gpg_fpr = NULL;
     cfg.query = NULL;
     cfg.limit = default_limit;
+    cfg.meta_path = NULL;
+    cfg.meta = NULL;
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -484,6 +494,13 @@ int main(int argc, char **argv){
     cfg.verify_ctx = evr_build_verify_ctx(cfg.accepted_gpg_fprs);
     if(!cfg.verify_ctx){
         goto out_with_free_cfg;
+    }
+    struct evr_file meta;
+    if(cfg.meta_path){
+        if(evr_meta_open(&meta, cfg.meta_path) != evr_ok){
+            goto out_with_free_cfg;
+        }
+        cfg.meta = &meta;
     }
     evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
     cfg.accepted_gpg_fprs = NULL;
@@ -536,6 +553,7 @@ int main(int argc, char **argv){
         cfg.dst_storage_port,
         cfg.signing_gpg_fpr,
         cfg.query,
+        cfg.meta_path,
     };
     void **tbfree_end = &tbfree[static_len(tbfree)];
  out_with_free_cfg:
@@ -546,6 +564,9 @@ int main(int argc, char **argv){
     }
     for(size_t i = 0; i < cfg.traces_len; ++i){
         free(cfg.traces[i]);
+    }
+    if(cfg.meta){
+        cfg.meta->close(cfg.meta);
     }
     evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
@@ -611,7 +632,7 @@ int evr_cli_get_verify(struct cli_cfg *cfg){
         goto out;
     }
     xmlDocPtr doc = NULL;
-    int fetch_res = evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref);
+    int fetch_res = evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref, cfg->meta);
     if(fetch_res != evr_ok){
         log_error("No validly signed XML found for ref %s", cfg->key);
         ret = fetch_res;
@@ -661,7 +682,7 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
     int claim_index;
     evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
     xmlDocPtr doc = NULL;
-    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref) != evr_ok){
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, blob_ref, cfg->meta) != evr_ok){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
     }
@@ -845,7 +866,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
     int claim;
     evr_split_claim_ref(bref, &claim, cref);
     xmlDocPtr doc = NULL;
-    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, bref) != evr_ok){
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, &c, bref, cfg->meta) != evr_ok){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
     }

@@ -574,7 +574,7 @@ int evr_watch_index_claims_worker(void *arg){
             }
         }
         xmlDocPtr claim_doc = NULL;
-        int fetch_res = evr_fetch_signed_xml(&claim_doc, cfg->verify_ctx, &cs, body.key);
+        int fetch_res = evr_fetch_signed_xml(&claim_doc, cfg->verify_ctx, &cs, body.key, NULL);
         if(fetch_res == evr_user_data_invalid){
             evr_blob_ref_str fmt_key;
             evr_fmt_blob_ref(fmt_key, body.key);
@@ -870,7 +870,7 @@ int evr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr_spec_claim
         }
     }
     xmlDocPtr claim_set = NULL;
-    int fetch_res = evr_fetch_signed_xml(&claim_set, cfg->verify_ctx, c, claim_set_ref);
+    int fetch_res = evr_fetch_signed_xml(&claim_set, cfg->verify_ctx, c, claim_set_ref, NULL);
     if(fetch_res == evr_user_data_invalid){
         evr_blob_ref_str ref_str;
         evr_fmt_blob_ref(ref_str, claim_set_ref);
@@ -1011,7 +1011,7 @@ int evr_index_sync_worker(void *arg){
                 goto out_with_free;
             }
             xmlDocPtr cs_doc = NULL;
-            int fetch_res = evr_fetch_signed_xml(&cs_doc, cfg->verify_ctx, &cw, index_ref);
+            int fetch_res = evr_fetch_signed_xml(&cs_doc, cfg->verify_ctx, &cw, index_ref, NULL);
             if(fetch_res == evr_user_data_invalid){
                 // this situation is somehow theoretical. it would
                 // mean that when initially building the index db the
@@ -1165,7 +1165,7 @@ xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
         }
     }
     xmlDocPtr doc = NULL;
-    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, c, claim_set_ref) != evr_ok){
+    if(evr_fetch_signed_xml(&doc, cfg->verify_ctx, c, claim_set_ref, NULL) != evr_ok){
         return NULL;
     }
     return doc;

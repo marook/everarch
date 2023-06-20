@@ -26,6 +26,7 @@
 #include "test.h"
 #include "logger.h"
 #include "errors.h"
+#include "file-mem.h"
 
 void stringify_dynamic_array(struct dynamic_array **da);
 
@@ -53,7 +54,15 @@ void test_validate_hello_world_signature(){
     { // verify signature with correct expected fingerprint
         struct evr_verify_ctx *v_ctx = evr_init_verify_ctx(&fpr, 1);
         assert(v_ctx);
-        assert(is_ok(evr_verify(v_ctx, &msg, sgn->data, sgn->size_used)));
+        struct evr_file_mem meta_fm;
+        struct evr_file meta;
+        evr_init_file_mem(&meta_fm, 4*1024);
+        assert(meta_fm.data);
+        evr_file_bind_file_mem(&meta, &meta_fm);
+        assert(is_ok(evr_verify(v_ctx, &msg, sgn->data, sgn->size_used, &meta)));
+        char expected_metadata_prefix[] = "signed-by=";
+        assert(strncmp(expected_metadata_prefix, meta_fm.data->data, min(sizeof(expected_metadata_prefix) - 1, meta_fm.data->size_used)) == 0);
+        free(meta_fm.data);
         evr_free_verify_ctx(v_ctx);
     }
     { // verify signature with different fingerprint
@@ -63,7 +72,7 @@ void test_validate_hello_world_signature(){
         struct evr_verify_ctx *v_ctx = evr_init_verify_ctx(&fpr, 1);
         assert(v_ctx);
         struct dynamic_array *msg2 = NULL;
-        assert(evr_verify(v_ctx, &msg2, sgn->data, sgn->size_used) == evr_user_data_invalid);
+        assert(evr_verify(v_ctx, &msg2, sgn->data, sgn->size_used, NULL) == evr_user_data_invalid);
         free(msg2);
         evr_free_verify_ctx(v_ctx);
     }

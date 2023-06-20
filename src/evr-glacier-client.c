@@ -70,7 +70,7 @@ int evr_fetch_xml(xmlDocPtr *doc, struct evr_file *f, evr_blob_ref key){
     return ret;
 }
 
-int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key){
+int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key, struct evr_file *meta){
     struct evr_resp_header resp;
     if(evr_req_cmd_get_blob(f, key, &resp) != evr_ok){
         return evr_error;
@@ -86,7 +86,7 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
         return evr_error;
     }
     struct dynamic_array *claim = NULL;
-    int verify_res = evr_verify(ctx, &claim, buf, resp.body_size - evr_blob_flags_n_size);
+    int verify_res = evr_verify(ctx, &claim, buf, resp.body_size - evr_blob_flags_n_size, meta);
     free(buf);
     if(verify_res == evr_user_data_invalid){
         return evr_user_data_invalid;

@@ -251,7 +251,7 @@ int evr_seed_desc_append_claims(xmlDoc *doc, xmlNode *desc_node, struct evr_veri
                 cached_claim_set = NULL;
             }
             memcpy(cached_claim_set_ref, current_claim_set_ref, evr_blob_ref_size);
-            if(evr_fetch_signed_xml(&cached_claim_set, vctx, c, cached_claim_set_ref) != evr_ok){
+            if(evr_fetch_signed_xml(&cached_claim_set, vctx, c, cached_claim_set_ref, NULL) != evr_ok){
                 goto out;
             }
         }

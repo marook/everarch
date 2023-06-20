@@ -46,7 +46,7 @@ int evr_write_auth_token(struct evr_file *f, evr_auth_token t);
 
 int evr_fetch_xml(xmlDocPtr *doc, struct evr_file *f, evr_blob_ref key);
 
-int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key);
+int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key, struct evr_file *meta);
 
 int evr_fetch_stylesheet(xsltStylesheetPtr *style, struct evr_file *f, evr_blob_ref ref);
 
