@@ -16,22 +16,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-let { map } = require('rxjs/operators');
+let os = require('os');
+let path = require('path');
+let process = require('process');
+let { EMPTY } = require('rxjs');
+let { map, switchMap, toArray } = require('rxjs/operators');
 
-let { readFile } = require('./fs');
+let { spawn } = require('./child_process');
 
-function readConfig(configPath){
-    return readFile(configPath, { encoding: 'utf-8' })
+let nextFifoId = 1;
+
+function mkTmpFifo(){
+    let fifoId = nextFifoId++;
+    let fifoPath = path.join(os.tmpdir(), `evr-websocket-server-${process.pid}-${fifoId}`);
+    return spawn('mkfifo', ['-m', '0600', fifoPath])
         .pipe(
-            map(body => JSON.parse(body)),
-            map(config => ({
-                port: 8030,
-                user: {},
-                ...config,
-            })),
+            switchMap(proc => EMPTY),
+            toArray(),
+            map(() => fifoPath),
         );
 }
 
 module.exports = {
-    readConfig,
+    mkTmpFifo,
 };

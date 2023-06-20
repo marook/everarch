@@ -16,51 +16,67 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-let childProcess = require('child_process');
+let fs = require('fs');
 let readline = require('readline');
-let { EMPTY, merge, Observable, of } = require('rxjs');
-let { catchError, concatWith, ignoreElements, map, mergeMap, share, switchMap, takeUntil, tap, toArray } = require('rxjs/operators');
+let { EMPTY, forkJoin, merge, Observable, of } = require('rxjs');
+let { catchError, concatWith, finalize, ignoreElements, map, mergeMap, share, switchMap, takeUntil, tap, toArray } = require('rxjs/operators');
 let ws = require('ws');
 
+let { ChildProcessError, spawn } = require('./child_process');
 let { readConfig } = require('./config');
+let { mkTmpFifo } = require('./fifo');
+let { readFile } = require('./fs');
 
 let nextConnectionId = 1;
 
 readConfig(process.argv[2])
     .pipe(
-        switchMap(config => new Observable(observer => {
-            let server = new ws.Server({
-                port: config.port,
-            });
-            console.log(`Listening on ws://localhost:${config.port}`);
-            server.on('connection', handle);
-            function handle(socket, request){
-                observer.next({
-                    socket,
-                    request,
+        switchMap(config => {
+            let userForKey = buildUserForKeyMap(config.user);
+            return new Observable(observer => {
+                let server = new ws.Server({
+                    port: config.port,
                 });
-            }
-            return () => {
-                server.close();
-                server.off('connection', handle);
-            };
-        })
-                  .pipe(
-                      mergeMap(connection => {
-                          let connectionId = nextConnectionId++;
-                          return handleSocket(config, connection, connectionId)
-                              .pipe(
-                                  catchError(error => {
-                                      console.log(`${connectionTag(connectionId)} crashed:`, error);
-                                      return EMPTY;
-                                  }),
-                              );
-                      }),
-                  )),
+                console.log(`Listening on ws://localhost:${config.port}`);
+                server.on('connection', handle);
+                function handle(socket, request){
+                    observer.next({
+                        socket,
+                        request,
+                    });
+                }
+                return () => {
+                    server.close();
+                    server.off('connection', handle);
+                };
+            })
+                .pipe(
+                    mergeMap(connection => {
+                        let connectionId = nextConnectionId++;
+                        return handleSocket(config, userForKey, connection, connectionId)
+                            .pipe(
+                                catchError(error => {
+                                    console.log(`${connectionTag(connectionId)} crashed:`, error);
+                                    return EMPTY;
+                                }),
+                            );
+                    }),
+                );
+        }),
     )
     .subscribe();
 
-function handleSocket(config, connection, connectionId){
+function buildUserForKeyMap(users){
+    let map = new Map();
+    for(let user of Object.keys(users)){
+        for(let key of users[user]['gpg-keys'] || []){
+            map.set(key, user);
+        }
+    }
+    return map;
+}
+
+function handleSocket(config, userForKey, connection, connectionId){
     let { socket, request } = connection;
     let address = getClientAddress(request);
     log(`Connection from ${address}`);
@@ -140,15 +156,44 @@ function handleSocket(config, connection, connectionId){
                                     sendUnauthenticated(msg.ch);
                                     break;
                                 }
-                                return getAndVerify(msg.ref)
+                                return getAndVerify(msg.ref, msg.meta || false)
                                     .pipe(
+                                        map(blob => {
+                                            if(!blob.meta){
+                                                return blob;
+                                            }
+                                            let extraMeta = [];
+                                            for(let [metaKey, metaValue] of blob.meta){
+                                                if(metaKey !== 'signed-by'){
+                                                    continue;
+                                                }
+                                                let user = userForKey.get(metaValue);
+                                                if(user){
+                                                    extraMeta.push([
+                                                        'signed-by-user',
+                                                        user,
+                                                    ]);
+                                                }
+                                            }
+                                            return {
+                                                ...blob,
+                                                meta: [
+                                                    ...blob.meta,
+                                                    ...extraMeta,
+                                                ],
+                                            };
+                                        }),
                                         sendErrorOnError(msg),
-                                        tap(content => {
-                                            send({
+                                        tap(blob => {
+                                            let resp = {
                                                 ch: msg.ch,
                                                 status: 'get',
-                                                body: content.toString(),
-                                            });
+                                                body: blob.body.toString(),
+                                            };
+                                            if(msg.meta){
+                                                resp.meta = blob.meta;
+                                            }
+                                            send(resp);
                                         }),
                                     );
                             case 'sign-put':
@@ -281,7 +326,7 @@ function buildModifiedClaimSetFilter(filterDesc){
     }
     return mergeMap(modifiedClaimSet => getAndVerify(modifiedClaimSet.ref).pipe(
         switchMap(claimSet => {
-            if(claimSet.indexOf(filterDesc.ns) !== -1){
+            if(claimSet.body.indexOf(filterDesc.ns) !== -1){
                 return of(modifiedClaimSet);
             }
             return EMPTY;
@@ -289,11 +334,57 @@ function buildModifiedClaimSetFilter(filterDesc){
     ), undefined, 1);
 }
 
-function getAndVerify(ref){
-    return evr(['get-verify', ref])
+let parseMetadata = map(metadataTxt => metadataTxt.split('\n').filter(line => line).map(line => {
+    let eqPos = line.indexOf('=');
+    return [
+        line.substring(0, eqPos),
+        line.substring(eqPos + 1),
+    ];
+}));
+
+function getAndVerify(ref, meta=false){
+    return (meta ? mkTmpFifo() : of(null))
         .pipe(
-            readProcessStdout(),
-            concatBuffers(),
+            switchMap(fifoPath => {
+                let args = [
+                    'get-verify',
+                ];
+                if(fifoPath){
+                    args = args.concat([
+                        '--meta',
+                        fifoPath,
+                    ]);
+                }
+                args.push(ref);
+                return forkJoin(
+                    evr(args)
+                        .pipe(
+                            readProcessStdout(),
+                            concatBuffers(),
+                        ),
+                    fifoPath ? readMetadata(fifoPath) : of(null),
+                )
+                    .pipe(
+                        map(([body, meta]) => ({
+                            body,
+                            meta,
+                        })),
+                        finalize(() => {
+                            fifoPath && fs.rm(fifoPath, err => {
+                                if(err){
+                                    console.log(`Unable to remove meta fifo ${fifoPath}: ${err}`);
+                                }
+                            });
+                        }),
+                    );
+            }),
+        );
+}
+
+function readMetadata(filePath){
+    return readFile(filePath, { encoding: 'utf-8' })
+        .pipe(
+            parseMetadata,
         );
 }
 
@@ -347,38 +438,3 @@ function concatBuffers(){
 function evr(args){
     return spawn('evr', args);
 }
-
-class ChildProcessError extends Error{
-    constructor(exitCode, stderr){
-        super(`Child process failed with exit code ${exitCode}: ${stderr}`);
-        this.exitCode = exitCode;
-        this.stderr = stderr;
-    }
-}
-
-function spawn(cmd, args=[]){
-    return new Observable(observer => {
-        let proc = childProcess.spawn(cmd, args);
-        let errout = [];
-        proc.stderr.on('data', handleData);
-        function handleData(data){
-            if(errout.length > 20){
-                errout.splice(0, errout.length - 20);
-            }
-            errout.push(data);
-        }
-        proc.on('close', exitCode => {
-            if(exitCode){
-                observer.error(new ChildProcessError(exitCode, errout.join('')));
-            } else {
-                observer.complete();
-            }
-        });
-        observer.next(proc);
-        return () => {
-            proc.stderr.off('data', handleData);
-            proc.kill();
-        };
-    });
-}
-

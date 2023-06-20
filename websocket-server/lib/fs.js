@@ -16,22 +16,22 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-let { map } = require('rxjs/operators');
+let fs = require('fs');
+let { Observable } = require('rxjs');
 
-let { readFile } = require('./fs');
-
-function readConfig(configPath){
-    return readFile(configPath, { encoding: 'utf-8' })
-        .pipe(
-            map(body => JSON.parse(body)),
-            map(config => ({
-                port: 8030,
-                user: {},
-                ...config,
-            })),
-        );
-}
+function readFile(path, opts){
+    return new Observable(observer => {
+        fs.readFile(path, opts, (err, data) => {
+            if(err){
+                observer.error(err);
+            } else {
+                observer.next(data);
+                observer.complete();
+            }
+        });
+    });
+};
 
 module.exports = {
-    readConfig,
+    readFile,
 };

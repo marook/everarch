@@ -98,18 +98,18 @@ let evrWebsocketClient = (function(){
                 );
         }
 
-        watchClaims(watchOpts={}, claimErrorsHandler=tap, maxParallelFetch=8){
+        watchClaims(watchOpts={}, claimErrorsHandler=tap, maxParallelFetch=8, meta=false){
             return this.watch({
                 ...watchOpts,
                 flags: watchOpts.flags || 1,
             })
                 .pipe(
                     map(blobModified => blobModified.ref),
-                    this.getVerifyMany(claimErrorsHandler, maxParallelFetch),
+                    this.getVerifyMany(claimErrorsHandler, maxParallelFetch, meta),
                 );
         }
 
-        getVerifyMany(claimErrorsHandler=undefined, maxParallelFetch=8){
+        getVerifyMany(claimErrorsHandler=undefined, maxParallelFetch=8, meta=false){
             return fetchedRefSource => {
                 // TODO convert claimsBacklog into a ring buffer approach
                 let destroy = new Subject();
@@ -118,10 +118,10 @@ let evrWebsocketClient = (function(){
                     .pipe(
                         tap(ref => {
                             let index = claimsBacklog.length;
-                            claimsBacklog.push(this.getVerify(ref).pipe(
-                                map(body => ({
+                            claimsBacklog.push(this.getVerify(ref, meta).pipe(
+                                map(blob => ({
+                                    ...blob,
                                     ref,
-                                    body,
                                 })),
                                 claimErrorsHandler || tap(),
                                 takeUntil(destroy),
@@ -190,15 +190,19 @@ let evrWebsocketClient = (function(){
             };
         }
 
-        getVerify(ref){
+        getVerify(ref, meta=false){
             return this._fetch({
                 cmd: 'get-verify',
                 ref,
+                meta,
             })
                 .pipe(
                     first(),
                     expectMessageStatus('get'),
-                    map(msg => msg.body),
+                    map(msg => ({
+                        body: msg.body,
+                        meta: msg.meta,
+                    })),
                 );
         }
 

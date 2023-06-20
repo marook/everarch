@@ -30,10 +30,16 @@ file might look like this:
     "port": 8030,
     "user": {
         "test": {
-            "password": "pazz"
+            "password": "pazz",
+            "gpg-keys": [
+                "BD1C9FFF…0F3B3"
+            ]
         }
     }
 }
+
+gpg-keys contains a list of GPG key fingerprints. The related user
+should be the only one who can sign claims using these keys.
 
 $ node . evr-websocket-server.conf.json
 
@@ -124,15 +130,24 @@ content.
 {
     "ch": 123,
     "cmd": "get-verify",
-    "ref": "sha3-224-…"
+    "ref": "sha3-224-…",
+    "meta": true
 }
+
+The meta property is optional. The default value is false. A value of
+true indicates that the response should also contain metadata
+about the fetched blob.
 
 Responses from the server might look like this:
 
 {
     "ch": 123,
     "status": "get",
-    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>…"
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>…",
+    "meta": {
+        "signed-by": "BD1C9FFF…0F3B3",
+        "signed-by-user": "test"
+    }
 }
 
 The put-claim-set command tells the server to store a provided claim
