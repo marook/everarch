@@ -201,7 +201,7 @@ function handleSocket(config, userForKey, connection, connectionId){
                                     sendUnauthenticated(msg.ch);
                                     break;
                                 }
-                                return signAndPut(msg.body)
+                                return signAndPut(msg.body, authenticatedUser['signing-key'])
                                     .pipe(
                                         sendErrorOnError(msg),
                                         tap(ref => {
@@ -388,8 +388,15 @@ function readMetadata(filePath){
         );
 }
 
-function signAndPut(claimSet){
-    return evr(['sign-put', '--flags=1'])
+function signAndPut(claimSet, signingKey=undefined){
+    let args = ['sign-put', '--flags=1'];
+    if(signingKey){
+        args = args.concat([
+            '--signing-gpg-key',
+            signingKey,
+        ]);
+    }
+    return evr(args)
         .pipe(
             switchMap(proc => merge(
                 of(proc).pipe(readProcessStdout()),

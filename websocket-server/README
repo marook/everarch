@@ -31,12 +31,17 @@ file might look like this:
     "user": {
         "test": {
             "password": "pazz",
+            "signing-key": "BD1C9FFF…0F3B3",
             "gpg-keys": [
                 "BD1C9FFF…0F3B3"
             ]
         }
     }
 }
+
+signing-key is the GPG key used for signing put claims. The property
+is optional. If omitted the default GPG key configured for evr cli is
+used.
 
 gpg-keys contains a list of GPG key fingerprints. The related user
 should be the only one who can sign claims using these keys.
