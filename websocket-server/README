@@ -171,3 +171,18 @@ Responses from the server might look like this:
     "status": "put",
     "ref": "sha3-224-…"
 }
+
+The list-users command asks the server for a list of user names.
+
+{
+    "ch": 123,
+    "cmd": "list-users"
+}
+
+Responses from the server might look like this:
+
+{
+    "ch": 123,
+    "status": "users",
+    "users": ["bob", "joe"]
+}

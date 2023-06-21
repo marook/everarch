@@ -212,6 +212,19 @@ function handleSocket(config, userForKey, connection, connectionId){
                                             });
                                         }),
                                     );
+                            case 'list-users':
+                                if(!authenticatedUser){
+                                    sendUnauthenticated(msg.ch);
+                                    break;
+                                }
+                                let users = Object.keys(config.user);
+                                users.sort();
+                                send({
+                                    ch: msg.ch,
+                                    status: 'users',
+                                    users,
+                                });
+                                return of(undefined);
                             }
                             return EMPTY;
                         }),

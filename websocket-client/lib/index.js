@@ -218,6 +218,17 @@ let evrWebsocketClient = (function(){
                 );
         }
 
+        listUsers(){
+            return this._fetch({
+                cmd: 'list-users',
+            })
+                .pipe(
+                    first(),
+                    expectMessageStatus('users'),
+                    map(msg => msg.users),
+                );
+        }
+
         _fetch(cmd){
             let chSubject = new ReplaySubject(1);
             return merge(
