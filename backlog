@@ -113,6 +113,8 @@ efs:file:
   created=""
   last-modified=""/>
 #+END_SRC
+* evr-websocket-server should put uploaded claims into cache
+right now the cache only is fed with fetched claims.
 * parallel evr-fs inode building
 right now evr-fs builds the inodes sequentially one seed by another.
 
