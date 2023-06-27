@@ -18,7 +18,7 @@
 
 let fs = require('fs');
 let readline = require('readline');
-let { EMPTY, forkJoin, merge, Observable, of, throwError } = require('rxjs');
+let { EMPTY, forkJoin, merge, Observable, of, ReplaySubject, Subject, throwError } = require('rxjs');
 let { catchError, concatWith, finalize, ignoreElements, map, mergeMap, share, switchMap, takeUntil, tap, toArray } = require('rxjs/operators');
 let ws = require('ws');
 
@@ -341,20 +341,93 @@ function buildModifiedClaimSetFilter(filterDesc){
     if(!filterDesc.ns){
         throw new Error(`namespace filter requires ns property with namespace`);
     }
-    return mergeMap(modifiedClaimSet => getAndVerify(modifiedClaimSet.ref).pipe(
-        catchError(err => {
-            if(err instanceof ChildProcessError && err.exitCode === errorCodes.userDataInvalid){
-                return EMPTY;
-            }
-            return throwError(err);
-        }),
-        switchMap(claimSet => {
-            if(claimSet.body.indexOf(filterDesc.ns) !== -1){
-                return of(modifiedClaimSet);
-            }
-            return EMPTY;
-        }),
-    ), undefined, 1);
+    let maxParallelFetch = 8;
+    return fetchedRefSource => {
+        // TODO convert claimsBacklog into a ring buffer approach
+        let destroy = new Subject();
+        let claimsBacklog = [];
+        return fetchedRefSource
+            .pipe(
+                tap(modifiedClaimSet => {
+                    let index = claimsBacklog.length;
+                    claimsBacklog.push(of(undefined).pipe(
+                        switchMap(() => getAndVerify(modifiedClaimSet.ref, true)),
+                        switchMap(claimSet => {
+                            if(claimSet.body.indexOf(filterDesc.ns) !== -1){
+                                return of(modifiedClaimSet);
+                            }
+                            return EMPTY;
+                        }),
+                        catchError(err => {
+                            if(err instanceof ChildProcessError && err.exitCode === errorCodes.userDataInvalid){
+                                return EMPTY;
+                            }
+                            return throwError(err);
+                        }),
+                        takeUntil(destroy),
+                        share({
+                            connector: () => new ReplaySubject(1),
+                            resetOnError: false,
+                            resetOnComplete: false,
+                            resetOnRefCountZero: false,
+                        }),
+                    ));
+                    if(index < maxParallelFetch){
+                        // prefetch some claims
+                        claimsBacklog[index].subscribe();
+                    }
+                }),
+                claimsBacklogPushTrigger => {
+                    return new Observable(observer => {
+                        let fetching = false;
+                        triggerFetch();
+                        claimsBacklogPushTrigger
+                            .pipe(
+                                takeUntil(destroy),
+                            )
+                            .subscribe({
+                                next: () => triggerFetch(),
+                                complete: () => observer.complete(),
+                                error: e => observer.error(e),
+                            });
+                        return () => {
+                            destroy.next(undefined);
+                            destroy.complete();
+                        };
+
+                        function triggerFetch(){
+                            if(fetching){
+                                return;
+                            }
+                            if(claimsBacklog.length === 0){
+                                return;
+                            }
+                            fetching = true;
+                            claimsBacklog[0]
+                                .pipe(
+                                    takeUntil(destroy),
+                                )
+                                .subscribe({
+                                    next: claim => observer.next(claim),
+                                    complete: () => {
+                                        claimsBacklog.splice(0, 1);
+                                        if(claimsBacklog.length >= maxParallelFetch){
+                                            // prefetch some claims
+                                            claimsBacklog[maxParallelFetch - 1].subscribe();
+                                        }
+                                        fetching = false;
+                                        triggerFetch();
+                                    },
+                                    error: e => {
+                                        fetching = false;
+                                        observer.error(e);
+                                    },
+                                });
+                        }
+                    });
+                },
+            );
+    };
 }
 
 let parseMetadata = map(metadataTxt => metadataTxt.split('\n').filter(line => line).map(line => {
@@ -366,6 +439,13 @@ let parseMetadata = map(metadataTxt => metadataTxt.split('\n').filter(line => li
 }));
 
 function getAndVerify(ref, meta=false){
+    let cachedClaim = findInClaimCache(ref, meta);
+    if(cachedClaim){
+        return of({
+            body: cachedClaim.body,
+            meta: meta && cachedClaim.meta || null,
+        });
+    }
     return (meta ? mkTmpFifo() : of(null))
         .pipe(
             switchMap(fifoPath => {
@@ -392,6 +472,10 @@ function getAndVerify(ref, meta=false){
                             body,
                             meta,
                         })),
+                        tap(claim => cacheClaim({
+                            ...claim,
+                            ref,
+                        })),
                         finalize(() => {
                             fifoPath && fs.rm(fifoPath, err => {
                                 if(err){
@@ -402,6 +486,37 @@ function getAndVerify(ref, meta=false){
                     );
             }),
         );
+}
+
+let claimCacheSize = 32;
+let claimCache = (function(){
+    let a = [];
+    for(let i = claimCacheSize; i > 0; --i){
+        a.push(null);
+    }
+    return a;
+}());
+let claimCacheCursor = 0;
+
+function findInClaimCache(ref, meta=false){
+    for(let item of claimCache){
+        if(!item){
+            continue;
+        }
+        if(item.ref !== ref){
+            continue;
+        }
+        if(meta && !item.meta){
+            continue;
+        }
+        return item;
+    }
+    return null;
+}
+
+function cacheClaim(claim){
+    claimCache[claimCacheCursor] = claim;
+    claimCacheCursor = (claimCacheCursor + 1) % claimCache.length;
 }
 
 function readMetadata(filePath){
