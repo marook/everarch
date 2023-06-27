@@ -18,7 +18,7 @@
 
 let fs = require('fs');
 let readline = require('readline');
-let { EMPTY, forkJoin, merge, Observable, of } = require('rxjs');
+let { EMPTY, forkJoin, merge, Observable, of, throwError } = require('rxjs');
 let { catchError, concatWith, finalize, ignoreElements, map, mergeMap, share, switchMap, takeUntil, tap, toArray } = require('rxjs/operators');
 let ws = require('ws');
 
@@ -28,6 +28,10 @@ let { mkTmpFifo } = require('./fifo');
 let { readFile } = require('./fs');
 
 let nextConnectionId = 1;
+
+let errorCodes = {
+    userDataInvalid: 5,
+};
 
 readConfig(process.argv[2])
     .pipe(
@@ -338,6 +342,12 @@ function buildModifiedClaimSetFilter(filterDesc){
         throw new Error(`namespace filter requires ns property with namespace`);
     }
     return mergeMap(modifiedClaimSet => getAndVerify(modifiedClaimSet.ref).pipe(
+        catchError(err => {
+            if(err instanceof ChildProcessError && err.exitCode === errorCodes.userDataInvalid){
+                return EMPTY;
+            }
+            return throwError(err);
+        }),
         switchMap(claimSet => {
             if(claimSet.body.indexOf(filterDesc.ns) !== -1){
                 return of(modifiedClaimSet);
