@@ -140,6 +140,7 @@ let evrWebsocketClient = (function(){
                         claimsBacklogPushTrigger => {
                             return new Observable(observer => {
                                 let fetching = false;
+                                let draining = false;
                                 triggerFetch();
                                 claimsBacklogPushTrigger
                                     .pipe(
@@ -147,7 +148,12 @@ let evrWebsocketClient = (function(){
                                     )
                                     .subscribe({
                                         next: () => triggerFetch(),
-                                        complete: () => observer.complete(),
+                                        complete: () => {
+                                            draining = true;
+                                            if(claimsBacklog.length === 0){
+                                                observer.complete();
+                                            }
+                                        },
                                         error: e => observer.error(e),
                                     });
                                 return () => {
@@ -160,6 +166,9 @@ let evrWebsocketClient = (function(){
                                         return;
                                     }
                                     if(claimsBacklog.length === 0){
+                                        if(draining){
+                                            observer.complete();
+                                        }
                                         return;
                                     }
                                     fetching = true;
