@@ -498,7 +498,7 @@ let claimCache = (function(){
 }());
 let claimCacheCursor = 0;
 
-function findInClaimCache(ref, meta=false){
+function findInClaimCache(ref, needMeta=false){
     for(let item of claimCache){
         if(!item){
             continue;
@@ -506,7 +506,7 @@ function findInClaimCache(ref, meta=false){
         if(item.ref !== ref){
             continue;
         }
-        if(meta && !item.meta){
+        if(needMeta && !item.meta){
             continue;
         }
         return item;
