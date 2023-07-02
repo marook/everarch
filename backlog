@@ -68,6 +68,16 @@ existing index attrs starting in the past with same value:
   update valid_until
 ** TODO rm x
 ** TODO rm all
+* evr-fs crash on modifying open file                                   :bug:
+evr-fs crashed with the following log message:
+
+#+BEGIN_SRC
+2023-07-02T21:32:09 fP Unexpected inode type 1 on release
+#+END_SRC
+
+a video stream was started and paused before the crash. after pausing
+the steam a modification was performed on the file. then the stream
+was resumed.
 * evr-fs unable to connect to glacier                                   :bug:
 from the evr-fs log
 #+BEGIN_SRC
