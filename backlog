@@ -1,3 +1,7 @@
+* check if argp is available
+in configure.ac because it may be missing on for example alpine
+systems with musl. systems where argp is not part of the libc may add
+additional libraries during linking.
 * op - not applied in evr-attr-index                                    :bug:
 the evr-attr-index sqlite db contains the following attributes for the
 affected seed. the valid_from and valid_until dates where simplified
