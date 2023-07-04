@@ -21,6 +21,8 @@
 
 #include "config.h"
 
+#include <sys/types.h>
+
 #include "dyn-mem.h"
 
 /**

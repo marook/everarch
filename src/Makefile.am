@@ -212,7 +212,7 @@ evr_SOURCES = \
 	metadata.c \
 	seed-desc.c \
 	signatures.c
-evr_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+evr_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
 
 evr_fs_SOURCES = \
 	auth.c \
@@ -256,7 +256,7 @@ evr_glacier_storage_SOURCES = \
 	notify.c \
 	queue.c \
 	server.c
-evr_glacier_storage_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
+evr_glacier_storage_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
 
 evr_glacier_tool_SOURCES = \
 	basics.c \
@@ -268,7 +268,7 @@ evr_glacier_tool_SOURCES = \
 	glacier.c \
 	keys.c \
 	logger.c
-evr_glacier_tool_LDADD = $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
+evr_glacier_tool_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
 
 evr_attr_index_client_test_SOURCES = \
 	assert.c \

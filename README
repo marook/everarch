@@ -43,12 +43,13 @@ at https://evr.ma300k.de
 Build & Installation
 
 everarch uses some linux and GNU libc APIs which makes it POSIX
-incompatible. So you might not be able to compilie it on Windows or
-BSD systems.
+incompatible. So you might not be able to compile it on Windows or BSD
+systems.
 
 Everarch is known to run at least on i686 and arm64 systems.
 
-Install at least the minimal required dependencies:
+Install at least the minimal required dependencies on Debian. For
+other distributions see the corresponding doc/BUILD.* files:
 
 $ apt install make automake pkg-config libtool texinfo libxml2-dev \
     libxslt1-dev libssl-dev libgpgme-dev libgcrypt-dev libsqlite3-dev

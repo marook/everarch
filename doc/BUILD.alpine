@@ -1,0 +1,16 @@
+Build instructions for alpine linux
+
+This document describes the steps need to build everarch on an alpine
+v3.18 linux https://www.alpinelinux.org/ system.
+
+Install at least the minimal required dependencies:
+
+$ apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo \
+    argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev \
+    libgcrypt-dev sqlite-dev
+
+Then enter the everarch project root directory and run:
+
+$ autoreconf --install
+$ ./configure
+$ make

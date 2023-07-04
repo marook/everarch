@@ -10,6 +10,18 @@ AC_DEFINE(_POSIX_C_SOURCE, [200809L], [We want to use for example strnlen])
 AC_DEFINE(_GNU_SOURCE, [1], [We use for example fcntl's F_GETSIG])
 AC_DEFINE(EVR_GCRY_MIN_VERSION, ["1.8.0"], [Minimum version required for libgrcy])
 
+AC_CHECK_HEADER([argp.h], [], AC_MSG_ERROR([Cannot find argparse headers.]))
+AC_CHECK_FUNC(
+  [argp_parse],
+  [have_argp=yes],
+  AC_CHECK_LIB([argp],
+    [argp_parse],
+    [ARGP_LIBS="-largp"],
+    []
+  )
+)
+AC_SUBST(ARGP_LIBS)
+
 AC_ARG_ENABLE(
   [futile-claim-set-tracking],
   [AS_HELP_STRING([--enable-futile-claim-set-tracking], [Enables tracking of claim-sets without any effect to the attr-index. Helpful for finding custom claims which are missing in the transformation.])],
