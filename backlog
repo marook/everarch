@@ -1,3 +1,11 @@
+* place apps in podman images in opt subdirectories
+for example into /opt/evr instead of just /opt
+* build von alpine binaries in podman
+https://docs.docker.com/build/building/multi-stage/#name-your-build-stages
+* apply start script naming convention CMD [ "/entrypoint.sh" ]
+https://github.com/restic/rest-server/blob/master/Dockerfile
+https://github.com/syncthing/syncthing/blob/main/Dockerfile
+* add the Z flag to the podman volumes where applicable
 * check if argp is available
 in configure.ac because it may be missing on for example alpine
 systems with musl. systems where argp is not part of the libc may add
