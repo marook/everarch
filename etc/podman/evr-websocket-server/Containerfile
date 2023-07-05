@@ -24,6 +24,8 @@ EXPOSE 8030
 # should be provided by the evr-glacier-storage container.
 VOLUME /pub
 
+VOLUME /data
+
 RUN apk update && apk add libxml2 libxslt gpgme
 
 ADD evr-websocket-server /opt/evr/evr-websocket-server

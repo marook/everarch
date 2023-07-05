@@ -5,7 +5,7 @@ services:
     image: evr-glacier-storage
     volumes:
       - conf:/pub
-      - store:/data
+      - glacier:/data
   websocket-server:
     image: evr-websocket-server
     environment:
@@ -14,3 +14,4 @@ services:
       - "8030:8030"
     volumes:
       - conf:/pub
+      - ws:/data

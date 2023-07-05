@@ -30,9 +30,9 @@ then
     echo "Creating TLS certificate pair..."
     mkdir -p `dirname "${tls_key}"`
     openssl genrsa -out "${tls_key}" 4096
-    openssl req -new -key "${tls_key}" -out '/opt/cert.csr' -config '/opt/cert.conf'
-    openssl x509 -req -days 3650 -in '/opt/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
-    rm '/opt/cert.csr'
+    openssl req -new -key "${tls_key}" -out '/opt/evr/cert.csr' -config '/opt/evr/cert.conf'
+    openssl x509 -req -days 3650 -in '/opt/evr/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
+    rm '/opt/evr/cert.csr'
     echo "key=${tls_key}" >> '/data/evr-glacier-storage.conf'
     echo "cert=${tls_cert}" >> '/data/evr-glacier-storage.conf'
 fi
@@ -53,7 +53,5 @@ then
     echo "bucket-dir=/data/buckets" >> '/data/evr-glacier-storage.conf'
 fi
 
-cat '/data/evr-glacier-storage.conf'
-
 cd /data
-exec /opt/evr-glacier-storage -f
+exec /opt/evr/evr-glacier-storage -f

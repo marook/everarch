@@ -32,7 +32,7 @@ VOLUME /data
 RUN apk update && apk add sqlite-libs libgcrypt openssl
 
 ADD entrypoint.sh /entrypoint.sh
-ADD cert.conf /opt/cert.conf
-ADD evr-glacier-storage /opt/evr-glacier-storage
+ADD cert.conf /opt/evr/cert.conf
+ADD evr-glacier-storage /opt/evr/evr-glacier-storage
 
 CMD ["/entrypoint.sh"]

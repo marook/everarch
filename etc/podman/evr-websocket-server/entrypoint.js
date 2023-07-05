@@ -22,6 +22,10 @@ let { readFile, stat, writeFile } = require('node:fs/promises');
 
 let { serve } = require('/opt/evr/evr-websocket-server/lib/server');
 
+let gpgPubExportPath = '/pub/my-identity.pub.gpg';
+let gpgSecExportPath = '/data/my-identity.sec.gpg';
+let gpgTrustDbPath = '/data/gpg-ownertrust.txt';
+
 main()
     .catch(e => {
         console.error(e);
@@ -29,8 +33,9 @@ main()
     });
 
 async function main(){
-    process.chdir('/opt');
+    process.chdir('/opt/evr');
     await waitForConfig();
+    await importSigningKeys();
     let signingKey = await getSigningKey();
     await exportGpgIdentity(signingKey);
     let configPath = await buildWebsocketServerConfig(signingKey);
@@ -83,6 +88,22 @@ async function waitForConfig(){
     }
 }
 
+async function importSigningKeys(){
+    if(await exists(gpgPubExportPath)){
+        console.log('Importing public GPG key...');
+        await gpg(['--import', gpgPubExportPath]);
+    }
+    if(await exists(gpgSecExportPath)){
+        console.log('Import secret GPG key...');
+        await gpg(['--import', gpgSecExportPath]);
+    }
+    if(await exists(gpgTrustDbPath)){
+        console.log('Import GPG owner trust...');
+        let trustDb = await readFile(gpgTrustDbPath, { encoding: 'utf-8' });
+        await gpg(['--import-ownertrust', gpgTrustDbPath], trustDb);
+    }
+}
+
 async function getSigningKey(){
     let secretKey = await getSecretKey();
     if(secretKey){
@@ -110,16 +131,24 @@ async function getSecretKey(){
 }
 
 async function exportGpgIdentity(key){
-    let exportPath = '/pub/my-identity.pub.gpg';
-    if(!await exists(exportPath)){
-        console.log('Exporting GPG identity...');
-        await gpg(['--export', '--output', exportPath, key]);
+    if(!await exists(gpgPubExportPath)){
+        console.log('Exporting public GPG key...');
+        await gpg(['--export', '--output', gpgPubExportPath, key]);
+    }
+    if(!await exists(gpgSecExportPath)){
+        console.log('Exporting secret GPG key...');
+        await gpg(['--export-secret-keys', '--output', gpgSecExportPath, key]);
+    }
+    if(!await exists(gpgTrustDbPath)){
+        console.log('Export GPG owner trust...');
+        let trustDb = await gpg(['--export-ownertrust']);
+        await writeFile(gpgTrustDbPath, trustDb, { encoding: 'utf-8' });
     }
 }
 
-function gpg(args){
+function gpg(args, stdin=undefined){
     return new Promise((resolve, reject) => {
-        execFile('gpg', args, { encoding: 'utf-8'}, (err, stdout, stderr) => {
+        let p = execFile('gpg', args, { encoding: 'utf-8'}, (err, stdout, stderr) => {
             if(err){
                 console.log(`GPG ${JSON.stringify(args)} failed: ${stderr}`, err);
                 reject(err);
@@ -127,6 +156,9 @@ function gpg(args){
                 resolve(stdout);
             }
         });
+        if(stdin !== undefined){
+            p.stdin.end(stdin, 'utf-8');
+        }
     });
 }
 
@@ -157,7 +189,7 @@ function randomPassword(){
 }
 
 async function buildEvrConfig(serverConfigPath){
-    let evrConfigPath = '/opt/evr.conf';
+    let evrConfigPath = '/opt/evr/evr.conf';
     let storageHost = process.env['EVR_GLACIER_STORAGE_HOST'];
     if(!storageHost){
         throw new Error(`Environment variable EVR_GLACIER_STORAGE_HOST must specify hosname of evr-glacier-storage server.`);
