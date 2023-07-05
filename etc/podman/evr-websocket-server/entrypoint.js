@@ -20,7 +20,7 @@ let { execFile } = require('child_process');
 let { randomBytes } = require('crypto');
 let { readFile, stat, writeFile } = require('node:fs/promises');
 
-let { serve } = require('./lib/server');
+let { serve } = require('/opt/evr/evr-websocket-server/lib/server');
 
 main()
     .catch(e => {

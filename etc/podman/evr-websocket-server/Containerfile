@@ -26,10 +26,12 @@ VOLUME /pub
 
 RUN apk update && apk add libxml2 libxslt gpgme
 
-ADD evr-websocket-server /opt/evr-websocket-server
-ADD evr /bin/evr
-ADD start.js /opt/evr-websocket-server/start.js
+ADD evr-websocket-server /opt/evr/evr-websocket-server
+ADD evr /opt/evr/bin/evr
+ADD entrypoint.js /entrypoint.js
 
-RUN cd /opt/evr-websocket-server && npm install
+ENV PATH="/opt/evr/bin:${PATH}"
 
-CMD ["/opt/evr-websocket-server/start.js"]
+RUN cd /opt/evr/evr-websocket-server && npm install
+
+CMD ["/entrypoint.js"]

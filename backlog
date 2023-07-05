@@ -1,11 +1,9 @@
-* place apps in podman images in opt subdirectories
-for example into /opt/evr instead of just /opt
 * build von alpine binaries in podman
 https://docs.docker.com/build/building/multi-stage/#name-your-build-stages
-* apply start script naming convention CMD [ "/entrypoint.sh" ]
-https://github.com/restic/rest-server/blob/master/Dockerfile
-https://github.com/syncthing/syncthing/blob/main/Dockerfile
 * add the Z flag to the podman volumes where applicable
+* perform apk upgrade during podman image building
+right now only the index is update but no updated packages are being
+installed
 * op - not applied in evr-attr-index                                    :bug:
 the evr-attr-index sqlite db contains the following attributes for the
 affected seed. the valid_from and valid_until dates where simplified
