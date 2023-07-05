@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+# TODO collect stuff like evr-glacier-storage binary
+podman build -t evr-websocket-server .

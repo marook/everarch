@@ -1,0 +1,21 @@
+evr-glacier-storage podman build
+
+This directory contains the files for building a podman image which
+runs an evr-glacier-storage server. The convenient thing about this
+image is the startup process which automatically creates TLS
+certificates and random passwords for you.
+
+For building the image first build everarch within an alpine
+linux. The build instructions for alpine linux are in
+../../../doc/BUILD.alpine.
+
+Then copy the built evr-glacier-storage binary into this
+directory. After that you can build the podman image:
+
+$ ./build
+
+The built image will be tagged evr-glacier-storage and will reference
+two volumes. The /pub volume will be populated with the TLS
+certificate of the instance and the evr-glacier-storage auth
+token. You will need these files if you want to connect to the
+evr-glacier-storage instance.

@@ -1,0 +1,11 @@
+podman and everarch
+
+This directory contains some hints how to run everarch within podman
+and some scripts for building everarch images for podman.
+
+The evr-glacier-storage and evr-websocket-server directories contain
+build scripts which generate podman images.
+
+The standalone-glacier-websocket directory contains a podman-compose
+configuration for starting a evr-glacier-storage and
+evr-websocket-server container.

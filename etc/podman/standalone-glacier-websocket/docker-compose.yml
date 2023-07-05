@@ -1,0 +1,16 @@
+version: 3.7
+
+services:
+  storage:
+    image: evr-glacier-storage
+    volumes:
+      - conf:/pub
+      - store:/data
+  websocket-server:
+    image: evr-websocket-server
+    environment:
+      - EVR_GLACIER_STORAGE_HOST=storage
+    ports:
+      - "8030:8030"
+    volumes:
+      - conf:/pub
