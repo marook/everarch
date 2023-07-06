@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-# TODO collect stuff like evr-glacier-storage binary
-podman build -t evr-websocket-server .
+cd ../../..
+podman build --target image -t evr-websocket-server -f etc/podman/evr-websocket-server/Containerfile .

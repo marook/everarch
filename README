@@ -2,10 +2,11 @@ everarch - the hopefully ever lasting archive
 
 1) Introduction
 2) Build & Installation
-3) Usage
-4) Tests
-5) License
-6) Contact
+3) Podman Images
+4) Usage
+5) Tests
+6) License
+7) Contact
 
 
 ------------------------------------------------------------------------
@@ -37,6 +38,9 @@ what we are heading for in the v0.1 release.
 
 To get a more in depth overview about everarch watch the presentation
 at https://evr.ma300k.de
+
+The everarch source code is available at
+https://github.com/marook/everarch
 
 
 ------------------------------------------------------------------------
@@ -96,6 +100,19 @@ $ make
 Install the applications:
 
 $ make install
+
+
+------------------------------------------------------------------------
+Podman Images
+
+Some parts of everarch are available as podman or docker images. These
+images can either be compiled by yourself or are available at
+https://hub.docker.com/u/ma300k
+
+Files for building the images are below etc/podman. Also there is a
+podman compose configuration for starting up an evr-websocket-server
+together with an evr-glacier-storage server. See
+etc/podman/standalone-glacier-websocket.
 
 
 ------------------------------------------------------------------------

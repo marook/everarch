@@ -1,0 +1,27 @@
+standalone glacier and websocket
+
+This directory contains a podman-compose (or docker-compose)
+configuration for starting a complete evr-glacier-storage and
+evr-websocket-server environment.
+
+To start the standalone environment run:
+
+$ podman-compose up
+
+The evr-websocket-server will be available at ws://localhost:8030
+
+The user for the evr-websocket-server will be kim and the password is
+randomly generated and written to the
+standalone-glacier-websocket_conf volume. You can retrieve the
+password by executing the following commands:
+
+$ podman unshare
+$ podman volume mount standalone-glacier-websocket_conf
+
+Then cd into the directory that the previous mount command printed on
+the screen.
+
+$ cat evr-websocket-server.conf.json
+
+Now you should see the evr-websocket-server configuration which
+contains the password for the user kim.

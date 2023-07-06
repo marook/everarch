@@ -1,0 +1,3 @@
+#!/bin/bash
+set -e
+podman push evr-glacier-storage docker://docker.io/ma300k/evr-glacier-storage:latest

@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-# TODO collect stuff like evr-glacier-storage binary
-podman build -t evr-glacier-storage .
+cd ../../..
+podman build --target image -t evr-glacier-storage -f etc/podman/evr-glacier-storage/Containerfile .

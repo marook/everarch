@@ -14,8 +14,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-FROM docker.io/library/node:18.16-alpine
-MAINTAINER Markus Peröbner <markus.peroebner@gmail.com>
+FROM docker.io/library/alpine:3.18 AS builder
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev
+WORKDIR /root/everarch
+COPY . /root/everarch
+RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr
+
+FROM docker.io/library/node:18.16-alpine AS image
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
 
 EXPOSE 8030
 
@@ -28,9 +37,12 @@ VOLUME /data
 
 RUN apk update && apk add libxml2 libxslt gpgme
 
-ADD evr-websocket-server /opt/evr/evr-websocket-server
-ADD evr /opt/evr/bin/evr
-ADD entrypoint.js /entrypoint.js
+ADD README /opt/evr/README
+ADD AUTHORS /opt/evr/AUTHORS
+ADD COPYING /opt/evr/COPYING
+ADD etc/podman/evr-websocket-server/evr-websocket-server /opt/evr/evr-websocket-server
+COPY --from=builder /root/everarch/src/evr /opt/evr/bin/evr
+ADD etc/podman/evr-websocket-server/entrypoint.js /entrypoint.js
 
 ENV PATH="/opt/evr/bin:${PATH}"
 
