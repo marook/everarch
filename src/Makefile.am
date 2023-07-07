@@ -234,7 +234,7 @@ evr_fs_SOURCES = \
 	open-files.c \
 	seed-desc.c \
 	signatures.c
-evr_fs_LDADD = $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+evr_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	auth.c \
@@ -329,7 +329,7 @@ glacier_benchmark_SOURCES = \
 	logger.c \
 	metadata.c \
 	signatures.c
-glacier_benchmark_LDADD = $(XML_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
+glacier_benchmark_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
 
 glacier_cmd_test_SOURCES = \
 	assert.c \
