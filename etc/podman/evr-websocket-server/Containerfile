@@ -37,12 +37,11 @@ VOLUME /data
 
 RUN apk update && apk add libxml2 libxslt gpgme
 
-ADD README /opt/evr/README
-ADD AUTHORS /opt/evr/AUTHORS
-ADD COPYING /opt/evr/COPYING
-ADD etc/podman/evr-websocket-server/evr-websocket-server /opt/evr/evr-websocket-server
-COPY --from=builder /root/everarch/src/evr /opt/evr/bin/evr
-ADD etc/podman/evr-websocket-server/entrypoint.js /entrypoint.js
+COPY README AUTHORS COPYING /opt/evr/
+COPY websocket-server/lib/*.js /opt/evr/evr-websocket-server/lib/
+COPY websocket-server/package.json websocket-server/package-lock.json /opt/evr/evr-websocket-server/
+COPY --from=builder /root/everarch/src/evr /opt/evr/bin/
+COPY etc/podman/evr-websocket-server/entrypoint.js /
 
 ENV PATH="/opt/evr/bin:${PATH}"
 
