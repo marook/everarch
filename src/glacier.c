@@ -453,11 +453,16 @@ int evr_walk_buckets(struct evr_glacier_write_ctx *wctx, int (*visit)(void *ctx,
     if(!dir){
         goto out;
     }
-    errno = 0;
+    int readdir_errno;
     while(1){
+        // readdir does not change errno if the end is reached. that's
+        // why we have to reset it so we know if an error happend
+        // during readdir.
+        errno = 0;
         struct dirent *d = readdir(dir);
+        readdir_errno = errno;
         if(!d){
-            if(errno){
+            if(readdir_errno){
                 goto out_with_close_dir;
             }
             break;
