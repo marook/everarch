@@ -26,7 +26,7 @@
 typedef char evr_auth_token[32];
 typedef char evr_auth_token_str[2 * sizeof(evr_auth_token) + 1];
 
-int evr_parse_auth_token(evr_auth_token t, evr_auth_token_str s);
+int evr_parse_auth_token(evr_auth_token t, char *s);
 
 void evr_fmt_auth_token(char *s, evr_auth_token t);
 

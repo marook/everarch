@@ -133,7 +133,7 @@ int get_signature_fpr(char *fpr, size_t fpr_max_size, struct dynamic_array *msg)
 }
 
 void stringify_dynamic_array(struct dynamic_array **da){
-    char buf[1];
+    char buf[1] = { 0 };
     *da = write_n_dynamic_array(*da, buf, sizeof(buf));
     assert(*da);
 }

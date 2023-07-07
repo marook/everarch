@@ -25,7 +25,7 @@
 #include "basics.h"
 #include "logger.h"
 
-int evr_parse_auth_token(evr_auth_token t, evr_auth_token_str s){
+int evr_parse_auth_token(evr_auth_token t, char *s){
     if(strlen(s) != sizeof(evr_auth_token_str) - 1){
         return evr_error;
     }
