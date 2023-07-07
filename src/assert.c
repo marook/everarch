@@ -18,7 +18,10 @@
 
 #include "assert.h"
 
+#ifdef EVR_HAVE_BACKTRACE
 #include <execinfo.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,10 +61,12 @@ void vfail(const char* format, va_list args){
 }
 
 void print_backtrace(){
+#ifdef EVR_HAVE_BACKTRACE
     const size_t max_pointers = 100;
     void *buffer[max_pointers];
     int len = backtrace(buffer, max_pointers);
     backtrace_symbols_fd(buffer, len, 2);
+#endif
 }
 
 int is_ok(int result){

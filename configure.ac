@@ -22,6 +22,11 @@ AC_CHECK_FUNC(
 )
 AC_SUBST(ARGP_LIBS)
 
+AC_CHECK_FUNC(
+  [backtrace],
+  [AC_DEFINE([EVR_HAVE_BACKTRACE], [1], [libc backtrace(…) function is available.])]
+)
+
 AC_ARG_ENABLE(
   [futile-claim-set-tracking],
   [AS_HELP_STRING([--enable-futile-claim-set-tracking], [Enables tracking of claim-sets without any effect to the attr-index. Helpful for finding custom claims which are missing in the transformation.])],
