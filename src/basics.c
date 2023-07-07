@@ -84,24 +84,27 @@ void evr_now(evr_time *t){
     evr_time_from_timespec(t, &ts);
 }
 
-const char *evr_iso_8601_timestamp_fmt = "%FT%TZ";
+const char *evr_iso_8601_timestamp_fmt = "%Y-%m-%dT%H:%M:%SZ";
 #define evr_second_fraction_digits 6
 
 int evr_time_from_iso8601(evr_time *t, const char *s){
     int ret = evr_error;
     size_t slen = strlen(s);
     if(slen < 2 + evr_second_fraction_digits){
+        log_debug("Unable to parse date %s because too short.", s);
         goto out;
     }
     const char *p = &s[slen - (2 + evr_second_fraction_digits)];
     const char *dot_s = p++;
     if(*dot_s != '.'){
+        log_debug("Unable to parse date %s because dot is missing.", s);
         goto out;
     }
     const char *ms_s = p;
     for(int i = 0; i < evr_second_fraction_digits; ++i){
         char c = *p++;
         if(c < '0' || c > '9'){
+            log_debug("Unable to parse date %s because milliseconds part contains something else but a number", s);
             goto out;
         }
     }
@@ -110,6 +113,7 @@ int evr_time_from_iso8601(evr_time *t, const char *s){
     }
     int ms;
     if(sscanf(ms_s, "%0" to_string(evr_second_fraction_digits) "d", &ms) != 1){
+        log_debug("Unable to parse date %s because milliseconds part can't be parsed.");
         goto out;
     }
     struct tm tm;
@@ -121,6 +125,7 @@ int evr_time_from_iso8601(evr_time *t, const char *s){
         buf[buf_len] = '\0';
         char *end = &buf[buf_len];
         if(strptime(buf, evr_iso_8601_timestamp_fmt, &tm) != end){
+            log_debug("Unable to parse date %s because extracted base date %s cannot be parsed.", s, buf);
             goto out;
         }
     }
