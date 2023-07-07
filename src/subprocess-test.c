@@ -40,17 +40,17 @@ void test_cat_subprocess(){
     const char msg[] = "hello world!";
     const size_t msg_len = strlen(msg);
     struct evr_file sp_stdin;
-    evr_file_bind_fd(&sp_stdin, sp.stdin);
+    evr_file_bind_fd(&sp_stdin, sp.in);
     assert(is_ok(write_n(&sp_stdin, msg, msg_len)));
-    assert(close(sp.stdin) == 0);
+    assert(close(sp.in) == 0);
     char buf[msg_len + 1];
     struct evr_file sp_stdout;
-    evr_file_bind_fd(&sp_stdout, sp.stdout);
+    evr_file_bind_fd(&sp_stdout, sp.out);
     assert(is_ok(read_n(&sp_stdout, buf, msg_len, NULL, NULL)));
     buf[sizeof(buf) - 1] = '\0';
     assert(is_str_eq(msg, buf));
-    assert(close(sp.stdout) == 0);
-    assert(close(sp.stderr) == 0);
+    assert(close(sp.out) == 0);
+    assert(close(sp.err) == 0);
     int status;
     assert(waitpid(sp.pid, &status, WUNTRACED) >= 0);
     assert(status == 0);
@@ -63,9 +63,9 @@ void test_false_subprocess(){
         NULL
     };
     assert(is_ok(evr_spawn(&sp, argv)));
-    assert(close(sp.stdin) == 0);
-    assert(close(sp.stdout) == 0);
-    assert(close(sp.stderr) == 0);
+    assert(close(sp.in) == 0);
+    assert(close(sp.out) == 0);
+    assert(close(sp.err) == 0);
     int status;
     assert(waitpid(sp.pid, &status, WUNTRACED) >= 0);
     assert(status);
@@ -84,14 +84,14 @@ void test_pass_path_to_subprocess(){
     // support not existing PATH environment variables
     assert(my_path);
     assert(is_ok(evr_spawn(&sp, argv)));
-    assert(close(sp.stdin) == 0);
+    assert(close(sp.in) == 0);
     char sp_path[4096];
-    ssize_t bytes_read = read(sp.stdout, sp_path, sizeof(sp_path));
+    ssize_t bytes_read = read(sp.out, sp_path, sizeof(sp_path));
     assert(bytes_read >= 0);
     sp_path[min((size_t)bytes_read, sizeof(sp_path)) - 1] = '\0';
     assert(strncmp(my_path, sp_path, sizeof(sp_path) - 1) == 0);
-    assert(close(sp.stdout) == 0);
-    assert(close(sp.stderr) == 0);
+    assert(close(sp.out) == 0);
+    assert(close(sp.err) == 0);
     int status;
     assert(waitpid(sp.pid, &status, WUNTRACED) >= 0);
     assert(status == 0);

@@ -91,9 +91,9 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
             goto panic;
         }
         p->pid = pid;
-        p->stdin = child_in[1];
-        p->stdout = child_out[0];
-        p->stderr = child_err[0];
+        p->in = child_in[1];
+        p->out = child_out[0];
+        p->err = child_err[0];
     }
     ret = evr_ok;
  out:

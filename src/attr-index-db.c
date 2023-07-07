@@ -852,7 +852,7 @@ int evr_append_attr_factory_claims_worker(void *context){
         goto out;
     }
     struct evr_file sp_stdin;
-    evr_file_bind_fd(&sp_stdin, sp.stdin);
+    evr_file_bind_fd(&sp_stdin, sp.in);
     int write_res = write_n(&sp_stdin, ctx->claim_set, ctx->claim_set_len);
     if(write_res != evr_ok && write_res != evr_end){
         goto out_with_close_sp;
@@ -861,12 +861,12 @@ int evr_append_attr_factory_claims_worker(void *context){
         goto out_with_close_sp;
     }
     const int closed_fd = -1;
-    sp.stdin = closed_fd;
+    sp.in = closed_fd;
     struct dynamic_array *buf = alloc_dynamic_array(32 * 1024);
     if(!buf){
         goto out_with_close_sp;
     }
-    int read_res = read_fd(&buf, sp.stdout, evr_max_blob_data_size);
+    int read_res = read_fd(&buf, sp.out, evr_max_blob_data_size);
     if(read_res != evr_ok && read_res != evr_end){
         if(buf){
             free(buf);
@@ -894,11 +894,11 @@ int evr_append_attr_factory_claims_worker(void *context){
  out_with_free_buf:
     free(buf);
  out_with_close_sp:
-    if(sp.stdin != closed_fd){
-        close(sp.stdin);
+    if(sp.in != closed_fd){
+        close(sp.in);
     }
-    close(sp.stdout);
-    close(sp.stderr);
+    close(sp.out);
+    close(sp.err);
     log_debug("Joined attr-factory %s for claim-set %s with exit code %d", attr_factory_str, claim_set_ref_str, ctx->res);
  out:
     return evr_ok;
@@ -916,7 +916,7 @@ int evr_append_attr_factory_claims_worker(void *context){
         evr_panic("Unable to log failed attr-factory %s call.", attr_factory_str);
         goto out_with_close_sp;
     }
-    int err_read_res = read_fd(&buf, sp.stderr, evr_max_blob_data_size);
+    int err_read_res = read_fd(&buf, sp.err, evr_max_blob_data_size);
     if(err_read_res != evr_ok && err_read_res != evr_end){
         goto out_with_free_buf;
     }

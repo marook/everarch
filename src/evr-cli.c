@@ -602,9 +602,9 @@ int evr_cli_get(struct cli_cfg *cfg){
     } else if(resp.status_code != evr_status_code_ok){
         goto out_with_close_c;
     }
-    struct evr_file stdout;
-    evr_file_bind_fd(&stdout, STDOUT_FILENO);
-    int pipe_res = evr_pipe_cmd_get_resp_blob(&stdout, &c, resp.body_size, key);
+    struct evr_file out;
+    evr_file_bind_fd(&out, STDOUT_FILENO);
+    int pipe_res = evr_pipe_cmd_get_resp_blob(&out, &c, resp.body_size, key);
     if(pipe_res != evr_ok && pipe_res != evr_end){
         goto out_with_close_c;
     }
@@ -645,9 +645,9 @@ int evr_cli_get_verify(struct cli_cfg *cfg){
         log_error("Failed to format output doc");
         goto out_with_free_doc;
     }
-    struct evr_file stdout;
-    evr_file_bind_fd(&stdout, STDOUT_FILENO);
-    if(write_n(&stdout, doc_str, doc_str_size) != evr_ok){
+    struct evr_file out;
+    evr_file_bind_fd(&out, STDOUT_FILENO);
+    if(write_n(&out, doc_str, doc_str_size) != evr_ok){
         goto out_with_free_doc_str;
     }
     ret = evr_ok;
@@ -714,9 +714,9 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
         log_error("Failed to format output doc");
         goto out_with_free_out_doc;
     }
-    struct evr_file stdout;
-    evr_file_bind_fd(&stdout, STDOUT_FILENO);
-    if(write_n(&stdout, out_doc_str, out_doc_str_size) != evr_ok){
+    struct evr_file out;
+    evr_file_bind_fd(&out, STDOUT_FILENO);
+    if(write_n(&out, out_doc_str, out_doc_str_size) != evr_ok){
         goto out_with_free_out_doc_str;
     }
     ret = evr_ok;
@@ -892,8 +892,8 @@ int evr_cli_get_file(struct cli_cfg *cfg){
     xmlNode *slice = evr_find_next_element(fbody->children, "slice", evr_claims_ns);
     evr_blob_ref sref;
     struct evr_resp_header resp;
-    struct evr_file stdout;
-    evr_file_bind_fd(&stdout, STDOUT_FILENO);
+    struct evr_file out;
+    evr_file_bind_fd(&out, STDOUT_FILENO);
     while(1){
         if(!slice){
             break;
@@ -919,7 +919,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
             log_error("Failed to fetch file slice blob with ref %s. Response status code was 0x%02x.", fmt_key, resp.status_code);
             goto out_with_free_doc;
         }
-        int pipe_res = evr_pipe_cmd_get_resp_blob(&stdout, &c, resp.body_size, sref);
+        int pipe_res = evr_pipe_cmd_get_resp_blob(&out, &c, resp.body_size, sref);
         if(pipe_res == evr_end){
             break;
         }

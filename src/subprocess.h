@@ -29,16 +29,16 @@
 
 struct evr_subprocess {
     pid_t pid;
-    int stdin;
-    int stdout;
-    int stderr;
+    int in;
+    int out;
+    int err;
 };
 
 /**
  * evr_spawn forks a new process and executes the arguments given in argv.
  *
  * The spawned process details are written to p. The caller must close
- * stdin, stdout and stderr if evr_spawn returns with evr_ok.
+ * in, out and err if evr_spawn returns with evr_ok.
  *
  * Returns evr_ok on success.
  */
