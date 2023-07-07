@@ -110,7 +110,7 @@ PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0], has_fuse=true, has_fuse=false)
 AM_CONDITIONAL([HAS_FUSE], [test x$has_fuse = xtrue])
 
 AM_PATH_LISPDIR()
-AM_CONDITIONAL([HAS_EMACS], [test x$lispdir != x])
+AM_CONDITIONAL([HAS_EMACS], [test x$EMACS != xno])
 
 AC_CHECK_PROG(has_poke, [poke], true, false)
 AM_CONDITIONAL([HAS_POKE], [test x$has_poke = xtrue])
