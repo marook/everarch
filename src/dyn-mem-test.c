@@ -163,6 +163,14 @@ void test_filled_llbuf_s(){
         assert(llb.child_count == i + 1);
         c->i = i;
         c->c = 'x';
+        struct evr_llbuf_s_iter it;
+        evr_init_llbuf_s_iter(&it, &llb);
+        for(size_t j = 0; j <= i; ++j){
+            c = evr_llbuf_s_iter_next(&it);
+            assert(c);
+            assert_msg(c->i == j, "But %zu != %zu", c->i, j);
+            assert(c->c == 'x');
+        }
     }
     assert(llb.block_count == 2);
     struct evr_llbuf_s_iter it;

@@ -225,11 +225,13 @@ inline void *evr_llbuf_s_iter_next(struct evr_llbuf_s_iter *iter){
     }
     iter->remaining_children -= 1;
     void *ret = iter->child;
-    void *end = &((char*)iter->block->data)[iter->llb->block_child_count * iter->llb->child_size];
-    iter->child += iter->llb->child_size;
-    if(iter->child == end){
-        iter->block = iter->block->next;
-        iter->child = iter->block->data;
+    if(iter->remaining_children > 0){
+        void *end = &((char*)iter->block->data)[iter->llb->block_child_count * iter->llb->child_size];
+        iter->child += iter->llb->child_size;
+        if(iter->child == end){
+            iter->block = iter->block->next;
+            iter->child = iter->block->data;
+        }
     }
     return ret;
 }

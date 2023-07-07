@@ -2,44 +2,6 @@
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
-* evr-fs segfault :bug:
-evr-fs crashed with a segfault. while the segfault happend content was
-uploaded to the connected evr-glacier-storage.
-
-information obtained via analyzing the core dump with gdb:
-
-#+BEGIN_SRC
-(gdb) bt
-#0  evr_llbuf_s_iter_next (iter=0x7f64e7ffec30) at dyn-mem.h:232
-#1  evr_collect_affected_seeds (affected_seeds=affected_seeds@entry=0x7f64e7ffece0, seed=0x7f64e7ffec28 "\244\025\a\330d\177", 
-    seed@entry=0x7f64e7ffee80 "jOx\201\b\205ҩg5uɚ\024\222\215l\326\005m\214\366\350\v\226rq\\") at evr-fs.c:1341
-#2  0x00005581f6136b22 in evr_index_watch_worker_visit_changed_seed (ctx=ctx@entry=0x7ffd57c7c8f0, 
-    index_ref=index_ref@entry=0x7f64e7ffee60 "ͺm\037\372n\276NJ\254\064\065X.\002\214$\376\331\363\315h̥\243\371\207a", 
-    seed=seed@entry=0x7f64e7ffee80 "jOx\201\b\205ҩg5uɚ\024\222\215l\326\005m\214\366\350\v\226rq\\", last_modified=<optimized out>) at evr-fs.c:1269
-#3  0x00005581f61347e6 in evr_attri_read_watch (r=0x5581f6c59c70, visit_changed_seed=visit_changed_seed@entry=0x5581f6136af0 <evr_index_watch_worker_visit_changed_seed>, 
-    ctx=ctx@entry=0x7ffd57c7c8f0) at evr-attr-index-client.c:248
-#4  0x00005581f6135028 in evr_index_watch_worker (_ctx=0x7ffd57c7c8f0) at evr-fs.c:1210
-#5  0x00007f64ea98af5a in start_thread (arg=<optimized out>) at pthread_create.c:474
-#6  0x00007f64ea3b0a2f in clone () at ../sysdeps/unix/sysv/linux/x86_64/clone.S:95
-(gdb) p *iter
-$2 = {llb = 0x7f64e7ffec50, block = 0x0, child = 0x7f64d8083930 "\020\020", remaining_children = 0}
-(gdb) f 1
-(gdb) p affected_inodes
-$4 = {first = 0x7f64d8082930, last = 0x7f64d8082930, block_count = 1, block_child_count = 510, child_count = 510, child_size = 8}
-#+END_SRC
-
-further information from the affected system:
-
-#+BEGIN_SRC
-$ ll /usr/local/bin/evr-fs
--rwxr-xr-x 1 root staff 525K Jun 22 14:39 /usr/local/bin/evr-fs
-#+END_SRC
-
-it seems like the struct evr_llbuf_s behaves badly when iterating over
-it while it has the capacity of exactly one block size.
-
-test_filled_llbuf_s() should try to iterate over the growing struct
-evr_llbuf_s so that errors with certain sizes can be detected.
 * op - not applied in evr-attr-index                                    :bug:
 the evr-attr-index sqlite db contains the following attributes for the
 affected seed. the valid_from and valid_until dates where simplified
