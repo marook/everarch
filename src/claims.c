@@ -96,7 +96,7 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
         if(s->size >= 100 << 20){
             goto out;
         }
-        sprintf(buf, "%lu", s->size);
+        sprintf(buf, "%zu", s->size);
         if(xmlTextWriterWriteAttribute(cs->writer, BAD_CAST "size", BAD_CAST buf) < 0){
             goto out;
         }
@@ -450,7 +450,7 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
             log_error("No size attribute found on slice element.");
             goto out_with_free_c;
         }
-        if(sscanf(fmt_size, "%lu", &s->size) != 1){
+        if(sscanf(fmt_size, "%zu", &s->size) != 1){
             log_error("Illegal size in claim '%s'", fmt_size);
             xmlFree(fmt_size);
             goto out_with_free_c;
@@ -651,7 +651,7 @@ int evr_parse_claim_index_seed_attr(size_t *index_seed, xmlNode *claim){
         return evr_not_found;
     }
     int ret = evr_error;
-    int scan_res = sscanf(fmt_index_seed, "%lu", index_seed);
+    int scan_res = sscanf(fmt_index_seed, "%zu", index_seed);
     if(scan_res != 1){
         log_debug("Claim index attribute with value '%s' can't be parsed as decimal number", fmt_index_seed);
         goto out_with_free_fmt_index_seed;
