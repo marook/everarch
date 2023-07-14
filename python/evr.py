@@ -76,6 +76,7 @@ def _read_ref(lines):
 
 class ModifiedBlob(object):
     def __init__(self, seed_ref, last_modified, watch_flags):
+        # TODO maybe it was wrong to name this seed_ref here because it's the blob that changes
         self.seed_ref = seed_ref
         self.last_modified = last_modified
         self.watch_flags = watch_flags
