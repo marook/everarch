@@ -1,3 +1,9 @@
+* evr treats expired gpg keys as invalid :bug:
+when fetching claims which got signed by an expired gpg key the evr
+cli will not verify the claims as valid.
+
+2023-07-14T20:43:44 eD Key with fingerprint 0…E is not valid for
+verification. So it is not used despite being required.
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
