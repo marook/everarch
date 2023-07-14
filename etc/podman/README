@@ -3,6 +3,10 @@ podman and everarch
 This directory contains some hints how to run everarch within podman
 and some scripts for building everarch images for podman.
 
+If your build system is amd64 you should install the following:
+
+$ apt install podman podman-compose buildah qemu-user-static qemu-system-arm
+
 The evr-glacier-storage and evr-websocket-server directories contain
 build scripts which generate podman images.
 

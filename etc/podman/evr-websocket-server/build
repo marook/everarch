@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-cd ../../..
-podman build --target image -t evr-websocket-server -f etc/podman/evr-websocket-server/Containerfile .
+. ../evr-podman.conf
+evr_podman_build evr-websocket-server

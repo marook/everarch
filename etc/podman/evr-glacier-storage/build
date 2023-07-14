@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-cd ../../..
-podman build --target image -t evr-glacier-storage -f etc/podman/evr-glacier-storage/Containerfile .
+. ../evr-podman.conf
+evr_podman_build evr-glacier-storage
