@@ -1,7 +1,14 @@
-* add the Z flag to the podman volumes where applicable
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
+* add the Z flag to the podman volumes where applicable
+* replace sscanf calls with strto*
+as there is some undefined behavior involved with overflowing numbers
+and scanf.
+
+https://port70.net/~nsz/c/c11/n1570.html#7.21.6.2p10
+
+hint came from pitrp.
 * op - not applied in evr-attr-index                                    :bug:
 the evr-attr-index sqlite db contains the following attributes for the
 affected seed. the valid_from and valid_until dates where simplified
