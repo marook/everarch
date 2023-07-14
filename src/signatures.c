@@ -169,8 +169,8 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
 
 int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s){
     for(; s; s = s->next){
-        if((s->summary & GPGME_SIGSUM_VALID) == 0){
-            log_debug("Key with fingerprint %s is not valid for verification. So it is not used despite being required.", s->fpr);
+        if((s->summary & GPGME_SIGSUM_VALID) == 0 && s->summary != GPGME_SIGSUM_KEY_EXPIRED){
+            log_debug("Signature from key %s not valid. Signature summary is 0x%lx and status is %lu", s->fpr, (unsigned long)s->summary, (unsigned long)s->status);
             continue;
         }
         if(bsearch(&s->fpr, ctx->accepted_fprs, ctx->accepted_fprs_len, sizeof(*ctx->accepted_fprs), (int (*)(const void *l, const void *r))evr_strpcmp) == NULL){

@@ -1,9 +1,3 @@
-* evr treats expired gpg keys as invalid :bug:
-when fetching claims which got signed by an expired gpg key the evr
-cli will not verify the claims as valid.
-
-2023-07-14T20:43:44 eD Key with fingerprint 0…E is not valid for
-verification. So it is not used despite being required.
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
@@ -140,11 +134,6 @@ efs:file:
   created=""
   last-modified=""/>
 #+END_SRC
-* DONE evr-websocket-server should put uploaded claims into cache
-right now the cache only is fed with fetched claims.
-
--> doing this is not easily possible because we never know which
-   metadat evr would produce.
 * parallel evr-fs inode building
 right now evr-fs builds the inodes sequentially one seed by another.
 
@@ -159,6 +148,21 @@ probably we should trigger the random blob validation via a command
 sent to evr-glacier-storage. that way admins can set up a cron to
 perform the check at a pleasant time. also checks can be triggered
 manually on demand.
+* check claim-set created date against key expiry                  :security:
+right now evr_is_signature_accepted(…) accepts valid and expired keys
+as valid signatures. this is the case because a claim could have been
+signed when the key was still valid.
+
+with this task the validation of claim-sets should be extended. if the
+claim was signed with an expired key the claim-set's created date must
+be before the expiry date of the key.
+* check claim-set created date against key revocation              :security:
+right now evr_is_signature_accepted(…) will not accept signatures by
+revoked keys as valid.
+
+with this task the revocation timestamp should be checked against the
+claim-set's created timestamp. claim-sets created before the
+revocation timestamp should be valid.
 * plan how can we handle repeating fields like social-child-of?
 update the backlog for evr-attr-ui. how can we produce multiple copies
 of the widget for repeating attributes?
