@@ -10,6 +10,8 @@ system error
 #+END_SRC
 * claim-stats should list a few example claims
 maybe seven for each combination of namespace an tag name.
+* drop evr-attr-ui and all it's backlog tasks
+i now think that evr-attr-ui leads to nowhere.
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
