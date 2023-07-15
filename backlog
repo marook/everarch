@@ -8,6 +8,8 @@ system error
 2023-07-15T07:24:25 iE Failed building attr index for sha3-224-613fbd92986c89fc10be237e83cb249c82e73d7b5a24c0c30c3b8e43
 2023-07-15T07:24:25 iP Ended build index worker with result 1
 #+END_SRC
+* claim-stats should list a few example claims
+maybe seven for each combination of namespace an tag name.
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
