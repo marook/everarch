@@ -14,6 +14,14 @@
 
   <xsl:template match="/esd:seed-description-set/esd:seed-description[//esd:attr/@k='file']">
     <efs:file-set>
+      <!--
+          add a broken file here which should be ignored
+      -->
+      <efs:file path="a/broken/file" size="" file-ref="" created="" last-modified=""/>
+
+      <!--
+          here is the good file for testing
+      -->
       <efs:file last-modified="2022-10-10T12:13:14.000000Z">
         <xsl:attribute name="path">test-subdir<xsl:if test="esd:attr-index/esd:attr/@k='category'">/cat-<xsl:value-of select="key('seed-desc', esd:attr-index/esd:attr[@k='category']/@v)/esd:attr-index/esd:attr[@k='title']/@v"/></xsl:if>/<xsl:value-of select="esd:attr-index/esd:attr[@k='title']/@v"/></xsl:attribute>
         <xsl:attribute name="size"><xsl:value-of select="esd:attr-index/esd:attr[@k='file-size']/@v"/></xsl:attribute>

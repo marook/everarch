@@ -545,23 +545,23 @@ int evr_populate_inode_set_visit_seed(void *_ctx, evr_claim_ref seed){
     evr_inode_remove_by_seed(inode_set.inodes, inode_set.inodes_len, seed);
     evr_claim_ref *ds = NULL;
     for(xmlNode *fn = evr_first_file_node(file_set); fn; fn = evr_next_file_node(fn)){
-        if(dependent_seeds_len > 0){
-            size_t size = evr_claim_ref_size * dependent_seeds_len;
-            ds = malloc(size);
-            if(!ds){
-                goto out_with_unlock_inode_set_lock;
-            }
-            memcpy(ds, dependent_seeds, size);
-        }
         struct evr_fs_file *f = evr_parse_fs_file(fn);
         if(!f){
             evr_claim_ref_str seed_str;
             evr_fmt_claim_ref(seed_str, seed);
             char *fn_str = evr_format_xml_node(fn);
-            log_error("Unable to parse XML file node based on seed %s: %s", seed_str, fn_str);
+            log_error("Ignoring unable to parse XML file node based on seed %s: %s", seed_str, fn_str);
             free(fn_str);
-            free(ds);
-            goto out_with_unlock_inode_set_lock;
+	    continue;
+        }
+        if(dependent_seeds_len > 0){
+            size_t size = evr_claim_ref_size * dependent_seeds_len;
+            ds = malloc(size);
+            if(!ds){
+                evr_free_fs_file(f);
+                goto out_with_unlock_inode_set_lock;
+            }
+            memcpy(ds, dependent_seeds, size);
         }
 #ifdef EVR_LOG_DEBUG
         {

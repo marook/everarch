@@ -128,24 +128,6 @@ failed.
 
 evr-glacier-storage should log when it rejects a connection and the
 reason why it did so.
-* evr-fs crash on invalid efs:file
-evr-fs will not start if an efs:file can't be parsed during
-startup. an invalid efs:file during runtime will just be ignored.
-
-an not parseable efs:file during startup should be logged and ignored.
-
-the following log message happend during startup with an invalid
-efs:file:
-
-#+BEGIN_SRC
-2023-04-15T19:05:57 fE Unable to parse XML file node based on seed sha3-224-0aeec15e324f0c6258e92352ca37354b90ad03d461374d40b8df66b2-0000: <?xml version="1.0" encoding="UTF-8"?>
-<efs:file xmlns:efs="https://evr.ma300k.de/files/"
-  path="Talks/nach Name/clt23-4-deu-Neues_von_LilyPond_hd (2023-03-17)."
-  size=""
-  file-ref=""
-  created=""
-  last-modified=""/>
-#+END_SRC
 * parallel evr-fs inode building
 right now evr-fs builds the inodes sequentially one seed by another.
 
