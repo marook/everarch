@@ -10,6 +10,15 @@ system error
 #+END_SRC
 * drop evr-attr-ui and all it's backlog tasks
 i now think that evr-attr-ui leads to nowhere.
+* evr-attr-index should resume building new index
+instead of just switching to the new index and continue building
+it. serving the old index until the new one is completely indexed will
+make index changes much more stable.
+
+right now the folllowing appears from time to time. a new index
+generation starts and might take halve a day. during that indexing
+evr-attr-index crashes an is restarted by systemd. now the new index
+is used which is only partly filled.
 * perform apk upgrade during podman image building
 right now only the index is update but no updated packages are being
 installed
@@ -21,6 +30,18 @@ and scanf.
 https://port70.net/~nsz/c/c11/n1570.html#7.21.6.2p10
 
 hint came from pitrp.
+* evr-file virtual file system for random access to files from storage
+right now an attr factory could use ffmpeg to analyze the
+files. streaming the video files via evr cli into ffmpeg is possible
+but might stream much more data than actually needed to analyze the
+video file. there should be a way for applications to have random
+access on evr files.
+
+in order to achive that a new everarch application should be
+implemented. another virtual file system like evr-fs called
+evr-file. evr-file should expect one or more claim refs pointing to
+evr file claims. these files should be presented in the evr-file
+virtual file system. the file names should be the claim refs.
 * op - not applied in evr-attr-index                                    :bug:
 the evr-attr-index sqlite db contains the following attributes for the
 affected seed. the valid_from and valid_until dates where simplified
