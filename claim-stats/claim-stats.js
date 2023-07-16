@@ -30,6 +30,8 @@
         userDataInvalid: 5,
     };
 
+    let maxClaimExampleCount = 7;
+
     let stats = fromEvent(document.forms.target, 'submit')
         .pipe(
             map(event => {
@@ -141,6 +143,33 @@
                     );
             },
         ),
+        stats.pipe(
+            observable => {
+                let container = document.getElementById('claim-examples-container');
+                let claimKindContainers = new Map();
+                return observable.pipe(
+                    tap(stats => {
+                        container.innerHTML = '';
+                        for(let ns of Object.keys(stats.claims)){
+                            let nsObj = stats.claims[ns];
+                            for(let name of Object.keys(nsObj)){
+                                let nameObj = nsObj[name];
+                                let h = document.createElement('h4');
+                                h.textContent = `${ns} ${name}`;
+                                container.appendChild(h);
+                                let list = document.createElement('ul');
+                                for(let exampleRef of nameObj.exampleClaimSetRefs){
+                                    let item = document.createElement('li');
+                                    item.textContent = exampleRef;
+                                    list.appendChild(item);
+                                }
+                                container.appendChild(list);
+                            }
+                        }
+                    }),
+                );
+            },
+        ),
         claimSetsPerDay.pipe(
             map(claimSetsPerDay => claimSetsPerDay.toFixed(1)),
             writeTextContent('.stats-claims-per-day'),
@@ -234,8 +263,20 @@
                                                     count: 1,
                                                     earliestCreated: created,
                                                     latestCreated: created,
+                                                    exampleClaimSetRefs: [],
                                                 };
                                                 nsObj[name] = nameObj;
+                                            }
+                                            let exampleClaimSetRefs = nameObj.exampleClaimSetRefs;
+                                            if(exampleClaimSetRefs.indexOf(blob.ref) === -1){
+                                                let chance = (exampleClaimSetRefs.length < maxClaimExampleCount) ? 1 : (maxClaimExampleCount / nameObj.count);
+                                                if(chance >= 1 || Math.random() < chance){
+                                                    if(exampleClaimSetRefs.length >= maxClaimExampleCount){
+                                                        exampleClaimSetRefs.splice(Math.floor(Math.random() * exampleClaimSetRefs.length), 1, blob.ref);
+                                                    } else {
+                                                        exampleClaimSetRefs.push(blob.ref);
+                                                    }
+                                                }
                                             }
                                         }
 
