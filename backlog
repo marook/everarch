@@ -1,3 +1,32 @@
+* evr-fs sigsegv's on startup                                           :bug:
+gdb output from analyzing the core dump:
+#+BEGIN_SRC
+(gdb) bt
+#0  __strlen_avx2 () at ../sysdeps/x86_64/multiarch/strlen-avx2.S:76
+#1  0x00007fc602c7d0f8 in __vfprintf_internal (s=s@entry=0x7ffd62ef22a0, 
+    format=format@entry=0x7ffd62ef24a0 "2023-07-17T07:53:35 fE Failed to read blob %s. Responded status code was 0x%02x\n", ap=ap@entry=0x7ffd62ef25b8, 
+    mode_flags=mode_flags@entry=0) at ./stdio-common/vfprintf-process-arg.c:397
+#2  0x00007fc602c9d3d5 in __vdprintf_internal (d=1, 
+    format=format@entry=0x7ffd62ef24a0 "2023-07-17T07:53:35 fE Failed to read blob %s. Responded status code was 0x%02x\n", arg=arg@entry=0x7ffd62ef25b8, 
+    mode_flags=mode_flags@entry=0) at ./libio/iovdprintf.c:54
+#3  0x00007fc602c9d4b7 in __vdprintf (d=<optimized out>, 
+    format=format@entry=0x7ffd62ef24a0 "2023-07-17T07:53:35 fE Failed to read blob %s. Responded status code was 0x%02x\n", arg=arg@entry=0x7ffd62ef25b8)
+    at ./libio/iovdprintf.c:67
+#4  0x0000560157272739 in evr_log_va (level=0x560157274d74 "E", 
+    fmt=0x560157276200 "Failed to read blob %s. Responded status code was 0x%02x", 
+    args=args@entry=0x7ffd62ef25b8) at logger.c:106
+#5  0x00005601572727d7 in evr_log (level=level@entry=0x560157274d74 "E", 
+    fmt=fmt@entry=0x560157276200 "Failed to read blob %s. Responded status code was 0x%02x") at logger.c:61
+#6  0x000056015726f8dc in evr_fetch_xml (doc=doc@entry=0x7ffd62ef2718, 
+    f=f@entry=0x7ffd62ef28a0, 
+    key=key@entry=0x7ffd62ef27b0 "\277\245l\365\334^\232\033\215\r.T\002\333)\255\211=Sn\003\301{\211Z\344\363\261\375\177") at evr-glacier-client.c:53
+#7  0x000056015726f981 in evr_fetch_stylesheet (style=style@entry=0x7ffd62ef2798, 
+    f=f@entry=0x7ffd62ef28a0, 
+    ref=ref@entry=0x7ffd62ef27b0 "\277\245l\365\334^\232\033\215\r.T\002\333)\255\211=Sn\003\301{\211Z\344\363\261\375\177") at evr-glacier-client.c:112
+#8  0x000056015726d2b9 in load_transformation (cfg=cfg@entry=0x56015727c9c0 <cfg>, 
+    gc=gc@entry=0x7ffd62ef28a0) at evr-fs.c:456
+#9  0x0000560157268ddc in main (argc=4, argv=0x7ffd62ef2a28) at evr-fs.c:305
+#+END_SRC
 * evr-attr-index crashes during indexing :bug:
 #+BEGIN_SRC
 2023-07-15T07:24:22 iI Listening on 0.0.0.0:2562
