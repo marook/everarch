@@ -404,26 +404,32 @@ size_t evr_count_elements(xmlNode *start, char *name);
 
 struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
     struct evr_file_claim *c = NULL;
-    char *title = (char*)xmlGetNsProp(claim_node, BAD_CAST "title", BAD_CAST evr_dc_ns);
-    if(!title){
-        // TODO support no title
-        goto out;
+    char *title = NULL;
+    if(xmlHasNsProp(claim_node, BAD_CAST "title", BAD_CAST evr_dc_ns)){
+        title = (char*)xmlGetNsProp(claim_node, BAD_CAST "title", BAD_CAST evr_dc_ns);
+        if(!title){
+            goto out;
+        }
     }
     xmlNode *body = evr_find_next_element(claim_node->children, "body", evr_claims_ns);
     if(!body){
         goto out_with_free_title;
     }
     size_t slices_count = evr_count_elements(body->children, "slice");
-    size_t title_size = strlen(title) + 1;
+    size_t title_size = title ? strlen(title) + 1 : 0;
     char *buf = malloc(sizeof(struct evr_file_claim) + title_size + slices_count * sizeof(struct evr_file_slice));
     if(!buf){
         goto out_with_free_title;
     }
     c = (struct evr_file_claim*)buf;
     buf = (char *)&((struct evr_file_claim*)buf)[1];
-    c->title = buf;
-    memcpy(c->title, title, title_size);
-    buf += title_size;
+    if(title){
+        c->title = buf;
+        memcpy(c->title, title, title_size);
+        buf += title_size;
+    } else {
+        c->title = NULL;
+    }
     c->slices_len = slices_count;
     c->slices = (struct evr_file_slice*)buf;
     int si = 0;
@@ -460,12 +466,16 @@ struct evr_file_claim *evr_parse_file_claim(xmlNode *claim_node){
         slice = slice->next;
     }
  out_with_free_title:
-    xmlFree(title);
+    if(title){
+        xmlFree(title);
+    }
  out:
     return c;
  out_with_free_c:
     free(c);
-    xmlFree(title);
+    if(title){
+        xmlFree(title);
+    }
     return NULL;
 }
 
