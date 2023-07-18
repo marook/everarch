@@ -115,9 +115,13 @@ AM_CONDITIONAL([HAS_EMACS], [test x$EMACS != xno])
 AC_CHECK_PROG(has_poke, [poke], true, false)
 AM_CONDITIONAL([HAS_POKE], [test x$has_poke = xtrue])
 
+AC_CHECK_PROG(has_valgrind, [valgrind], true, false)
+AC_SUBST(HAS_VALGRIND, $has_valgrind)
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
     Makefile
+    test.conf
     src/Makefile
     python/Makefile
     emacs/Makefile
