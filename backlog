@@ -42,6 +42,7 @@ implemented. another virtual file system like evr-fs called
 evr-file. evr-file should expect one or more claim refs pointing to
 evr file claims. these files should be presented in the evr-file
 virtual file system. the file names should be the claim refs.
+* valgrind fails when executing unit tests in alpine environment
 * op - not applied in evr-attr-index                                    :bug:
 the evr-attr-index sqlite db contains the following attributes for the
 affected seed. the valid_from and valid_until dates where simplified
