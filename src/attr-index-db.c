@@ -493,7 +493,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         }
 #endif
     }
-    if(evr_add_claim_seed_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
+    if(evr_annotate_claims(raw_claim_set_doc, claim_set_ref) != evr_ok){
         evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set before attr factories.");
         goto out_with_reset_insert_claim_set;
     }
@@ -517,7 +517,7 @@ int evr_merge_attr_index_claim_set(struct evr_attr_index_db *db, struct evr_attr
         }
         goto out_with_reset_insert_claim_set;
     }
-    if(evr_add_claim_seed_attrs(raw_claim_set_doc, claim_set_ref) != evr_ok){
+    if(evr_annotate_claims(raw_claim_set_doc, claim_set_ref) != evr_ok){
         evr_log_failed_claim_set_doc(db, claim_set_ref, raw_claim_set_doc, "Unable to add seeds attributes to claim-set after attr factories.");
         goto out_with_reset_insert_claim_set;
     }

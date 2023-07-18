@@ -48,6 +48,18 @@ then
     exit 1
 fi
 
+claim=`evr get-verify --annotate ${ref}`
+if [[ "${claim}" != *"claim-ref=\"${ref}-0000\""* ]]
+then
+    echo "Claim should contain claim-ref attribute: ${claim}" >&2
+    exit 1
+fi
+if [[ "${claim}" != *"seed=\"${ref}-0000\""* ]]
+then
+    echo "Claim should contain seed attribute: ${claim}" >&2
+    exit 1
+fi
+
 # it should read from stdin if file argument is missing
 ref=`echo 'piped content' | evr post-file`
 content=`evr get-file ${ref}`

@@ -222,7 +222,7 @@ int evr_is_evr_element(xmlNode *n, char *name, char *ns){
 
 int evr_parse_claim_index_seed_attr(size_t *index_seed, xmlNode *claim);
 
-int evr_add_claim_seed_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
+int evr_annotate_claims(xmlDocPtr doc, evr_blob_ref doc_ref){
     xmlNode *cs = evr_get_root_claim_set(doc);
     if(!cs){
         return evr_ok;
@@ -234,6 +234,22 @@ int evr_add_claim_seed_attrs(xmlDocPtr doc, evr_blob_ref doc_ref){
         c = evr_find_next_element(c, NULL, NULL);
         if(!c){
             break;
+        }
+        xmlAttrPtr claim_ref_attr = xmlHasProp(c, BAD_CAST "claim-ref");
+        if(claim_ref_attr){
+#ifdef EVR_LOG_DEBUG
+            evr_blob_ref_str doc_ref_str;
+            evr_fmt_blob_ref(doc_ref_str, doc_ref);
+            log_debug("Ignoring already existing claim-ref attribute at claim from %s", doc_ref_str);
+#endif
+        } else {
+            evr_claim_ref claim_ref;
+            evr_build_claim_ref(claim_ref, doc_ref, ci);
+            evr_claim_ref_str claim_ref_str;
+            evr_fmt_claim_ref(claim_ref_str, claim_ref);
+            if(!xmlSetProp(c, BAD_CAST "claim-ref", BAD_CAST claim_ref_str)){
+                return evr_error;
+            }
         }
         xmlAttrPtr seed_attr = xmlHasProp(c, BAD_CAST "seed");
         if(!seed_attr){

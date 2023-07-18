@@ -85,6 +85,7 @@ static char args_doc[] = "CMD";
 #define arg_index_host 264
 #define arg_index_port 265
 #define arg_metadata_file 266
+#define arg_annotate 267
 
 #define max_traces_len 64
 
@@ -109,6 +110,7 @@ static struct argp_option options[] = {
     {"signing-gpg-key", arg_signing_gpg_key, "FINGERPRINT", 0, "Fingerprint of the GPG key which is used for signing claims. You can call 'gpg --list-secret-keys' to see your known keys."},
     {"limit", 'l', "LIMIT", 0, "Sets an upper limit for the maximum number results for evr-attr-index search queries. A value of 0 will not limit the number of results. Default is " to_string(default_limit) "."},
     {"meta", arg_metadata_file, "FILE", 0, "Appends metadata obtained via processing the get command into the given file. Some data might be written to the file even if the evr process fails."},
+    {"annotate", arg_annotate, NULL, 0, "Completes seed and claim-ref attributes at claims within the printed claim-set. Can be used when fetching claim-sets via get-verify."},
     {0}
 };
 
@@ -143,6 +145,7 @@ struct cli_cfg {
     char *traces[max_traces_len];
     unsigned long long last_modified_after;
     int two_way;
+    int annotate;
 
     /**
      * blobs_sort_order must be one of evr_cmd_watch_sort_order_*.
@@ -268,6 +271,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case arg_two_way:
         cfg->two_way = 1;
+        break;
+    case arg_annotate:
+        cfg->annotate = 1;
         break;
     case arg_accepted_gpg_key: {
         const size_t arg_size = strlen(arg) + 1;
@@ -466,6 +472,7 @@ int main(int argc, char **argv){
     cfg.traces_len = 0;
     cfg.last_modified_after = LLONG_MAX;
     cfg.two_way = 0;
+    cfg.annotate = 0;
     cfg.blobs_sort_order = evr_cmd_watch_sort_order_last_modified;
     cfg.src_storage_host = NULL;
     cfg.src_storage_port = NULL;
@@ -637,6 +644,12 @@ int evr_cli_get_verify(struct cli_cfg *cfg){
         log_error("No validly signed XML found for ref %s", cfg->key);
         ret = fetch_res;
         goto out_with_close_c;
+    }
+    if(cfg->annotate){
+        if(evr_annotate_claims(doc, blob_ref) != evr_ok){
+            log_error("Unable to append seed attributes to claims.");
+            goto out_with_free_doc;
+        }
     }
     char *doc_str = NULL;
     int doc_str_size;
