@@ -271,7 +271,10 @@ stop_via_pid_file(){
     local fn=`basename "${pid_file}"`
     echo "Stopping ${pid} via ${fn}…"
     kill -v -s sigint "${pid}"
-    tail --pid="${pid}" -f /dev/null || true
+    while kill -0 "${pid}" 2>/dev/null
+    do
+        sleep 0.5
+    done
     rm "${pid_file}"
   fi
 }
