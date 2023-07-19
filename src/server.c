@@ -29,7 +29,7 @@ int evr_make_tcp_socket(char *host, char *port){
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = 0;
+    hints.ai_flags = AI_PASSIVE;
     hints.ai_protocol = 0;
     hints.ai_canonname = NULL;
     hints.ai_addr = NULL;
@@ -40,26 +40,41 @@ int evr_make_tcp_socket(char *host, char *port){
         log_error("Unable to resolve bind service %s:%s: %s", host, port, gai_strerror(res));
         return -1;
     }
-    for(struct addrinfo *p = result; p != NULL; p = p->ai_next){
 #ifdef EVR_LOG_DEBUG
-        char num_addr[128];
-        char num_port[16];
+    char num_addr[128];
+    char num_port[16];
+    for(struct addrinfo *p = result; p != NULL; p = p->ai_next){
         if(getnameinfo(p->ai_addr, p->ai_addrlen, num_addr, sizeof(num_addr), num_port, sizeof(num_port), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
             evr_panic("Unable to format numeric address for %s", host);
             freeaddrinfo(result);
             return -1;
         }
-        log_debug("Trying address %s with port %s for server", num_addr, num_port);
+        log_debug("Potential address %s with port %s for server detected", num_addr, num_port);
+    }
+#endif
+    for(struct addrinfo *p = result; p != NULL; p = p->ai_next){
+#ifdef EVR_LOG_DEBUG
+        if(getnameinfo(p->ai_addr, p->ai_addrlen, num_addr, sizeof(num_addr), num_port, sizeof(num_port), NI_NUMERICHOST | NI_NUMERICSERV) != 0){
+            evr_panic("Unable to format numeric address for %s", host);
+            freeaddrinfo(result);
+            return -1;
+        }
+        log_debug("Try taking address %s with port %s for server", num_addr, num_port);
 #endif
         int s = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if(s == -1){
             continue;
         }
+        if(p->ai_family == AF_INET6){
+            log_debug("Make the IPv6 a dual-stack socket which also binds to IPv4.");
+            int mode = 0;
+            if(setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &mode, sizeof(mode)) != 0){
+                goto fail_with_free_addrinfo;
+            }
+        }
         int enable = 1;
-        if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
-            close(s);
-            freeaddrinfo(result);
-            return -1;
+        if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) != 0) {
+            goto fail_with_free_addrinfo;
         }
         if(bind(s, p->ai_addr, p->ai_addrlen) < 0){
             close(s);
@@ -67,6 +82,10 @@ int evr_make_tcp_socket(char *host, char *port){
         }
         freeaddrinfo(result);
         return s;
+    fail_with_free_addrinfo:
+        close(s);
+        freeaddrinfo(result);
+        return -1;
     }
     freeaddrinfo(result);
     log_error("Unable to bind to %s:%s", host, port);
