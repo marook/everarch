@@ -1,3 +1,18 @@
+* run autoupdate
+it seems to fix some warnings created by running configure
+#+BEGIN_SRC
+configure.ac:61: warning: The macro `AC_STDC_HEADERS' is obsolete.
+configure.ac:61: You should run autoupdate.
+./lib/autoconf/oldnames.m4:75: AC_STDC_HEADERS is expanded from...
+configure.ac:61: the top level
+configure.ac:61: warning: The macro `AC_HEADER_STDC' is obsolete.
+configure.ac:61: You should run autoupdate.
+./lib/autoconf/headers.m4:704: AC_HEADER_STDC is expanded from...
+./lib/autoconf/oldnames.m4:75: AC_STDC_HEADERS is expanded from...
+configure.ac:61: the top level
+configure.ac:62: warning: The macro `AC_HAVE_HEADERS' is obsolete.
+configure.ac:62: You should run autoupdate.
+#+END_SRC
 * evr-attr-index crashes during indexing :bug:
 #+BEGIN_SRC
 2023-07-15T07:24:22 iI Listening on 0.0.0.0:2562
