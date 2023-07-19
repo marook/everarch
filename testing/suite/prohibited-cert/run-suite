@@ -3,6 +3,12 @@ set -e
 set -o pipefail
 . ../config
 
+if [[ `whoami` = 'root' ]]
+then
+    echo "Skipping prohibited-cert test because root can read any file."
+    exit 0
+fi
+
 if [[ ! -e 'prohibited-cert.pem' ]]
 then
     cp "${glacier_storage_cert_path}" 'prohibited-cert.pem'
