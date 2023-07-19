@@ -122,7 +122,7 @@ int evr_seed_desc_build_visit_attr(void *_ctx, char *key, char *val){
         if(strncmp(*tr, key, key_len) != 0){
             continue;
         }
-        if(*tr[key_len] != ',' && *tr[key_len] != '\0'){
+        if((*tr)[key_len] != ',' && (*tr)[key_len] != '\0'){
             continue;
         }
         key_is_ref = 1;
