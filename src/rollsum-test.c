@@ -36,7 +36,7 @@ int split(struct Rollsum *rs){
 
 #define max_splits 100
 
-int print_splits(char *buffer, size_t buffer_size, size_t *splits);
+size_t print_splits(char *buffer, size_t buffer_size, size_t *splits);
 
 void test_zero_input_rollsum(){
     const size_t buffer_size = 5 * 8 * 1024;
@@ -49,20 +49,20 @@ void test_zero_input_rollsum(){
 
     size_t splits0[max_splits];
     memset(splits0, 0, sizeof(size_t) * max_splits);
-    int splits0_len = print_splits(buffer, buffer_size, splits0);
+    size_t splits0_len = print_splits(buffer, buffer_size, splits0);
 
     log_info("buffer[12] += 1");
     buffer[12] += 1;
     size_t splits1[max_splits];
     memset(splits1, 0, sizeof(size_t) * max_splits);
-    int splits1_len = print_splits(buffer, buffer_size, splits1);
+    size_t splits1_len = print_splits(buffer, buffer_size, splits1);
     buffer[12] -= 1; // restore
     
     log_info("del buffer[12]");
     memmove(&buffer[12], &buffer[13], buffer_size - 13);
     size_t splits2[max_splits];
     memset(splits2, 0, sizeof(size_t) * max_splits);
-    int splits2_len = print_splits(buffer, buffer_size, splits2);
+    size_t splits2_len = print_splits(buffer, buffer_size, splits2);
 
     assert(splits0_len == splits1_len);
     assert(splits0_len == splits2_len);
@@ -77,10 +77,10 @@ void test_zero_input_rollsum(){
     free(buffer);
 }
 
-int print_splits(char *buffer, size_t buffer_size, size_t *splits){
+size_t print_splits(char *buffer, size_t buffer_size, size_t *splits){
     struct Rollsum rs;
     RollsumInit(&rs);
-    int split_count = 0;
+    size_t split_count = 0;
     size_t last_split = 0;
     printf("Splits: ");
     for(size_t i = 0; i < buffer_size; ++i){
@@ -92,12 +92,12 @@ int print_splits(char *buffer, size_t buffer_size, size_t *splits){
         if(split(&rs)){
             splits[split_count] = i;
             ++split_count;
-            printf(" %ld(+%ld)", i, i - last_split);
+            printf(" %zu(+%zu)", i, i - last_split);
             last_split = i;
         }
     }
     printf("\n");
-    log_info("Splitted on average every %d bytes", buffer_size / split_count);
+    log_info("Splitted on average every %zu bytes", buffer_size / split_count);
     return split_count;
 }
 
