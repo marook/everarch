@@ -3,6 +3,12 @@ set -e
 set -o pipefail
 . ../config
 
+if [[ "${HAS_FUSE}" != 'true' ]]
+then
+    echo "Skipping attr-index-watching-end integration test because fuse is not available."
+    exit 0
+fi
+
 allocate_ports
 write_evr_conf
 trap stop_everarch_servers EXIT

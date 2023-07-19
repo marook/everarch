@@ -108,6 +108,7 @@ AM_CONDITIONAL([HAS_GTK], [test x$has_gtk = xtrue])
 AC_DEFINE(FUSE_USE_VERSION, [34], [Fuse target API version.])
 PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0], has_fuse=true, has_fuse=false)
 AM_CONDITIONAL([HAS_FUSE], [test x$has_fuse = xtrue])
+AC_SUBST(HAS_FUSE_SUBST, $has_fuse)
 
 AM_PATH_LISPDIR()
 AM_CONDITIONAL([HAS_EMACS], [test x$EMACS != xno])
@@ -127,6 +128,7 @@ AC_CONFIG_FILES([
     emacs/Makefile
     etc/Makefile
     etc/poke-pickles/Makefile
+    testing/suite/config
 ])
 
 AC_OUTPUT
