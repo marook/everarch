@@ -52,7 +52,6 @@ evr_c_unit_tests = \
 	evr-attr-index-client-test \
 	evr-tls-test \
 	files-test \
-	fs-inode-test \
 	glacier-cmd-test \
 	glacier-test \
 	keys-test \
@@ -63,6 +62,10 @@ evr_c_unit_tests = \
 	seed-desc-test \
 	signatures-test \
 	subprocess-test
+
+if HAS_FUSE
+evr_c_unit_tests += fs-inode-test
+endif
 
 check_PROGRAMS = \
 	$(evr_c_unit_tests) \
