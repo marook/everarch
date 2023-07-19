@@ -157,6 +157,6 @@ int evr_bucket_ls_visit_bucket(void *ctx, size_t last_bucket_pos){
 int evr_bucket_ls_visit_blob(void *ctx, struct evr_glacier_bucket_blob_stat *stat){
     evr_blob_ref_str ref_str;
     evr_fmt_blob_ref(ref_str, stat->ref);
-    printf("%s,%d," evr_time_fmt ",%lu,%lu,%d\n", ref_str, stat->flags, stat->last_modified, stat->offset, stat->size, (int)stat->checksum);
+    printf("%s,%d," evr_time_fmt ",%zu,%zu,%d\n", ref_str, stat->flags, stat->last_modified, stat->offset, stat->size, (int)stat->checksum);
     return evr_ok;
 }

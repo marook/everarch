@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 
 /**
  * evr_page_size contains sysconf(_SC_PAGESIZE) or 4096 if no page
@@ -211,7 +212,7 @@ int evr_pull_8bit_checksum(struct evr_buf_pos *bp);
  */
 typedef uint64_t evr_time;
 
-#define evr_time_fmt "%lu"
+#define evr_time_fmt "%" PRIu64
 
 void evr_now(evr_time *t);
 
