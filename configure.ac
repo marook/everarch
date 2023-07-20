@@ -120,6 +120,9 @@ AM_CONDITIONAL([HAS_POKE], [test x$has_poke = xtrue])
 AC_CHECK_PROG(has_valgrind, [valgrind], true, false)
 AC_SUBST(HAS_VALGRIND, $has_valgrind)
 
+AC_CHECK_PROG(has_podman, [podman], true, false)
+AM_CONDITIONAL([HAS_PODMAN], [test x$has_podman = xtrue])
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
     Makefile
@@ -128,6 +131,10 @@ AC_CONFIG_FILES([
     python/Makefile
     emacs/Makefile
     etc/Makefile
+    etc/podman/Makefile
+    etc/podman/evr-alpine/Makefile
+    etc/podman/evr-glacier-storage/Makefile
+    etc/podman/evr-websocket-server/Makefile
     etc/poke-pickles/Makefile
     testing/suite/config
 ])
