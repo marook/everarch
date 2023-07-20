@@ -1,8 +1,10 @@
-AC_INIT([everarch], [0.1.0], [markus.peroebner@gmail.com])
+AC_INIT([everarch],[0.1.0],[markus.peroebner@gmail.com])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/evr-glacier-storage.c])
 AC_CONFIG_MACRO_DIR([m4])
 
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
 AC_PROG_CC
 
 AC_DEFINE(_DEFAULT_SOURCE, [1], [This macro can be defined to ensure that the "default" definitions are provided.])
@@ -58,8 +60,7 @@ fi
 
 AC_DEFINE_UNQUOTED([EVR_PREFIX], ["${prefix}"], [Path prefix where everarch will be installed])
 
-AC_STDC_HEADERS
-AC_HAVE_HEADERS([string.h])
+AC_CHECK_HEADERS([string.h])
 
 AC_FUNC_ALLOCA
 
