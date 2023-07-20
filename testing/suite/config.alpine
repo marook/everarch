@@ -1,0 +1,2 @@
+socat_opts=-6
+nc_opts=-6

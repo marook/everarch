@@ -1,0 +1,50 @@
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2023  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+FROM docker.io/library/alpine:3.18 AS builder
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison bash netcat-openbsd socat util-linux
+COPY . /root/everarch
+WORKDIR /root/everarch
+RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && cp testing/suite/config.alpine testing/suite/config.local && autoreconf --install && ./configure && make clean && make -j 4 && ( ./test.sh || ( cat src/test-suite.log test.log && exit 1 ) )
+
+# The following commented RUN instructions are a collection of 'last
+# resort, show me the error' quick hacks.
+#
+# RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && autoreconf --install && ./configure --enable-log-debug && make clean && cd src && make -j 4 glacier-test && ./glacier-test
+# RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && cp testing/suite/config.alpine testing/suite/config.local && autoreconf --install && ./configure --enable-log-debug && make clean && make -j 4 && ( cd testing/suite/attr-index && ./run-suite || ( cat evr-attr-index.log && exit 1 ) )
+
+FROM docker.io/library/node:18.16-alpine AS image
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+
+EXPOSE 2361
+EXPOSE 2362
+EXPOSE 8030
+
+# the volume /data stores the state of the evr-glacier-storage instance.
+# this volume should not be shared with other containers.
+VOLUME /data
+
+RUN apk update && apk add sqlite-libs libgcrypt openssl libxml2 libxslt gpgme libgcrypt
+
+COPY README AUTHORS COPYING /opt/evr/
+COPY --from=builder /root/everarch/src/evr /root/everarch/src/evr-glacier-storage /root/everarch/src/evr-glacier-tool /root/everarch/src/evr-attr-index /root/everarch/src/evr-fs /opt/evr/bin/
+
+ENV PATH="/opt/evr/bin:${PATH}"
+
+CMD ["/bin/sh"]

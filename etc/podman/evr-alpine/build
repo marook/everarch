@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+. ../evr-podman.conf
+
+# the qemu build form arm 32-bits has issues right now:
+# qemu: uncaught target signal 4 (Illegal instruction) - core dumped
+# that's why it's not part of the evr-alpine build
+platforms='amd64 arm64'
+
+evr_podman_build evr-alpine
