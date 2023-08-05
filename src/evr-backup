@@ -1,0 +1,78 @@
+#!/bin/bash
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2022  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+set -e
+
+# TODO scan for available port or randomize it
+backup_glacier_port=39566
+
+if [ "$#" != '2' ]
+then
+    cat >&2 <<EOF
+Usage $0 HOST:PORT BACKUP_DIR
+evr-backup is a utility application for synchronizing the content of an
+evr-glacier-storage instance into a backup directory.
+EOF
+    exit 1
+fi
+
+source_glacier="$1"
+backup_dir="$2"
+
+tmpd=`mktemp -d`
+
+cleanup(){
+    if [ -e "${tmpd}/glacier.pid" ]
+    then
+        pid=`cat "${tmpd}/glacier.pid"`
+        kill -v -s sigint "${pid}"
+        while kill -0 "${pid}" 2>/dev/null
+        do
+            sleep 0.5
+        done
+        rm "${tmpd}/glacier.pid"
+    fi
+    if [ -n "${tmpd}" ]
+    then
+        rm -rf "${tmpd}"
+    fi
+}
+trap cleanup EXIT
+
+cat > "${tmpd}/cert.conf" <<EOF
+[req]
+default_bit = 4096
+distinguished_name = req_distinguished_name
+prompt = no
+
+[req_distinguished_name]
+commonName = localhost
+countryName = XX
+stateOrProvinceName = XX
+localityName = Somewhere
+organizationName = ACME
+EOF
+
+tls_key="${tmpd}/glacier-key.pem"
+tls_cert="${tmpd}/glacier-cert.pem"
+openssl genrsa -out "${tls_key}" 4096
+openssl req -new -key "${tls_key}" -out "${tmpd}/cert.csr" -config "${tmpd}/cert.conf"
+openssl x509 -req -days 30 -in "${tmpd}/cert.csr" -signkey "${tls_key}" -out "${tls_cert}"
+
+auth_token=`openssl rand -hex 32`
+evr-glacier-storage "--pid=${tmpd}/glacier.pid" -d "${backup_dir}" "--auth-token=${auth_token}" "--cert=${tls_cert}" "--key=${tls_key}" '--host=localhost' -p "${backup_glacier_port}"
+
+evr sync "${source_glacier}" "localhost:${backup_glacier_port}" "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"

@@ -24,6 +24,8 @@ bin_PROGRAMS = \
 	evr-glacier-storage \
 	evr-glacier-tool
 
+dist_bin_SCRIPTS = evr-backup
+
 if HAS_LEX
 bin_PROGRAMS += evr-attr-index
 
