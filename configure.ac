@@ -103,9 +103,6 @@ AM_CONDITIONAL([HAS_LEX], [test x$has_lex = xtrue])
 AM_PATH_PYTHON([3.0], has_python=true, has_python=false)
 AM_CONDITIONAL([HAS_PYTHON], [test x$has_python = xtrue])
 
-PKG_CHECK_MODULES([GTK], [gtk+-3.0], has_gtk=true, has_gtk=false)
-AM_CONDITIONAL([HAS_GTK], [test x$has_gtk = xtrue])
-
 AC_DEFINE(FUSE_USE_VERSION, [34], [Fuse target API version.])
 PKG_CHECK_MODULES([FUSE], [fuse3 >= 3.0], has_fuse=true, has_fuse=false)
 AM_CONDITIONAL([HAS_FUSE], [test x$has_fuse = xtrue])

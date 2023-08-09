@@ -16,9 +16,6 @@ AM_YFLAGS = -d
 
 info_TEXINFOS = evr.texi
 
-resdir = $(prefix)/share/everarch
-dist_res_DATA = attr-ui-spec-interface.xslt
-
 bin_PROGRAMS = \
 	evr \
 	evr-glacier-storage \
@@ -37,10 +34,6 @@ BUILT_SOURCES += \
 	attr-query-parser.h \
 	attr_index_db_test-attr-query-lexer.c \
 	evr_attr_index-attr-query-lexer.c
-endif
-
-if HAS_GTK
-bin_PROGRAMS += evr-attr-ui
 endif
 
 if HAS_FUSE
@@ -185,23 +178,6 @@ evr_attr_index_SOURCES = \
 	subprocess.c
 evr_attr_index_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
-
-evr_attr_ui_SOURCES = \
-	auth.c \
-	basics.c \
-	claims.c \
-	configp.c \
-	dyn-mem.c \
-	evr-attr-ui.c \
-	evr-glacier-client.c \
-	evr-tls.c \
-	files.c \
-	glacier-cmd.c \
-	keys.c \
-	logger.c \
-	metadata.c \
-	signatures.c
-evr_attr_ui_LDADD = $(GTK_LIBS) $(XML_LIBS) $(SSL_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS)
 
 evr_SOURCES = \
 	auth.c \
