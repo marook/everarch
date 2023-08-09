@@ -16,21 +16,100 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 set -e
 
-# TODO scan for available port or randomize it
-backup_glacier_port=39566
+# parse args
+TEMP=$(getopt -o 'h' --long 'help,backup-glacier-port:,two-way,skip-gpg-keys' -n 'evr-backup' -- "$@")
+if [ $? -ne 0 ]; then
+	echo 'Terminating...' >&2
+	exit 1
+fi
+eval set -- "$TEMP"
+unset TEMP
 
-if [ "$#" != '2' ]
-then
-    cat >&2 <<EOF
-Usage $0 HOST:PORT BACKUP_DIR
+default_backup_glacier_port=39566
+backup_glacier_port=${default_backup_glacier_port}
+two_way=0
+backup_gpg_keys=1
+
+while true
+do
+	case "$1" in
+            '-h'|'--help')
+                cat >&2 <<EOF
+Usage: evr-backup [--backup-glacier-port=PORT] [--two-way] HOST:PORT BACKUP_DIR
 evr-backup is a utility application for synchronizing the content of an
 evr-glacier-storage instance into a backup directory.
+
+After a backup the backup directory will contain an
+evr-glacier-storage bucket directory and the backed up public GPG keys
+in the gpg-keys-pub.asc file.
+
+A backup can be restored by running the backup script with the
+--two-way option. The GPG keys from the backup directory must be
+manually imported using the gpg command.
+
+OPTIONS
+  --backup-glacier-port PORT
+    The port that will be used to run the temporary evr-glacier-storage
+    which writes to the backup directory. The default backup-glacier-port
+    is ${default_backup_glacier_port}.
+
+  --two-way
+    Performes a two-way synchronization from the evr-glacier-storage
+    server and backup directory. The default is to just copy blobs from
+    the evr-glacier-storage server to the backup directory. With the
+    two-way option present the blobs missing in the evr-glacier-storage
+    server but present in the backup directory will also be copied to
+    the evr-glacier-storage server.
+
+  --skip-gpg-keys
+    Skips backing up the public GPG keys into the backup directory.
+
+  -h, --help
+    Shows this help message.
+
+Report bugs to markus.peroebner@gmail.com.
 EOF
+                exit 0
+                ;;
+            '--backup-glacier-port')
+                backup_glacier_port=$2
+                shift 2
+                continue
+                ;;
+            '--two-way')
+                two_way=1
+                shift
+                continue
+                ;;
+            'skip-gpg-keys')
+                backup_gpg_keys=0
+                shift
+                continue
+                ;;
+            '--')
+		shift
+		break
+                ;;
+	    *)
+		echo 'Internal error!' >&2
+		exit 1
+		;;
+        esac
+done
+
+source_glacier=${@:$OPTIND:1}
+backup_dir=${@:$OPTIND+1:1}
+
+if [[ -z "${source_glacier}" ]]
+then
+    echo "Missing source glacier argument" >&2
     exit 1
 fi
-
-source_glacier="$1"
-backup_dir="$2"
+if [[ -z "${backup_dir}" ]]
+then
+    echo "Missing backup destination directory argument" >&2
+    exit 1
+fi
 
 tmpd=`mktemp -d`
 
@@ -72,7 +151,19 @@ openssl genrsa -out "${tls_key}" 4096
 openssl req -new -key "${tls_key}" -out "${tmpd}/cert.csr" -config "${tmpd}/cert.conf"
 openssl x509 -req -days 30 -in "${tmpd}/cert.csr" -signkey "${tls_key}" -out "${tls_cert}"
 
+if [[ "${backup_gpg_keys}" = '1' ]]
+then
+    gpg --export --armor > "${backup_dir}/gpg-keys-pub.asc"
+    sha224sum < "${backup_dir}/gpg-keys-pub.asc" > "${backup_dir}/gpg-keys-pub.asc.sha224"
+fi
+
 auth_token=`openssl rand -hex 32`
 evr-glacier-storage "--pid=${tmpd}/glacier.pid" -d "${backup_dir}" "--auth-token=${auth_token}" "--cert=${tls_cert}" "--key=${tls_key}" '--host=localhost' -p "${backup_glacier_port}"
 
-evr sync "${source_glacier}" "localhost:${backup_glacier_port}" "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"
+evr_sync_opts=
+if [[ "${two_way}" = '1' ]]
+then
+    evr_sync_opts+=--two-way
+fi
+
+evr sync ${evr_sync_opts} "${source_glacier}" "localhost:${backup_glacier_port}" "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"

@@ -123,6 +123,21 @@ AC_SUBST(HAS_VALGRIND, $has_valgrind)
 AC_CHECK_PROG(has_podman, [podman], true, false)
 AM_CONDITIONAL([HAS_PODMAN], [test x$has_podman = xtrue])
 
+AC_CHECK_PROG(has_getopt, [getopt], true, false)
+AC_CHECK_PROG(has_openssl, [openssl], true, false)
+AC_CHECK_PROG(has_openssl, [openssl], true, false)
+AC_CHECK_PROG(has_sha224sum, [sha224sum], true, false)
+
+if test x$has_getopt = xtrue -a x$has_openssl = xtrue -a x$has_sha224sum = xtrue
+then
+  build_evr_backup=true
+else
+  build_evr_backup=false
+fi
+
+AM_CONDITIONAL([BUILD_EVR_BACKUP], $build_evr_backup)
+AC_SUBST(BUILD_EVR_BACKUP_SUBST, $build_evr_backup)
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
     Makefile
@@ -140,3 +155,7 @@ AC_CONFIG_FILES([
 ])
 
 AC_OUTPUT
+
+AC_MSG_NOTICE([With the results from the checks above configure decided the following.
+	build evr-backup: $build_evr_backup
+])

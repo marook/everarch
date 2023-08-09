@@ -1,4 +1,3 @@
-* add evr-backup integration test
 * drop evr-attr-ui and all it's backlog tasks
 i now think that evr-attr-ui leads to nowhere.
 * evr-attr-index should resume building new index

@@ -4,6 +4,7 @@ ulimit -c unlimited
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 HAS_FUSE=@HAS_FUSE_SUBST@
+BUILD_EVR_BACKUP=@BUILD_EVR_BACKUP_SUBST@
 
 PATH="${script_dir}/../../src:${PATH}"
 export PYTHONPATH="${script_dir}/../../python:${PYTHONPATH}"

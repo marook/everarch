@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+set -o pipefail
+. ../config
+
+if [[ "${BUILD_EVR_BACKUP}" != 'true' ]]
+then
+    echo "Skipping evr-backup integration test because evr-backup is not built."
+    exit 0
+fi
+
+allocate_ports
+write_evr_conf
+trap stop_everarch_servers EXIT
+
+start_glacier_storage
+wait_for_glacier_storage
+
+ref_a=`echo a | evr put`
+
+echo "ref_a is ${ref_a}"
+
+mkdir -p "${secondary_glacier_storage_bucket_dir}"
+evr-backup "localhost:${glacier_storage_port}" "${secondary_glacier_storage_bucket_dir}"
+
+echo "Starting secondary evr-glacier-storage…"
+evr-glacier-storage --pid evr-glacier-storage-secondary.pid --log evr-glacier-storage-secondary.log --port "${secondary_glacier_storage_port}" --auth-token "${secondary_glacier_storage_auth_token}" --bucket-dir "${secondary_glacier_storage_bucket_dir}"
+wait_for_secondary_glacier_storage
+
+# after sync ref_a should be in secondary storage
+evr get ${ref_a} --storage-port "${secondary_glacier_storage_port}" > /dev/null
