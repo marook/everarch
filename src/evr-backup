@@ -28,6 +28,7 @@ unset TEMP
 default_backup_glacier_port=39566
 backup_glacier_port=${default_backup_glacier_port}
 two_way=0
+reverse=0
 backup_gpg_keys=1
 
 while true
@@ -61,6 +62,10 @@ OPTIONS
     server but present in the backup directory will also be copied to
     the evr-glacier-storage server.
 
+  --reverse
+    Performes a synchronization from the backup dir into the
+    evr-glacier-storage server.
+
   --skip-gpg-keys
     Skips backing up the public GPG keys into the backup directory.
 
@@ -78,6 +83,11 @@ EOF
                 ;;
             '--two-way')
                 two_way=1
+                shift
+                continue
+                ;;
+            '--reverse')
+                reverse=1
                 shift
                 continue
                 ;;
@@ -166,4 +176,13 @@ then
     evr_sync_opts+=--two-way
 fi
 
-evr sync ${evr_sync_opts} "${source_glacier}" "localhost:${backup_glacier_port}" "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"
+if [[ "${reverse}" = '1' ]]
+then
+    sync_src="localhost:${backup_glacier_port}"
+    sync_dst="${source_glacier}"
+else
+    sync_src="${source_glacier}"
+    sync_dst="localhost:${backup_glacier_port}"
+fi
+
+evr sync ${evr_sync_opts} "${sync_src}" "${sync_dst}" "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"
