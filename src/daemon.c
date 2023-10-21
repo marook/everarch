@@ -98,7 +98,7 @@ int evr_write_pid_file(char *path){
     if(size < 0 || size >= (int)sizeof(buf)){
         goto out;
     }
-    int f = open(path, O_WRONLY | O_CREAT, 0744);
+    int f = open(path, O_WRONLY | O_CREAT, 0644);
     if(f < 0){
         log_error("Unable to open pid file %s", path);
         goto out;
