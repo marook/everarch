@@ -1,3 +1,12 @@
+* evr-backup should write to dest just with final fsync
+currently evr-backup uses evr sync to copy blobs from a source glacier
+into a destination glacier. after every blob several fsyncs are
+performed in order to obtain data integrity on crash after every
+single blob.
+
+during backup it would also be feasible to have one fsync when closing
+a bucket and one final fsync when all blobs are synchronized. this
+should drastically improve backup performance.
 * evr-attr-index should resume building new index
 instead of just switching to the new index and continue building
 it. serving the old index until the new one is completely indexed will
