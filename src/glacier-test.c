@@ -101,6 +101,7 @@ void test_evr_glacier_write_smal_blobs(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
+        wb->sync_strategy = evr_sync_strategy_per_blob;
         assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &first_last_modified)));
         assert(write_ctx->current_bucket_index == 1);
         assert_msg(write_ctx->current_bucket_pos == evr_bucket_header_size + 53, "current_bucket_pos was %zu", write_ctx->current_bucket_pos);
@@ -132,6 +133,7 @@ void test_evr_glacier_write_smal_blobs(){
         size_t data_len = strlen(data);
         memcpy(wb->chunks[0], data, data_len);
         wb->size = data_len;
+        wb->sync_strategy = evr_sync_strategy_avoid;
         assert(is_ok(evr_glacier_append_blob(write_ctx, wb, &second_last_modified)));
         assert(write_ctx->current_bucket_index == 1);
         assert_msg(write_ctx->current_bucket_pos == evr_bucket_header_size + 98, "current_bucket_pos was %zu", write_ctx->current_bucket_pos);
@@ -261,6 +263,7 @@ void test_evr_glacier_write_big_blob(){
         assert(wb->chunks[1]);
         memset(wb->chunks[1], 0x44, chunk_1_len);
         wb->size = evr_chunk_size + chunk_1_len;
+        wb->sync_strategy = evr_sync_strategy_per_blob;
         evr_time last_modified;
         assert(is_ok(evr_glacier_append_blob(ctx, wb, &last_modified)));
         free(wb->chunks[0]);
@@ -625,6 +628,7 @@ void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *b
     wb.flags = 0;
     wb.chunks = chunks;
     wb.size = strlen(chunks[0]);
+    wb.sync_strategy = evr_sync_strategy_per_blob;
     assert(is_ok(evr_calc_blob_ref(ref, wb.size, chunks)));
     memcpy(wb.key, ref, evr_blob_ref_size);
     evr_time lm = last_modified;

@@ -61,6 +61,7 @@ struct evr_writing_blob {
     evr_blob_ref key;
     int flags;
     size_t size;
+    int sync_strategy;
     char **chunks;
 };
 
@@ -161,6 +162,12 @@ struct evr_glacier_write_ctx {
     unsigned long current_bucket_index;
     int current_bucket_f;
     size_t current_bucket_pos;
+    /**
+     * current_bucket_sync indicates if the current bucket file is
+     * fdatasynced. 0 means these is data in the file which has not
+     * been fdatasynced yet. 1 means the bucket is sync.
+     */
+    int current_bucket_sync;
     int lock_fd;
     sqlite3 *db;
     sqlite3_stmt *insert_blob_stmt;
@@ -180,6 +187,10 @@ struct evr_glacier_write_ctx {
 int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **ctx, struct evr_glacier_storage_cfg *config);
 
 int evr_free_glacier_write_ctx(struct evr_glacier_write_ctx *ctx);
+
+#define evr_sync_strategy_default 0x00
+#define evr_sync_strategy_per_blob 0x01
+#define evr_sync_strategy_avoid 0x02
 
 /**
  * evr_glacier_append_blob appends the given blob at the current

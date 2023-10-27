@@ -185,4 +185,4 @@ else
     sync_dst="localhost:${backup_glacier_port}"
 fi
 
-evr sync ${evr_sync_opts} "${sync_src}" "${sync_dst}" "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"
+evr sync ${evr_sync_opts} "${sync_src}" "${sync_dst}" '--dest-sync=avoid' "--auth-token=localhost:${backup_glacier_port}:${auth_token}" "--ssl-cert=localhost:${backup_glacier_port}:${tls_cert}"

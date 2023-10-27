@@ -135,6 +135,7 @@ sig_atomic_t running = 1;
 
 struct evr_connection{
     struct evr_file socket;
+    int sync_strategy;
 };
 
 /**
@@ -153,9 +154,11 @@ int evr_load_glacier_storage_cfg(int argc, char **argv);
 void handle_sigterm(int signum);
 int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg);
 int evr_connection_worker(void *context);
+int evr_work_unknown_cmd(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_work_stat_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
 int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd, struct evr_glacier_read_ctx **rctx);
+int evr_work_configure_connection(struct evr_connection *ctx, struct evr_cmd_header *cmd);
 int evr_handle_blob_list(void *ctx, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob);
 int evr_flush_list_blobs_ctx(struct evr_list_blobs_ctx *ctx);
 int evr_ensure_worker_rctx_exists(struct evr_glacier_read_ctx **rctx, struct evr_connection *ctx);
@@ -316,6 +319,7 @@ int evr_glacier_tcp_server(const struct evr_glacier_storage_cfg *cfg){
                     if(!ctx){
                         continue;
                     }
+                    ctx->sync_strategy = evr_sync_strategy_default;
                     if(evr_tls_accept(&ctx->socket, s, ssl_ctx) != evr_ok){
                         goto out_with_free_ctx;
                     }
@@ -383,11 +387,10 @@ int evr_connection_worker(void *context){
         log_debug("Worker %d retrieved cmd 0x%02x with body size %d", ctx.socket.get_fd(&ctx.socket), cmd.type, cmd.body_size);
         switch(cmd.type){
         default:
-            // unknown command
-            log_error("Worker %d retieved unknown cmd 0x%02x", ctx.socket.get_fd(&ctx.socket), cmd.type);
-            // TODO respond evr_status_code_unknown_cmd
-            result = evr_ok;
-            goto out_with_free_rctx;
+            if(evr_work_unknown_cmd(&ctx, &cmd) != evr_ok){
+                goto out_with_free_rctx;
+            }
+            break;
         case evr_cmd_type_get_blob: {
             size_t body_size = evr_blob_ref_size;
             if(cmd.body_size != body_size){
@@ -442,6 +445,11 @@ int evr_connection_worker(void *context){
                 goto out_with_free_rctx;
             }
             break;
+        case evr_cmd_type_configure_connection:
+            if(evr_work_configure_connection(&ctx, &cmd) != evr_ok){
+                goto out_with_free_rctx;
+            }
+            break;
         }
     }
     result = evr_ok;
@@ -480,6 +488,24 @@ int evr_authenticate_client(struct evr_file *c){
         return evr_user_data_invalid;
     }
     log_debug("Client successfully authenticated");
+    return evr_ok;
+}
+
+int evr_work_unknown_cmd(struct evr_connection *ctx, struct evr_cmd_header *cmd){
+    struct evr_resp_header resp;
+    char buf[evr_resp_header_n_size];
+    log_error("Worker %d retieved unknown cmd 0x%02x", ctx->socket.get_fd(&ctx->socket), cmd->type);
+    if(dump_n(&ctx->socket, cmd->body_size, NULL, NULL) != evr_ok){
+        return evr_error;
+    }
+    resp.status_code = evr_unknown_request;
+    resp.body_size = 0;
+    if(evr_format_resp_header(buf, &resp) != evr_ok){
+        return evr_error;
+    }
+    if(write_n(&ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
+        return evr_error;
+    }
     return evr_ok;
 }
 
@@ -525,6 +551,7 @@ int evr_work_put_blob(struct evr_connection *ctx, struct evr_cmd_header *cmd){
     wblob.flags = flags;
     wblob.size = blob_size;
     wblob.chunks = blob->chunks;
+    wblob.sync_strategy = ctx->sync_strategy == evr_sync_strategy_default ? evr_sync_strategy_per_blob : ctx->sync_strategy;
     if(evr_persister_init_task(&task, &wblob) != evr_ok){
         goto out_free_blob;
     }
@@ -718,6 +745,41 @@ int evr_work_watch_blobs(struct evr_connection *ctx, struct evr_cmd_header *cmd,
  out:
     log_debug("Worker %d watch ends with status %d", ctx->socket.get_fd(&ctx->socket), ret);
     return ret;
+}
+
+int evr_work_configure_connection(struct evr_connection *ctx, struct evr_cmd_header *cmd){
+    char buf[max(512, evr_resp_header_n_size)];
+    struct evr_buf_pos bp;
+    int sync_strategy;
+    struct evr_resp_header resp;
+    if(cmd->body_size < 1 || cmd->body_size > sizeof(buf)){
+        log_error("Worker %d received illegal configure connection body size %zu", ctx->socket.get_fd(&ctx->socket), cmd->body_size);
+        return evr_error;
+    }
+    if(read_n(&ctx->socket, buf, cmd->body_size, NULL, NULL) != evr_ok){
+        return evr_error;
+    }
+    evr_init_buf_pos(&bp, buf);
+    evr_pull_as(&bp, &sync_strategy, uint8_t);
+    if(sync_strategy != evr_sync_strategy_default && sync_strategy != evr_sync_strategy_per_blob && sync_strategy != evr_sync_strategy_avoid){
+        log_error("Worker %d received unknown sync strategy 0x%02x", ctx->socket.get_fd(&ctx->socket), sync_strategy);
+        sync_strategy = evr_sync_strategy_default;
+    }
+#ifdef EVR_LOG_DEBUG
+    if(ctx->sync_strategy != sync_strategy){
+        log_debug("Worker %d switches from sync strategy 0x%02x to 0x%02x", ctx->socket.get_fd(&ctx->socket), ctx->sync_strategy, sync_strategy);
+    }
+#endif
+    ctx->sync_strategy = sync_strategy;
+    resp.status_code = evr_status_code_ok;
+    resp.body_size = 0;
+    if(evr_format_resp_header(buf, &resp) != evr_ok){
+        return evr_error;
+    }
+    if(write_n(&ctx->socket, buf, evr_resp_header_n_size) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
 }
 
 int evr_handle_blob_list(void *ctx0, const evr_blob_ref key, int flags, evr_time last_modified, int last_blob){

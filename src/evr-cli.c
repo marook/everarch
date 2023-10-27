@@ -86,6 +86,7 @@ static char args_doc[] = "CMD";
 #define arg_index_port 265
 #define arg_metadata_file 266
 #define arg_annotate 267
+#define arg_dest_sync 268
 
 #define max_traces_len 64
 
@@ -111,6 +112,7 @@ static struct argp_option options[] = {
     {"limit", 'l', "LIMIT", 0, "Sets an upper limit for the maximum number results for evr-attr-index search queries. A value of 0 will not limit the number of results. Default is " to_string(default_limit) "."},
     {"meta", arg_metadata_file, "FILE", 0, "Appends metadata obtained via processing the get command into the given file. Some data might be written to the file even if the evr process fails."},
     {"annotate", arg_annotate, NULL, 0, "Completes seed and claim-ref attributes at claims within the printed claim-set. Can be used when fetching claim-sets via get-verify."},
+    {"dest-sync", arg_dest_sync, "STRATEGY", 0, "Defines the fsync strategy during synchronization for the destination glacier. Possible strategies are the following:\ndefault indicates that the server's default strategy should be used.\nper-blob will fsync after every single blob.\navoid will avoid calling fsync after writing single blobs."},
     {0}
 };
 
@@ -146,6 +148,7 @@ struct cli_cfg {
     unsigned long long last_modified_after;
     int two_way;
     int annotate;
+    int dest_sync_strategy;
 
     /**
      * blobs_sort_order must be one of evr_cmd_watch_sort_order_*.
@@ -274,6 +277,18 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         break;
     case arg_annotate:
         cfg->annotate = 1;
+        break;
+    case arg_dest_sync:
+        if(strcmp(arg, "default") == 0){
+            cfg->dest_sync_strategy = evr_sync_strategy_default;
+        } else if(strcmp(arg, "per-blob") == 0){
+            cfg->dest_sync_strategy = evr_sync_strategy_per_blob;
+        } else if(strcmp(arg, "avoid") == 0){
+            cfg->dest_sync_strategy = evr_sync_strategy_avoid;
+        } else {
+            usage(state);
+            return ARGP_ERR_UNKNOWN;
+        }
         break;
     case arg_accepted_gpg_key: {
         const size_t arg_size = strlen(arg) + 1;
@@ -473,6 +488,7 @@ int main(int argc, char **argv){
     cfg.last_modified_after = LLONG_MAX;
     cfg.two_way = 0;
     cfg.annotate = 0;
+    cfg.dest_sync_strategy = evr_sync_strategy_default;
     cfg.blobs_sort_order = evr_cmd_watch_sort_order_last_modified;
     cfg.src_storage_host = NULL;
     cfg.src_storage_port = NULL;
@@ -751,6 +767,7 @@ int evr_cli_get_claim(struct cli_cfg *cfg){
 
 int evr_cli_put(struct cli_cfg *cfg){
     int ret = evr_error;
+    struct evr_glacier_connection_config c_cfg;
     struct chunk_set *blob = evr_allocate_chunk_set(0);
     if(!blob){
         goto out;
@@ -770,6 +787,11 @@ int evr_cli_put(struct cli_cfg *cfg){
     struct evr_file c;
     if(evr_connect_to_storage(&c, cfg, cfg->storage_host, cfg->storage_port) != evr_ok){
         goto out_with_free_blob;
+    }
+    c_cfg.sync_strategy = cfg->dest_sync_strategy;
+    if(evr_configure_connection(&c, &c_cfg) != evr_ok){
+        log_error("Unable to configure glacier connection to %s:%s", cfg->storage_host, cfg->storage_port);
+        goto out_with_close_c;
     }
     int put_res = evr_stat_and_put(&c, key, cfg->flags, blob);
     if(put_res != evr_ok && put_res != evr_exists){
@@ -1462,9 +1484,15 @@ int blob_sync_worker(void *context){
                 }
             }
             if(c_dst.get_fd(&c_dst) == -1){
+                struct evr_glacier_connection_config c_cfg;
                 // TODO reuse SSL_CTX and auth-token from outside worker
                 if(evr_connect_to_storage(&c_dst, ctx->cfg, ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port) != evr_ok){
                     goto continue_with_retry;
+                }
+                c_cfg.sync_strategy = ctx->cfg->dest_sync_strategy;
+                if(evr_configure_connection(&c_dst, &c_cfg) != evr_ok){
+                    log_error("Unable to configure glacier connection to %s:%s", ctx->cfg->dst_storage_host, ctx->cfg->dst_storage_port);
+                    goto out_with_close_c;
                 }
             }
             struct evr_file *cg;

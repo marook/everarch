@@ -76,6 +76,8 @@ struct evr_persister_task {
      * after done is unlocked.
      */
     evr_time last_modified;
+
+    int sync_strategy;
 };
 
 /**

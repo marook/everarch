@@ -44,6 +44,12 @@
 
 int evr_write_auth_token(struct evr_file *f, evr_auth_token t);
 
+struct evr_glacier_connection_config {
+    int sync_strategy;
+};
+
+int evr_configure_connection(struct evr_file *f, struct evr_glacier_connection_config *conf);
+
 int evr_fetch_xml(xmlDocPtr *doc, struct evr_file *f, evr_blob_ref key);
 
 int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_file *f, evr_blob_ref key, struct evr_file *meta);

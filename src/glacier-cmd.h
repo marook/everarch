@@ -92,6 +92,8 @@
  */
 #define evr_cmd_type_watch_blobs 0x04
 
+#define evr_cmd_type_configure_connection 0x05
+
 struct evr_cmd_header {
     int type;
     size_t body_size;

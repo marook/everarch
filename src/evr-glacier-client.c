@@ -41,6 +41,43 @@ int evr_write_auth_token(struct evr_file *f, evr_auth_token t){
     return evr_ok;
 }
 
+int evr_write_cmd_configure_connection(struct evr_file *f, struct evr_glacier_connection_config *conf);
+
+int evr_configure_connection(struct evr_file *f, struct evr_glacier_connection_config *conf){
+    struct evr_resp_header resp;
+    if(evr_write_cmd_configure_connection(f, conf) != evr_ok){
+        return evr_error;
+    }
+    if(evr_read_resp_header(f, &resp) != evr_ok){
+        return evr_error;
+    }
+    if(resp.status_code == evr_unknown_request){
+        return evr_unknown_request;
+    }
+    if(resp.status_code != evr_status_code_ok){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
+int evr_write_cmd_configure_connection(struct evr_file *f, struct evr_glacier_connection_config *conf){
+    char buf[evr_cmd_header_n_size + 1];
+    struct evr_buf_pos bp;
+    struct evr_cmd_header cmd;
+    evr_init_buf_pos(&bp, buf);
+    cmd.type = evr_cmd_type_configure_connection;
+    cmd.body_size = 1;
+    if(evr_format_cmd_header(bp.pos, &cmd) != evr_ok){
+        return evr_error;
+    }
+    evr_inc_buf_pos(&bp, evr_cmd_header_n_size);
+    evr_push_as(&bp, &conf->sync_strategy, uint8_t);
+    if(write_n(f, buf, sizeof(buf)) != evr_ok){
+        return evr_error;
+    }
+    return evr_ok;
+}
+
 int evr_fetch_xml(xmlDocPtr *doc, struct evr_file *f, evr_blob_ref key){
     int ret = evr_error;
     struct evr_resp_header resp;
