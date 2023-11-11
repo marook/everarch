@@ -905,6 +905,7 @@ int evr_cli_get_file(struct cli_cfg *cfg){
         log_error("No validly signed XML found for ref %s", cfg->key);
         goto out_with_close_c;
     }
+    // TODO :cligetfile: use evr_fetch_file_claim(…) here instead of own XML parsing
     xmlNode *cs = evr_get_root_claim_set(doc);
     if(!cs){
         log_error("No claim set found in blob");

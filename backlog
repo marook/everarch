@@ -1,3 +1,22 @@
+* integration tests should be run on host system before podman
+right now the long running podman builds start, just so that some
+common integration test might fail also on the host build.
+* evr-backup should force index-db directory for glacier :bug:
+otherwise running the backup script in a environment with a custom
+index-db directory will try to create the backup index-db exactly
+where the original index-db is located.
+* glacier reindex panics without detailed error message
+a reindex of the evr glacier storage ends with the following error messages:
+
+#+BEGIN_SRC
+2023-11-08T21:15:48 gI Recreate glacier index.db
+2023-11-08T23:42:25 gE Unable to reindex glacier
+2023-11-08T23:42:25 gP Unable to recreate glacier index.db
+#+END_SRC
+
+there should be more logging about the possible reasons of the
+failure. it seems like the server started fine after the panic crash.
+* evr cli's evr_cli_get_file(…) should use evr_fetch_file_claim(…) :cligetfile:
 * evr-attr-index should resume building new index
 instead of just switching to the new index and continue building
 it. serving the old index until the new one is completely indexed will
