@@ -173,6 +173,50 @@ int evr_fetch_stylesheet(xsltStylesheetPtr *style, struct evr_file *f, evr_blob_
     return ret;
 }
 
+struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref, struct evr_verify_ctx *verify_ctx, evr_time *create_timestamp){
+    struct evr_file_claim *ret = NULL;
+    evr_blob_ref blob_ref;
+    int claim_index;
+    evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
+    xmlDoc *doc = NULL;
+    if(evr_fetch_signed_xml(&doc, verify_ctx, c, blob_ref, NULL) != evr_ok){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("No validly signed XML found for ref %s", claim_ref_str);
+        goto out;
+    }
+    xmlNode *cs = evr_get_root_claim_set(doc);
+    if(!cs){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("No claim set found in blob for claim ref %s", claim_ref_str);
+        goto out_with_free_doc;
+    }
+    if(create_timestamp && evr_parse_created(create_timestamp, cs) != evr_ok){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("Unable to parse created timestamp for file claim %s", claim_ref_str);
+        goto out_with_free_doc;
+    }
+    xmlNode *cn = evr_nth_claim(cs, claim_index);
+    if(!cn){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("There is no claim with index %d in claim-set with ref %s", claim_index, claim_ref_str);
+        goto out_with_free_doc;
+    }
+    ret = evr_parse_file_claim(cn);
+    if(!ret){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("Unable to parse file claim from claim XML with ref %s", claim_ref_str);
+    }
+ out_with_free_doc:
+    xmlFreeDoc(doc);
+ out:
+    return ret;
+}
+
 int evr_stat_and_put(struct evr_file *c, evr_blob_ref key, int flags, struct chunk_set *blob){
     int ret = evr_error;
 #ifdef EVR_LOG_DEBUG

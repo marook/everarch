@@ -132,6 +132,8 @@ int evr_init_claim_set(struct evr_claim_set *cs, const evr_time *created);
 
 int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim *claim);
 
+size_t evr_file_claim_file_size(struct evr_file_claim *fc);
+
 int evr_finalize_claim_set(struct evr_claim_set *cs);
 
 int evr_free_claim_set(struct evr_claim_set *cs);

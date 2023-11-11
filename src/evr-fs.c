@@ -20,7 +20,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <fuse_lowlevel.h>
 #include <argp.h>
 #include <string.h>
 #include <libxslt/xsltInternals.h>
@@ -40,7 +39,7 @@
 #include "seed-desc.h"
 #include "claims.h"
 #include "open-files.h"
-#include "daemon.h"
+#include "evr-fuse.h"
 
 #define program_name "evr-fs"
 
@@ -74,34 +73,9 @@ struct evr_fs_cfg {
     struct evr_cert_cfg *ssl_certs;
     size_t traces_len;
     char *traces[max_traces_len];
-    /**
-     * foreground's meaning is defined by the fuse -d option.
-     */
-    int foreground;
-    /**
-     * single_thread's meaning is defined by the fuse -s option.
-     */
-    int single_thread;
-    /**
-     * allow_other indicates if other users may access this file
-     * system.
-     */
-    int allow_other;
     char *transformation;
-    char *mount_point;
-
-    /**
-     * accepted_gpg_fprs contains the accepted gpg fingerprints for
-     * signed claims.
-     *
-     * The llbuf data points to a fingerprint string.
-     *
-     * This field is only filled during the initialization of the
-     * application. During runtime verify_ctx should be used.
-     */
-    struct evr_llbuf *accepted_gpg_fprs;
-
-    struct evr_verify_ctx *verify_ctx;
+    struct evr_fuse_cfg fuse;
+    struct evr_verify_cfg verify;
 
     /**
      * uid of the owner of the virtual files and directories.
@@ -114,7 +88,6 @@ struct evr_fs_cfg {
     gid_t gid;
 
     char *log_path;
-    char *pid_path;
 };
 
 struct evr_fs_cfg cfg;
@@ -156,13 +129,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         cfg->traces_len += 1;
         break;
     case 'f':
-        cfg->foreground = 1;
+        cfg->fuse.foreground = 1;
         break;
     case 's':
-        cfg->single_thread = 1;
+        cfg->fuse.single_thread = 1;
         break;
     case arg_allow_other:
-        cfg->allow_other = 1;
+        cfg->fuse.allow_other = 1;
         break;
     case arg_storage_host:
         evr_replace_str(cfg->storage_host, arg);
@@ -189,20 +162,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
         }
         break;
     case arg_accepted_gpg_key: {
-        const size_t arg_size = strlen(arg) + 1;
-        struct evr_buf_pos bp;
-        if(evr_llbuf_prepend(&cfg->accepted_gpg_fprs, &bp, arg_size) != evr_ok){
+        if(evr_verify_add_gpg_fpr(&cfg->verify, arg) != evr_ok){
             usage(state);
             return ARGP_ERR_UNKNOWN;
         }
-        evr_push_n(&bp, arg, arg_size);
         break;
     }
     case arg_log_path:
         evr_replace_str(cfg->log_path, arg);
         break;
     case arg_pid_path:
-        evr_replace_str(cfg->pid_path, arg);
+        evr_replace_str(cfg->fuse.pid_path, arg);
         break;
     case ARGP_KEY_ARG:
         switch(state->arg_num){
@@ -213,7 +183,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
             evr_replace_str(cfg->transformation, arg);
             break;
         case 1:
-            evr_replace_str(cfg->mount_point, arg);
+            evr_replace_str(cfg->fuse.mount_point, arg);
             break;
         }
         break;
@@ -245,11 +215,17 @@ struct evr_index_watch_ctx {
 int evr_connect_to_storage(struct evr_file *c, struct evr_fs_cfg *cfg, char *host, char *port);
 int evr_connect_to_index(struct evr_file *c, struct evr_buf_read **r, struct evr_fs_cfg *cfg, char *host, char *port);
 xsltStylesheet *load_transformation(struct evr_fs_cfg *cfg, struct evr_file *gc);
-int evr_start_index_watch(struct evr_index_watch_ctx *ctx);
-int evr_free_index_watch(struct evr_index_watch_ctx *ctx);
+int evr_start_index_watch(void **arg);
+int evr_free_index_watch(void *arg);
 int evr_add_status_dir_inode(struct evr_inode_set *inode_set);
 int evr_populate_inode_set(struct evr_buf_read *ir, struct evr_fs_cfg *cfg);
-int run_fuse(char *program, struct evr_fs_cfg *cfg);
+
+static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
+static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
+static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
+static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
+static void evr_fs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
+static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
 
 int main(int argc, char *argv[]) {
     int ret = 1;
@@ -267,17 +243,16 @@ int main(int argc, char *argv[]) {
     cfg.auth_tokens = NULL;
     cfg.ssl_certs = NULL;
     cfg.traces_len = 0;
-    cfg.foreground = 0;
-    cfg.single_thread = 0;
-    cfg.allow_other = 0;
+    cfg.fuse.foreground = 0;
+    cfg.fuse.single_thread = 0;
+    cfg.fuse.allow_other = 0;
     cfg.transformation = NULL;
-    cfg.mount_point = NULL;
-    cfg.accepted_gpg_fprs = NULL;
-    cfg.verify_ctx = NULL;
+    cfg.fuse.mount_point = NULL;
     cfg.uid = getuid();
     cfg.gid = getgid();
     cfg.log_path = NULL;
-    cfg.pid_path = NULL;
+    cfg.fuse.pid_path = NULL;
+    evr_init_verify_cfg(&cfg.verify);
     if(evr_push_cert(&cfg.ssl_certs, evr_glacier_storage_host, to_string(evr_glacier_storage_port), default_storage_ssl_cert_path) != evr_ok){
         goto out_with_free_cfg;
     }
@@ -291,12 +266,9 @@ int main(int argc, char *argv[]) {
     if(evr_setup_log(cfg.log_path) != evr_ok){
         goto out_with_free_cfg;
     }
-    cfg.verify_ctx = evr_build_verify_ctx(cfg.accepted_gpg_fprs);
-    if(!cfg.verify_ctx){
+    if(evr_verify_cfg_parse(&cfg.verify) != evr_ok){
         goto out_with_free_cfg;
     }
-    evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
-    cfg.accepted_gpg_fprs = NULL;
     {
         struct evr_file gc;
         if(evr_connect_to_storage(&gc, &cfg, cfg.storage_host, cfg.storage_port) != evr_ok){
@@ -341,7 +313,15 @@ int main(int argc, char *argv[]) {
     if(evr_init_open_file_set(&open_files) != evr_ok){
         goto out_with_empty_inode_set;
     }
-    if(run_fuse(argv[0], &cfg) != 0){
+    cfg.fuse.ops.lookup = evr_fs_lookup;
+    cfg.fuse.ops.getattr = evr_fs_getattr;
+    cfg.fuse.ops.readdir = evr_fs_readdir;
+    cfg.fuse.ops.open = evr_fs_open;
+    cfg.fuse.ops.release = evr_fs_release;
+    cfg.fuse.ops.read = evr_fs_read;
+    cfg.fuse.setup = evr_start_index_watch;
+    cfg.fuse.teardown = evr_free_index_watch;
+    if(evr_run_fuse(argv[0], program_name, &cfg.fuse) != evr_ok){
         goto out_with_empty_open_file_set;
     }
     ret = 0;
@@ -365,9 +345,9 @@ int main(int argc, char *argv[]) {
             cfg.index_host,
             cfg.index_port,
             cfg.transformation,
-            cfg.mount_point,
+            cfg.fuse.mount_point,
             cfg.log_path,
-            cfg.pid_path,
+            cfg.fuse.pid_path,
         };
         void **tbfree_end = &tbfree[static_len(tbfree)];
         for(void **it = tbfree; it != tbfree_end; ++it){
@@ -379,10 +359,7 @@ int main(int argc, char *argv[]) {
     }
     evr_free_auth_token_chain(cfg.auth_tokens);
     evr_free_cert_chain(cfg.ssl_certs);
-    evr_free_llbuf_chain(cfg.accepted_gpg_fprs, NULL);
-    if(cfg.verify_ctx){
-        evr_free_verify_ctx(cfg.verify_ctx);
-    }
+    evr_free_verify_cfg(&cfg.verify);
     xsltCleanupGlobals();
     xmlCleanupParser();
     evr_tls_free();
@@ -692,22 +669,6 @@ xmlDoc *evr_seed_desc_to_file_set(xmlDoc *seed_desc_doc, evr_claim_ref seed){
     return file_set_doc;
 }
 
-static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
-static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
-static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
-static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
-static void evr_fs_release(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
-static void evr_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi);
-
-static const struct fuse_lowlevel_ops evr_fs_oper = {
-    .lookup = evr_fs_lookup,
-    .getattr = evr_fs_getattr,
-    .readdir = evr_fs_readdir,
-    .open = evr_fs_open,
-    .release = evr_fs_release,
-    .read = evr_fs_read,
-};
-
 void evr_lock_inode_set_or_panic();
 void evr_unlock_inode_set_or_panic();
 struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
@@ -751,7 +712,9 @@ static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
             goto out_with_unlock_inode_set;
         }
         log_debug("fuse request %p responds child inode %d", req, (int)*c);
-        fuse_reply_entry(req, &e);
+        if(fuse_reply_entry(req, &e) != 0){
+            evr_panic("fuse request %p unable to reply entry", req);
+        }
         goto out_with_unlock_inode_set;
     }
     log_debug("fuse request %p did not find matching child", req);
@@ -824,7 +787,7 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
                 goto fail;                                              \
             }                                                           \
         }                                                               \
-        buf->size_used += fuse_add_direntry(req, &buf->data[buf->size_used], buf->size_allocated, name, &st, buf->size_used + entry_size); \
+        buf->size_used += fuse_add_direntry(req, &buf->data[buf->size_used], buf->size_allocated - buf->size_used, name, &st, buf->size_used + entry_size); \
     } while(0)
 
 static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
@@ -877,8 +840,6 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
 
 #undef evr_add_direntry
 
-struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref);
-
 static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, evr_claim_ref file_ref);
 
 static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
@@ -926,7 +887,7 @@ static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_inf
         log_error("Unable to connect to glacier when opening file with inode %d", (int)ino);
         goto fail_with_close_open_file;
     }
-    of->claim = evr_fetch_file_claim(&of->gc, file_ref);
+    of->claim = evr_fetch_file_claim(&of->gc, file_ref, cfg.verify.ctx, NULL);
     if(!of->claim){
         log_error("Unable to fetch file claim for inode %d", (int)ino);
         goto fail_with_close_open_file;
@@ -954,44 +915,6 @@ void evr_unlock_inode_set_or_panic(){
     if(mtx_unlock(&inode_set_lock) != thrd_success){
         evr_panic("Unable to unlock inode set.");
     }
-}
-
-struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref){
-    struct evr_file_claim *ret = NULL;
-    evr_blob_ref blob_ref;
-    int claim_index;
-    evr_split_claim_ref(blob_ref, &claim_index, claim_ref);
-    xmlDoc *doc = NULL;
-    if(evr_fetch_signed_xml(&doc, cfg.verify_ctx, c, blob_ref, NULL) != evr_ok){
-        evr_claim_ref_str claim_ref_str;
-        evr_fmt_claim_ref(claim_ref_str, claim_ref);
-        log_error("No validly signed XML found for ref %s", claim_ref_str);
-        goto out;
-    }
-    xmlNode *cs = evr_get_root_claim_set(doc);
-    if(!cs){
-        evr_claim_ref_str claim_ref_str;
-        evr_fmt_claim_ref(claim_ref_str, claim_ref);
-        log_error("No claim set found in blob for claim ref %s", claim_ref_str);
-        goto out_with_free_doc;
-    }
-    xmlNode *cn = evr_nth_claim(cs, claim_index);
-    if(!cn){
-        evr_claim_ref_str claim_ref_str;
-        evr_fmt_claim_ref(claim_ref_str, claim_ref);
-        log_error("There is no claim with index %d in claim-set with ref %s", claim_index, claim_ref_str);
-        goto out_with_free_doc;
-    }
-    ret = evr_parse_file_claim(cn);
-    if(!ret){
-        evr_claim_ref_str claim_ref_str;
-        evr_fmt_claim_ref(claim_ref_str, claim_ref);
-        log_error("Unable to parse file claim from claim XML with ref %s", claim_ref_str);
-    }
- out_with_free_doc:
-    xmlFreeDoc(doc);
- out:
-    return ret;
 }
 
 static int evr_fs_release_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
@@ -1122,78 +1045,34 @@ struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino){
     return nd;
 }
 
-int run_fuse(char *program, struct evr_fs_cfg *cfg){
-    int ret = 1;
-    size_t fuse_argv_len = 2;
-    char *fuse_argv[] = {
-        program,
-        "-osubtype=" program_name,
-        NULL,
-    };
-    if(cfg->allow_other){
-        fuse_argv[fuse_argv_len++] = "-oallow_other";
-    }
-    struct fuse_args fuse_args = FUSE_ARGS_INIT(fuse_argv_len, fuse_argv);
-    struct fuse_session *se = fuse_session_new(&fuse_args, &evr_fs_oper, sizeof(evr_fs_oper), NULL);
-    if(se == NULL) {
-        goto out;
-    }
-    if(fuse_set_signal_handlers(se) != 0) {
-        goto out_with_destroy_session;
-    }
-    if(fuse_session_mount(se, cfg->mount_point) != 0) {
-        goto out_with_free_signal_handlers;
-    }
-    if(!cfg->foreground){
-        if(evr_daemonize(cfg->pid_path) != evr_ok){
-            goto out_with_session_unmount;
-        }
-    }
-    struct evr_index_watch_ctx watch_ctx;
-    if(evr_start_index_watch(&watch_ctx) != evr_ok){
-        goto out_with_session_unmount;
-    }
-    if(cfg->single_thread) {
-        ret = fuse_session_loop(se);
-    } else {
-        struct fuse_loop_config fcfg;
-        fcfg.clone_fd = 0;
-        fcfg.max_idle_threads = 10;
-        ret = fuse_session_loop_mt(se, &fcfg);
-    }
-    running = 0;
-    if(evr_free_index_watch(&watch_ctx) != evr_ok){
-        ret = 1;
-    }
- out_with_session_unmount:
-    fuse_session_unmount(se);
- out_with_free_signal_handlers:
-    fuse_remove_signal_handlers(se);
- out_with_destroy_session:
-    fuse_session_destroy(se);
- out:
-    return ret;
-}
-
 int evr_index_watch_worker(void *_ctx);
 
-int evr_start_index_watch(struct evr_index_watch_ctx *ctx){
-    if(evr_connect_to_index(&ctx->c, &ctx->r, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
+int evr_start_index_watch(void **arg){
+    struct evr_index_watch_ctx **ctx = (struct evr_index_watch_ctx**)arg;
+    struct evr_index_watch_ctx *c;
+    c = malloc(sizeof(struct evr_index_watch_ctx));
+    if(!c){
         goto fail;
     }
-    if(evr_attri_write_watch(&ctx->c) != evr_ok){
+    if(evr_connect_to_index(&c->c, &c->r, &cfg, cfg.index_host, cfg.index_port) != evr_ok){
+        goto fail_with_free_c;
+    }
+    if(evr_attri_write_watch(&c->c) != evr_ok){
         goto fail_with_close_c;
     }
     online = 1;
-    if(thrd_create(&ctx->worker, evr_index_watch_worker, ctx) != thrd_success){
+    if(thrd_create(&c->worker, evr_index_watch_worker, c) != thrd_success){
         goto fail_with_close_c;
     }
+    *ctx = c;
     return evr_ok;
  fail_with_close_c:
-    evr_free_buf_read(ctx->r);
-    if(ctx->c.close(&ctx->c) != 0){
+    evr_free_buf_read(c->r);
+    if(c->c.close(&c->c) != 0){
         evr_panic("Unable to close evr-attr-index connection");
     }
+ fail_with_free_c:
+    free(c);
  fail:
     return evr_error;
 }
@@ -1366,8 +1245,10 @@ int evr_collect_affected_seeds(struct evr_llbuf_s *affected_seeds, evr_claim_ref
     return ret;
 }
 
-int evr_free_index_watch(struct evr_index_watch_ctx *ctx){
+int evr_free_index_watch(void *arg){
+    struct evr_index_watch_ctx *ctx = arg;
     int worker_res;
+    running = 0;
     if(thrd_join(ctx->worker, &worker_res) != thrd_success){
         evr_panic("Unable to join index watch thread");
         return evr_error;
@@ -1377,5 +1258,6 @@ int evr_free_index_watch(struct evr_index_watch_ctx *ctx){
         evr_panic("Unable to close evr-attr-index connection");
         return evr_error;
     }
+    free(ctx);
     return worker_res;
 }

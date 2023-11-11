@@ -67,4 +67,26 @@ struct evr_verify_ctx* evr_init_verify_ctx(char **accepted_fprs, size_t accepted
  */
 int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen, struct evr_file *meta);
 
+struct evr_verify_cfg {
+    /**
+     * accepted_gpg_fprs contains the accepted gpg fingerprints for
+     * signed claims.
+     *
+     * The llbuf data points to a fingerprint string.
+     *
+     * This field is only filled during the initialization of the
+     * application. During runtime the ctx field should be used.
+     */
+    struct evr_llbuf *accepted_gpg_fprs;
+
+    struct evr_verify_ctx *ctx;
+};
+
+// TODO check if this can also be used in evr cli or evr-attr-index
+void evr_init_verify_cfg(struct evr_verify_cfg *cfg);
+void evr_free_verify_cfg(struct evr_verify_cfg *cfg);
+
+int evr_verify_add_gpg_fpr(struct evr_verify_cfg *cfg, const char *fpr);
+int evr_verify_cfg_parse(struct evr_verify_cfg *cfg);
+
 #endif

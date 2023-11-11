@@ -37,7 +37,7 @@ BUILT_SOURCES += \
 endif
 
 if HAS_FUSE
-bin_PROGRAMS += evr-fs
+bin_PROGRAMS += evr-fs evr-glacier-fs
 endif
 
 evr_c_unit_tests = \
@@ -199,6 +199,26 @@ evr_SOURCES = \
 	signatures.c
 evr_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
 
+evr_glacier_fs_SOURCES = \
+	auth.c \
+	basics.c \
+	claims.c \
+	configp.c \
+	daemon.c \
+	dyn-mem.c \
+	evr-fuse.c \
+	evr-glacier-client.c \
+	evr-glacier-fs.c \
+	evr-tls.c \
+	files.c \
+	glacier-cmd.c \
+	keys.c \
+	logger.c \
+	metadata.c \
+	open-files.c \
+	signatures.c
+evr_glacier_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+
 evr_fs_SOURCES = \
 	auth.c \
 	basics.c \
@@ -208,6 +228,7 @@ evr_fs_SOURCES = \
 	dyn-mem.c \
 	evr-attr-index-client.c \
 	evr-fs.c \
+	evr-fuse.c \
 	evr-glacier-client.c \
 	evr-tls.c \
 	files.c \

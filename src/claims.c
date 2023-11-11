@@ -118,6 +118,16 @@ int evr_append_file_claim(struct evr_claim_set *cs, const struct evr_file_claim 
     return evr_error;
 }
 
+size_t evr_file_claim_file_size(struct evr_file_claim *fc){
+    size_t s = 0;
+    struct evr_file_slice *s_end, *s_it;
+    s_end = &fc->slices[fc->slices_len];
+    for(s_it = fc->slices; s_it != s_end; ++s_it){
+        s += s_it->size;
+    }
+    return s;
+}
+
 int evr_finalize_claim_set(struct evr_claim_set *cs){
     int ret = evr_error;
     // end claim-set element

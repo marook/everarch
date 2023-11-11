@@ -219,3 +219,38 @@ int evr_signatures_read_data(struct dynamic_array **dest, gpgme_data_t d, size_t
  out:
     return ret;
 }
+
+void evr_init_verify_cfg(struct evr_verify_cfg *cfg){
+    cfg->accepted_gpg_fprs = NULL;
+    cfg->ctx = NULL;
+}
+
+void evr_free_verify_cfg(struct evr_verify_cfg *cfg){
+    if(cfg->ctx){
+        evr_free_verify_ctx(cfg->ctx);
+    }
+    if(cfg->accepted_gpg_fprs){
+        evr_free_llbuf_chain(cfg->accepted_gpg_fprs, NULL);
+    }
+}
+
+int evr_verify_add_gpg_fpr(struct evr_verify_cfg *cfg, const char *fpr){
+    struct evr_buf_pos bp;
+    const size_t fpr_size = strlen(fpr) + 1;
+    if(evr_llbuf_prepend(&cfg->accepted_gpg_fprs, &bp, fpr_size) != evr_ok){
+        return evr_error;
+    }
+    evr_push_n(&bp, fpr, fpr_size);
+    return evr_ok;
+}
+
+int evr_verify_cfg_parse(struct evr_verify_cfg *cfg){
+    cfg->ctx = evr_build_verify_ctx(cfg->accepted_gpg_fprs);
+    if(!cfg->ctx){
+        return evr_error;
+    }
+    evr_free_llbuf_chain(cfg->accepted_gpg_fprs, NULL);
+    cfg->accepted_gpg_fprs = NULL;
+    return evr_ok;
+}
+

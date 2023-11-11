@@ -81,3 +81,30 @@ then
     echo "Retrieved unexpected claim: ${claim}" >&2
     exit 1
 fi
+
+if [[ "${HAS_FUSE}" == 'true' ]]
+then
+    mount_evr_glacier_fs
+
+    find_mnt=`find ${evr_glacier_fs_mnt_dir}`
+    if [[ "${find_mnt}" != "${evr_glacier_fs_mnt_dir}
+${evr_glacier_fs_mnt_dir}/file" ]]
+    then
+        echo "Unexpected find ${evr_glacier_fs_mnt_dir} result: ${find_mnt}" >&2
+        exit 1
+    fi
+
+    ls_ref=`ls ${evr_glacier_fs_mnt_dir}/file/${ref}`
+    if [[ "${ls_ref}" != "${evr_glacier_fs_mnt_dir}/file/${ref}" ]]
+    then
+        echo "Unexpected ls ${evr_glacier_fs_mnt_dir}/file/${ref} result: ${ls_ref}" >&2
+        exit 1
+    fi
+
+    cat_ref=`cat ${evr_glacier_fs_mnt_dir}/file/${ref}`
+    if [[ "${cat_ref}" != 'piped content' ]]
+    then
+        echo "Unexpected cat ${evr_glacier_fs_mnt_dir}/file/${ref} result: ${cat_ref}" >&2
+        exit 1
+    fi
+fi

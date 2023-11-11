@@ -56,6 +56,8 @@ int evr_fetch_signed_xml(xmlDocPtr *doc, struct evr_verify_ctx *ctx, struct evr_
 
 int evr_fetch_stylesheet(xsltStylesheetPtr *style, struct evr_file *f, evr_blob_ref ref);
 
+struct evr_file_claim *evr_fetch_file_claim(struct evr_file *c, evr_claim_ref claim_ref, struct evr_verify_ctx *verify_ctx, evr_time *create_timestamp);
+
 /**
  * evr_stat_and_put checks if the given key exists and puts it if
  * not. Check and put are not one atomic operation.
