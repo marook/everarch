@@ -37,7 +37,6 @@ int evr_run_fuse(char *prog, char *prog_name, struct evr_fuse_cfg *cfg){
         NULL,
         NULL,
     };
-    struct fuse_args fuse_args = FUSE_ARGS_INIT(fuse_argv_len, fuse_argv);
     struct fuse_session *se;
     void *ctx;
     const size_t prog_name_len = strlen(prog_name);
@@ -48,6 +47,7 @@ int evr_run_fuse(char *prog, char *prog_name, struct evr_fuse_cfg *cfg){
     if(cfg->allow_other){
         fuse_argv[fuse_argv_len++] = evr_fuse_opt_allow_other;
     }
+    struct fuse_args fuse_args = FUSE_ARGS_INIT(fuse_argv_len, fuse_argv);
     se = fuse_session_new(&fuse_args, &cfg->ops, sizeof(cfg->ops), NULL);
     if(se == NULL) {
         goto out;
