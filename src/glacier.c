@@ -1124,6 +1124,7 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
         end_offset = evr_bucket_end_offset_corrupt;
         goto out_with_write_end_offset;
     } else if(walk_res != evr_ok){
+        log_error("Unable to walk bucket " evr_bucket_file_name_fmt " on reindex", bucket_index);
         goto out;
     }
     end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
@@ -1174,6 +1175,7 @@ int evr_glacier_reindex_visit_blob(void *context, struct evr_glacier_bucket_blob
         goto out;
     }
     if(lseek(ctx->current_bucket_f, stat->offset, SEEK_SET) == -1){
+        log_error("Unable to seek in bucket file to offset %zu during reindexing", (size_t)stat->offset);
         goto out;
     }
     evr_blob_ref_hd hd;
@@ -1183,6 +1185,9 @@ int evr_glacier_reindex_visit_blob(void *context, struct evr_glacier_bucket_blob
     struct evr_file f;
     evr_file_bind_fd(&f, ctx->current_bucket_f);
     if(dump_n(&f, stat->size, evr_blob_ref_write_se, hd) != evr_ok){
+        evr_blob_ref_str ref_str;
+        evr_fmt_blob_ref(ref_str, stat->ref);
+        log_error("Unable to read over blob %s body during reindexing", ref_str);
         goto out_with_close_hd;
     }
     if(evr_blob_ref_hd_match(hd, stat->ref) != evr_ok){
@@ -1213,6 +1218,7 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
     int ret = evr_error;
     int f = open(bucket_path, O_RDONLY);
     if(f < 0){
+        log_error("Failed to open bucket file %s readonly", bucket_path);
         return ret;
     }
     const size_t header_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t);
