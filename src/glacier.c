@@ -360,7 +360,7 @@ int evr_create_glacier_write_ctx(struct evr_glacier_write_ctx **context, struct 
             goto fail_with_db;
         }
     } else {
-        if(open_current_bucket(ctx, 0)){
+        if(open_current_bucket(ctx, 0) != evr_ok){
             goto fail_with_db;
         }
         if(evr_validate_bucket_magic_number(ctx->current_bucket_f) != evr_ok){
@@ -482,6 +482,7 @@ int evr_walk_buckets(struct evr_glacier_write_ctx *wctx, int (*visit)(void *ctx,
             continue;
         }
         if(visit(ctx, index, d->d_name) != evr_ok){
+            log_error("Unable to visit bucket file %s", d->d_name);
             goto out_with_close_dir;
         }
     }
@@ -499,6 +500,7 @@ int open_current_bucket(struct evr_glacier_write_ctx *ctx, int create) {
     int open_flags = O_RDWR | (create ? (O_CREAT | O_EXCL) : 0);
     ctx->current_bucket_f = evr_open_bucket(ctx->config, ctx->current_bucket_index, open_flags);
     if(ctx->current_bucket_f == -1){
+        log_error("Unable to open bucket " evr_bucket_file_name_fmt " file", ctx->current_bucket_index);
         return evr_error;
     }
     return evr_ok;
@@ -786,7 +788,7 @@ int create_next_bucket(struct evr_glacier_write_ctx *ctx){
         goto out;
     }
     ctx->current_bucket_index++;
-    if(open_current_bucket(ctx, 1)){
+    if(open_current_bucket(ctx, 1) != evr_ok){
         ctx->current_bucket_index--;
         goto out;
     }
@@ -1145,6 +1147,7 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
         goto out_with_reset_update_stmt;
     }
     if(evr_step_stmt(ctx->db, ctx->update_bucket_end_offset_stmt) != SQLITE_DONE){
+        log_error("Unable to update bucket " evr_bucket_file_name_fmt " end offset in index DB.", bucket_index);
         goto out_with_reset_update_stmt;
     }
     ret = evr_ok;
