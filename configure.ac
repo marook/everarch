@@ -140,6 +140,8 @@ AC_CONFIG_FILES([
     Makefile
     test.conf
     src/Makefile
+    testing/Makefile
+    testing/suite/Makefile
     python/Makefile
     emacs/Makefile
     etc/Makefile

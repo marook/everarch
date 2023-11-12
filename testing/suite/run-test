@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+set -o pipefail
+suite="$1"
+
+if [[ ! -d "${suite}" ]]
+then
+    echo "Usage $0 TEST_SUITE_DIR" >&2
+    exit 1
+fi
+
+cd "${suite}"
+exec ./run-suite

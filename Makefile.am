@@ -1,4 +1,4 @@
-SUBDIRS = src etc
+SUBDIRS = src testing etc
 
 if HAS_PYTHON
 SUBDIRS += python

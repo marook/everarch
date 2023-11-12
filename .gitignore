@@ -2,6 +2,9 @@
 /*.log
 *.actual.log
 
+# test run result files
+*.trs
+
 # build system artifacts
 Makefile
 Makefile.in
