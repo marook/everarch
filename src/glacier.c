@@ -1109,7 +1109,7 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
     }
     if(evr_validate_bucket_magic_number(ctx->current_bucket_f) != evr_ok){
         log_error("Reindexing of bucket %s aborted because of invalid magic number. If you are sure the file is a bucket consider setting the first three bytes in the file to " evr_bucket_magic_number " and reindex again.", bucket_file_name);
-        goto out;
+        goto out_with_close_bucket;
     }
     struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, bucket_path);
@@ -1125,15 +1125,15 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
         goto out_with_write_end_offset;
     } else if(walk_res != evr_ok){
         log_error("Unable to walk bucket " evr_bucket_file_name_fmt " on reindex", bucket_index);
-        goto out;
+        goto out_with_close_bucket;
     }
     end_offset = lseek(ctx->current_bucket_f, 0, SEEK_END);
     if(end_offset == -1){
-        goto out;
+        goto out_with_close_bucket;
     }
  out_with_write_end_offset:
     if(evr_write_bucket_end_offset(ctx->current_bucket_f, end_offset, 1) != evr_ok){
-        goto out;
+        goto out_with_close_bucket;
     }
     if(sqlite3_bind_int(ctx->insert_bucket_stmt, 1, ctx->current_bucket_index) != SQLITE_OK){
         goto out_with_reset_insert_stmt;
@@ -1161,6 +1161,11 @@ int evr_glacier_reindex_bucket(void *context, unsigned long bucket_index, char *
     if(sqlite3_reset(ctx->insert_bucket_stmt) != SQLITE_OK){
         evr_panic("Unable to reset insert_bucket_stmt");
         ret = evr_error;
+    }
+ out_with_close_bucket:
+    if(close_current_bucket(ctx) != evr_ok){
+        evr_panic("Unable to close current bucket");
+        goto out;
     }
  out:
     return ret;
@@ -1216,6 +1221,9 @@ int evr_glacier_reindex_visit_blob(void *context, struct evr_glacier_bucket_blob
 
 int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, size_t end_offset), int (*visit_blob)(void *ctx, struct evr_glacier_bucket_blob_stat *stat), void *ctx){
     int ret = evr_error, open_error;
+    const size_t header_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t);
+    char buf[header_size];
+    size_t end_offset;
     int f = open(bucket_path, O_RDONLY);
     if(f < 0){
         char buf[1024], *err_msg;
@@ -1225,11 +1233,8 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
             buf[sizeof(buf)-1] = '\0';
         }
         log_error("Failed to open bucket file %s readonly: %s", bucket_path, err_msg);
-        return ret;
+        goto out;
     }
-    const size_t header_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t);
-    char buf[header_size];
-    size_t end_offset;
     if(evr_read_bucket_end_offset(f, &end_offset) != evr_ok){
         goto out_with_close_f;
     }
@@ -1290,6 +1295,7 @@ int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, si
         evr_panic("Unable to close bucket file");
         ret = evr_error;
     }
+ out:
     return ret;
 }
 

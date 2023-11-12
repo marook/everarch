@@ -1,3 +1,4 @@
+* integration test where 1000 buckets are reindexed
 * evr-backup should force index-db directory for glacier :bug:
 otherwise running the backup script in a environment with a custom
 index-db directory will try to create the backup index-db exactly
