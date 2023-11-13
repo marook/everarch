@@ -537,7 +537,9 @@ void test_reindex_and_append_glacier_with_corrupt_bucket_end(){
 }
 
 void test_many_small_buckets(){
-    const int blob_count = 256;
+    // how big should blob_count be? it should be bigger that the
+    // number of open file handles permitted on the system.
+    const int blob_count = 1111;
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     const int max_data_size = 8;
     config->max_bucket_size = evr_bucket_header_size + evr_bucket_blob_header_size + max_data_size;

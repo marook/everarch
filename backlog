@@ -1,4 +1,3 @@
-* integration test where 1000 buckets are reindexed
 * fix build with musl
 #+BEGIN_SRC
 glacier.c: In function 'evr_glacier_walk_bucket':
