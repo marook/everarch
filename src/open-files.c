@@ -36,7 +36,9 @@ int evr_open_file_read(struct evr_open_file *f, char *buf, size_t *size, off_t o
         struct evr_file_slice *s = &f->claim->slices[si];
         if((size_t)off < slices_off + s->size){
             if(f->cached_slice_buf == NULL || f->cached_slice_index != si){
+                log_debug("Loading slice %zu into cache", si);
                 if(evr_open_file_cache_slice(f, si) != evr_ok){
+                    log_error("Unable to load slice %zu into cache", si);
                     goto out_with_unlock;
                 }
             }

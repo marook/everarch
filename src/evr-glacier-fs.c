@@ -39,7 +39,19 @@
 const char *argp_program_version = " " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
 
-static char doc[] = program_name " is a virtual file system to access evr blobs and files by blob key.\n\n";
+#define evr_glacier_fs_ino_files_name "file"
+
+static char doc[] =
+    program_name " is a virtual file system to access evr blobs and files by blob key."
+    "\n\n"
+    "The file system mounted at MOUNT_POINT will contain a file system hierarchy like this:\n\n"
+    evr_glacier_fs_ino_files_name "/\n"
+    "  sha3-224-01234…abcde-0000\n"
+    "  sha3-224-12345…bcdef-0000\n"
+    "\n"
+    "The file names within the " evr_glacier_fs_ino_files_name " subdirectory provide the content from everarch file claims.\n"
+    "\n"
+    ;
 
 static char args_doc[] = "MOUNT_POINT";
 
@@ -160,7 +172,8 @@ static error_t parse_opt_glacier(int key, char *arg, struct argp_state *state){
 /**
  * lifetime duration of an inode assignment in milliseconds.
  */
-#define evr_inode_lifetime 1000
+#define evr_inode_lifetime 10000
+#define evr_inode_lifetime_overlap 20000
 
 static mtx_t evr_inodes_mtx;
 
@@ -281,7 +294,6 @@ int main(int argc, char *argv[]) {
 
 #define evr_glacier_fs_ino_root 1
 #define evr_glacier_fs_ino_files 2
-#define evr_glacier_fs_ino_files_name "file"
 #define evr_glacier_fs_ino_dyn 3
 
 static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino){
@@ -297,9 +309,12 @@ static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino){
     }
     ind = &evr_inodes[ino - evr_glacier_fs_ino_dyn];
     if(ind->timeout < t){
+        log_debug("Inode %d expired at t=" evr_time_fmt " which is " evr_time_fmt " ago", (int)ino, ind->timeout, t - ind->timeout);
         ret = evr_not_found;
         goto out_with_unlock_inodes;
     }
+    ind->timeout = t + evr_inode_lifetime + evr_inode_lifetime_overlap;
+    log_debug("Inode %d extended until t=" evr_time_fmt, (int)ino, ind->timeout);
     memcpy(ref, ind->ref, evr_claim_ref_size);
     ret = evr_ok;
  out_with_unlock_inodes:
@@ -328,7 +343,7 @@ static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref){
         } else {
             if(evr_cmp_claim_ref(ref, ind_it->ref) == 0){
                 *ino = ind_it - evr_inodes + evr_glacier_fs_ino_dyn;
-                ind_it->timeout = t + evr_inode_lifetime;
+                ind_it->timeout = t + evr_inode_lifetime + evr_inode_lifetime_overlap;
                 ret = evr_ok;
 #ifdef EVR_LOG_DEBUG
                 {
@@ -348,7 +363,7 @@ static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref){
     ret = evr_ok;
     *ino = available_ind - evr_inodes + evr_glacier_fs_ino_dyn;
     memcpy(available_ind->ref, ref, evr_claim_ref_size);
-    available_ind->timeout = t + evr_inode_lifetime;
+    available_ind->timeout = t + evr_inode_lifetime + evr_inode_lifetime_overlap;
 #ifdef EVR_LOG_DEBUG
     {
         evr_claim_ref_str ref_str;
@@ -400,26 +415,23 @@ static void evr_glacier_fs_file_dir_stat(struct stat *stat){
     stat->st_gid = cfg.gid;
 }
 
+static int evr_stat_file(struct stat *st, evr_claim_ref ref);
+
 static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *ref_str){
     int err = EIO, res;
     evr_claim_ref ref;
-    struct evr_file gc;
-    struct evr_file_claim *file;
-    struct fuse_entry_param ep;
-    evr_time file_created;
+    struct fuse_entry_param ep = { 0 };
     if(evr_parse_claim_ref(ref, ref_str) != evr_ok){
         err = ENOENT;
         goto out;
     }
-    if(evr_connect_to_storage(&gc, cfg.storage_host, cfg.storage_port) != evr_ok){
+    res = evr_stat_file(&ep.attr, ref);
+    if(res == evr_not_found){
+        err = ENOENT;
+        goto out;
+    } else if(res != evr_ok){
         goto out;
     }
-    file = evr_fetch_file_claim(&gc, ref, cfg.verify.ctx, &file_created);
-    if(!file){
-        err = ENOENT;
-        goto out_with_close_gc;
-    }
-    memset(&ep, 0, sizeof(ep));
     res = evr_acquire_inode(&ep.ino, ref);
     if(res == evr_temporary_occupied) {
         // if you ever see this error the evr_inodes buffer should
@@ -427,29 +439,16 @@ static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *ref_str){
         // growing buffer.
         log_info("Unable to acquire another inode. inode buffer fully occupied.");
         err = EBUSY;
-        goto out_with_free_file;
+        goto out;
     } else if(res != evr_ok){
-        goto out_with_free_file;
+        goto out;
     }
-    ep.attr.st_mode = S_IFREG | 0444;
-    ep.attr.st_nlink = 1;
-    ep.attr.st_size = evr_file_claim_file_size(file);
-    ep.attr.st_uid = cfg.uid;
-    ep.attr.st_gid = cfg.gid;
-    evr_time_to_timespec(&ep.attr.st_mtim, &file_created);
-    evr_time_to_timespec(&ep.attr.st_ctim, &file_created);
     ep.attr_timeout = evr_inode_lifetime / 1000.0;
     ep.entry_timeout = ep.attr_timeout;
     if(fuse_reply_entry(req, &ep) != 0){
         evr_panic("fuse request %p unable to reply entry", req);
     }
     err = 0;
- out_with_free_file:
-    free(file);
- out_with_close_gc:
-    if(gc.close(&gc) != 0){
-        evr_panic("Unable to close connection to evr-glacier-storage");
-    }
  out:
     if(err != 0 && fuse_reply_err(req, err) != 0){
         evr_panic("fuse request %p can't be replied", req);
@@ -457,7 +456,9 @@ static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *ref_str){
 }
 
 static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi){
-    struct stat st;
+    int err = EIO, res;
+    struct stat st = { 0 };
+    evr_claim_ref ref;
     log_debug("fuse request %p: getattr for inode %d", req, (int)ino);
     if(ino == evr_glacier_fs_ino_root){
         st.st_mode = S_IFDIR | 0555;
@@ -465,15 +466,62 @@ static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_f
     } else if(ino == evr_glacier_fs_ino_files) {
         evr_glacier_fs_file_dir_stat(&st);
     } else {
-        if(fuse_reply_err(req, ENOENT) != 0){
-            evr_panic("not yet implemented");
+        if(evr_lookup_inode(ref, ino) != evr_ok){
+            log_debug("fuse request %p: inode %d not found", req, (int)ino);
+            err = ENOENT;
+            goto fail;
+        }
+        memset(&st, 0, sizeof(st));
+        res = evr_stat_file(&st, ref);
+        if(res == evr_not_found){
+            err = ENOENT;
+            goto fail;
+        } else if(res != evr_ok){
+            goto fail;
         }
     }
     st.st_uid = cfg.uid;
     st.st_gid = cfg.gid;
-    if(fuse_reply_attr(req, &st, 1.0) != 0){
+    if(fuse_reply_attr(req, &st, evr_inode_lifetime / 1000.0) != 0){
         evr_panic("fuser request %p unable to reply attr", req);
     }
+    return;
+ fail:
+    if(fuse_reply_err(req, err) != 0){
+        evr_panic("Unable to report ENOENT on getattr for inode %d", (int)ino);
+    }
+}
+
+static int evr_stat_file(struct stat *st, evr_claim_ref ref){
+    int ret = evr_error, res;
+    evr_time file_created;
+    struct evr_file gc;
+    struct evr_file_claim *file;
+    if(evr_connect_to_storage(&gc, cfg.storage_host, cfg.storage_port) != evr_ok){
+        goto out;
+    }
+    res = evr_fetch_file_claim(&file, &gc, ref, cfg.verify.ctx, &file_created);
+    if(res == evr_not_found || res == evr_user_data_invalid){
+        ret = evr_not_found;
+        goto out_with_close_gc;
+    } else if(res != evr_ok){
+        goto out_with_close_gc;
+    }
+    st->st_mode = S_IFREG | 0444;
+    st->st_nlink = 1;
+    st->st_size = evr_file_claim_file_size(file);
+    st->st_uid = cfg.uid;
+    st->st_gid = cfg.gid;
+    evr_time_to_timespec(&st->st_mtim, &file_created);
+    evr_time_to_timespec(&st->st_ctim, &file_created);
+    ret = evr_ok;
+    free(file);
+ out_with_close_gc:
+    if(gc.close(&gc) != 0){
+        evr_panic("Unable to close connection to evr-glacier-storage");
+    }
+ out:
+    return ret;
 }
 
 #define evr_add_direntry(name, ino)                                     \
@@ -567,8 +615,7 @@ static int evr_glacier_fs_open_file(fuse_req_t req, struct fuse_file_info *fi, e
         log_error("Unable to connect to glacier when opening file for ref %s", ref_str);
         goto fail_with_close_open_file;
     }
-    of->claim = evr_fetch_file_claim(&of->gc, ref, cfg.verify.ctx, NULL);
-    if(!of->claim){
+    if(evr_fetch_file_claim(&of->claim, &of->gc, ref, cfg.verify.ctx, NULL) != evr_ok){
         evr_claim_ref_str ref_str;
         evr_fmt_claim_ref(ref_str, ref);
         log_error("Unable to fetch file claim for ref %s", ref_str);
@@ -623,7 +670,7 @@ static void evr_glacier_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off
     if(evr_open_file_read(f, buf, &read_size, off) != evr_ok){
         goto out_with_free_buf;
     }
-    log_debug(">>> pass %zu bytes to fuse", read_size);
+    log_debug("fuse request %p: reply %zu bytes", req, read_size);
     if(fuse_reply_buf(req, buf, read_size) != 0){
         goto out_with_free_buf;
     }
@@ -632,7 +679,7 @@ static void evr_glacier_fs_read(fuse_req_t req, fuse_ino_t ino, size_t size, off
     free(buf);
  out:
     if(err && fuse_reply_err(req, err) != 0){
-            evr_panic("not yet implemented");
+        evr_panic("Unable to read from file");
     }
 }
 

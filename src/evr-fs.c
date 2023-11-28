@@ -878,6 +878,7 @@ static void evr_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *f
 }
 
 static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi, evr_claim_ref file_ref){
+    int res, ret = evr_error;
     if(evr_allocate_open_file(&open_files, &fi->fh) != evr_ok){
         log_error("Unable to allocate file handle for inode %d", (int)ino);
         goto fail;
@@ -887,22 +888,26 @@ static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_inf
         log_error("Unable to connect to glacier when opening file with inode %d", (int)ino);
         goto fail_with_close_open_file;
     }
-    of->claim = evr_fetch_file_claim(&of->gc, file_ref, cfg.verify.ctx, NULL);
-    if(!of->claim){
+    res = evr_fetch_file_claim(&of->claim, &of->gc, file_ref, cfg.verify.ctx, NULL);
+    if(res == evr_not_found || res == evr_user_data_invalid){
+        ret = res;
+        goto fail_with_close_open_file;
+    } else if(res != evr_ok){
         log_error("Unable to fetch file claim for inode %d", (int)ino);
         goto fail_with_close_open_file;
     }
     if(fuse_reply_open(req, fi) != 0){
         goto fail_with_close_open_file;
     }
+    ret = evr_ok;
     log_debug("opened file handle %u for inode %d", (unsigned int)fi->fh, (int)ino);
-    return evr_ok;
+    return ret;
  fail_with_close_open_file:
     if(evr_close_open_file(&open_files, fi->fh) != evr_ok){
         evr_panic("Unable to close file with inode %d on failed open", (int)ino);
     }
  fail:
-    return evr_error;
+    return ret;
 }
 
 void evr_lock_inode_set_or_panic(){
