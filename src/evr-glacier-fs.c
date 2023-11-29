@@ -409,6 +409,7 @@ static void evr_glacier_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char 
 }
 
 static void evr_glacier_fs_file_dir_stat(struct stat *stat){
+    stat->st_ino = evr_glacier_fs_ino_files;
     stat->st_mode = S_IFDIR | 0444;
     stat->st_nlink = 1;
     stat->st_uid = cfg.uid;
@@ -443,6 +444,7 @@ static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *ref_str){
     } else if(res != evr_ok){
         goto out;
     }
+    ep.attr.st_ino = ep.ino;
     ep.attr_timeout = evr_inode_lifetime / 1000.0;
     ep.entry_timeout = ep.attr_timeout;
     if(fuse_reply_entry(req, &ep) != 0){
@@ -480,6 +482,7 @@ static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_f
             goto fail;
         }
     }
+    st.st_ino = ino;
     st.st_uid = cfg.uid;
     st.st_gid = cfg.gid;
     if(fuse_reply_attr(req, &st, evr_inode_lifetime / 1000.0) != 0){
@@ -538,7 +541,7 @@ static void evr_glacier_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, 
     char buf[1024];
     struct evr_buf_pos bp;
     struct stat st;
-    size_t entry_size;
+    size_t entry_size, reply_size;
     char *buf_end = &buf[sizeof(buf)];
     log_debug("fuse request %p: readdir for inode %d at %zu+%zu", req, (int)ino, (size_t)off, size);
     if(ino == evr_glacier_fs_ino_root){
@@ -548,11 +551,14 @@ static void evr_glacier_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, 
         evr_add_direntry("..", 0); // TODO is 0 correct here?
         evr_add_direntry(evr_glacier_fs_ino_files_name, evr_glacier_fs_ino_files);
         if(buf + off >= bp.pos){
+            log_debug("fuse request %p: readdir reply 0 bytes", req);
             if(fuse_reply_buf(req, NULL, 0) != 0){
                 evr_panic("Falied to reply fuse request %p", req);
             }
         } else {
-            if(fuse_reply_buf(req, &buf[off], min(bp.pos - buf - (size_t)off, size)) != 0){
+            reply_size = min(bp.pos - buf - (size_t)off, size);
+            log_debug("fuse request %p: readdir reply %zu bytes at offset %zu", req, reply_size, (size_t)off);
+            if(fuse_reply_buf(req, &buf[off], reply_size) != 0){
                 evr_panic("Falied to reply fuse request %p", req);
             }
         }
