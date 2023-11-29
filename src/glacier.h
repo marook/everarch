@@ -55,6 +55,8 @@
  */
 #define evr_bucket_end_offset_corrupt 0
 
+#define glacier_dir_index_db_path "/index.db"
+
 extern const size_t evr_max_chunks_per_blob;
 
 struct evr_writing_blob {

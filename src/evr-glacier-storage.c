@@ -77,7 +77,7 @@ static struct argp_option options[] = {
     {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
     // TODO max-bucket-size
     {"bucket-dir", 'd', "DIR", 0, "Bucket directory path. This is the place where the data is persisted. Default path is " default_bucket_dir_path "."},
-    {"index-db", arg_index_db, "DB", 0, "Path to where the sqlite bucket index DB should be put. The default is to put the index db within the bucket-dir."},
+    {"index-db", arg_index_db, "DB", 0, "Path to the file where the sqlite bucket index DB should be put. The default is to put the index db within BUCKET_DIR" glacier_dir_index_db_path "."},
     {"foreground", 'f', NULL, 0, "The process will not demonize. It will stay in the foreground instead."},
     {"log", arg_log_path, "FILE", 0, "A file to which log output messages will be appended. By default logs are written to stdout."},
     {"pid", arg_pid_path, "FILE", 0, "A file to which the daemon's pid is written."},

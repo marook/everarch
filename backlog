@@ -7,10 +7,6 @@ glacier.c:1231:17: error: assignment to 'char *' from 'int' makes pointer from i
 * replace memset with {0}
 replace memset(…, 0, …) initializations with … = { 0 } because of
 https://man7.org/linux/man-pages/man3/freeaddrinfo.3p.html#APPLICATION_USAGE
-* evr-backup should force index-db directory for glacier :bug:
-otherwise running the backup script in a environment with a custom
-index-db directory will try to create the backup index-db exactly
-where the original index-db is located.
 * evr cli's evr_cli_get_file(…) should use evr_fetch_file_claim(…) :cligetfile:
 * evr-attr-index should resume building new index
 instead of just switching to the new index and continue building

@@ -47,7 +47,6 @@
 // TODO convert every variable here into a define in order to save binary space
 const size_t evr_max_chunks_per_blob = evr_max_blob_data_size / evr_chunk_size + 1;
 const char *glacier_dir_lock_file_path = "/lock";
-#define glacier_dir_index_db_path "/index.db"
 const size_t evr_read_buffer_size = 1*1024*1024;
 #define evr_bucket_file_ext "evb"
 #define evr_bucket_file_name_fmt "%05lx." evr_bucket_file_ext

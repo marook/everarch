@@ -168,7 +168,7 @@ then
 fi
 
 auth_token=`openssl rand -hex 32`
-evr-glacier-storage "--pid=${tmpd}/glacier.pid" -d "${backup_dir}" "--auth-token=${auth_token}" "--cert=${tls_cert}" "--key=${tls_key}" '--host=localhost' -p "${backup_glacier_port}"
+evr-glacier-storage "--pid=${tmpd}/glacier.pid" -d "${backup_dir}" "--index-db=${backup_dir}/index.db" "--auth-token=${auth_token}" "--cert=${tls_cert}" "--key=${tls_key}" '--host=localhost' -p "${backup_glacier_port}"
 
 evr_sync_opts=
 if [[ "${two_way}" = '1' ]]
