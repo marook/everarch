@@ -1,3 +1,13 @@
+* fix inode timeout corner cases in evr-glacier-fs
+evr-glacier-fs's struct evr_inode has a timeout field which indicates
+until when the inode must be kept valid. currently the timeout is
+calculated when the fuse request for the inode is incomming. this is
+incorrect because the kernel seems to care about the timestamp when
+the fuse response was submitted.
+
+the implementation should update time timestamp after the response was
+sumtitten to fuse. that way the evr_inode_lifetime_overlap can
+probably be a very small value.
 * fix build with musl
 #+BEGIN_SRC
 glacier.c: In function 'evr_glacier_walk_bucket':
@@ -8,6 +18,10 @@ glacier.c:1231:17: error: assignment to 'char *' from 'int' makes pointer from i
 replace memset(…, 0, …) initializations with … = { 0 } because of
 https://man7.org/linux/man-pages/man3/freeaddrinfo.3p.html#APPLICATION_USAGE
 * evr cli's evr_cli_get_file(…) should use evr_fetch_file_claim(…) :cligetfile:
+* applications should print their config lookup parts in usage
+executing any of the evr applications which loads configuration from
+files should print the lookup paths when invoked with the --help
+argument.
 * evr-attr-index should resume building new index
 instead of just switching to the new index and continue building
 it. serving the old index until the new one is completely indexed will
