@@ -90,6 +90,14 @@ PKG_CHECK_MODULES([SQLITE], [sqlite3])
 PKG_CHECK_MODULES([XML], [libxml-2.0 >= 2.9 libxslt >= 1.1])
 PKG_CHECK_MODULES([SSL], [libssl >= 1.1 libcrypto >= 1.1])
 
+PKG_CHECK_MODULES([HTTPD], [libmicrohttpd >= 0.9], has_httpd=true, has_httpd=false)
+if test "x$has_httpd" == "xtrue"
+then
+  AC_DEFINE([EVR_HAS_HTTPD], [1], [libmicrohttpd is available.])
+fi
+AM_CONDITIONAL([HAS_HTTPD], [test x$has_httpd = xtrue])
+AC_SUBST(HAS_HTTPD_SUBST, $has_httpd)
+
 AC_PROG_LEX
 AC_PROG_YACC
 if test "x$LEX" == "x:"
@@ -157,4 +165,5 @@ AC_OUTPUT
 
 AC_MSG_NOTICE([With the results from the checks above configure decided the following.
 	build evr-backup: $build_evr_backup
+        http server for evr-attr-index: $has_httpd
 ])

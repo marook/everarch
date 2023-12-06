@@ -4,6 +4,7 @@ ulimit -c unlimited
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 HAS_FUSE=@HAS_FUSE_SUBST@
+HAS_HTTPD=@HAS_HTTPD_SUBST@
 BUILD_EVR_BACKUP=@BUILD_EVR_BACKUP_SUBST@
 
 PATH="${script_dir}/../../src:${PATH}"
@@ -22,6 +23,7 @@ secondary_glacier_storage_bucket_dir=secondary-storage
 secondary_glacier_storage_auth_token='ee3e9ad7a89ef1745f54f91689207d27d1b976a2791dca30ce74aef5c251e40f'
 
 attr_index_port=2462
+attr_index_http_port=2463
 attr_index_state_dir=attr-index
 attr_index_cert_path="${script_dir}/../tls/attr-index-cert.pem"
 attr_index_auth_token='7c0c40cb392ceeb42097988f21ed968f3590f25ae3deca8632e4a905cd340cbe'
@@ -45,6 +47,7 @@ allocate_ports() {
     ensure_port_available "${glacier_storage_port}"
     ensure_port_available "${secondary_glacier_storage_port}"
     ensure_port_available "${attr_index_port}"
+    ensure_port_available "${attr_index_http_port}"
 }
 
 write_evr_conf() {
@@ -88,6 +91,7 @@ EOF
     cat > evr-attr-index.conf <<EOF
 state-dir=${attr_index_state_dir}
 port=${attr_index_port}
+http-port=${attr_index_http_port}
 storage-port=${glacier_storage_port}
 storage-auth-token=${glacier_storage_auth_token}
 cert=${attr_index_cert_path}

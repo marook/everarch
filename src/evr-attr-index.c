@@ -27,6 +27,10 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
+#ifdef EVR_HAS_HTTPD
+#include <microhttpd.h>
+#endif
+
 #include "basics.h"
 #include "claims.h"
 #include "errors.h"
@@ -67,6 +71,9 @@ static char args_doc[] = "";
 #define arg_gpg_key 264
 #define arg_log_path 265
 #define arg_pid_path 266
+#ifdef EVR_HAS_HTTPD
+#define arg_http_port 267
+#endif
 
 static struct argp_option options[] = {
     {"state-dir", 'd', "DIR", 0, "State directory path. This is the place where the index is persisted. Default path is " default_state_dir_path "."},
@@ -74,6 +81,9 @@ static struct argp_option options[] = {
     {"port", 'p', "PORT", 0, "The tcp port at which the attr index server will listen. The default port is " to_string(evr_attr_index_port) "."},
     {"cert", arg_ssl_cert_path, "FILE", 0, "The path to the pem file which contains the public SSL certificate. Default path is " default_ssl_cert_path "."},
     {"key", arg_ssl_key_path, "FILE", 0, "The path to the pem file which contains the private SSL key. Default path is " default_ssl_key_path "."},
+#ifdef EVR_HAS_HTTPD
+    {"http-port", arg_http_port, "PORT", 0, "The tcp port at which the attr index server will listen for http connections. Using the port number 0 will disable the http server. The default port is " to_string(evr_attr_index_http_port) "."},
+#endif
     {"auth-token", arg_auth_token, "TOKEN", 0, "An authorization token which must be presented by clients so their requests are accepted. Must be a 64 characters string only containing 0-9 and a-f. Should be hard to guess and secret. You can call 'openssl rand -hex 32' to generate a good token."},
     {"storage-host", arg_storage_host, "HOST", 0, "The hostname of the evr-glacier-storage server to connect to. Default hostname is " evr_glacier_storage_host "."},
     {"storage-port", arg_storage_port, "PORT", 0, "The port of the evr-glalier-storage server to connect to. Default port is " to_string(evr_glacier_storage_port) "."},
@@ -100,6 +110,11 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
     case 'p':
         evr_replace_str(cfg->port, arg);
         break;
+#ifdef EVR_HAS_HTTPD
+    case arg_http_port:
+        evr_replace_str(cfg->http_port, arg);
+        break;
+#endif
     case 'f':
         cfg->foreground = 1;
         break;
@@ -236,6 +251,10 @@ int evr_respond_status(struct evr_connection *ctx, int ok, char *msg);
 int evr_respond_message_end(struct evr_connection *ctx);
 int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
 
+#ifdef EVR_HAS_HTTPD
+static enum MHD_Result evr_attr_index_handle_http_request(void *cls, struct MHD_Connection *connection, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls);
+#endif
+
 int main(int argc, char **argv){
     int ret = evr_error;
     evr_log_app = "i";
@@ -309,34 +328,66 @@ int main(int argc, char **argv){
         goto out_with_join_build_index_thrd;
     }
     thrd_t tcp_server_thrd;
-    if(thrd_create(&tcp_server_thrd, evr_attr_index_tcp_server, &index_handover_ctx) != thrd_success){
+    if(thrd_create(&tcp_server_thrd, evr_attr_index_tcp_server, NULL) != thrd_success){
         goto out_with_join_index_sync_thrd;
     }
+#ifdef EVR_HAS_HTTPD
+#define out_with_stop_httpd_conditional out_with_stop_httpd
+    struct MHD_Daemon *httpd;
+    long http_port;
+    char *http_port_end;
+    http_port = strtol(cfg->http_port, &http_port_end, 10);
+    if(*http_port_end != '\0'){
+        log_error("Expected a number as http port but got: %s", cfg->http_port);
+        goto out_with_join_index_sync_thrd;
+    }
+    if(http_port < 0 || http_port > 65535){
+        log_error("http port must be greater equal 0 and smaller equal 65535");
+        goto out_with_join_index_sync_thrd;
+    }
+    if(http_port == 0){
+        log_info("http server disabled");
+        httpd = NULL;
+    } else {
+        // TODO use a thread pool
+        httpd = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD, (uint16_t)http_port, NULL, NULL, &evr_attr_index_handle_http_request, NULL, MHD_OPTION_END);
+        if(!httpd){
+            log_error("Unable to start http daemon");
+            goto out_with_join_watch_index_claims_thrd;
+        }
+        log_info("http server listening on %s", cfg->http_port);
+    }
+#else
+#define out_with_stop_httpd_conditional out_with_join_index_sync_thrd
+#endif
     if(mtx_lock(&stop_lock) != thrd_success){
         evr_panic("Failed to lock stop lock");
-        goto out_with_join_watch_index_claims_thrd;
     }
     while(running){
         if(cnd_wait(&stop_signal, &stop_lock) != thrd_success){
             evr_panic("Failed to wait for stop signal");
-            goto out_with_join_watch_index_claims_thrd;
         }
     }
     if(mtx_unlock(&stop_lock) != thrd_success){
         evr_panic("Failed to unlock stop lock");
-        goto out_with_join_watch_index_claims_thrd;
     }
     if(evr_abort_handover(&index_handover_ctx.handover, 1) != evr_ok){
-        goto out_with_join_watch_index_claims_thrd;
+        goto out_with_stop_httpd_conditional;
     }
     if(evr_abort_handover(&attr_spec_handover_ctx.handover, 1) != evr_ok){
-        goto out_with_join_watch_index_claims_thrd;
+        goto out_with_stop_httpd_conditional;
     }
     if(evr_abort_handover(&current_index_ctx.handover, 1) != evr_ok){
-        goto out_with_join_watch_index_claims_thrd;
+        goto out_with_stop_httpd_conditional;
     }
     ret = evr_ok;
     int thrd_res;
+#ifdef EVR_HAS_HTTPD
+ out_with_stop_httpd:
+    if(httpd){
+        MHD_stop_daemon(httpd);
+    }
+#endif
  out_with_join_index_sync_thrd:
     if(thrd_join(index_sync_thrd, &thrd_res) != thrd_success){
         evr_panic("Failed to join index sync thread");
@@ -403,6 +454,12 @@ int evr_load_attr_index_cfg(int argc, char **argv){
     cfg->state_dir_path = strdup(default_state_dir_path);
     cfg->host = strdup(evr_attr_index_host);
     cfg->port = strdup(to_string(evr_attr_index_port));
+#ifdef EVR_HAS_HTTPD
+    cfg->http_port = strdup(to_string(evr_attr_index_http_port));
+    if(!cfg->http_port){
+        evr_panic("Unable to allocate memory for configuration.");
+    }
+#endif
     cfg->ssl_cert_path = strdup(default_ssl_cert_path);
     cfg->ssl_key_path = strdup(default_ssl_key_path);
     cfg->auth_token_set = 0;
@@ -1724,3 +1781,99 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
  out:
     return ret;
 }
+
+#ifdef EVR_HAS_HTTPD
+static const char evr_httpd_not_found[] = "Endpoint not found";
+static const char evr_httpd_unauthorized[] = "No Bearer Authentication header with valid auth-token provided";
+static const char evr_httpd_server_error[] = "Internal server error";
+
+static int evr_attr_index_check_authentication_header(struct MHD_Connection *c);
+static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const char *query_params);
+static enum MHD_Result evr_httpd_respond_static_msg(struct MHD_Connection *c, unsigned int status_code, const char *msg);
+
+static const char evr_httpd_search_path[] = "/search";
+
+static enum MHD_Result evr_attr_index_handle_http_request(void *cls, struct MHD_Connection *c, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls){
+    int res, is_get;
+    log_debug("http request %s %s", method, url);
+    res = evr_attr_index_check_authentication_header(c);
+    if(res == evr_user_data_invalid) {
+        return evr_httpd_respond_static_msg(c, 401, evr_httpd_unauthorized);
+    } else if(res != evr_ok) {
+        return evr_httpd_respond_static_msg(c, 500, evr_httpd_server_error);
+    }
+    // after this point the request is authenticated
+    is_get = strcmp(method, "GET") == 0;
+    if(is_get && strncmp(url, evr_httpd_search_path, sizeof(evr_httpd_search_path) - 1) == 0 && (url[sizeof(evr_httpd_search_path) - 1] == '\0' || url[sizeof(evr_httpd_search_path) - 1] == '?')){
+        return evr_httpd_handle_search(c, &url[sizeof(evr_httpd_search_path) - 1]);
+    }
+    return evr_httpd_respond_static_msg(c, 404, evr_httpd_not_found);
+}
+
+static enum MHD_Result evr_attr_index_authentication_header_it(void *ctx, enum MHD_ValueKind kind, const char *key, const char *value);
+
+static int evr_attr_index_check_authentication_header(struct MHD_Connection *c){
+    int ret = evr_user_data_invalid;
+    MHD_get_connection_values(c, MHD_HEADER_KIND, evr_attr_index_authentication_header_it, &ret);
+    return ret;
+}
+
+// the 'AT' stands for authentication token. it defines the type of
+// token. this way we can add different kinds of tokens in the future.
+static const char evr_attr_index_bearer[] = "Bearer AT";
+
+static enum MHD_Result evr_attr_index_authentication_header_it(void *ctx, enum MHD_ValueKind kind, const char *key, const char *value){
+    const char *token_str;
+    evr_auth_token token;
+    int *ret = ctx;
+    if(strcmp(key, "Authorization") != 0){
+        return MHD_YES;
+    }
+    if(strncmp(value, evr_attr_index_bearer, sizeof(evr_attr_index_bearer) - 1) != 0){
+        log_debug("Retrieved http authorization header which is not bearer: %s", value);
+        return MHD_YES;
+    }
+    token_str = &value[sizeof(evr_attr_index_bearer) - 1];
+    if(evr_parse_auth_token(token, token_str) != evr_ok){
+        log_debug("Retrieved syntactically invalid http authorization token: %s", token_str);
+        return MHD_YES;
+    }
+    if(memcmp(cfg->auth_token, token, sizeof(evr_auth_token)) != 0){
+        log_error("Invalid auth token provided to http server");
+        return MHD_YES;
+    }
+    *ret = evr_ok;
+    return MHD_NO;
+}
+
+static const char evr_httpd_query_param_prefix[] = "?q=";
+static const char evr_httpd_search_params_error[] = "Invalid search params";
+
+static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const char *query_params){
+    char *search_query;
+    if(*query_params == '\0') {
+        search_query = "";
+    } else if(strncmp(evr_httpd_query_param_prefix, query_params, sizeof(evr_httpd_query_param_prefix) - 1) == 0) {
+        search_query = &query_params[sizeof(evr_httpd_query_param_prefix) - 1];
+    } else {
+        return evr_httpd_respond_static_msg(c, 400, evr_httpd_search_params_error);
+    }
+    log_debug("http server retrieved query: %s", search_query);
+    // TODO
+    return evr_httpd_respond_static_msg(c, 500, "TODO");
+}
+
+static enum MHD_Result evr_httpd_respond_static_msg(struct MHD_Connection *c, unsigned int status_code, const char *msg){
+    int ret;
+    struct MHD_Response *resp;
+    size_t msg_len;
+    msg_len = strlen(msg);
+    resp = MHD_create_response_from_buffer(msg_len, (void*)msg, MHD_RESPMEM_PERSISTENT);
+    if(MHD_add_response_header(resp, "Server", program_name "/" VERSION) != MHD_YES){
+        return evr_error;
+    }
+    ret = MHD_queue_response(c, status_code, resp);
+    MHD_destroy_response(resp);
+    return ret;
+}
+#endif

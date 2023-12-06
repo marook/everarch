@@ -51,6 +51,9 @@ struct evr_attr_index_cfg {
     char *state_dir_path;
     char *host;
     char *port;
+#ifdef EVR_HAS_HTTPD
+    char *http_port;
+#endif
     char *ssl_cert_path;
     char *ssl_key_path;
     int auth_token_set;

@@ -49,6 +49,9 @@ void evr_free_attr_index_cfg(struct evr_attr_index_cfg *cfg){
         cfg->state_dir_path,
         cfg->host,
         cfg->port,
+#ifdef EVR_HAS_HTTPD
+        cfg->http_port,
+#endif
         cfg->ssl_cert_path,
         cfg->ssl_key_path,
         cfg->storage_host,

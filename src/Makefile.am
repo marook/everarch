@@ -11,6 +11,10 @@ CFLAGS_WARN=\
 	-Wno-variadic-macros
 
 AM_CFLAGS = $(CFLAGS_WARN) $(SQLITE_CFLAGS) $(LIBGCRYPT_CFLAGS) $(PTHREAD_CFLAGS) $(XML_CFLAGS) $(GPGME_CFLAGS) $(SSL_CFLAGS) $(FUSE_CFLAGS) $(GTK_CFLAGS)
+if HAS_HTTPD
+AM_CFLAGS += $(HTTPD_CFLAGS)
+endif
+
 BUILT_SOURCES =
 AM_YFLAGS = -d
 
@@ -178,6 +182,9 @@ evr_attr_index_SOURCES = \
 	subprocess.c
 evr_attr_index_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
+if HAS_HTTPD
+  evr_attr_index_LDADD += $(HTTPD_LIBS)
+endif
 
 evr_SOURCES = \
 	auth.c \

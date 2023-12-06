@@ -66,9 +66,14 @@ $ apt install flex bison
 
 evr-fs let's you access everarch content from the file system instead
 of just via the evr command line interface. You need the following
-extra dependencies if you want te bouild evr-fs:
+extra dependencies if you want to build evr-fs:
 
 $ apt install fuse3 libfuse3-dev
+
+evr-attr-index has an optional http server to query the index. Install
+the following if you want to use it:
+
+$ apt install libmicrohttpd-dev
 
 Install the following if you want to use the emacs integration:
 

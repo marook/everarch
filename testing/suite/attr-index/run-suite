@@ -230,4 +230,39 @@ then
     exit 1
 fi
 
+if [[ "${HAS_HTTPD}" == 'true' ]]
+then
+    echo "Running http server tests…"
+    server_name=`curl -o /dev/null -s -w "%header{Server}\n" http://localhost:${attr_index_http_port}/no/such/endpoint`
+    if [[ "${server_name}" != "evr-attr-index/0.1.0" ]]
+    then
+        echo "Expected server name but got: ${server_name}" >&2
+        exit 1
+    fi
+
+    http_status=`curl -o /dev/null -s -w "%{http_code}\n" http://localhost:${attr_index_http_port}/no/such/endpoint`
+    if [[ "${http_status}" != "401" ]]
+    then
+        echo "Expected request without authentication to report 401 but got ${http_status}" >&2
+        exit 1
+    fi
+
+    http_status=`curl -o /dev/null -s -w "%{http_code}\n" -H "Authorization: Bearer AT${attr_index_auth_token}" http://localhost:${attr_index_http_port}/no/such/endpoint`
+    if [[ "${http_status}" != "404" ]]
+    then
+        echo "Expected request without authentication to report 404 but got ${http_status}" >&2
+        exit 1
+    fi
+
+    results=`curl -s -H "Authorization: Bearer AT${attr_index_auth_token}" http://localhost:${attr_index_http_port}/search`
+    if [[ "${results}" != "${germany_ref}-0000
+${berlin_ref}-0000
+${test2_ref}-0000
+${test_ref}-0000" ]]
+    then
+        echo "Unexpected http result from empty expression search query: ${results}" >&2
+        exit 1
+    fi
+fi
+
 echo "Stopping…"
