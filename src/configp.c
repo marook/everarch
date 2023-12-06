@@ -88,7 +88,7 @@ int configp_parse_file(struct configp *p, char *file, void *input){
             ret = configp_no_such_file;
             goto out_with_free_wexp;
         }
-        log_error("Config file %s not found", exp_file);
+        log_error("Config file %s can't be opened: %s", exp_file, strerror(errno));
         goto out_with_free_wexp;
     }
     log_debug("Parsing config file %s", exp_file);
