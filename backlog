@@ -1,13 +1,3 @@
-* fix inode timeout corner cases in evr-glacier-fs
-evr-glacier-fs's struct evr_inode has a timeout field which indicates
-until when the inode must be kept valid. currently the timeout is
-calculated when the fuse request for the inode is incomming. this is
-incorrect because the kernel seems to care about the timestamp when
-the fuse response was submitted.
-
-the implementation should update time timestamp after the response was
-sumtitten to fuse. that way the evr_inode_lifetime_overlap can
-probably be a very small value.
 * fix build with musl
 #+BEGIN_SRC
 glacier.c: In function 'evr_glacier_walk_bucket':

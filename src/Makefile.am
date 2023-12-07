@@ -73,6 +73,7 @@ endif
 check_PROGRAMS = \
 	$(evr_c_unit_tests) \
 	glacier-benchmark \
+	slow-read \
 	zipper
 
 TESTS = $(evr_c_unit_tests)
@@ -443,3 +444,6 @@ subprocess_test_SOURCES = \
 zipper_SOURCES = \
 	logger.c \
 	zipper.c
+
+slow_read_SOURCES = \
+	slow-read.c

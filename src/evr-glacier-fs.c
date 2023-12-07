@@ -172,13 +172,19 @@ static error_t parse_opt_glacier(int key, char *arg, struct argp_state *state){
 /**
  * lifetime duration of an inode assignment in milliseconds.
  */
-#define evr_inode_lifetime 10000
-#define evr_inode_lifetime_overlap 20000
+#define evr_inode_lifetime 3000
+#define evr_inode_lifetime_overlap 3000
 
 static mtx_t evr_inodes_mtx;
 
 struct evr_inode {
     evr_claim_ref ref;
+
+    /**
+     * The locked flag indicates if this inode must not be reassigned
+     * even if the timeout expired.
+     */
+    int locked;
 
     /**
      * Absolute timestamp until when the inode must stay valid.
@@ -190,8 +196,16 @@ static struct evr_inode evr_inodes[512];
 
 static struct evr_open_file_set open_files;
 
-static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino);
-static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref);
+/**
+ * evr_lookup_inode finds the claim ref that is currently assigned to
+ * ino.
+ *
+ * lock_inode will disallow reusal of this inode until
+ * evr_unlock_inode(…) is called. Even if the inode timeout expired.
+ */
+static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino, int lock_inode);
+static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref, int lock_inode);
+static int evr_unlock_inode(fuse_ino_t ino);
 
 static void evr_glacier_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name);
 static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi);
@@ -296,7 +310,7 @@ int main(int argc, char *argv[]) {
 #define evr_glacier_fs_ino_files 2
 #define evr_glacier_fs_ino_dyn 3
 
-static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino){
+static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino, int lock_inode){
     int ret = evr_error;
     evr_time t;
     struct evr_inode *ind;
@@ -308,7 +322,7 @@ static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino){
         goto out;
     }
     ind = &evr_inodes[ino - evr_glacier_fs_ino_dyn];
-    if(ind->timeout < t){
+    if(!ind->locked && ind->timeout < t){
         log_debug("Inode %d expired at t=" evr_time_fmt " which is " evr_time_fmt " ago", (int)ino, ind->timeout, t - ind->timeout);
         ret = evr_not_found;
         goto out_with_unlock_inodes;
@@ -316,6 +330,9 @@ static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino){
     ind->timeout = t + evr_inode_lifetime + evr_inode_lifetime_overlap;
     log_debug("Inode %d extended until t=" evr_time_fmt, (int)ino, ind->timeout);
     memcpy(ref, ind->ref, evr_claim_ref_size);
+    if(lock_inode){
+        ind->locked = 1;
+    }
     ret = evr_ok;
  out_with_unlock_inodes:
     if(mtx_unlock(&evr_inodes_mtx) != thrd_success){
@@ -325,7 +342,7 @@ static int evr_lookup_inode(evr_claim_ref ref, fuse_ino_t ino){
     return ret;
 }
 
-static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref){
+static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref, int lock_inode){
     int ret = evr_error;
     evr_time t;
     struct evr_inode *ind_end, *ind_it, *available_ind;
@@ -336,7 +353,7 @@ static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref){
     evr_now(&t);
     ind_end = &evr_inodes[static_len(evr_inodes)];
     for(ind_it = evr_inodes; ind_it != ind_end; ++ind_it){
-        if(ind_it->timeout < t){
+        if(!ind_it->locked && ind_it->timeout < t){
             if(!available_ind) {
                 available_ind = ind_it;
             }
@@ -344,12 +361,15 @@ static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref){
             if(evr_cmp_claim_ref(ref, ind_it->ref) == 0){
                 *ino = ind_it - evr_inodes + evr_glacier_fs_ino_dyn;
                 ind_it->timeout = t + evr_inode_lifetime + evr_inode_lifetime_overlap;
+                if(lock_inode){
+                    ind_it->locked = 1;
+                }
                 ret = evr_ok;
 #ifdef EVR_LOG_DEBUG
                 {
                     evr_claim_ref_str ref_str;
                     evr_fmt_claim_ref(ref_str, ref);
-                    log_debug("Extended lifetime of inode %zu with assignemt %s", (size_t)*ino, ref_str);
+                    log_debug("Extended lifetime of inode %zu with assignemt %s until " evr_time_fmt, (size_t)*ino, ref_str, ind_it->timeout);
                 }
 #endif
                 goto out_with_unlock_inodes;
@@ -372,6 +392,26 @@ static int evr_acquire_inode(fuse_ino_t *ino, evr_claim_ref ref){
     }
 #endif
  out_with_unlock_inodes:
+    if(mtx_unlock(&evr_inodes_mtx) != thrd_success){
+        evr_panic("Unable to unlock inodes mutex");
+    }
+ out:
+    return ret;
+}
+
+static int evr_unlock_inode(fuse_ino_t ino){
+    int ret = evr_error;
+    evr_time t;
+    struct evr_inode *ind;
+    evr_now(&t);
+    if(mtx_lock(&evr_inodes_mtx) != thrd_success){
+        goto out;
+    }
+    ind = &evr_inodes[ino - evr_glacier_fs_ino_dyn];
+    ind->timeout = t + evr_inode_lifetime + evr_inode_lifetime_overlap;
+    ind->locked = 0;
+    ret = evr_ok;
+    log_debug("Extended lifetime of inode %zu until " evr_time_fmt, (size_t)ino, ind->timeout);
     if(mtx_unlock(&evr_inodes_mtx) != thrd_success){
         evr_panic("Unable to unlock inodes mutex");
     }
@@ -433,7 +473,7 @@ static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *ref_str){
     } else if(res != evr_ok){
         goto out;
     }
-    res = evr_acquire_inode(&ep.ino, ref);
+    res = evr_acquire_inode(&ep.ino, ref, 1);
     if(res == evr_temporary_occupied) {
         // if you ever see this error the evr_inodes buffer should
         // probably be changed from a fixed size to a dynamically
@@ -450,6 +490,9 @@ static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *ref_str){
     if(fuse_reply_entry(req, &ep) != 0){
         evr_panic("fuse request %p unable to reply entry", req);
     }
+    if(evr_unlock_inode(ep.ino) != evr_ok){
+        evr_panic("Unable to unlock inode.");
+    }
     err = 0;
  out:
     if(err != 0 && fuse_reply_err(req, err) != 0){
@@ -461,6 +504,7 @@ static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_f
     int err = EIO, res;
     struct stat st = { 0 };
     evr_claim_ref ref;
+    int unlock_inode = 0;
     log_debug("fuse request %p: getattr for inode %d", req, (int)ino);
     if(ino == evr_glacier_fs_ino_root){
         st.st_mode = S_IFDIR | 0555;
@@ -468,12 +512,12 @@ static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_f
     } else if(ino == evr_glacier_fs_ino_files) {
         evr_glacier_fs_file_dir_stat(&st);
     } else {
-        if(evr_lookup_inode(ref, ino) != evr_ok){
+        if(evr_lookup_inode(ref, ino, 1) != evr_ok){
             log_debug("fuse request %p: inode %d not found", req, (int)ino);
             err = ENOENT;
             goto fail;
         }
-        memset(&st, 0, sizeof(st));
+        unlock_inode = 1;
         res = evr_stat_file(&st, ref);
         if(res == evr_not_found){
             err = ENOENT;
@@ -487,6 +531,11 @@ static void evr_glacier_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_f
     st.st_gid = cfg.gid;
     if(fuse_reply_attr(req, &st, evr_inode_lifetime / 1000.0) != 0){
         evr_panic("fuser request %p unable to reply attr", req);
+    }
+    if(unlock_inode){
+        if(evr_unlock_inode(ino) != evr_ok){
+            evr_panic("Unable to unlock inode.");
+        }
     }
     return;
  fail:
@@ -583,7 +632,7 @@ static void evr_glacier_fs_open(fuse_req_t req, fuse_ino_t ino, struct fuse_file
     log_debug("fuse request %p: open for inode %d", req, (int)ino);
     switch(ino){
     default:
-        res = evr_lookup_inode(ref, ino);
+        res = evr_lookup_inode(ref, ino, 0);
         if(res == evr_not_found) {
             log_error("No file ref found for inode %zu", (size_t)ino);
             err = ENOENT;

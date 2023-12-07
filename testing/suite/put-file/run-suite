@@ -61,11 +61,11 @@ then
 fi
 
 # it should read from stdin if file argument is missing
-ref=`echo 'piped content' | evr post-file`
+ref=`echo 'piped content from file' | evr post-file`
 content=`evr get-file ${ref}`
-if [[ 'piped content' != "${content}" ]]
+if [[ 'piped content from file' != "${content}" ]]
 then
-    echo "Expected 'piped content' but got: ${content}" >&2
+    echo "Expected 'piped content from file' but got: ${content}" >&2
     exit 1
 fi
 
@@ -74,7 +74,7 @@ claim=`evr get-claim ${ref}`
 if [[ "${claim}" != "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <file xmlns=\"https://evr.ma300k.de/claims/\">
   <body>
-   <slice ref=\"sha3-224-0890c2f681f23e2c67aa9f9685cf753be459f460b4ee8404752aa449\" size=\"14\"/>
+   <slice ref=\"sha3-224-983df141d42447fd2b6661fd4f5af62f671f11703076b994f104f69e\" size=\"24\"/>
   </body>
  </file>" ]]
 then
@@ -102,9 +102,11 @@ ${evr_glacier_fs_mnt_dir}/file" ]]
     fi
 
     cat_ref=`cat ${evr_glacier_fs_mnt_dir}/file/${ref}`
-    if [[ "${cat_ref}" != 'piped content' ]]
+    if [[ "${cat_ref}" != 'piped content from file' ]]
     then
         echo "Unexpected cat ${evr_glacier_fs_mnt_dir}/file/${ref} result: ${cat_ref}" >&2
         exit 1
     fi
+
+    slow-read "${evr_glacier_fs_mnt_dir}/file/${ref}"
 fi
