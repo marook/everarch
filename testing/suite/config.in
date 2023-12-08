@@ -91,7 +91,6 @@ EOF
     cat > evr-attr-index.conf <<EOF
 state-dir=${attr_index_state_dir}
 port=${attr_index_port}
-http-port=${attr_index_http_port}
 storage-port=${glacier_storage_port}
 storage-auth-token=${glacier_storage_auth_token}
 cert=${attr_index_cert_path}
@@ -100,6 +99,10 @@ auth-token=${attr_index_auth_token}
 ssl-cert=localhost:${glacier_storage_port}:${glacier_storage_cert_path}
 EOF
     append_accepted_gpg_keys >> evr-attr-index.conf
+    if [[ "${HAS_HTTPD}" == 'true' ]]
+    then
+        echo "http-port=${attr_index_http_port}" >> evr-attr-index.conf
+    fi
 
     cat > glacier-benchmark.conf <<EOF
 storage-port=${glacier_storage_port}
