@@ -30,6 +30,7 @@
 #include <time.h>
 #include <limits.h>
 
+#include "errors.h"
 #include "logger.h"
 #include "dyn-mem.h"
 #include "db.h"
@@ -1219,17 +1220,18 @@ int evr_glacier_reindex_visit_blob(void *context, struct evr_glacier_bucket_blob
 }
 
 int evr_glacier_walk_bucket(char *bucket_path, int (*visit_bucket)(void *ctx, size_t end_offset), int (*visit_blob)(void *ctx, struct evr_glacier_bucket_blob_stat *stat), void *ctx){
-    int ret = evr_error, open_error;
+    int ret = evr_error;
     const size_t header_size = evr_blob_ref_size + sizeof(uint8_t) + sizeof(uint64_t) + sizeof(uint32_t) + sizeof(uint8_t);
     char buf[header_size];
     size_t end_offset;
     int f = open(bucket_path, O_RDONLY);
     if(f < 0){
+        int open_error;
         char buf[1024], *err_msg;
+        err_msg = buf;
         open_error = errno;
-        err_msg = strerror_r(open_error, buf, sizeof(buf));
-        if(err_msg == buf){
-            buf[sizeof(buf)-1] = '\0';
+        if(evr_strerror_r(errno, &err_msg, sizeof(buf)) != evr_ok){
+            evr_panic("Unable to produce error message for errno %d", open_error);
         }
         log_error("Failed to open bucket file %s readonly: %s", bucket_path, err_msg);
         goto out;

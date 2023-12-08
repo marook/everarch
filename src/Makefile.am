@@ -91,6 +91,7 @@ attr_index_db_test_SOURCES = \
 	configurations.c \
 	db.c \
 	dyn-mem.c \
+	errors.c \
 	evr-tls.c \
 	files.c \
 	glacier.c \
@@ -167,6 +168,7 @@ evr_attr_index_SOURCES = \
 	daemon.c \
 	db.c \
 	dyn-mem.c \
+	errors.c \
 	evr-attr-index.c \
 	evr-glacier-client.c \
 	evr-tls.c \
@@ -259,6 +261,7 @@ evr_glacier_storage_SOURCES = \
 	daemon.c \
 	db.c \
 	dyn-mem.c \
+	errors.c \
 	evr-glacier-storage.c \
 	evr-tls.c \
 	files.c \
@@ -277,6 +280,7 @@ evr_glacier_tool_SOURCES = \
 	configp.c \
 	db.c \
 	dyn-mem.c \
+	errors.c \
 	evr-glacier-tool.c \
 	files.c \
 	glacier.c \
@@ -361,6 +365,7 @@ glacier_test_SOURCES = \
 	configurations.c \
 	db.c \
 	dyn-mem.c \
+	errors.c \
 	files.c \
 	glacier.c \
 	glacier-storage-configuration.c \

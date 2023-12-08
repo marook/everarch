@@ -7,9 +7,11 @@ AC_CHECK_INCLUDES_DEFAULT
 AC_PROG_EGREP
 AC_PROG_CC
 
-AC_DEFINE(_DEFAULT_SOURCE, [1], [This macro can be defined to ensure that the "default" definitions are provided.])
-AC_DEFINE(_POSIX_C_SOURCE, [200809L], [We want to use for example strnlen])
-AC_DEFINE(_GNU_SOURCE, [1], [We use for example fcntl's F_GETSIG])
+AC_DEFINE([_DEFAULT_SOURCE], [1], [Use modern C features as defined in feature_test_macros(7)])
+AC_DEFINE([_XOPEN_SOURCE], [700], [Use modern C features as defined in feature_test_macros(7)])
+AC_DEFINE([_POSIX_C_SOURCE], [200809L], [Use modern C features as defined in feature_test_macros(7)])
+AC_DEFINE([_GNU_SOURCE], [1], [Use modern linux features with glibc.])
+
 AC_DEFINE(EVR_GCRY_MIN_VERSION, ["1.8.0"], [Minimum version required for libgrcy])
 
 AC_CHECK_HEADER([argp.h], [], AC_MSG_ERROR([Cannot find argparse headers.]))

@@ -1,9 +1,3 @@
-* fix build with musl
-#+BEGIN_SRC
-glacier.c: In function 'evr_glacier_walk_bucket':
-glacier.c:1231:17: error: assignment to 'char *' from 'int' makes pointer from integer without a cast [-Werror=int-conversion]
- 1231 |         err_msg = strerror_r(open_error, buf, sizeof(buf));
-#+END_SRC
 * replace memset with {0}
 replace memset(…, 0, …) initializations with … = { 0 } because of
 https://man7.org/linux/man-pages/man3/freeaddrinfo.3p.html#APPLICATION_USAGE

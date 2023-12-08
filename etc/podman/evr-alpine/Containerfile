@@ -21,7 +21,7 @@ LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
 RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev coreutils openssl openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison bash netcat-openbsd socat util-linux
 COPY . /root/everarch
 WORKDIR /root/everarch
-RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && cp testing/suite/config.alpine testing/suite/config.local && autoreconf --install && ./configure && make clean && make -j 4 && ( ./test.sh || ( cat src/test-suite.log test.log && exit 1 ) )
+RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && cp testing/suite/config.alpine testing/suite/config.local && autoreconf --install && ./configure && make clean && make -j 4 && ./test.sh
 
 # The following commented RUN instructions are a collection of 'last
 # resort, show me the error' quick hacks.

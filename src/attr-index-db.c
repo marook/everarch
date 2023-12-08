@@ -1025,7 +1025,14 @@ void evr_log_failed_claim_set_buf(struct evr_attr_index_db *db, evr_blob_ref cla
     log_debug("Logging failed claim-set operation to %s: %s", log_path, fail_reason);
     int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT, 0644);
     if(fd < 0){
-        log_error(log_scope " Can't open claim-set log file %s: %s", log_path, strerror(errno));
+        int open_error;
+        char buf[1024], *err_msg;
+        err_msg = buf;
+        open_error = errno;
+        if(evr_strerror_r(errno, &err_msg, sizeof(buf)) != evr_ok){
+            evr_panic("Unable to produce error message for errno %d", open_error);
+        }
+        log_error(log_scope " Can't open claim-set log file %s: %s", log_path, err_msg);
         return;
     }
     struct evr_file f;

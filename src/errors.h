@@ -19,6 +19,10 @@
 #ifndef __errors_h__
 #define __errors_h__
 
+#include "config.h"
+
+#include <stddef.h>
+
 #define evr_ok 0
 #define evr_error 1
 #define evr_not_found 2
@@ -33,5 +37,19 @@
  * index.db is corrupt.
  */
 #define evr_glacier_index_db_corrupt 100
+
+/**
+ * evr_strerror_r is the superset of the XSI and GNU compliant
+ * strerror_r function.
+ *
+ * The caller must provide a buffer of buflen at *buf. The *buf
+ * pointer may have changed after the call and point to a statically
+ * allocated string. In that case the provided buffer is not used.
+ *
+ * *buf points to the error string in any success case after the call.
+ *
+ * Returns evr_ok if the call was successful.
+ */
+int evr_strerror_r(int errnum, char **buf, size_t buflen);
 
 #endif
