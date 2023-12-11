@@ -423,12 +423,11 @@ static void evr_glacier_fs_file_dir_stat(struct stat *stat);
 static void evr_glacier_fs_lookup_file(fuse_req_t req, const char *seed_str);
 
 static void evr_glacier_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
-    struct fuse_entry_param ep;
+    struct fuse_entry_param ep = { 0 };
     log_debug("fuse request %p: lookup %s with parent %d", req, name, (int)parent);
     switch(parent){
     case evr_glacier_fs_ino_root:
         if(strcmp(name, evr_glacier_fs_ino_files_name) == 0){
-            memset(&ep, 0, sizeof(ep));
             ep.ino = evr_glacier_fs_ino_files;
             evr_glacier_fs_file_dir_stat(&ep.attr);
             ep.attr_timeout = DBL_MAX;
@@ -589,13 +588,12 @@ static int evr_stat_file(struct stat *st, evr_claim_ref ref){
 static void evr_glacier_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, struct fuse_file_info *fi){
     char buf[1024];
     struct evr_buf_pos bp;
-    struct stat st;
+    struct stat st = { 0 };
     size_t entry_size, reply_size;
     char *buf_end = &buf[sizeof(buf)];
     log_debug("fuse request %p: readdir for inode %d at %zu+%zu", req, (int)ino, (size_t)off, size);
     if(ino == evr_glacier_fs_ino_root){
         evr_init_buf_pos(&bp, buf);
-        memset(&st, 0, sizeof(st));
         evr_add_direntry(".", ino);
         evr_add_direntry("..", 0); // TODO is 0 correct here?
         evr_add_direntry(evr_glacier_fs_ino_files_name, evr_glacier_fs_ino_files);

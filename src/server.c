@@ -24,9 +24,11 @@
 
 #include "logger.h"
 
+static struct addrinfo hints_init = { 0 };
+
 int evr_make_tcp_socket(char *host, char *port){
     struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
+    hints = hints_init;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;

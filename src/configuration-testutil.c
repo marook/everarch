@@ -37,10 +37,12 @@ char *new_temp_dir_path(){
     return s;
 }
 
+static struct evr_glacier_storage_cfg evr_glacier_storage_cfg_init = { 0 };
+
 struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(){
     struct evr_glacier_storage_cfg *config = malloc(sizeof(struct evr_glacier_storage_cfg));
     assert(config);
-    memset(config, 0, sizeof(struct evr_glacier_storage_cfg));
+    *config = evr_glacier_storage_cfg_init;
     config->host = strdup("localhost");
     config->port = strdup(to_string(evr_glacier_storage_port));
     config->ssl_cert_path = strdup("../testing/tls/glacier-cert.pem");
@@ -53,10 +55,12 @@ struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(){
     return config;
 }
 
+static struct evr_attr_index_cfg evr_attr_index_cfg_init = { 0 };
+
 struct evr_attr_index_cfg *create_temp_attr_index_db_configuration(){
     struct evr_attr_index_cfg *cfg = malloc(sizeof(struct evr_attr_index_cfg));
     assert(cfg);
-    memset(cfg, 0, sizeof(struct evr_attr_index_cfg));
+    *cfg = evr_attr_index_cfg_init;
     cfg->state_dir_path = new_temp_dir_path();
     cfg->host = strdup("localhost");
     cfg->port = strdup(to_string(evr_attr_index_port));

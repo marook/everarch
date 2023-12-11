@@ -698,8 +698,7 @@ static void evr_fs_lookup(fuse_req_t req, fuse_ino_t parent, const char *name){
         if(strcmp(name, cnd->name) != 0){
             continue;
         }
-        struct fuse_entry_param e;
-        memset(&e, 0, sizeof(e));
+        struct fuse_entry_param e = { 0 };
         e.ino = *c;
         e.attr_timeout = 1.0;
         e.entry_timeout = 1.0;
@@ -740,6 +739,8 @@ static void evr_fs_getattr(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info
     evr_unlock_inode_set_or_panic();
 }
 
+static struct stat stat_init = { 0 };
+
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
     struct evr_inode *nd = evr_get_inode(req, ino);
     if(!nd){
@@ -748,7 +749,7 @@ int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino){
         }
         return evr_error;
     }
-    memset(st, 0, sizeof(*st));
+    *st = stat_init;
     switch(nd->type){
     default:
         evr_panic("Unknown node type %d", nd->type);
@@ -804,8 +805,7 @@ static void evr_fs_readdir(fuse_req_t req, fuse_ino_t ino, size_t size, off_t of
     if(!buf){
         goto fail;
     }
-    struct stat st;
-    memset(&st, 0, sizeof(st));
+    struct stat st = { 0 };
     evr_add_direntry(".", ino);
     evr_add_direntry("..", nd->parent);
     struct evr_inode_dir *dir = &nd->data.dir;

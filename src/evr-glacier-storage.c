@@ -187,8 +187,7 @@ int main(int argc, char **argv){
         goto out_with_free_configuration;
     }
     {
-        struct sigaction action;
-        memset(&action, 0, sizeof(action));
+        struct sigaction action = { 0 };
         action.sa_handler = handle_sigterm;
         sigaction(SIGINT, &action, NULL);
         sigaction(SIGTERM, &action, NULL);
