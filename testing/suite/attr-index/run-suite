@@ -254,16 +254,15 @@ then
         exit 1
     fi
 
-# TODO the following feature is not yet implemented
-#     results=`curl -s -H "Authorization: Bearer AT${attr_index_auth_token}" http://localhost:${attr_index_http_port}/search`
-#     if [[ "${results}" != "${germany_ref}-0000
-# ${berlin_ref}-0000
-# ${test2_ref}-0000
-# ${test_ref}-0000" ]]
-#     then
-#         echo "Unexpected http result from empty expression search query: ${results}" >&2
-#         exit 1
-#     fi
+    results=`curl -s -H "Authorization: Bearer AT${attr_index_auth_token}" http://localhost:${attr_index_http_port}/search`
+    if [[ "${results}" != "${germany_ref}-0000
+${berlin_ref}-0000
+${test2_ref}-0000
+${test_ref}-0000" ]]
+    then
+        echo "Unexpected http result from empty expression search query: ${results}" >&2
+        exit 1
+    fi
 fi
 
 echo "Stopping…"

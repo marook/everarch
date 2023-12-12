@@ -16,32 +16,30 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * file-mem.h declares an in memory implementation of struct evr_file.
+ */
+
 #ifndef file_mem_h
 #define file_mem_h
 
 #include "config.h"
 
-#include "dyn-mem.h"
 #include "files.h"
 
 struct evr_file_mem {
+    size_t max_size;
+    size_t alloc_size;
+    size_t used_size;
     /**
      * Current offset of the read and write pointer inside data.
      */
     size_t offset;
-    struct dynamic_array *data;
+    char *data;
 };
 
-/**
- * evr_init_file_mem initalizes a struct evr_file_mem.
- *
- * An error occured if fm->data is NULL after the call.
- */
-#define evr_init_file_mem(fm, max_size)                 \
-    do {                                                \
-        (fm)->offset = 0;                               \
-        (fm)->data = alloc_dynamic_array(max_size);     \
-    } while (0)
+int evr_init_file_mem(struct evr_file_mem *fm, size_t initial_size, size_t max_size);
+void evr_destroy_file_mem(struct evr_file_mem *fm);
 
 void evr_file_bind_file_mem(struct evr_file *f, struct evr_file_mem *fm);
 

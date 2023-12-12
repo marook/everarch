@@ -27,7 +27,7 @@
 
 void test_write_auth_token(){
     struct evr_file_mem fm;
-    evr_init_file_mem(&fm, 1024);
+    assert(is_ok(evr_init_file_mem(&fm, 1024, 1024)));
     assert(fm.data);
     struct evr_file f;
     evr_file_bind_file_mem(&f, &fm);
@@ -37,13 +37,13 @@ void test_write_auth_token(){
     assert(fm.data);
     char expected[] = "a token 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a\n";
     assert(fm.offset == sizeof(expected) - 1);
-    assert(memcmp(fm.data->data, expected, sizeof(expected) - 1) == 0);
-    free(fm.data);
+    assert(memcmp(fm.data, expected, sizeof(expected) - 1) == 0);
+    evr_destroy_file_mem(&fm);
 }
 
 void test_write_list_claims_for_seed(){
     struct evr_file_mem fm;
-    evr_init_file_mem(&fm, 1024);
+    assert(is_ok(evr_init_file_mem(&fm, 1024, 1024)));
     assert(fm.data);
     struct evr_file f;
     evr_file_bind_file_mem(&f, &fm);
@@ -52,8 +52,8 @@ void test_write_list_claims_for_seed(){
     assert(is_ok(evr_attri_write_list_claims_for_seed(&f, seed)));
     char expected[] = "c sha3-224-ffffffffffffffffffffffffffffffffffffffffffffffffffffffff-1234\n";
     assert(fm.offset == sizeof(expected) - 1);
-    assert(memcmp(fm.data->data, expected, sizeof(expected) - 1) == 0);
-    free(fm.data);
+    assert(memcmp(fm.data, expected, sizeof(expected) - 1) == 0);
+    evr_destroy_file_mem(&fm);
 }
 
 int test_read_search_visit_attr(void *ctx, evr_claim_ref claim_ref, char *key, char *val){
@@ -80,7 +80,7 @@ int test_read_search_visit_attr(void *ctx, evr_claim_ref claim_ref, char *key, c
 
 void test_read_search(){
     struct evr_file_mem fm;
-    evr_init_file_mem(&fm, 1024);
+    assert(is_ok(evr_init_file_mem(&fm, 1024, 1024)));
     assert(fm.data);
     struct evr_file f;
     evr_file_bind_file_mem(&f, &fm);
@@ -99,7 +99,7 @@ void test_read_search(){
     assert(is_ok(evr_attri_read_search(r, NULL, test_read_search_visit_attr, &state)));
     assert(state == 3);
     evr_free_buf_read(r);
-    free(fm.data);
+    evr_destroy_file_mem(&fm);
 }
 
 int main(){

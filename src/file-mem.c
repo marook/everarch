@@ -21,6 +21,24 @@
 #include "logger.h"
 #include "errors.h"
 
+int evr_init_file_mem(struct evr_file_mem *fm, size_t initial_size, size_t max_size){
+    char *buf;
+    buf = malloc(initial_size);
+    if(!buf){
+        return evr_error;
+    }
+    fm->max_size = max_size;
+    fm->alloc_size = initial_size;
+    fm->used_size = 0;
+    fm->offset = 0;
+    fm->data = buf;
+    return evr_ok;
+}
+
+void evr_destroy_file_mem(struct evr_file_mem *fm){
+    free(fm->data);
+}
+
 int evr_file_mem_get_fd(struct evr_file *f);
 int evr_file_mem_wait_for_data(struct evr_file *f, int timeout);
 size_t evr_file_mem_pending(struct evr_file *f);
@@ -64,32 +82,43 @@ ssize_t evr_file_mem_read(struct evr_file *f, void *buf, size_t count){
     if(!fm->data){
         return 0;
     }
-    if(fm->offset > fm->data->size_used){
-        log_error("Offset may never be greater than size_used in a defined file-mem state.");
+    if(fm->offset > fm->used_size){
+        log_error("Offset may never be greater than used_size in a defined file-mem state.");
         return -1;
     }
-    size_t possible = fm->data->size_used - fm->offset;
+    size_t possible = fm->used_size - fm->offset;
     size_t read_bytes = min(count, possible);
-    memcpy(buf, &fm->data->data[fm->offset], count);
+    memcpy(buf, &fm->data[fm->offset], read_bytes);
     fm->offset += read_bytes;
     return read_bytes;
 }
 
 ssize_t evr_file_mem_write(struct evr_file *f, const void *buf, size_t count){
+    char *data;
+    size_t new_size;
     struct evr_file_mem *fm = evr_file_get_mem(f);
     if(!fm->data){
         return -1;
     }
     size_t min_size = fm->offset + count;
-    if(min_size < fm->data->size_allocated){
-        fm->data = grow_dynamic_array_at_least(fm->data, min_size);
-        if(!fm->data){
+    if(min_size > fm->alloc_size){
+        if(min_size > fm->max_size){
             return -1;
         }
+        new_size = max(2*fm->alloc_size, 2*min_size);
+        if(new_size > fm->max_size){
+            new_size = fm->max_size;
+        }
+        data = realloc(fm->data, new_size);
+        if(!data){
+            return -1;
+        }
+        fm->data = data;
+        fm->alloc_size = new_size;
     }
-    memcpy(&fm->data->data[fm->offset], buf, count);
+    memcpy(&fm->data[fm->offset], buf, count);
     fm->offset = min_size;
-    fm->data->size_used += count;
+    fm->used_size = min_size;
     return count;
 }
 

@@ -1,3 +1,6 @@
+* introduce evr-web/explorer
+HTML/CSS/JS application which allows exploring seed claims. should use
+the evr-attr-index http API for retrieving
 * evr cli's evr_cli_get_file(…) should use evr_fetch_file_claim(…) :cligetfile:
 * applications should print their config lookup parts in usage
 executing any of the evr applications which loads configuration from
@@ -358,9 +361,6 @@ must rewrite queries in the future.
 everything above will be part of the first release of everarch. first
 release means i will personally use it in production as mirror of my
 perkeep stuff.
-* evaluate http libraries for C
-the evaluation should decide if the evr-web-server is implemented in C
-, node.js or maybe deno.
 * plan graph query approach
 [[https://en.wikipedia.org/wiki/SPARQL][sparql]] queryability can be achieved via [[https://librdf.org/][librdf]] which stores data in
 RDF. query output can be formatted with [[https://www.w3.org/TR/2013/REC-rdf-sparql-XMLres-20130321/][sparql xml results]].
@@ -389,29 +389,6 @@ tag=todo order by created asc
 'the key'='the value'
 "the key"="the value"
 #+END_SRC
-* introduce evr-web-server
-should bind to port 443 and respond some hello world as a demo.
-* search seed claims endpoint for evr-web-server
-GET /seeds?tag=todo
-POST /seeds with query in post body?
-
-responds found seed claims as JSON:
-
-#+BEGIN_SRC
-[
-  {
-    "ref": "sha3-224-…",
-    "attr": {
-      "tag": ["todo"]
-    }
-  }
-]
-#+END_SRC
-* introduce evr-web-explorer
-HTML/CSS/JS application which allows exploring seed claims. should use the evr-web-server API for retrieving 
-* evr-web-explorer should show seed claims
-query /seeds evr-web-server endpoint and show the seeds as some kind
-of list.
 * parallel evr-attr-index claim-set preparation
 indexing a claim-set can be splitted into two phases. a first phase
 which fetches the claim-set XML, then applies the attr factories and

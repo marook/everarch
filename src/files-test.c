@@ -132,7 +132,7 @@ int visit_slice(char *buf, size_t size, void *ctx){
 
 void test_buf_read_bytes_ready(){
     struct evr_file_mem fm;
-    evr_init_file_mem(&fm, 32);
+    assert(is_ok(evr_init_file_mem(&fm, 32, 32)));
     assert(fm.data);
     struct evr_file f;
     evr_file_bind_file_mem(&f, &fm);
@@ -192,7 +192,7 @@ void test_buf_read_bytes_ready(){
     bytes_read = evr_buf_read_read(br);
     assert(evr_buf_read_read(br) == 0);
     evr_free_buf_read(br);
-    free(fm.data);
+    evr_destroy_file_mem(&fm);
 }
 
 int main(){

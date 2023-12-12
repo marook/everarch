@@ -54,6 +54,7 @@ evr_c_unit_tests = \
 	dyn-mem-test \
 	evr-attr-index-client-test \
 	evr-tls-test \
+	file-mem-test \
 	files-test \
 	glacier-cmd-test \
 	glacier-test \
@@ -172,6 +173,7 @@ evr_attr_index_SOURCES = \
 	evr-attr-index.c \
 	evr-glacier-client.c \
 	evr-tls.c \
+	file-mem.c \
 	files.c \
 	glacier-cmd.c \
 	handover.c \
@@ -311,6 +313,12 @@ evr_tls_test_SOURCES = \
 	logger.c \
 	server.c
 evr_tls_test_LDADD = $(SSL_LIBS)
+
+file_mem_test_SOURCES = \
+	assert.c \
+	file-mem.c \
+	file-mem-test.c \
+	logger.c
 
 files_test_SOURCES = \
 	assert.c \

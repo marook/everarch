@@ -56,13 +56,13 @@ void test_validate_hello_world_signature(){
         assert(v_ctx);
         struct evr_file_mem meta_fm;
         struct evr_file meta;
-        evr_init_file_mem(&meta_fm, 4*1024);
+        assert(is_ok(evr_init_file_mem(&meta_fm, 4*1024, 4*1024)));
         assert(meta_fm.data);
         evr_file_bind_file_mem(&meta, &meta_fm);
         assert(is_ok(evr_verify(v_ctx, &msg, sgn->data, sgn->size_used, &meta)));
         char expected_metadata_prefix[] = "signed-by=";
-        assert(strncmp(expected_metadata_prefix, meta_fm.data->data, min(sizeof(expected_metadata_prefix) - 1, meta_fm.data->size_used)) == 0);
-        free(meta_fm.data);
+        assert(strncmp(expected_metadata_prefix, meta_fm.data, min(sizeof(expected_metadata_prefix) - 1, meta_fm.used_size)) == 0);
+        evr_destroy_file_mem(&meta_fm);
         evr_free_verify_ctx(v_ctx);
     }
     { // verify signature with different fingerprint

@@ -41,6 +41,7 @@
 #include "attr-index-db.h"
 #include "configurations.h"
 #include "files.h"
+#include "file-mem.h"
 #include "configp.h"
 #include "handover.h"
 #include "evr-tls.h"
@@ -1457,6 +1458,49 @@ int evr_work_search_cmd(struct evr_connection *ctx, char *query){
     return ret;
 }
 
+int evr_respond_search_status(void *context, int parse_res, char *parse_error){
+    struct evr_search_ctx *ctx = context;
+    ctx->parse_res = parse_res;
+    if(parse_res != evr_ok){
+        return evr_respond_status(ctx->con, 0, parse_error);
+    }
+    return evr_respond_status(ctx->con, 1, NULL);
+}
+
+int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
+    int ret = evr_error;
+    size_t attrs_size = 0;
+    if(attrs){
+        struct evr_attr_tuple *end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
+            attrs_size += 1 + strlen(a->key) + 1 + strlen(a->value) + 1;
+        }
+    }
+    struct evr_search_ctx *ctx = context;
+    char buf[evr_claim_ref_str_size + attrs_size];
+    struct evr_buf_pos bp;
+    evr_init_buf_pos(&bp, buf);
+    evr_fmt_claim_ref(bp.pos, ref);
+    evr_inc_buf_pos(&bp, evr_claim_ref_str_size - 1);
+    evr_push_concat(&bp, "\n");
+    if(attrs){
+        struct evr_attr_tuple *end = &attrs[attrs_len];
+        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
+            evr_push_concat(&bp, "\t");
+            evr_push_concat(&bp, a->key);
+            evr_push_concat(&bp, "=");
+            evr_push_concat(&bp, a->value);
+            evr_push_concat(&bp, "\n");
+        }
+    }
+    if(write_n(&ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
+        goto out;
+    }
+    ret = evr_ok;
+ out:
+    return ret;
+}
+
 int evr_respond_claims_for_seed_result(void *ctx, const evr_claim_ref claim);
 
 int evr_list_claims_for_seed(struct evr_connection *ctx, char *seed_ref_str){
@@ -1616,49 +1660,6 @@ int evr_describe_index(struct evr_connection *ctx){
     return evr_ok;
 }
 
-int evr_respond_search_status(void *context, int parse_res, char *parse_error){
-    struct evr_search_ctx *ctx = context;
-    ctx->parse_res = parse_res;
-    if(parse_res != evr_ok){
-        return evr_respond_status(ctx->con, 0, parse_error);
-    }
-    return evr_respond_status(ctx->con, 1, NULL);
-}
-
-int evr_respond_search_result(void *context, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len){
-    int ret = evr_error;
-    size_t attrs_size = 0;
-    if(attrs){
-        struct evr_attr_tuple *end = &attrs[attrs_len];
-        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
-            attrs_size += 1 + strlen(a->key) + 1 + strlen(a->value) + 1;
-        }
-    }
-    struct evr_search_ctx *ctx = context;
-    char buf[evr_claim_ref_str_size + attrs_size];
-    struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, buf);
-    evr_fmt_claim_ref(bp.pos, ref);
-    evr_inc_buf_pos(&bp, evr_claim_ref_str_size - 1);
-    evr_push_concat(&bp, "\n");
-    if(attrs){
-        struct evr_attr_tuple *end = &attrs[attrs_len];
-        for(struct evr_attr_tuple *a = attrs; a != end; ++a){
-            evr_push_concat(&bp, "\t");
-            evr_push_concat(&bp, a->key);
-            evr_push_concat(&bp, "=");
-            evr_push_concat(&bp, a->value);
-            evr_push_concat(&bp, "\n");
-        }
-    }
-    if(write_n(&ctx->con->socket, bp.buf, bp.pos - bp.buf) != evr_ok){
-        goto out;
-    }
-    ret = evr_ok;
- out:
-    return ret;
-}
-
 int evr_get_current_index_ref(evr_blob_ref index_ref){
     int wait_res = evr_wait_for_handover_occupied(&current_index_ctx.handover);
     if(wait_res == evr_end){
@@ -1785,6 +1786,7 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
 static const char evr_httpd_not_found[] = "Endpoint not found";
 static const char evr_httpd_unauthorized[] = "No Bearer Authentication header with valid auth-token provided";
 static const char evr_httpd_server_error[] = "Internal server error";
+static const char evr_httpd_ending[] = "Service is being stopped";
 
 static int evr_attr_index_check_authentication_header(struct MHD_Connection *c);
 static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const char *query_params);
@@ -1848,8 +1850,21 @@ static enum MHD_Result evr_attr_index_authentication_header_it(void *ctx, enum M
 static const char evr_httpd_query_param_prefix[] = "?q=";
 static const char evr_httpd_search_params_error[] = "Invalid search params";
 
+static int evr_add_std_http_headers(struct MHD_Response *resp);
+static int evr_httpd_handle_search_status(void *ctx, int parse_res, char *parse_error);
+static struct MHD_Response *evr_httpd_create_heap_buffer_response(struct evr_file_mem *fm);
+
 static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const char *query_params){
+    int ret = evr_error, res;
+    enum MHD_Result mhd_ret;
     char *search_query;
+    evr_blob_ref index_ref;
+    evr_blob_ref_str index_ref_str;
+    struct evr_attr_index_db *db;
+    struct evr_connection con = { 0 };
+    struct evr_search_ctx sctx = { &con, 0 };
+    struct MHD_Response *resp;
+    struct evr_file_mem fm = { 0 };
     if(*query_params == '\0') {
         search_query = "";
     } else if(strncmp(evr_httpd_query_param_prefix, query_params, sizeof(evr_httpd_query_param_prefix) - 1) == 0) {
@@ -1858,21 +1873,126 @@ static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const c
         return evr_httpd_respond_static_msg(c, 400, evr_httpd_search_params_error);
     }
     log_debug("http server retrieved query: %s", search_query);
-    // TODO
-    return evr_httpd_respond_static_msg(c, 500, "TODO");
+    res = evr_get_current_index_ref(index_ref);
+    if(res == evr_end){
+        ret = evr_end;
+        goto out_with_response;
+    }
+    if(res != evr_ok){
+        goto out_with_response;
+    }
+    evr_fmt_blob_ref(index_ref_str, index_ref);
+    log_debug("http server is using index %s for query", index_ref_str);
+    db = evr_open_attr_index_db(cfg, index_ref_str, evr_write_blob_to_file, NULL);
+    if(!db){
+        goto out_with_response;
+    }
+    if(evr_init_file_mem(&fm, 64*1024, 1*1024*1024) != evr_ok){
+        goto out_with_free_db;
+    }
+    evr_file_bind_file_mem(&sctx.con->socket, &fm);
+    if(evr_attr_query_claims(db, search_query, evr_httpd_handle_search_status, evr_respond_search_result, &sctx) != evr_ok){
+        goto out_with_free_db;
+    }
+    if(sctx.parse_res == evr_ok){
+        ret = evr_ok;
+    } else {
+        // the syntax of the query expression was invalid
+        ret = evr_user_data_invalid;
+    }
+ out_with_free_db:
+    if(evr_free_attr_index_db(db) != evr_ok){
+        ret = evr_error;
+    }
+ out_with_response:
+    if(ret == evr_ok){
+        resp = evr_httpd_create_heap_buffer_response(&fm);
+        if(!resp){
+            log_error("Unable to produce search results http response");
+            ret = evr_error;
+            goto out;
+        }
+        // after this outcome we don't evr_destroy_file_mem because
+        // MHD_queue_response will free the buffer
+        mhd_ret = MHD_queue_response(c, 200, resp);
+        MHD_destroy_response(resp);
+        return mhd_ret;
+    } else if(ret == evr_end){
+        evr_destroy_file_mem(&fm);
+        return evr_httpd_respond_static_msg(c, 503, evr_httpd_ending);
+    } else if(ret == evr_user_data_invalid){
+        // the syntax of the query expression was invalid
+        resp = evr_httpd_create_heap_buffer_response(&fm);
+        if(!resp){
+            log_error("Unable to produce illegal syntax http response");
+            ret = evr_error;
+            goto out;
+        }
+        // after this outcome we don't evr_destroy_file_mem because
+        // MHD_queue_response will free the buffer
+        mhd_ret = MHD_queue_response(c, 400, resp);
+        MHD_destroy_response(resp);
+        return mhd_ret;
+    }
+ out:
+    evr_destroy_file_mem(&fm);
+    return evr_httpd_respond_static_msg(c, 500, evr_httpd_server_error);
+}
+
+static int evr_httpd_handle_search_status(void *_ctx, int parse_res, char *parse_error){
+    struct evr_search_ctx *ctx = _ctx;
+    ssize_t parse_error_len;
+    ctx->parse_res = parse_res;
+    if(parse_res != evr_ok){
+        parse_error_len = strlen(parse_error);
+        if(ctx->con->socket.write(&ctx->con->socket, parse_error, parse_error_len) != parse_error_len){
+            // we "know" that we write into a in memory file and also
+            // we write only a few bytes. so we don't try multiple
+            // times if we can't write all the bytes as permitted by
+            // the write API.
+            return evr_error;
+        }
+    }
+    return evr_ok;
 }
 
 static enum MHD_Result evr_httpd_respond_static_msg(struct MHD_Connection *c, unsigned int status_code, const char *msg){
-    int ret;
+    enum MHD_Result ret;
     struct MHD_Response *resp;
     size_t msg_len;
     msg_len = strlen(msg);
     resp = MHD_create_response_from_buffer(msg_len, (void*)msg, MHD_RESPMEM_PERSISTENT);
-    if(MHD_add_response_header(resp, "Server", program_name "/" VERSION) != MHD_YES){
-        return evr_error;
+    if(evr_add_std_http_headers(resp) != evr_ok){
+        evr_panic("Unable to add standard http headers");
     }
     ret = MHD_queue_response(c, status_code, resp);
     MHD_destroy_response(resp);
     return ret;
+}
+
+static struct MHD_Response *evr_httpd_create_heap_buffer_response(struct evr_file_mem *fm){
+    struct MHD_Response *resp;
+    resp = MHD_create_response_from_buffer(fm->used_size, (void*)fm->data, MHD_RESPMEM_MUST_FREE);
+    if(!resp){
+        return NULL;
+    }
+    if(evr_add_std_http_headers(resp) != evr_ok){
+        goto fail_with_destroy_resp;
+    }
+    // TODO what is the charset of our data? we should add it so that browser's wont start guessing
+    if(MHD_add_response_header(resp, "Content-Type", "text/plain") != MHD_YES){
+        goto fail_with_destroy_resp;
+    }
+    return resp;
+ fail_with_destroy_resp:
+    MHD_destroy_response(resp);
+    return NULL;
+}
+
+static int evr_add_std_http_headers(struct MHD_Response *resp){
+    if(MHD_add_response_header(resp, "Server", program_name "/" VERSION) != MHD_YES){
+        return evr_error;
+    }
+    return evr_ok;
 }
 #endif
