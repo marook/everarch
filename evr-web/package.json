@@ -1,0 +1,29 @@
+{
+    "name": "evr-web",
+    "version": "0.1.1",
+    "description": "A static web frontend for everarch",
+    "keywords": [
+        "evr",
+        "everarch",
+        "ui"
+    ],
+    "license": "AGPL-3.0-or-later",
+    "author": {
+        "name": "Markus Peröbner",
+        "email": "markus.peroebner@gmail.com"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/marook/everarch.git",
+        "directory": "evr-web"
+    },
+    "scripts": {
+        "prepublish": "make",
+        "serve": "cd dist && nginx -c ../etc/nginx.conf -p ."
+    },
+    "devDependencies": {
+        "rxjs": "^7.8.1",
+        "webpack": "^5.89.0",
+        "webpack-cli": "^5.1.4"
+    }
+}

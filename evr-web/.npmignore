@@ -1,0 +1,8 @@
+*~
+*.log
+*.pid
+
+/etc
+/node_modules
+/Makefile
+/src
