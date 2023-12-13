@@ -1784,12 +1784,12 @@ int evr_write_blob_to_file(void *ctx, char *path, mode_t mode, evr_blob_ref ref)
 
 #ifdef EVR_HAS_HTTPD
 static const char evr_httpd_not_found[] = "Endpoint not found";
-static const char evr_httpd_unauthorized[] = "No Bearer Authentication header with valid auth-token provided";
+static const char evr_httpd_unauthorized[] = "No Bearer Authorization header with valid auth-token provided";
 static const char evr_httpd_server_error[] = "Internal server error";
 static const char evr_httpd_ending[] = "Service is being stopped";
 
 static int evr_attr_index_check_authentication_header(struct MHD_Connection *c);
-static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const char *query_params);
+static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c);
 static enum MHD_Result evr_httpd_respond_static_msg(struct MHD_Connection *c, unsigned int status_code, const char *msg);
 
 static const char evr_httpd_search_path[] = "/search";
@@ -1805,8 +1805,8 @@ static enum MHD_Result evr_attr_index_handle_http_request(void *cls, struct MHD_
     }
     // after this point the request is authenticated
     is_get = strcmp(method, "GET") == 0;
-    if(is_get && strncmp(url, evr_httpd_search_path, sizeof(evr_httpd_search_path) - 1) == 0 && (url[sizeof(evr_httpd_search_path) - 1] == '\0' || url[sizeof(evr_httpd_search_path) - 1] == '?')){
-        return evr_httpd_handle_search(c, &url[sizeof(evr_httpd_search_path) - 1]);
+    if(is_get && strcmp(url, evr_httpd_search_path) == 0){
+        return evr_httpd_handle_search(c);
     }
     return evr_httpd_respond_static_msg(c, 404, evr_httpd_not_found);
 }
@@ -1847,14 +1847,11 @@ static enum MHD_Result evr_attr_index_authentication_header_it(void *ctx, enum M
     return MHD_NO;
 }
 
-static const char evr_httpd_query_param_prefix[] = "?q=";
-static const char evr_httpd_search_params_error[] = "Invalid search params";
-
 static int evr_add_std_http_headers(struct MHD_Response *resp);
 static int evr_httpd_handle_search_status(void *ctx, int parse_res, char *parse_error);
 static struct MHD_Response *evr_httpd_create_heap_buffer_response(struct evr_file_mem *fm);
 
-static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const char *query_params){
+static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c){
     int ret = evr_error, res;
     enum MHD_Result mhd_ret;
     char *search_query;
@@ -1865,12 +1862,9 @@ static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c, const c
     struct evr_search_ctx sctx = { &con, 0 };
     struct MHD_Response *resp;
     struct evr_file_mem fm = { 0 };
-    if(*query_params == '\0') {
+    search_query = MHD_lookup_connection_value(c, MHD_GET_ARGUMENT_KIND, "q");
+    if(!search_query){
         search_query = "";
-    } else if(strncmp(evr_httpd_query_param_prefix, query_params, sizeof(evr_httpd_query_param_prefix) - 1) == 0) {
-        search_query = &query_params[sizeof(evr_httpd_query_param_prefix) - 1];
-    } else {
-        return evr_httpd_respond_static_msg(c, 400, evr_httpd_search_params_error);
     }
     log_debug("http server retrieved query: %s", search_query);
     res = evr_get_current_index_ref(index_ref);

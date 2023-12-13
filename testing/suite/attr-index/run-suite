@@ -263,6 +263,15 @@ ${test_ref}-0000" ]]
         echo "Unexpected http result from empty expression search query: ${results}" >&2
         exit 1
     fi
+
+    results=`curl -s -H "Authorization: Bearer AT${attr_index_auth_token}" http://localhost:${attr_index_http_port}/search?q=select%20*%20where%20tag=todo`
+    if [[ "${results}" != "${test_ref}-0000
+	tag=todo
+	title=test claim" ]]
+    then
+        echo "Unexpected http result from 'select * where tag=todo' search query: ${results}" >&2
+        exit 1
+    fi
 fi
 
 echo "Stopping…"
