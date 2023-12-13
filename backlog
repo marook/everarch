@@ -1,3 +1,29 @@
+* evr-attr-index segfault on http search query :bug:
+#+BEGIN_SRC
+Program terminated with signal SIGSEGV, Segmentation fault.
+#0  0x0000561fb88899e0 in evr_append_bool (ctx=0x7f6c1137b670, node=<optimized out>, append=0x561fb8883510 <evr_attr_build_sql_append>, join_str=0x561fb8898c7e ") and (")
+    at attr-query-sql.c:274
+274	    if(data->r->append_cnd(ctx, data->r, append) != evr_ok){
+[Current thread is 1 (Thread 0x7f6c1137c6c0 (LWP 3479930))]
+(gdb) bt
+#0  0x0000561fb88899e0 in evr_append_bool (ctx=0x7f6c1137b670, node=<optimized out>, append=0x561fb8883510 <evr_attr_build_sql_append>, join_str=0x561fb8898c7e ") and (")
+    at attr-query-sql.c:274
+#1  0x0000561fb8886c12 in evr_attr_build_sql_query (root=0x7f6c002d3760, ctx=ctx@entry=0x7f6c1137b670) at attr-index-db.c:1804
+#2  0x0000561fb8886dc6 in evr_attr_query_claims (db=db@entry=0x7f6c001a6a00, query_str=query_str@entry=0x7f6c00000d4e "select * where class=file &&", 
+    status=status@entry=0x561fb888d220 <evr_httpd_handle_search_status>, visit=visit@entry=0x561fb888df10 <evr_respond_search_result>, 
+    visit_ctx=visit_ctx@entry=0x7f6c1137b710) at attr-index-db.c:1655
+#3  0x0000561fb888fab9 in evr_httpd_handle_search (c=0x7f6c00024aa0) at evr-attr-index.c:1888
+#4  evr_attr_index_handle_http_request (cls=<optimized out>, c=0x7f6c00024aa0, url=<optimized out>, method=<optimized out>, version=<optimized out>, 
+    upload_data=<optimized out>, upload_data_size=0x7f6c1137b860, con_cls=0x7f6c00024af8) at evr-attr-index.c:1809
+#5  0x00007f6c15b481ac in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
+#6  0x00007f6c15b4a548 in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
+#7  0x00007f6c15b4cc9f in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
+#8  0x00007f6c15b50e96 in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
+#9  0x00007f6c15b526c9 in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
+#10 0x00007f6c15b52d01 in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
+#11 0x00007f6c154a8044 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
+#12 0x00007f6c1552861c in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+#+END_SRC
 * introduce evr-web/explorer
 HTML/CSS/JS application which allows exploring seed claims. should use
 the evr-attr-index http API for retrieving
