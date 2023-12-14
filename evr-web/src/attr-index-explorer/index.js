@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { EMPTY, fromEvent, merge, of, throwError } from 'rxjs';
+import { BehaviorSubject, EMPTY, fromEvent, merge, of, throwError } from 'rxjs';
 import { catchError, debounceTime, delay, distinctUntilChanged, map, switchMap, tap } from 'rxjs/operators';
 
 import { createRouter } from '../routers.js';
@@ -43,13 +43,22 @@ class SearchController {
             // give the events some time to let the changed values
             // tickle into the input.value property
             delay(0),
-            map(event => queryInput.value),
+            map(event => queryInput.value.trim()),
             distinctUntilChanged(),
         );
+        let loading = new BehaviorSubject(false);
+        let validQuery = new BehaviorSubject(true);
         let seeds = query.pipe(
+            tap(() => loading.next(true)),
             switchMap(query => search(`select * where ${query}`).pipe(
+                tap(() => {
+                    loading.next(false);
+                    validQuery.next(true);
+                }),
                 catchError(err => {
+                    loading.next(false);
                     if(err instanceof ClientError){
+                        validQuery.next(false);
                         console.warn(err);
                         return EMPTY;
                     }
@@ -61,16 +70,57 @@ class SearchController {
             map(seeds => seeds.map(s => new SeedTileController(s))),
         );
         let renderFoundSeeds = wireControllers(seedTiles, this.element.querySelector('.found-seeds'));
-        this.active = renderFoundSeeds;
+        let showLoadingOverlay = loading.pipe(
+            distinctUntilChanged(),
+            tap(loading => {
+                this.element.querySelector('.loading-indicator').style.display = loading ? 'block' : 'none';
+            }),
+        );
+        let indicateValidQuery = validQuery.pipe(
+            distinctUntilChanged(),
+            tap(valid => {
+                if(valid){
+                    queryInput.classList.remove('invalid');
+                } else {
+                    queryInput.classList.add('invalid');
+                }
+            }),
+        );
+        this.active = merge(renderFoundSeeds, showLoadingOverlay, indicateValidQuery);
     }
 }
 
 class SeedTileController {
     constructor(seedDesc){
         this.element = instantiateTemplate('seed-tile');
+        this.element.setAttribute('data-seed', seedDesc.ref);
         let title = seedDesc.firstAttr('title');
-        this.element.setAttribute('title', title);
-        this.element.querySelector('.title').textContent = title;
+        if(title){
+            this.element.setAttribute('title', title);
+            this.element.querySelector('.title').textContent = title;
+        }
+        let expanded = new BehaviorSubject(false);
+        let clickHandler = fromEvent(this.element, 'click').pipe(
+            tap(() => expanded.next(!expanded.value)),
+        );
+        let renderExpanded = expanded.pipe(
+            distinctUntilChanged(),
+            tap(expanded => {
+                if(expanded){
+                    this.element.classList.add('expanded');
+                    let ul = this.element.querySelector('.attrs');
+                    for(let [key, val] of seedDesc.attrs){
+                        let li = document.createElement('li');
+                        li.textContent = `${key} = ${val}`;
+                        ul.appendChild(li);
+                    }
+                } else {
+                    this.element.classList.remove('expanded');
+                    this.element.querySelector('.attrs').innerHTML = '';
+                }
+            }),
+        );
+        this.active = merge(clickHandler, renderExpanded);
     }
 }
 

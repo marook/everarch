@@ -49,7 +49,7 @@ function rxFetch(url, opts={}){
         let authToken = localStorage.getItem('evr-attr-index-auth-token');
         if(!authToken){
             observer.error('No auth token found in local storage key evr-attr-index-auth-token');
-            return;
+            return undefined;
         }
 
         let ctrl = new AbortController();
@@ -84,7 +84,9 @@ function parseSearchResponse(body){
     let seeds = [];
     let currentSeedDesc = null;
     for(let line of body.split('\n')){
-        if(line[0] == '\t'){
+        if(line.length === 0){
+            // ignore empty lines
+        } else if(line[0] == '\t'){
             // line describes an attribute
             let sepPos = line.indexOf('=');
             if(sepPos === -1){

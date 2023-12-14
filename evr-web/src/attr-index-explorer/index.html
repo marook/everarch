@@ -35,8 +35,29 @@
             type="search"
             placeholder="Search…"/>
         </form>
-        <div class="found-seeds-scroll-container">
-          <div class="found-seeds"></div>
+        <div class="found-seed-loading-container">
+          <div class="found-seeds-scroll-container">
+            <div class="found-seeds"></div>
+          </div>
+          <div class="loading-indicator">
+            <div class="loader-inner">
+	      <div class="loader-line-wrap">
+	        <div class="loader-line"></div>
+	      </div>
+	      <div class="loader-line-wrap">
+	        <div class="loader-line"></div>
+	      </div>
+	      <div class="loader-line-wrap">
+	        <div class="loader-line"></div>
+	      </div>
+	      <div class="loader-line-wrap">
+	        <div class="loader-line"></div>
+	      </div>
+	      <div class="loader-line-wrap">
+	        <div class="loader-line"></div>
+	      </div>
+            </div>
+          </div>
         </div>
       </main>
     </template>
@@ -44,6 +65,7 @@
     <template id="seed-tile-view">
       <article>
         <h2 class="title"></h2>
+        <ul class="attrs"></ul>
       </article>
     </template>
 
