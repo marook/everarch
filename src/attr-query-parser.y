@@ -87,6 +87,7 @@ int yylex(YYSTYPE *yylval_param);
 %type <selector> attr_selector;
 %destructor { evr_free_attr_selector($$); } <selector>;
 %type <node> condition;
+%type <node> condition_or_empty;
 %destructor { evr_free_attr_query_node($$); } <node>;
 %type <timestamp> at_expression;
 %type <i> offset_expression;
@@ -104,8 +105,8 @@ line:
 ;
 
 query:
-  condition at_expression limit_expression offset_expression { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1, $2, $3, $4); }
-| attr_selector WHERE condition at_expression limit_expression offset_expression { $$ = evr_build_attr_query($1, $3, $4, $5, $6); }
+  condition_or_empty at_expression limit_expression offset_expression { $$ = evr_build_attr_query(evr_build_attr_selector(evr_attr_selector_none), $1, $2, $3, $4); }
+| attr_selector WHERE condition_or_empty at_expression limit_expression offset_expression { $$ = evr_build_attr_query($1, $3, $4, $5, $6); }
 | attr_selector at_expression limit_expression offset_expression {{ $$ = evr_build_attr_query($1, NULL, $2, $3, $4); }}
 ;
 
@@ -114,9 +115,12 @@ attr_selector:
 |  SELECT WILDCARD { $$ = evr_build_attr_selector(evr_attr_selector_all); }
 ;
 
-condition:
+condition_or_empty:
 %empty { $$ = NULL; }
-| REF EQ STRING { evr_ret_node($$, evr_attr_query_ref_cnd($3), "Unable to parse ref=* condition."); }
+| condition;
+
+condition:
+REF EQ STRING { evr_ret_node($$, evr_attr_query_ref_cnd($3), "Unable to parse ref=* condition."); }
 | STRING EQ STRING { evr_ret_node($$, evr_attr_query_eq_cnd($1, $3), "Unable to parse *=* condition."); }
 | STRING CONTAINS STRING { evr_ret_node($$, evr_attr_query_contains_cnd($1, $3), "Unable to parse *~* condition."); }
 | B_OPEN condition B_CLOSE { $$ = $2; }

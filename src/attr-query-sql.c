@@ -205,19 +205,26 @@ int evr_bind_bool(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *no
 
 void evr_free_data_bool_data(void *data);
 
+struct evr_attr_query_node *evr_attr_query_bool(struct evr_attr_query_node *l, struct evr_attr_query_node *r, int (*append_cnd)(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)));
+
 struct evr_attr_query_node *evr_attr_query_bool_and(struct evr_attr_query_node *l, struct evr_attr_query_node *r){
+    return evr_attr_query_bool(l, r, evr_append_bool_and);
+}
+
+struct evr_attr_query_node *evr_attr_query_bool(struct evr_attr_query_node *l, struct evr_attr_query_node *r, int (*append_cnd)(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd))){
     struct evr_attr_query_node *ret = NULL;
-    char *buf = malloc(sizeof(struct evr_attr_query_node) + sizeof(struct evr_attr_query_bool_bool_data));
+    struct evr_attr_query_bool_bool_data *data;
+    struct evr_buf_pos bp;
+    char *buf;
+    buf = malloc(sizeof(struct evr_attr_query_node) + sizeof(struct evr_attr_query_bool_bool_data));
     if(!buf){
         goto out;
     }
-    struct evr_buf_pos bp;
     evr_init_buf_pos(&bp, buf);
     evr_map_struct(&bp, ret);
-    ret->append_cnd = evr_append_bool_and;
+    ret->append_cnd = append_cnd;
     ret->bind = evr_bind_bool;
     ret->free_data = evr_free_data_bool_data;
-    struct evr_attr_query_bool_bool_data *data;
     evr_map_struct(&bp, data);
     ret->data = data;
     data->l = l;
@@ -235,24 +242,7 @@ int evr_append_bool_and(struct evr_attr_query_ctx *ctx, struct evr_attr_query_no
 int evr_append_bool_or(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd));
 
 struct evr_attr_query_node *evr_attr_query_bool_or(struct evr_attr_query_node *l, struct evr_attr_query_node *r){
-    struct evr_attr_query_node *ret = NULL;
-    char *buf = malloc(sizeof(struct evr_attr_query_node) + sizeof(struct evr_attr_query_bool_bool_data));
-    if(!buf){
-        goto out;
-    }
-    struct evr_buf_pos bp;
-    evr_init_buf_pos(&bp, buf);
-    evr_map_struct(&bp, ret);
-    ret->append_cnd = evr_append_bool_or;
-    ret->bind = evr_bind_bool;
-    ret->free_data = evr_free_data_bool_data;
-    struct evr_attr_query_bool_bool_data *data;
-    evr_map_struct(&bp, data);
-    ret->data = data;
-    data->l = l;
-    data->r = r;
- out:
-    return ret;
+    return evr_attr_query_bool(l, r, evr_append_bool_or);
 }
 
 int evr_append_bool_or(struct evr_attr_query_ctx *ctx, struct evr_attr_query_node *node, int (*append)(struct evr_attr_query_ctx *ctx, const char *cnd)){

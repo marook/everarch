@@ -388,15 +388,27 @@ void test_setup_attr_index_db_twice(){
     evr_free_attr_index_cfg(cfg);
 }
 
-int claims_status_syntax_error_calls;
+static int claims_status_syntax_error_calls;
+static char *expected_syntax_error_msg;
+
+void assert_syntax_error(char *query, char *expected_error_msg);
+
+void test_query_syntax_error(){
+    assert_syntax_error("tag=todo && tachjen at 1970-01-01T00:00:07.000000Z", "syntax error, unexpected AT, expecting EQ or CONTAINS");
+}
+
+void test_query_syntax_error_open_and_expression(){
+    assert_syntax_error("select * where class=file &&", "syntax error, unexpected END, expecting B_OPEN or STRING or REF");
+}
 
 int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error);
 
-void test_query_syntax_error(){
+void assert_syntax_error(char *query, char *expected_error_msg){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     claims_status_syntax_error_calls = 0;
-    assert(is_ok(evr_attr_query_claims(db, "tag=todo && tachjen at 1970-01-01T00:00:07.000000Z", claims_status_syntax_error, NULL, NULL)));
+    expected_syntax_error_msg = expected_error_msg;
+    assert(is_ok(evr_attr_query_claims(db, query, claims_status_syntax_error, NULL, NULL)));
     assert(claims_status_syntax_error_calls == 1);
     assert(is_ok(evr_free_attr_index_db(db)));
     evr_free_attr_index_cfg(cfg);
@@ -404,8 +416,8 @@ void test_query_syntax_error(){
 
 int claims_status_syntax_error(void *ctx, int parse_res, char *parse_error){
     ++claims_status_syntax_error_calls;
-    assert(is_err(parse_res));
-    assert(is_str_eq(parse_error, "syntax error, unexpected AT, expecting EQ or CONTAINS"));
+    assert_msg(is_err(parse_res), "Expected parse error but got %d", parse_res);
+    assert(is_str_eq(parse_error, expected_syntax_error_msg));
     return evr_ok;
 }
 
@@ -1152,6 +1164,7 @@ int main(){
     run_test(test_get_set_state);
     run_test(test_setup_attr_index_db_twice);
     run_test(test_query_syntax_error);
+    run_test(test_query_syntax_error_open_and_expression);
     run_test(test_attr_factories);
     run_test(test_attr_factories_fail_and_reindex);
     run_test(test_attr_attribute_factories);
