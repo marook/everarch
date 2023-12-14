@@ -23,6 +23,8 @@ Program terminated with signal SIGSEGV, Segmentation fault.
 #10 0x00007f6c15b52d01 in ?? () from /lib/x86_64-linux-gnu/libmicrohttpd.so.12
 #11 0x00007f6c154a8044 in start_thread (arg=<optimized out>) at ./nptl/pthread_create.c:442
 #12 0x00007f6c1552861c in clone3 () at ../sysdeps/unix/sysv/linux/x86_64/clone3.S:81
+(gdb) p data->r
+$1 = (struct evr_attr_query_node *) 0x0
 #+END_SRC
 * introduce evr-web/explorer
 HTML/CSS/JS application which allows exploring seed claims. should use
