@@ -1,6 +1,19 @@
-* introduce evr-web/explorer
-HTML/CSS/JS application which allows exploring seed claims. should use
-the evr-attr-index http API for retrieving
+* file upload http application evr-upload-httpd
+probably something which just streams the data into evr post-file?
+* file upload app in evr-web
+* evr-home-edition docker setup
+evr-home-edition should configure and start the everarch services
+evr-glacier-storage, evr-attr-index and evr-web. configurations with
+keys should be generated on the first startup of the services.
+
+the setup should either be a single docker image or a docker-compose
+configuration.
+
+the setup should contain an evr-attr-index attr-spec with a simple
+claim transformation. the transformation should especially index
+images with their width and height.
+* attr-index-explorer should watch evr-attr-index
+and refresh shown seeds on changes
 * evr cli's evr_cli_get_file(…) should use evr_fetch_file_claim(…) :cligetfile:
 * applications should print their config lookup parts in usage
 executing any of the evr applications which loads configuration from
