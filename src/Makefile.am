@@ -44,6 +44,10 @@ if HAS_FUSE
 bin_PROGRAMS += evr-fs evr-glacier-fs
 endif
 
+if HAS_HTTPD
+bin_PROGRAMS += evr-upload-httpd
+endif
+
 evr_c_unit_tests = \
 	attr-index-db-test \
 	auth-test \
@@ -188,6 +192,7 @@ evr_attr_index_SOURCES = \
 evr_attr_index_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) -lm $(SSL_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 if HAS_HTTPD
+  evr_attr_index_SOURCES += httpd.c
   evr_attr_index_LDADD += $(HTTPD_LIBS)
 endif
 
@@ -276,6 +281,19 @@ evr_glacier_storage_SOURCES = \
 	queue.c \
 	server.c
 evr_glacier_storage_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
+
+evr_upload_httpd_SOURCES = \
+	auth.c \
+	basics.c \
+	configp.c \
+	daemon.c \
+	dyn-mem.c \
+	evr-upload-httpd.c \
+	files.c \
+	httpd.c \
+	logger.c \
+	subprocess.c
+evr_upload_httpd_LDADD = @ARGP_LIBS@ $(HTTPD_LIBS)
 
 evr_glacier_tool_SOURCES = \
 	basics.c \

@@ -48,7 +48,12 @@
 #include "notify.h"
 #include "daemon.h"
 
+#ifdef EVR_HAS_HTTPD
+#include "httpd.h"
+#endif
+
 #define program_name "evr-attr-index"
+#define server_name program_name "/" VERSION
 
 const char *argp_program_version = program_name " " VERSION;
 const char *argp_program_bug_address = PACKAGE_BUGREPORT;
@@ -1788,66 +1793,27 @@ static const char evr_httpd_unauthorized[] = "No Bearer Authorization header wit
 static const char evr_httpd_server_error[] = "Internal server error";
 static const char evr_httpd_ending[] = "Service is being stopped";
 
-static int evr_attr_index_check_authentication_header(struct MHD_Connection *c);
 static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c);
-static enum MHD_Result evr_httpd_respond_static_msg(struct MHD_Connection *c, unsigned int status_code, const char *msg);
 
 static const char evr_httpd_search_path[] = "/search";
 
 static enum MHD_Result evr_attr_index_handle_http_request(void *cls, struct MHD_Connection *c, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls){
     int res, is_get;
     log_debug("http request %s %s", method, url);
-    res = evr_attr_index_check_authentication_header(c);
+    res = evr_httpd_check_authentication(c, cfg->auth_token);
     if(res == evr_user_data_invalid) {
-        return evr_httpd_respond_static_msg(c, 401, evr_httpd_unauthorized);
+        return evr_httpd_respond_static_msg(c, 401, evr_httpd_unauthorized, server_name);
     } else if(res != evr_ok) {
-        return evr_httpd_respond_static_msg(c, 500, evr_httpd_server_error);
+        return evr_httpd_respond_static_msg(c, 500, evr_httpd_server_error, server_name);
     }
     // after this point the request is authenticated
     is_get = strcmp(method, "GET") == 0;
     if(is_get && strcmp(url, evr_httpd_search_path) == 0){
         return evr_httpd_handle_search(c);
     }
-    return evr_httpd_respond_static_msg(c, 404, evr_httpd_not_found);
+    return evr_httpd_respond_static_msg(c, 404, evr_httpd_not_found, server_name);
 }
 
-static enum MHD_Result evr_attr_index_authentication_header_it(void *ctx, enum MHD_ValueKind kind, const char *key, const char *value);
-
-static int evr_attr_index_check_authentication_header(struct MHD_Connection *c){
-    int ret = evr_user_data_invalid;
-    MHD_get_connection_values(c, MHD_HEADER_KIND, evr_attr_index_authentication_header_it, &ret);
-    return ret;
-}
-
-// the 'AT' stands for authentication token. it defines the type of
-// token. this way we can add different kinds of tokens in the future.
-static const char evr_attr_index_bearer[] = "Bearer AT";
-
-static enum MHD_Result evr_attr_index_authentication_header_it(void *ctx, enum MHD_ValueKind kind, const char *key, const char *value){
-    const char *token_str;
-    evr_auth_token token;
-    int *ret = ctx;
-    if(strcmp(key, "Authorization") != 0){
-        return MHD_YES;
-    }
-    if(strncmp(value, evr_attr_index_bearer, sizeof(evr_attr_index_bearer) - 1) != 0){
-        log_debug("Retrieved http authorization header which is not bearer: %s", value);
-        return MHD_YES;
-    }
-    token_str = &value[sizeof(evr_attr_index_bearer) - 1];
-    if(evr_parse_auth_token(token, token_str) != evr_ok){
-        log_debug("Retrieved syntactically invalid http authorization token: %s", token_str);
-        return MHD_YES;
-    }
-    if(memcmp(cfg->auth_token, token, sizeof(evr_auth_token)) != 0){
-        log_error("Invalid auth token provided to http server");
-        return MHD_YES;
-    }
-    *ret = evr_ok;
-    return MHD_NO;
-}
-
-static int evr_add_std_http_headers(struct MHD_Response *resp);
 static int evr_httpd_handle_search_status(void *ctx, int parse_res, char *parse_error);
 static struct MHD_Response *evr_httpd_create_heap_buffer_response(struct evr_file_mem *fm);
 
@@ -1913,7 +1879,7 @@ static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c){
         return mhd_ret;
     } else if(ret == evr_end){
         evr_destroy_file_mem(&fm);
-        return evr_httpd_respond_static_msg(c, 503, evr_httpd_ending);
+        return evr_httpd_respond_static_msg(c, 503, evr_httpd_ending, server_name);
     } else if(ret == evr_user_data_invalid){
         // the syntax of the query expression was invalid
         resp = evr_httpd_create_heap_buffer_response(&fm);
@@ -1930,7 +1896,7 @@ static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c){
     }
  out:
     evr_destroy_file_mem(&fm);
-    return evr_httpd_respond_static_msg(c, 500, evr_httpd_server_error);
+    return evr_httpd_respond_static_msg(c, 500, evr_httpd_server_error, server_name);
 }
 
 static int evr_httpd_handle_search_status(void *_ctx, int parse_res, char *parse_error){
@@ -1950,43 +1916,19 @@ static int evr_httpd_handle_search_status(void *_ctx, int parse_res, char *parse
     return evr_ok;
 }
 
-static enum MHD_Result evr_httpd_respond_static_msg(struct MHD_Connection *c, unsigned int status_code, const char *msg){
-    enum MHD_Result ret;
-    struct MHD_Response *resp;
-    size_t msg_len;
-    msg_len = strlen(msg);
-    resp = MHD_create_response_from_buffer(msg_len, (void*)msg, MHD_RESPMEM_PERSISTENT);
-    if(evr_add_std_http_headers(resp) != evr_ok){
-        evr_panic("Unable to add standard http headers");
-    }
-    ret = MHD_queue_response(c, status_code, resp);
-    MHD_destroy_response(resp);
-    return ret;
-}
-
 static struct MHD_Response *evr_httpd_create_heap_buffer_response(struct evr_file_mem *fm){
     struct MHD_Response *resp;
     resp = MHD_create_response_from_buffer(fm->used_size, (void*)fm->data, MHD_RESPMEM_MUST_FREE);
     if(!resp){
         return NULL;
     }
-    if(evr_add_std_http_headers(resp) != evr_ok){
-        goto fail_with_destroy_resp;
-    }
     // TODO what is the charset of our data? we should add it so that browser's wont start guessing
-    if(MHD_add_response_header(resp, "Content-Type", "text/plain") != MHD_YES){
+    if(evr_add_std_http_headers(resp, server_name, "text/plain") != evr_ok){
         goto fail_with_destroy_resp;
     }
     return resp;
  fail_with_destroy_resp:
     MHD_destroy_response(resp);
     return NULL;
-}
-
-static int evr_add_std_http_headers(struct MHD_Response *resp){
-    if(MHD_add_response_header(resp, "Server", program_name "/" VERSION) != MHD_YES){
-        return evr_error;
-    }
-    return evr_ok;
 }
 #endif

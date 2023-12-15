@@ -65,6 +65,9 @@ void evr_init_basics();
 #define evr_attr_index_http_port 2363
 #define default_index_ssl_cert_path EVR_PREFIX "/etc/everarch/evr-attr-index-cert.pem"
 
+#define evr_upload_httpd_host "localhost"
+#define evr_upload_httpd_http_port 2364
+
 #define evr_max_blob_data_size (16*1024*1024)
 
 /**

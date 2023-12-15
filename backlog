@@ -1,5 +1,3 @@
-* file upload http application evr-upload-httpd
-probably something which just streams the data into evr post-file?
 * file upload app in evr-web
 * evr-home-edition docker setup
 evr-home-edition should configure and start the everarch services
@@ -12,6 +10,9 @@ configuration.
 the setup should contain an evr-attr-index attr-spec with a simple
 claim transformation. the transformation should especially index
 images with their width and height.
+* add integration test for evr-upload-httpd
+one of the integration tests which starts an evr-glacier-storage
+should also add a file via the evr-upload-httpd server.
 * attr-index-explorer should watch evr-attr-index
 and refresh shown seeds on changes
 * evr cli's evr_cli_get_file(…) should use evr_fetch_file_claim(…) :cligetfile:
