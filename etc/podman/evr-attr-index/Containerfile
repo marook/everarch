@@ -1,0 +1,57 @@
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2023  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+FROM docker.io/library/alpine:3.18 AS builder
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev libmicrohttpd-dev
+WORKDIR /root/everarch
+COPY . /root/everarch
+RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-attr-index
+
+FROM docker.io/library/alpine:3.18 AS image
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
+
+# tcp port for telnet like interface
+EXPOSE 2362
+# http port
+EXPOSE 2363
+
+# the volume /pub exposes the TLS certificate and auth-token necessary
+# to access this evr-attr-index instance. also this volume must
+# contain the TLS certificate and auth-token provided by the
+# evr-glacier-storage server. this volume should be shared with
+# containers which want to access this evr-attr-index instance.
+VOLUME /pub
+
+# the volume /data stores the state of the evr-attr-index instance.
+# this volume should not be shared with other containers. if this
+# volume is lost it can be rebuilt from the blobs stored in an
+# evr-glacier-storage instance.
+VOLUME /data
+
+RUN apk update && apk add sqlite-libs libgcrypt openssl libxml2 libxslt gpgme libmicrohttpd
+
+COPY README AUTHORS COPYING /opt/evr/
+COPY etc/podman/evr-attr-index/entrypoint.sh /
+COPY etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
+COPY etc/podman/evr-attr-index/cert.conf /opt/evr/
+COPY --from=builder /root/everarch/src/evr-attr-index /opt/evr/
+
+CMD ["/entrypoint.sh"]

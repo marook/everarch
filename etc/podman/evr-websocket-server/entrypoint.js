@@ -22,8 +22,8 @@ let { readFile, stat, writeFile } = require('node:fs/promises');
 
 let { serve } = require('/opt/evr/evr-websocket-server/lib/server');
 
-let gpgPubExportPath = '/pub/my-identity.pub.gpg';
-let gpgSecExportPath = '/data/my-identity.sec.gpg';
+let gpgPubExportPath = '/pub/evr-websocket-server-identity.pub.gpg';
+let gpgSecExportPath = '/data/evr-websocket-server-identity.sec.gpg';
 let gpgTrustDbPath = '/data/gpg-ownertrust.txt';
 
 main()
@@ -195,7 +195,7 @@ async function buildEvrConfig(serverConfigPath){
         throw new Error(`Environment variable EVR_GLACIER_STORAGE_HOST must specify hosname of evr-glacier-storage server.`);
     }
     let storagePort = process.env['EVR_GLACIER_STORAGE_PORT'] || '2361';
-    let authToken = await readFile('/pub/auth-token', { encoding: 'utf-8' });
+    let authToken = await readFile('/pub/evr-glacier-auth-token', { encoding: 'utf-8' });
     let evrConfig = [
         `storage-host=${storageHost}`,
         `storage-port=${storagePort}`,

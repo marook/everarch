@@ -10,6 +10,10 @@ $ apt install podman podman-compose buildah qemu-user-static qemu-system-arm
 The evr-glacier-storage and evr-websocket-server directories contain
 build scripts which generate podman images.
 
+The evr-home-edition directory contains a podman-compose configuration
+for starting an evr-glacier-storage, evr-attr-index and the evr-web
+frontend.
+
 The standalone-glacier-websocket directory contains a podman-compose
 configuration for starting a evr-glacier-storage and
 evr-websocket-server container.

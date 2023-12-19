@@ -22,35 +22,35 @@ tls_cert='/pub/evr-glacier-storage-cert.pem'
 
 if [ ! -e '/data/evr-glacier-storage.conf' ]
 then
-    echo 'host=0.0.0.0' > '/data/evr-glacier-storage.conf'
-fi
+    echo 'host=0.0.0.0' > '/data/evr-glacier-storage.conf.tmp'
 
-if [ ! -e "${tls_key}" ]
-then
-    echo "Creating TLS certificate pair..."
-    mkdir -p `dirname "${tls_key}"`
-    openssl genrsa -out "${tls_key}" 4096
-    openssl req -new -key "${tls_key}" -out '/opt/evr/cert.csr' -config '/opt/evr/cert.conf'
-    openssl x509 -req -days 3650 -in '/opt/evr/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
-    rm '/opt/evr/cert.csr'
-    echo "key=${tls_key}" >> '/data/evr-glacier-storage.conf'
-    echo "cert=${tls_cert}" >> '/data/evr-glacier-storage.conf'
-fi
+    if [ ! -e "${tls_key}" ]
+    then
+        echo "Creating TLS certificate pair..."
+        mkdir -p `dirname "${tls_key}"`
+        openssl genrsa -out "${tls_key}" 4096
+        openssl req -new -key "${tls_key}" -out '/opt/evr/cert.csr' -config '/opt/evr/cert.conf'
+        openssl x509 -req -days 3650 -in '/opt/evr/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
+        rm '/opt/evr/cert.csr'
+    fi
+    echo "key=${tls_key}" >> '/data/evr-glacier-storage.conf.tmp'
+    echo "cert=${tls_cert}" >> '/data/evr-glacier-storage.conf.tmp'
+    
+    if [ ! -e "/pub/evr-glacier-auth-token" ]
+    then
+        echo "Generating auth-token..."
+        openssl rand -hex 32 > "/pub/evr-glacier-auth-token.tmp"
+        mv "/pub/evr-glacier-auth-token.tmp" "/pub/evr-glacier-auth-token"
+        chmod a-w "/pub/evr-glacier-auth-token"
+    fi
+    auth_token=`cat "/pub/evr-glacier-auth-token"`
+    echo "auth-token=${auth_token}" >> '/data/evr-glacier-storage.conf.tmp'
 
-if [ ! -e "/pub/auth-token" ]
-then
-    echo "Generating auth-token..."
-    openssl rand -hex 32 > "/pub/auth-token"
-    chmod a-w "/pub/auth-token"
-    auth_token=`cat "/pub/auth-token"`
-    echo "auth-token=${auth_token}" >> '/data/evr-glacier-storage.conf'
-fi
-
-if [ ! -e '/data/buckets' ]
-then
     echo "Preparing buckets directory..."
-    mkdir '/data/buckets'
-    echo "bucket-dir=/data/buckets" >> '/data/evr-glacier-storage.conf'
+    mkdir -p '/data/buckets'
+    echo "bucket-dir=/data/buckets" >> '/data/evr-glacier-storage.conf.tmp'
+
+    mv '/data/evr-glacier-storage.conf.tmp' '/data/evr-glacier-storage.conf'
 fi
 
 cd /data

@@ -1,0 +1,69 @@
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2023  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# everarch home edition
+#
+# This file is a podman-compose (or docker-compose) configuration for
+# starting an everarch stack including the web UI and storage server.
+#
+# To start the environment run:
+#
+# $ podman-compose up
+#
+# TODO script should print join and logon url
+
+version: 3.7
+
+services:
+  storage:
+    image: localhost/evr-glacier-storage:amd64
+    volumes:
+      - conf:/pub
+      - glacier:/data
+    networks:
+      - com
+  attr-index:
+    image: localhost/evr-attr-index:amd64
+    environment:
+      - EVR_GLACIER_STORAGE_HOST=storage
+      - EVR_WITH_UPLOAD_HTTPD=1
+    volumes:
+      - conf:/pub
+      - attr-index:/data
+    networks:
+      - com
+  upload-httpd:
+    image: localhost/evr-upload-httpd:amd64
+    environment:
+      - EVR_GLACIER_STORAGE_HOST=storage
+    volumes:
+      - conf:/pub
+      - upload-httpd:/data
+    networks:
+      - com
+  evr-web:
+    image: localhost/evr-web:amd64
+    environment:
+      - NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+      - EVR_ATTR_INDEX_HOST=attr-index
+      - EVR_UPLOAD_HTTPD_HOST=upload-httpd
+    ports:
+      - "8030:80"
+    networks:
+      - com
+networks:
+  com: {}

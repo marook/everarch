@@ -158,6 +158,9 @@ AC_CONFIG_FILES([
     etc/podman/Makefile
     etc/podman/evr-alpine/Makefile
     etc/podman/evr-glacier-storage/Makefile
+    etc/podman/evr-attr-index/Makefile
+    etc/podman/evr-upload-httpd/Makefile
+    etc/podman/evr-web/Makefile
     etc/podman/evr-websocket-server/Makefile
     etc/poke-pickles/Makefile
     testing/suite/config
@@ -166,6 +169,7 @@ AC_CONFIG_FILES([
 AC_OUTPUT
 
 AC_MSG_NOTICE([With the results from the checks above configure decided the following.
+	build evr-attr-index: $has_lex
 	build evr-backup: $build_evr_backup
         http server for evr-attr-index: $has_httpd
 ])
