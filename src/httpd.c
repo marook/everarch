@@ -87,5 +87,8 @@ int evr_add_std_http_headers(struct MHD_Response *resp, const char *server_name,
     if(content_type && MHD_add_response_header(resp, "Content-Type", content_type) != MHD_YES){
         return evr_error;
     }
+    if(MHD_add_response_header(resp, "Cache-Control", "no-store") != MHD_YES){
+        return evr_error;
+    }
     return evr_ok;
 }
