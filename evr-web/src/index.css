@@ -15,5 +15,38 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-let { buildAppConfig } = require('../webpack.config.common');
-module.exports = buildAppConfig('upload');
+
+main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-space);
+    padding: var(--gap-space);
+}
+
+.apps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-space);
+}
+
+.apps > a {
+    width: 7rem;
+    height: 8rem;
+    display: flex;
+    flex-direction: column;
+    outline: 0.1rem solid #444;
+    padding: var(--gap-space-1-4);
+    text-decoration: none;
+    color: #000;
+}
+
+.apps > a .icon {
+    flex-grow: 1;
+    text-align: center;
+    font-size: 5rem;
+    overflow: hidden;
+}
+
+.apps > a .name {
+    text-align: center;
+}

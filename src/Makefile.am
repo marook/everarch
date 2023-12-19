@@ -288,6 +288,7 @@ evr_upload_httpd_SOURCES = \
 	configp.c \
 	daemon.c \
 	dyn-mem.c \
+	errors.c \
 	evr-upload-httpd.c \
 	files.c \
 	httpd.c \
@@ -467,6 +468,7 @@ subprocess_test_SOURCES = \
 	assert.c \
 	basics.c \
 	dyn-mem.c \
+	errors.c \
 	files.c \
 	logger.c \
 	subprocess.c \

@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 . ../evr-podman.conf
-evr_podman_publish evr-attr-index
+evr_podman_publish evr-upload-httpd

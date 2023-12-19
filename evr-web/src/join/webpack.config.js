@@ -16,4 +16,4 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 let { buildAppConfig } = require('../webpack.config.common');
-module.exports = buildAppConfig('upload');
+module.exports = buildAppConfig('join');

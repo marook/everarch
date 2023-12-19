@@ -15,5 +15,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-let { buildAppConfig } = require('../webpack.config.common');
-module.exports = buildAppConfig('upload');
+
+.joining-view, .status-view {
+    padding: var(--gap-space);
+}
+
+.status-view {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-space);
+}
+
+.status-view .actions {
+    display: flex;
+}

@@ -37,19 +37,7 @@ then
     mv '/data/evr-upload-httpd.conf.tmp' '/data/evr-upload-httpd.conf'
 fi
 
-if [ -e "/data/evr-upload-httpd-identity.sec.gpg" ]
-then
-    echo "Importing upload httpd GPG keys..."
-    gpg --import "/pub/evr-upload-httpd-identity.pub.gpg"
-    gpg --import "/data/evr-upload-httpd-identity.sec.gpg"
-    gpg --import-ownertrust < '/data/evr-upload-httpd-ownertrust.sec.txt'
-else
-    echo "Generating upload httpd GPG key..."
-    gpg --quick-gen-key --batch --passphrase '' 'evr-upload-httpd@example.org' 'default' 'default' '3650d'
-    gpg --export --output "/pub/evr-upload-httpd-identity.pub.gpg"
-    gpg --export-secret-keys --output "/data/evr-upload-httpd-identity.sec.gpg"
-    gpg --export-ownertrust > '/data/evr-upload-httpd-ownertrust.sec.txt'
-fi
+prepare_gpg_key 'evr-upload-httpd'
 
 if [ ! -e '/data/evr.conf' ]
 then

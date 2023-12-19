@@ -15,14 +15,5 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-let path = require('path');
-
-module.exports = {
-    entry: './src/attr-index-explorer/index.js',
-    devtool: 'source-map',
-    output: {
-        filename: 'app.js',
-        path: path.resolve('dist/attr-index-explorer'),
-    },
-};
+let { buildAppConfig } = require('../webpack.config.common');
+module.exports = buildAppConfig('attr-index-explorer');

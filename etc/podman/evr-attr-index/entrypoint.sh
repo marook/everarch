@@ -17,10 +17,45 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 set -e
 
+ORIG_PATH="${PATH}"
 PATH="/opt/evr/entrypoint:${PATH}"
 
 tls_key='/data/evr-attr-index-key.pem'
 tls_cert='/pub/evr-attr-index-cert.pem'
+
+prepare_gpg_key 'evr-attr-index'
+
+if [ ! -e '/data/evr.conf' ]
+then
+    echo -n '' > '/data/evr.conf.tmp'
+
+    echo "Configure glacier..."
+    if [ -z "${EVR_GLACIER_STORAGE_HOST}" ]
+    then
+        echo "evr-glacier-storage hostname must be provided via environment variable EVR_GLACIER_STORAGE_HOST"
+        exit 1
+    fi
+    echo "storage-host=${EVR_GLACIER_STORAGE_HOST}" >> '/data/evr.conf.tmp'
+    echo "ssl-cert=${EVR_GLACIER_STORAGE_HOST}:2361:/pub/evr-glacier-storage-cert.pem" >> '/data/evr.conf.tmp'
+    echo "Waiting for glacier auth-token..."
+    wait_for_file "/pub/evr-glacier-auth-token"
+    storage_auth_token=`cat "/pub/evr-glacier-auth-token"`
+    echo "auth-token=${EVR_GLACIER_STORAGE_HOST}:2361:${storage_auth_token}" >> '/data/evr.conf.tmp'
+
+    for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    do
+        echo "accepted-gpg-key=${fpr}" >> '/data/evr.conf.tmp'
+    done
+
+    for fpr in `gpg --list-secret-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    do
+        # take the first secret key we find for signing
+        echo "signing-gpg-key=${fpr}" >> '/data/evr.conf.tmp'
+        break
+    done
+
+    mv '/data/evr.conf.tmp' '/data/evr.conf'
+fi
 
 if [ ! -e '/data/evr-attr-index.conf' ]
 then
@@ -91,9 +126,7 @@ then
     mv '/data/evr-attr-index.conf.tmp' '/data/evr-attr-index.conf'
 fi
 
-# TODO import default attr index factory
-# TODO import default attr index xslt
-# TODO import dafault attr index spec
-
+export PATH="/opt/evr/bin:${ORIG_PATH}"
 cd /data
+/opt/evr/attr-spec/install_attr_spec
 exec /opt/evr/evr-attr-index -f

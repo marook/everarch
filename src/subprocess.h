@@ -44,6 +44,4 @@ struct evr_subprocess {
  */
 int evr_spawn(struct evr_subprocess *p, char *argv[]);
 
-char *evr_env_path();
-
 #endif

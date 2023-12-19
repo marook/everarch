@@ -1,3 +1,5 @@
+#!/bin/sh
+#
 # everarch - the hopefully ever lasting archive
 # Copyright (C) 2021-2023  Markus Peröbner
 #
@@ -13,16 +15,26 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+set -e
 
-FROM docker.io/library/nginx:1.25.3-alpine3.18 AS image
-LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
-LABEL org.opencontainers.image.licenses="AGPL-3.0"
-LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
+key_name="$1"
 
-# http port
-EXPOSE 80
+if [ -z "${key_name}" ]
+then
+    echo "Usage: $0 KEY_NAME" >&2
+    exit 1
+fi
 
-COPY README AUTHORS COPYING /opt/evr/
-COPY etc/podman/evr-web/envsubst-var-fix.sh /docker-entrypoint.d/18-envsubst-var-fix.sh
-COPY etc/podman/evr-web/nginx.conf /etc/nginx/templates/default.conf.template
-COPY evr-web/dist/. /opt/evr/evr-web/
+if [ -e "/data/${key_name}-identity.sec.gpg" ]
+then
+    echo "Importing ${key_name} GPG keys..."
+    gpg --import "/pub/${key_name}-identity.pub.gpg"
+    gpg --import "/data/${key_name}-identity.sec.gpg"
+    gpg --import-ownertrust < '/data/${key_name}-ownertrust.sec.txt'
+else
+    echo "Generating ${key_name} GPG key..."
+    gpg --quick-gen-key --batch --passphrase '' "${key_name}@example.org" 'default' 'default' '3650d'
+    gpg --export --output "/pub/${key_name}-identity.pub.gpg"
+    gpg --export-secret-keys --output "/data/${key_name}-identity.sec.gpg"
+    gpg --export-ownertrust > '/data/${key_name}-ownertrust.sec.txt'
+fi

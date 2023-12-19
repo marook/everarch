@@ -21,7 +21,7 @@ LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
 RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev libmicrohttpd-dev
 WORKDIR /root/everarch
 COPY . /root/everarch
-RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-attr-index
+RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-attr-index evr
 
 FROM docker.io/library/alpine:3.18 AS image
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
@@ -41,17 +41,17 @@ EXPOSE 2363
 VOLUME /pub
 
 # the volume /data stores the state of the evr-attr-index instance.
-# this volume should not be shared with other containers. if this
-# volume is lost it can be rebuilt from the blobs stored in an
-# evr-glacier-storage instance.
+# this volume should not be shared with other containers.
 VOLUME /data
 
 RUN apk update && apk add sqlite-libs libgcrypt openssl libxml2 libxslt gpgme libmicrohttpd
 
 COPY README AUTHORS COPYING /opt/evr/
 COPY etc/podman/evr-attr-index/entrypoint.sh /
-COPY etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
+COPY etc/podman/entrypoints/prepare_gpg_key etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
 COPY etc/podman/evr-attr-index/cert.conf /opt/evr/
+COPY etc/podman/evr-attr-index/attr-spec/attr-trans.xslt etc/podman/evr-attr-index/attr-spec/install_attr_spec /opt/evr/attr-spec/
 COPY --from=builder /root/everarch/src/evr-attr-index /opt/evr/
+COPY --from=builder /root/everarch/src/evr /opt/evr/bin/
 
 CMD ["/entrypoint.sh"]

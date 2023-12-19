@@ -65,5 +65,16 @@ services:
       - "8030:80"
     networks:
       - com
+  evr-join-link:
+    image: localhost/evr-join-link:amd64
+    environment:
+      - EVR_WITH_UPLOAD_HTTPD=1
+      - EVR_WITH_ATTR_INDEX=1
+      - EVR_WEB_PORT=8030
+    volumes:
+      - conf:/pub
+    networks:
+      - com
+
 networks:
   com: {}

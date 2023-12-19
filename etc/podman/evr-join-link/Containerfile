@@ -14,15 +14,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-FROM docker.io/library/nginx:1.25.3-alpine3.18 AS image
+FROM docker.io/library/alpine:3.18 AS image
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
 
-# http port
-EXPOSE 80
+# the volume /pub exposes the public GPG keys used and auth-token
+# necessary to access the other evr services.
+VOLUME /pub
 
 COPY README AUTHORS COPYING /opt/evr/
-COPY etc/podman/evr-web/envsubst-var-fix.sh /docker-entrypoint.d/18-envsubst-var-fix.sh
-COPY etc/podman/evr-web/nginx.conf /etc/nginx/templates/default.conf.template
-COPY evr-web/dist/. /opt/evr/evr-web/
+COPY etc/podman/evr-join-link/entrypoint.sh /
+COPY etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
+
+CMD ["/entrypoint.sh"]

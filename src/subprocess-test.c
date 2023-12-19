@@ -71,6 +71,8 @@ void test_false_subprocess(){
     assert(status);
 }
 
+char *evr_env_path();
+
 void test_pass_path_to_subprocess(){
     struct evr_subprocess sp;
     char *argv[] = {
@@ -95,6 +97,19 @@ void test_pass_path_to_subprocess(){
     int status;
     assert(waitpid(sp.pid, &status, WUNTRACED) >= 0);
     assert(status == 0);
+}
+
+char *evr_env_path(){
+    char *path = NULL;
+    char *path_prefix = "PATH=";
+    size_t path_len = strlen(path_prefix);
+    for(char **e = environ; *e; ++e){
+        if(strncmp(*e, path_prefix, path_len) != 0){
+            continue;
+        }
+        path = *e;
+    }
+    return path;
 }
 
 int main(){

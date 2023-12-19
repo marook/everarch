@@ -159,6 +159,7 @@ AC_CONFIG_FILES([
     etc/podman/evr-alpine/Makefile
     etc/podman/evr-glacier-storage/Makefile
     etc/podman/evr-attr-index/Makefile
+    etc/podman/evr-join-link/Makefile
     etc/podman/evr-upload-httpd/Makefile
     etc/podman/evr-web/Makefile
     etc/podman/evr-websocket-server/Makefile

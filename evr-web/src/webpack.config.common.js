@@ -15,5 +15,20 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-let { buildAppConfig } = require('../webpack.config.common');
-module.exports = buildAppConfig('upload');
+
+let path = require('path');
+
+function buildAppConfig(appName){
+    return {
+        entry: `./src/${appName}/index.js`,
+        devtool: 'source-map',
+        output: {
+            filename: 'app.js',
+            path: path.resolve(`dist/${appName}`),
+        },
+    };
+}
+
+module.exports = {
+    buildAppConfig,
+};

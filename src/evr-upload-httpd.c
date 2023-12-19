@@ -305,7 +305,7 @@ static enum MHD_Result evr_http_upload_handle_file_upload(struct MHD_Connection 
         NULL,
     };
     int res;
-    struct dynamic_array *buf;
+    struct dynamic_array *buf, *err_buf;
     char *resp_body;
     size_t resp_body_size;
     struct MHD_Response *resp;
@@ -331,7 +331,7 @@ static enum MHD_Result evr_http_upload_handle_file_upload(struct MHD_Connection 
     if(*upload_data_size){
         res = write_n(&ctx->evr_cli_stdin, upload_data, *upload_data_size);
         if(res != evr_ok){
-            log_error("Unable to write http body to evr cli");
+            log_error("Unable to write http body chunk of %zu bytes to evr cli", *upload_data_size);
             goto fail_with_close_evr_cli;
         }
         *upload_data_size = 0;
@@ -405,6 +405,15 @@ static enum MHD_Result evr_http_upload_handle_file_upload(struct MHD_Connection 
  fail_with_free_buf:
     free(buf);
  fail_with_close_evr_cli:
+    err_buf = alloc_dynamic_array(64*1024);
+    if(err_buf) {
+        res = read_fd(&err_buf, ctx->evr_cli.err, 64*1024);
+        if((res == evr_ok || res == evr_end) && err_buf){
+            err_buf->data[min(err_buf->size_used, err_buf->size_allocated - 1)] = '\0';
+            log_error("evr cli post file failed with stderr: %s", err_buf->data);
+        }
+        free(err_buf);
+    }
     if(ctx->evr_cli.in != closed_fd){
         close(ctx->evr_cli.in);
     }

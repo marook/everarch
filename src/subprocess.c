@@ -18,6 +18,7 @@
 
 #include "subprocess.h"
 
+#include <errno.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -49,10 +50,15 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
     if(pipe(child_err)){
         goto panic;
     }
-    char *path = evr_env_path();
     pid_t pid = fork();
     if(pid < 0){
         goto panic;
+    }
+    if(evr_log_fd == STDOUT_FILENO){
+        // switch logging output to stderr. that should stream evr log
+        // calls into the right direction until we call execvp later
+        // in this function.
+        evr_log_fd = STDERR_FILENO;
     }
     if (pid == 0) {
         for(int f = 0; f <= 2; ++f){
@@ -72,12 +78,14 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
         replace_fd(child_in[0], 0);
         replace_fd(child_out[1], 1);
         replace_fd(child_err[1], 2);
-        char* envp[] = {
-            path,
-            NULL
-        };
-        if(execve(argv[0], argv, envp)){
-            evr_panic("Failed to execute %s", argv[0]);
+        if(execvp(argv[0], argv)){
+            char err_buf[1024];
+            char *err_msg = err_buf;
+            int exec_errno = errno;
+            if(evr_strerror_r(exec_errno, &err_msg, sizeof(err_buf)) != evr_ok){
+                evr_panic("Unable to produce error message for errno %d", exec_errno);
+            }
+            evr_panic("Failed to execute %s: %s", argv[0], err_msg);
             goto out;
         }
     } else {
@@ -104,16 +112,3 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
 }
 
 #undef replace_fd
-
-char *evr_env_path(){
-    char *path = NULL;
-    char *path_prefix = "PATH=";
-    size_t path_len = strlen(path_prefix);
-    for(char **e = environ; *e; ++e){
-        if(strncmp(*e, path_prefix, path_len) != 0){
-            continue;
-        }
-        path = *e;
-    }
-    return path;
-}
