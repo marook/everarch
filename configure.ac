@@ -130,6 +130,9 @@ AC_SUBST(HAS_VALGRIND, $has_valgrind)
 AC_CHECK_PROG(has_podman, [podman], true, false)
 AM_CONDITIONAL([HAS_PODMAN], [test x$has_podman = xtrue])
 
+AC_CHECK_PROG(has_xsltproc, [xsltproc], true, false)
+AM_CONDITIONAL([TEST_ATTR_SPEC], [test x$has_xsltproc = xtrue])
+
 AC_CHECK_PROG(has_getopt, [getopt], true, false)
 AC_CHECK_PROG(has_openssl, [openssl], true, false)
 AC_CHECK_PROG(has_openssl, [openssl], true, false)
@@ -173,4 +176,5 @@ AC_MSG_NOTICE([With the results from the checks above configure decided the foll
 	build evr-attr-index: $has_lex
 	build evr-backup: $build_evr_backup
         http server for evr-attr-index: $has_httpd
+        test evr-attr-index default attr-spec transformations: $has_xsltproc
 ])

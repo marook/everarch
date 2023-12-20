@@ -20,9 +20,6 @@ set -e
 ORIG_PATH="${PATH}"
 PATH="/opt/evr/entrypoint:${PATH}"
 
-tls_key='/data/evr-attr-index-key.pem'
-tls_cert='/pub/evr-attr-index-cert.pem'
-
 prepare_gpg_key 'evr-attr-index'
 
 if [ ! -e '/data/evr.conf' ]
@@ -57,21 +54,14 @@ then
     mv '/data/evr.conf.tmp' '/data/evr.conf'
 fi
 
+prepare_tls_cert 'evr-attr-index'
+
 if [ ! -e '/data/evr-attr-index.conf' ]
 then
     echo 'host=0.0.0.0' > '/data/evr-attr-index.conf.tmp'
 
-    if [ ! -e "${tls_key}" ]
-    then
-        echo "Creating TLS certificate pair..."
-        mkdir -p `dirname "${tls_key}"`
-        openssl genrsa -out "${tls_key}" 4096
-        openssl req -new -key "${tls_key}" -out '/opt/evr/cert.csr' -config '/opt/evr/cert.conf'
-        openssl x509 -req -days 3650 -in '/opt/evr/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
-        rm '/opt/evr/cert.csr'
-    fi
-    echo "key=${tls_key}" >> '/data/evr-attr-index.conf.tmp'
-    echo "cert=${tls_cert}" >> '/data/evr-attr-index.conf.tmp'
+    echo "key=/data/evr-attr-index-key.pem" >> '/data/evr-attr-index.conf.tmp'
+    echo "cert=/pub/evr-attr-index-cert.pem" >> '/data/evr-attr-index.conf.tmp'
 
     if [ ! -e "/pub/evr-attr-index-auth-token" ]
     then

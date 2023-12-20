@@ -24,7 +24,20 @@
 #
 # $ podman-compose up
 #
-# TODO script should print join and logon url
+# Wait for the services to come up. On a successful run you should a
+# message like the following one at the end of the startup process:
+#
+# ************************************************************************
+#  everarch successfully started
+#
+#  You can join the instance with your browser now:
+#  http://localhost:8030/join/#j/uf756c3ae32a5e838b9ef051486b5a7520d842aa8f241421219aa47ba22a864d5/i4800e0e71777708923c35d7c07669a45eb82a9d33d569f588ec5fffd89ff087a
+#
+#     (keep this link a secret if you don't
+#      want someone else to access your data)
+#
+# ************************************************************************
+#
 
 version: 3.7
 
@@ -35,7 +48,7 @@ services:
       - conf:/pub
       - glacier:/data
     networks:
-      - com
+      - internal
   attr-index:
     image: localhost/evr-attr-index:amd64
     environment:
@@ -45,7 +58,7 @@ services:
       - conf:/pub
       - attr-index:/data
     networks:
-      - com
+      - internal
   upload-httpd:
     image: localhost/evr-upload-httpd:amd64
     environment:
@@ -54,7 +67,7 @@ services:
       - conf:/pub
       - upload-httpd:/data
     networks:
-      - com
+      - internal
   evr-web:
     image: localhost/evr-web:amd64
     environment:
@@ -64,7 +77,7 @@ services:
     ports:
       - "8030:80"
     networks:
-      - com
+      - internal
   evr-join-link:
     image: localhost/evr-join-link:amd64
     environment:
@@ -74,7 +87,9 @@ services:
     volumes:
       - conf:/pub
     networks:
-      - com
+      - internal
 
 networks:
-  com: {}
+  internal:
+    name: evr-home-edition
+    internal: true

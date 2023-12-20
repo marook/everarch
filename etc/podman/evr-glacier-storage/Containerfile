@@ -43,8 +43,9 @@ VOLUME /data
 RUN apk update && apk add sqlite-libs libgcrypt openssl
 
 COPY README AUTHORS COPYING /opt/evr/
+COPY etc/podman/entrypoints/prepare_tls_cert /opt/evr/entrypoint/
 COPY etc/podman/evr-glacier-storage/entrypoint.sh /
-COPY etc/podman/evr-glacier-storage/cert.conf /opt/evr/
+COPY etc/podman/entrypoints/cert.conf /opt/evr/
 COPY --from=builder /root/everarch/src/evr-glacier-storage /opt/evr/
 
 CMD ["/entrypoint.sh"]

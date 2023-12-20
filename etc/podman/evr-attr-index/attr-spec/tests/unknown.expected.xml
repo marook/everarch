@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<evr:claim-set xmlns:evr="https://evr.ma300k.de/claims/" xmlns:dc="http://purl.org/dc/terms/" dc:created="2023-12-14T12:45:18.667000Z">
+  <evr:attr index-seed="0">
+    <evr:a op="=" k="title" v="ye-unknown-tag"/>
+    <evr:a op="+" k="class" v="unknown"/>
+    <evr:a op="+" k="unknown-claim-name" v="ye-unknown-tag"/>
+    <evr:a op="+" k="unknown-claim-ns" v="http://ma300k.de/some-never-existing-unknown-namespace/"/>
+  </evr:attr>
+</evr:claim-set>

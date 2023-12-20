@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set xmlns:dc="http://purl.org/dc/terms/" xmlns="https://evr.ma300k.de/claims/" dc:created="2023-12-14T12:45:18.667000Z">
+ <file dc:title="ye-file-name.jpg">
+  <body>
+   <slice ref="sha3-224-0019e890270173302174062423aab4a456fca2360edc5a9c119bd1dd" size="75053"/>
+  </body>
+ </file>
+</claim-set>

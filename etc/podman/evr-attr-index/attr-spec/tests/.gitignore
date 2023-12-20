@@ -1,0 +1,4 @@
+*.diff
+*.out.xml
+*.pass
+*.proposed.xml

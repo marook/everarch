@@ -17,24 +17,17 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 set -e
 
-tls_key='/data/evr-glacier-storage-key.pem'
-tls_cert='/pub/evr-glacier-storage-cert.pem'
+ORIG_PATH="${PATH}"
+PATH="/opt/evr/entrypoint:${PATH}"
+
+prepare_tls_cert 'evr-glacier-storage'
 
 if [ ! -e '/data/evr-glacier-storage.conf' ]
 then
     echo 'host=0.0.0.0' > '/data/evr-glacier-storage.conf.tmp'
 
-    if [ ! -e "${tls_key}" ]
-    then
-        echo "Creating TLS certificate pair..."
-        mkdir -p `dirname "${tls_key}"`
-        openssl genrsa -out "${tls_key}" 4096
-        openssl req -new -key "${tls_key}" -out '/opt/evr/cert.csr' -config '/opt/evr/cert.conf'
-        openssl x509 -req -days 3650 -in '/opt/evr/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
-        rm '/opt/evr/cert.csr'
-    fi
-    echo "key=${tls_key}" >> '/data/evr-glacier-storage.conf.tmp'
-    echo "cert=${tls_cert}" >> '/data/evr-glacier-storage.conf.tmp'
+    echo "key=/data/evr-glacier-storage-key.pem" >> '/data/evr-glacier-storage.conf.tmp'
+    echo "cert=/pub/evr-glacier-storage-cert.pem" >> '/data/evr-glacier-storage.conf.tmp'
     
     if [ ! -e "/pub/evr-glacier-auth-token" ]
     then
@@ -53,5 +46,6 @@ then
     mv '/data/evr-glacier-storage.conf.tmp' '/data/evr-glacier-storage.conf'
 fi
 
+export PATH="/opt/evr/bin:${ORIG_PATH}"
 cd /data
 exec /opt/evr/evr-glacier-storage -f

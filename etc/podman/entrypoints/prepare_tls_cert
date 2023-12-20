@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2023  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+set -e
+
+cert_name="$1"
+
+if [ -z "${cert_name}" ]
+then
+    echo "Usage: $0 CERT_NAME" >&2
+    exit 1
+fi
+
+tls_key="/data/${cert_name}-key.pem"
+tls_cert="/pub/${cert_name}-cert.pem"
+
+if [ ! -e "${tls_key}" ]
+then
+    echo "Creating TLS certificate pair..."
+    mkdir -p `dirname "${tls_key}"`
+    openssl genrsa -out "${tls_key}" 4096
+    openssl req -new -key "${tls_key}" -out '/opt/evr/cert.csr' -config '/opt/evr/cert.conf'
+    openssl x509 -req -days 3650 -in '/opt/evr/cert.csr' -signkey "${tls_key}" -out "${tls_cert}"
+    rm '/opt/evr/cert.csr'
+fi

@@ -40,7 +40,9 @@
 
   <xsl:template match="evr:file" mode="claim">
     <evr:attr>
-      <xsl:call-template name="common-attr"/>
+      <xsl:call-template name="common-attr">
+        <xsl:with-param name="default-title" select="'file'" />
+      </xsl:call-template>
       <evr:a op="+" k="class" v="file"/>
       <evr:a op="=" k="file-size" v="{format-number(sum(evr:body/evr:slice/@size), '0')}"/>
       <evr:a op="=" k="file" vf="claim-ref"/>
@@ -50,7 +52,9 @@
   <xsl:template match="*" mode="claim">
     <!-- default match in the end for unknown claims -->
     <evr:attr>
-      <xsl:call-template name="common-attr"/>
+      <xsl:call-template name="common-attr">
+        <xsl:with-param name="default-title" select="local-name(.)" />
+      </xsl:call-template>
       <evr:a op="+" k="class" v="unknown" />
       <evr:a op="+" k="unknown-claim-name" v="{local-name(.)}" />
       <evr:a op="+" k="unknown-claim-ns" v="{namespace-uri(.)}" />
@@ -61,9 +65,13 @@
        common templates follow below this line
   -->
   <xsl:template name="common-attr">
+    <xsl:param name="default-title" select="''"/>
     <xsl:call-template name="seed-attr"/>
     <xsl:if test="@dc:title">
       <evr:a op="=" k="title" v="{@dc:title}"/>
+    </xsl:if>
+    <xsl:if test="not(@dc:title) and $default-title">
+      <evr:a op="=" k="title" v="{$default-title}"/>
     </xsl:if>
   </xsl:template>
 

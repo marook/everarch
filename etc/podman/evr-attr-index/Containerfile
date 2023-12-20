@@ -47,9 +47,9 @@ VOLUME /data
 RUN apk update && apk add sqlite-libs libgcrypt openssl libxml2 libxslt gpgme libmicrohttpd
 
 COPY README AUTHORS COPYING /opt/evr/
+COPY etc/podman/entrypoints/prepare_gpg_key etc/podman/entrypoints/prepare_tls_cert etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
 COPY etc/podman/evr-attr-index/entrypoint.sh /
-COPY etc/podman/entrypoints/prepare_gpg_key etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
-COPY etc/podman/evr-attr-index/cert.conf /opt/evr/
+COPY etc/podman/entrypoints/cert.conf /opt/evr/
 COPY etc/podman/evr-attr-index/attr-spec/attr-trans.xslt etc/podman/evr-attr-index/attr-spec/install_attr_spec /opt/evr/attr-spec/
 COPY --from=builder /root/everarch/src/evr-attr-index /opt/evr/
 COPY --from=builder /root/everarch/src/evr /opt/evr/bin/
