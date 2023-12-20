@@ -14,8 +14,6 @@ external DNS ended:
 probably my own unstable dns server was the cause of the issue. let's
 monitor the situation and close this issue if it does not appear
 anymore soon.
-* file upload app in evr-web
-should allow dropping files in and show the current uploads in a list
 * add header to evr-web to navigate to root index.html
 * evr-home-edition index image properties
 the evr-home-edition should contain an evr-attr-index attr-spec with a
@@ -25,6 +23,8 @@ their width and height.
 it should retrieve refs that point to file claims. a thumbnail for the
 given image should be generated.
 * attr-index-explorer should show thumbnails for image seeds
+* add drop support in evr-web upload app
+should allow dropping files in and show the current uploads in a list
 * cache up to N megabytes of thumbnails in evr-thumbnail-httpd
 * document and migrate evr-home-edition to docker images
 right now the evr-home-edition docker-compose.yml points to localhost

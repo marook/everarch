@@ -15,3 +15,57 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+.upload-view {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: var(--gap-space);
+}
+
+.upload-view .initiate-upload-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-space);
+}
+
+.upload-view .initiate-upload-container form[name=fileUpload], .upload-view .initiate-upload-container .file-drop-zone {
+    flex-grow: 1;
+    padding: var(--gap-space-1-2);
+    border: 0.3rem #888 dashed;
+    background-color: #ddd;
+}
+
+.upload-view .initiate-upload-container form[name=fileUpload] {
+    display: grid;
+    grid-template-columns: 1fr;
+}
+
+.upload-view .initiate-upload-container .file-drop-zone {
+    font-size: 4rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #888;
+}
+
+.upload-view .uploads-queue-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-space-1-4);
+}
+
+.upload-entry-view {
+    display: flex;
+    gap: var(--gap-space-1-4)
+}
+
+.upload-entry-view .status {
+    cursor: default;
+}
+
+.upload-entry-view .file-name {
+    flex-grow: 1;
+}

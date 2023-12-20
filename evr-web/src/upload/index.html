@@ -29,11 +29,26 @@
 
     <template id="upload-view">
       <main>
-        <form name="fileUpload">
-          <input name="file" type="file"/>
-          <button>submit</button>
-        </form>
+        <div class="initiate-upload-container">
+          <form name="fileUpload">
+            <input name="file" type="file" multiple="multiple"/>
+            <button>submit</button>
+          </form>
+          <div class="file-drop-zone">
+            <div>
+              drop zone
+            </div>
+          </div>
+        </div>
+        <div class="uploads-queue-container"></div>
       </main>
+    </template>
+
+    <template id="upload-entry-view">
+      <article>
+        <span class="status"></span>
+        <span class="file-name"></span>
+      </article>
     </template>
 
     <script src="app.js"></script>

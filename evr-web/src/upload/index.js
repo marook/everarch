@@ -16,31 +16,101 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { fromEvent } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { BehaviorSubject, EMPTY, fromEvent, merge } from 'rxjs';
+import { distinctUntilChanged, filter, switchMap, tap, map } from 'rxjs/operators';
 
 import { createRouter } from '../routers.js';
-import { instantiateTemplate } from '../mvc.js';
+import { instantiateTemplate, wireControllers } from '../mvc.js';
+
+let uploadQueue = new BehaviorSubject([]);
+
+uploadQueue.pipe(
+    switchMap(queue => {
+        if(queue.length === 0){
+            return EMPTY;
+        }
+        let firstEntry = queue[0];
+        if(firstEntry.status.value === 'queued'){
+            uploadQueueEntry(firstEntry);
+        }
+        return firstEntry.status;
+    }),
+    filter(status => status === 'uploaded'),
+    tap(() => uploadQueue.next(uploadQueue.value.slice(1))),
+).subscribe();
+
+function uploadQueueEntry(queueEntry){
+    let authToken = localStorage.getItem('evr-upload-httpd-auth-token');
+    if(!authToken){
+        return;
+    }
+    queueEntry.status.next('uploading');
+    fetch(`/evr-upload-httpd/files/${queueEntry.file.name}`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer AT${authToken}`,
+        },
+        body: queueEntry.file,
+    })
+        .then(res => {
+            if(res.ok){
+                queueEntry.status.next('uploaded');
+            } else {
+                queueEntry.status.next('error');
+            }
+        });
+}
 
 class UploadController {
     constructor(){
         this.element = instantiateTemplate('upload');
-        this.active = fromEvent(this.element.querySelector('form[name=fileUpload]'), 'submit').pipe(
+        let queueUploads = fromEvent(this.element.querySelector('form[name=fileUpload]'), 'submit').pipe(
             tap(event => {
                 event.preventDefault();
-                let files = this.element.querySelector('form[name=fileUpload] input[name=file]').files;
-                let file = files[0];
-                let authToken = localStorage.getItem('evr-upload-httpd-auth-token');
-                fetch(`/evr-upload-httpd/files/${file.name}`, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer AT${authToken}`,
-                    },
-                    body: file,
-                });
+                let fileInput = this.element.querySelector('form[name=fileUpload] input[name=file]');
+                let files = fileInput.files;
+                let newUploads = [];
+                for(let file of files){
+                    newUploads.push({
+                        fileName: file.name,
+                        status: new BehaviorSubject('queued'),
+                        file,
+                    });
+                }
+                uploadQueue.next(uploadQueue.value.concat(newUploads));
+                fileInput.value = '';
             }),
         );
+        let uploadQueueControllers = uploadQueue.pipe(
+            map(queue => queue.map(e => new UploadEntryController(e))),
+        );
+        let renderUploadQueue = wireControllers(uploadQueueControllers, this.element.querySelector('.uploads-queue-container'));
+        this.active = merge(queueUploads, renderUploadQueue);
     }
+}
+
+let statusIcons = {
+    queued: '😴',
+    uploading: '😬',
+    uploaded: '😌',
+    error: '🙀',
+};
+
+class UploadEntryController {
+    constructor(uploadEntry){
+        this.element = instantiateTemplate('upload-entry');
+        this.element.querySelector('.file-name').textContent = uploadEntry.fileName;
+        let renderStatus = uploadEntry.status.pipe(
+            distinctUntilChanged(),
+            tap(status => {
+                let statEl = this.element.querySelector('.status');
+                statEl.textContent = statusIcons[status] || '😐';
+                statEl.setAttribute('title', status);
+            }),
+        );
+        this.active = renderStatus;
+    }
+    
 }
 
 let router = createRouter(document.getElementById('viewport'), routePath => {
