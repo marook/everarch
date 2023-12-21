@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+#
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2023  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# This script produces attr claims based on file claim's content
+# metadata.
+
+from subprocess import run
+import sys
+import xml.etree.ElementTree as et
+
+ns = {
+    '': 'https://evr.ma300k.de/claims/',
+    'dc': 'http://purl.org/dc/terms/'
+}
+
+def qname(name):
+    if ':' in name:
+        ns_name, element_name = name.split(':')
+        if ns_name == 'evr':
+            ns_name = ''
+        ns_uri = ns[ns_name]
+        return et.QName(ns_uri, element_name)
+    return name
+
+claim_ref = sys.argv[1]
+in_doc = et.parse(sys.stdin)
+out_cs = et.Element(qname(':claim-set'))
+
+def shell(cmd):
+    p = run(['/bin/ash', '-e', '-o', 'pipefail', '-c', cmd], capture_output=True, encoding='UTF-8')
+    if p.returncode != 0:
+        raise Exception(f'Failed to execute cmd: {cmd}\n\n{p.stderr}')
+    return p.stdout
+
+identify_formats = {
+    'image/vnd.microsoft.icon': 'ico',
+}
+
+for claim_index, fc in enumerate(in_doc.getroot()):
+    if fc.tag != '{https://evr.ma300k.de/claims/}file':
+        continue
+    seed = fc.attrib['seed']
+    attr = et.SubElement(out_cs, qname(':attr'), {
+        qname(':seed'): seed,
+    })
+    file_claim_ref = f'{claim_ref}-{claim_index:04x}'
+    file_stdout = shell(f'evr get-file {file_claim_ref} | file -b -i -')
+    mime_type, charset = [s.strip() for s in file_stdout.split(';')]
+    charset = charset.split('=')[1]
+    et.SubElement(attr, qname(':a'), {
+        qname(':op'): '=',
+        qname(':k'): 'mime-type',
+        qname(':v'): mime_type,
+    })
+    et.SubElement(attr, qname(':a'), {
+        qname(':op'): '=',
+        qname(':k'): 'charset',
+        qname(':v'): charset,
+    })
+    if mime_type.startswith('image/'):
+        fmt = f'{identify_formats[mime_type]}:' if mime_type in identify_formats else ''
+        max_w = None
+        max_h = None
+        # gifs which contain multiple frames report multiple resolutions
+        for line in shell(f'evr get-file {file_claim_ref} | identify -ping -format \'%w %h\\n\' {fmt}-').split('\n'):
+            if line.strip() == '':
+                continue
+            w, h = [int(n) for n in line.split(' ')]
+            if max_w is None or w > max_w:
+                max_w = w
+            if max_h is None or h > max_h:
+                max_h = h
+        if max_w is None:
+            raise Exception(f'Image file {file_claim_ref} did not report any resolution')
+        et.SubElement(attr, qname(':a'), {
+            qname(':op'): '=',
+            qname(':k'): 'image-width',
+            qname(':v'): f'{max_w}',
+        })
+        et.SubElement(attr, qname(':a'), {
+            qname(':op'): '=',
+            qname(':k'): 'image-height',
+            qname(':v'): f'{max_h}',
+        })
+
+tree = et.ElementTree(element=out_cs)
+tree.write(sys.stdout.buffer,
+           encoding='UTF-8',
+           xml_declaration=True,
+           default_namespace=ns[''])

@@ -23,6 +23,7 @@
 #include <argp.h>
 #include <unistd.h>
 #include <threads.h>
+#include <float.h>
 
 #include "basics.h"
 #include "logger.h"

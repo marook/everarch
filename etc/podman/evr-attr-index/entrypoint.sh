@@ -22,6 +22,28 @@ PATH="/opt/evr/entrypoint:${PATH}"
 
 prepare_gpg_key 'evr-attr-index'
 
+if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' ]
+then
+    echo "Importing upload httpd GPG keys..."
+    wait_for_file "/pub/evr-upload-httpd-identity.pub.gpg"
+    gpg --import "/pub/evr-upload-httpd-identity.pub.gpg"
+fi
+
+if [ "${EVR_WITH_WEBSOCKET_SERVER}" == '1' ]
+then
+    echo "Importing websocket server GPG keys..."
+    wait_for_file "/pub/evr-websocket-server-identity.pub.gpg"
+    gpg --import "/pub/evr-websocket-server-identity.pub.gpg"
+fi
+
+if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' -o "${EVR_WITH_WEBSOCKET_SERVER}" == '1' ]
+then
+    for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    do
+        echo "${fpr}:6:" | gpg --import-ownertrust
+    done
+fi
+
 if [ ! -e '/data/evr.conf' ]
 then
     echo -n '' > '/data/evr.conf.tmp'
@@ -35,8 +57,8 @@ then
     echo "storage-host=${EVR_GLACIER_STORAGE_HOST}" >> '/data/evr.conf.tmp'
     echo "ssl-cert=${EVR_GLACIER_STORAGE_HOST}:2361:/pub/evr-glacier-storage-cert.pem" >> '/data/evr.conf.tmp'
     echo "Waiting for glacier auth-token..."
-    wait_for_file "/pub/evr-glacier-auth-token"
-    storage_auth_token=`cat "/pub/evr-glacier-auth-token"`
+    wait_for_file "/pub/evr-glacier-storage-auth-token"
+    storage_auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
     echo "auth-token=${EVR_GLACIER_STORAGE_HOST}:2361:${storage_auth_token}" >> '/data/evr.conf.tmp'
 
     for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
@@ -63,13 +85,8 @@ then
     echo "key=/data/evr-attr-index-key.pem" >> '/data/evr-attr-index.conf.tmp'
     echo "cert=/pub/evr-attr-index-cert.pem" >> '/data/evr-attr-index.conf.tmp'
 
-    if [ ! -e "/pub/evr-attr-index-auth-token" ]
-    then
-        echo "Generating auth-token..."
-        openssl rand -hex 32 > "/pub/evr-attr-index-auth-token.tmp"
-        mv "/pub/evr-attr-index-auth-token.tmp" "/pub/evr-attr-index-auth-token"
-        chmod a-w "/pub/evr-attr-index-auth-token"
-    fi
+    prepare_auth_token 'evr-attr-index'
+
     auth_token=`cat "/pub/evr-attr-index-auth-token"`
     echo "auth-token=${auth_token}" >> '/data/evr-attr-index.conf.tmp'
 
@@ -82,32 +99,14 @@ then
     echo "storage-host=${EVR_GLACIER_STORAGE_HOST}" >> '/data/evr-attr-index.conf.tmp'
     echo "ssl-cert=${EVR_GLACIER_STORAGE_HOST}:2361:/pub/evr-glacier-storage-cert.pem" >> '/data/evr-attr-index.conf.tmp'
     echo "Waiting for glacier auth-token..."
-    wait_for_file "/pub/evr-glacier-auth-token"
-    storage_auth_token=`cat "/pub/evr-glacier-auth-token"`
+    wait_for_file "/pub/evr-glacier-storage-auth-token"
+    storage_auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
     echo "storage-auth-token=${storage_auth_token}" >> '/data/evr-attr-index.conf.tmp'
 
-    if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' ]
-    then
-        echo "Importing upload httpd GPG keys..."
-        wait_for_file "/pub/evr-upload-httpd-identity.pub.gpg"
-        gpg --import "/pub/evr-upload-httpd-identity.pub.gpg"
-    fi
-
-    if [ "${EVR_WITH_WEBSOCKET_SERVER}" == '1' ]
-    then
-        echo "Importing websocket server GPG keys..."
-        wait_for_file "/pub/evr-websocket-server-identity.pub.gpg"
-        gpg --import "/pub/evr-websocket-server-identity.pub.gpg"
-    fi
-
-    if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' -o "${EVR_WITH_WEBSOCKET_SERVER}" == '1' ]
-    then
-        for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
-        do
-            echo "${fpr}:6:" | gpg --import-ownertrust
-            echo "accepted-gpg-key=${fpr}" >> '/data/evr-attr-index.conf.tmp'
-        done
-    fi
+    for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    do
+        echo "accepted-gpg-key=${fpr}" >> '/data/evr-attr-index.conf.tmp'
+    done
 
     echo "Preparing state directory..."
     mkdir -p '/data/evr-attr-index'

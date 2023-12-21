@@ -195,7 +195,7 @@ async function buildEvrConfig(serverConfigPath){
         throw new Error(`Environment variable EVR_GLACIER_STORAGE_HOST must specify hosname of evr-glacier-storage server.`);
     }
     let storagePort = process.env['EVR_GLACIER_STORAGE_PORT'] || '2361';
-    let authToken = await readFile('/pub/evr-glacier-auth-token', { encoding: 'utf-8' });
+    let authToken = await readFile('/pub/evr-glacier-storage-auth-token', { encoding: 'utf-8' });
     let evrConfig = [
         `storage-host=${storageHost}`,
         `storage-port=${storagePort}`,

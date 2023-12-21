@@ -16,9 +16,9 @@ all: $(app_dist_index_htmls) $(app_dist_app_js) $(app_dist_app_css) dist/base.cs
 clean:
 	rm -rf dist
 
-dist/%/index.html: src/%/index.html
+dist/%/index.html: src/%/index.html src/*.html bin/render-html
 	mkdir -p `dirname $@`
-	cp $^ $@
+	./bin/render-html $(firstword $^) $@
 
 dist/%/app.js: src/%/webpack.config.js src/webpack.config.common.js src/%/*.js src/*.js
 	mkdir -p `dirname $@`

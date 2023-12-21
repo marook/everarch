@@ -14,13 +14,6 @@ external DNS ended:
 probably my own unstable dns server was the cause of the issue. let's
 monitor the situation and close this issue if it does not appear
 anymore soon.
-* evr-home-edition index image properties
-the evr-home-edition should contain an evr-attr-index attr-spec with a
-simple claim transformation. the transformation must index images with
-their width and height.
-* make evr-home-edition use same token for all http endpoints
-so we avoid producing longer and longer join urls
-* evr-web must always revalidate static content
 * allow access to file claim content with evr-home-edition
 file claim content should be accessible via the evr-web server.
 

@@ -17,6 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 set -e
 
+file_meta_factory=`evr put < "/opt/evr/attr-spec/file-meta-factory"`
 attr_trans_ref=`evr put < "/opt/evr/attr-spec/attr-trans.xslt"`
 
 evr -f 3 sign-put <<EOF
@@ -37,6 +38,7 @@ evr -f 3 sign-put <<EOF
     <attr-def k="unknown-claim-name" type="str" example="some-tag"/>
     <attr-def k="unknown-claim-ns" type="str" example="https://acme.org/xml-ns"/>
 
+    <attr-factory type="executable" blob="${file_meta_factory}"/>
     <transformation type="xslt" blob="${attr_trans_ref}"/>
   </attr-spec>
 </claim-set>

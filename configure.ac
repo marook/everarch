@@ -175,6 +175,7 @@ AC_OUTPUT
 AC_MSG_NOTICE([With the results from the checks above configure decided the following.
 	build evr-attr-index: $has_lex
 	build evr-backup: $build_evr_backup
+        build fuse file systems: $has_fuse
         http server for evr-attr-index: $has_httpd
         test evr-attr-index default attr-spec transformations: $has_xsltproc
 ])

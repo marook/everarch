@@ -22,6 +22,8 @@ import { tap } from 'rxjs/operators';
 import { createRouter } from '../routers.js';
 import { instantiateTemplate, wireControllers } from '../mvc.js';
 
+let allTokenOpPrefix = 'A';
+
 let tokenConfig = [
     {
         name: 'evr-upload-httpd-auth-token',
@@ -40,12 +42,21 @@ class JoiningController {
             if(op.length === 0){
                 continue;
             }
-            let cfg = findTokenConfig(op);
-            if(!cfg){
-                throw new Error(`Unknown token operation: ${op}`);
+            if(op.startsWith(allTokenOpPrefix)){
+                // use same token for all services
+                let token = op.substring(allTokenOpPrefix.length);
+                for(let cfg of tokenConfig){
+                    localStorage.setItem(cfg.name, token);
+                }
+            } else {
+                // set an individual token for one service
+                let cfg = findTokenConfig(op);
+                if(!cfg){
+                    throw new Error(`Unknown token operation: ${op}`);
+                }
+                let token = op.substring(cfg.opPrefix.length);
+                localStorage.setItem(cfg.name, token);
             }
-            let token = op.substring(cfg.opPrefix.length);
-            localStorage.setItem(cfg.name, token);
         }
         window.location.hash = '';
     }

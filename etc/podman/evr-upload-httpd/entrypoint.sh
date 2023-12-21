@@ -24,13 +24,7 @@ if [ ! -e '/data/evr-upload-httpd.conf' ]
 then
     echo 'host=0.0.0.0' > '/data/evr-upload-httpd.conf.tmp'
 
-    if [ ! -e "/pub/evr-upload-httpd-auth-token" ]
-    then
-        echo "Generating auth-token..."
-        openssl rand -hex 32 > "/pub/evr-upload-httpd-auth-token.tmp"
-        mv "/pub/evr-upload-httpd-auth-token.tmp" "/pub/evr-upload-httpd-auth-token"
-        chmod a-w "/pub/evr-upload-httpd-auth-token"
-    fi
+    prepare_auth_token 'evr-upload-httpd'
     auth_token=`cat "/pub/evr-upload-httpd-auth-token"`
     echo "auth-token=${auth_token}" >> '/data/evr-upload-httpd.conf.tmp'
     
@@ -52,8 +46,8 @@ then
     echo "storage-host=${EVR_GLACIER_STORAGE_HOST}" >> '/data/evr.conf.tmp'
     echo "ssl-cert=${EVR_GLACIER_STORAGE_HOST}:2361:/pub/evr-glacier-storage-cert.pem" >> '/data/evr.conf.tmp'
     echo "Waiting for glacier auth-token..."
-    wait_for_file "/pub/evr-glacier-auth-token"
-    storage_auth_token=`cat "/pub/evr-glacier-auth-token"`
+    wait_for_file "/pub/evr-glacier-storage-auth-token"
+    storage_auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
     echo "auth-token=${EVR_GLACIER_STORAGE_HOST}:2361:${storage_auth_token}" >> '/data/evr.conf.tmp'
 
     for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`

@@ -46,7 +46,7 @@ RUN apk update && apk add libgcrypt openssl libxml2 libxslt gpgme libmicrohttpd
 
 COPY README AUTHORS COPYING /opt/evr/
 COPY etc/podman/evr-upload-httpd/entrypoint.sh /
-COPY etc/podman/entrypoints/prepare_gpg_key etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
+COPY etc/podman/entrypoints/prepare_auth_token etc/podman/entrypoints/prepare_gpg_key etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
 COPY --from=builder /root/everarch/src/evr-upload-httpd /opt/evr/
 COPY --from=builder /root/everarch/src/evr /opt/evr/bin/
 

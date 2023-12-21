@@ -54,6 +54,7 @@ services:
     environment:
       - EVR_GLACIER_STORAGE_HOST=storage
       - EVR_WITH_UPLOAD_HTTPD=1
+      - EVR_REUSE_GLACIER_AUTH_TOKEN=1
     volumes:
       - conf:/pub
       - attr-index:/data
@@ -63,6 +64,7 @@ services:
     image: localhost/evr-upload-httpd:amd64
     environment:
       - EVR_GLACIER_STORAGE_HOST=storage
+      - EVR_REUSE_GLACIER_AUTH_TOKEN=1
     volumes:
       - conf:/pub
       - upload-httpd:/data
@@ -81,6 +83,7 @@ services:
   evr-join-link:
     image: localhost/evr-join-link:amd64
     environment:
+      - EVR_REUSE_GLACIER_AUTH_TOKEN=1
       - EVR_WITH_UPLOAD_HTTPD=1
       - EVR_WITH_ATTR_INDEX=1
       - EVR_WEB_PORT=8030

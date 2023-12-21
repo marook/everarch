@@ -21,18 +21,25 @@ PATH="/opt/evr/entrypoint:${PATH}"
 
 token_ops=
 
-if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' ]
+if [ "${EVR_REUSE_GLACIER_AUTH_TOKEN}" == '1' ]
 then
-    wait_for_file "/pub/evr-upload-httpd-auth-token"
-    auth_token=`cat "/pub/evr-upload-httpd-auth-token"`
-    token_ops="${token_ops}/u${auth_token}"
-fi
+    wait_for_file "/pub/evr-glacier-storage-auth-token"
+    auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
+    token_ops="${token_ops}/A${auth_token}"    
+else
+    if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' ]
+    then
+        wait_for_file "/pub/evr-upload-httpd-auth-token"
+        auth_token=`cat "/pub/evr-upload-httpd-auth-token"`
+        token_ops="${token_ops}/u${auth_token}"
+    fi
 
-if [ "${EVR_WITH_ATTR_INDEX}" == '1' ]
-then
-    wait_for_file "/pub/evr-attr-index-auth-token"
-    auth_token=`cat "/pub/evr-attr-index-auth-token"`
-    token_ops="${token_ops}/i${auth_token}"
+    if [ "${EVR_WITH_ATTR_INDEX}" == '1' ]
+    then
+        wait_for_file "/pub/evr-attr-index-auth-token"
+        auth_token=`cat "/pub/evr-attr-index-auth-token"`
+        token_ops="${token_ops}/i${auth_token}"
+    fi
 fi
 
 cat <<EOF

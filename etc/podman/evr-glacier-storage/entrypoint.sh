@@ -28,15 +28,9 @@ then
 
     echo "key=/data/evr-glacier-storage-key.pem" >> '/data/evr-glacier-storage.conf.tmp'
     echo "cert=/pub/evr-glacier-storage-cert.pem" >> '/data/evr-glacier-storage.conf.tmp'
-    
-    if [ ! -e "/pub/evr-glacier-auth-token" ]
-    then
-        echo "Generating auth-token..."
-        openssl rand -hex 32 > "/pub/evr-glacier-auth-token.tmp"
-        mv "/pub/evr-glacier-auth-token.tmp" "/pub/evr-glacier-auth-token"
-        chmod a-w "/pub/evr-glacier-auth-token"
-    fi
-    auth_token=`cat "/pub/evr-glacier-auth-token"`
+
+    prepare_auth_token 'evr-glacier-storage'
+    auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
     echo "auth-token=${auth_token}" >> '/data/evr-glacier-storage.conf.tmp'
 
     echo "Preparing buckets directory..."
