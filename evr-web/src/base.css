@@ -74,3 +74,15 @@ form input[type=text], form input[type=search], form input[type=password], input
     height: 100vh;
     display: grid;
 }
+
+.nav-view {
+    color: #fff;
+    background-color: #000;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.nav-view a {
+    color: #fff;
+    text-decoration: none;
+}

@@ -16,41 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-main {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap-space);
-    padding: var(--gap-space);
-}
+import { instantiateTemplate } from './mvc.js';
 
-.apps {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gap-space);
-}
-
-.apps > a {
-    width: 7rem;
-    height: 8rem;
-    display: flex;
-    flex-direction: column;
-    outline: 0.1rem solid #444;
-    padding: var(--gap-space-1-4);
-    text-decoration: none;
-    color: #000;
-}
-
-.apps > a .icon {
-    flex-grow: 1;
-    text-align: center;
-    font-size: 5rem;
-    overflow: hidden;
-}
-
-.apps > a.c .icon {
-    font-family: monospace;
-}
-
-.apps > a .name {
-    text-align: center;
+export class NavController {
+    constructor(){
+        this.element = instantiateTemplate('nav');
+    }
 }

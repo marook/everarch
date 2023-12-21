@@ -18,7 +18,7 @@
 
 .upload-view {
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     gap: var(--gap-space);
 }
 

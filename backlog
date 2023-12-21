@@ -14,17 +14,53 @@ external DNS ended:
 probably my own unstable dns server was the cause of the issue. let's
 monitor the situation and close this issue if it does not appear
 anymore soon.
-* add header to evr-web to navigate to root index.html
 * evr-home-edition index image properties
 the evr-home-edition should contain an evr-attr-index attr-spec with a
 simple claim transformation. the transformation must index images with
 their width and height.
+* make evr-home-edition use same token for all http endpoints
+so we avoid producing longer and longer join urls
+* evr-web must always revalidate static content
+* allow access to file claim content with evr-home-edition
+file claim content should be accessible via the evr-web server.
+
+the ideal option would be to have a container run evr-glacier-fs and
+some webserver for accessing these files.
+
+trying to mount a evr-glacier-fs inside a podman container fails like
+this:
+
+#+BEGIN_SRC
+Mounting evr-glacier-fs…
+fuse: device not found, try 'modprobe fuse' first
+#+END_SRC
+
+After running the build with the '--device /dev/fuse' option now the
+following error stops the mounting:
+
+#+BEGIN_SRC
+Mounting evr-glacier-fs…
+fusermount3: mount failed: Operation not permitted
+#+END_SRC
+
+After running the build with the --cap-add=sys_admin option we get the
+following error:
+
+#+BEGIN_SRC
+Mounting evr-glacier-fs…
+fuse: mount failed: Invalid argument
+#+END_SRC
+
+[[https://stackoverflow.com/questions/69786271/how-to-mount-a-squashfs-file-in-a-container-when-running-rootless-podman][describes how to use squashfuse inside podman]].
+[[https://unix.stackexchange.com/questions/625206/cant-run-fuse-inside-podman-fusermount-mount-failed-operation-not-permitted][describes how to use sshfs inside podman]].
 * implement a evr-thumbnail-httpd server
 it should retrieve refs that point to file claims. a thumbnail for the
 given image should be generated.
 * attr-index-explorer should show thumbnails for image seeds
 * add drop support in evr-web upload app
 should allow dropping files in and show the current uploads in a list
+* evr-web must not allow requests to other domains
+for security reasons.
 * cache up to N megabytes of thumbnails in evr-thumbnail-httpd
 * document and migrate evr-home-edition to docker images
 right now the evr-home-edition docker-compose.yml points to localhost
@@ -63,6 +99,24 @@ right now the folllowing appears from time to time. a new index
 generation starts and might take halve a day. during that indexing
 evr-attr-index crashes an is restarted by systemd. now the new index
 is used which is only partly filled.
+* replace select with poll or epoll
+because of possible deadlocks in the way evr uses select it's usage
+should be replaced with either poll or epoll. for details about
+possible select issues in evr see
+https://man7.org/linux/man-pages/man2/select.2.html#BUGS
+
+i'm pretty sure that evr is at least vulnerable against the following
+section from the select manpage:
+
+#+BEGIN_SRC
+       On Linux, select() may report a socket file descriptor as "ready
+       for reading", while nevertheless a subsequent read blocks.  This
+       could for example happen when data has arrived but upon
+       examination has the wrong checksum and is discarded.  There may
+       be other circumstances in which a file descriptor is spuriously
+       reported as ready.  Thus it may be safer to use O_NONBLOCK on
+       sockets that should not block.
+#+END_SRC
 * replace sscanf calls with strto*
 as there is some undefined behavior involved with overflowing numbers
 and scanf.

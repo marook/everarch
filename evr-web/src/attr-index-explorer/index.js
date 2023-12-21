@@ -22,10 +22,12 @@ import { catchError, debounceTime, delay, distinctUntilChanged, map, switchMap, 
 import { createRouter } from '../routers.js';
 import { instantiateTemplate, wireControllers } from '../mvc.js';
 import { search, ClientError } from '../evr-attr-index.js';
+import { NavController } from '../nav.js';
 
 class SearchController {
     constructor(){
         this.element = instantiateTemplate('search');
+        let renderNav = wireControllers(of([new NavController()]), this.element.querySelector('.nav-container'));
         let queryInput = this.element.querySelector('form[name=search] input[name=query]');
         setTimeout(() => queryInput.focus(), 0);
         let query = merge(
@@ -86,7 +88,7 @@ class SearchController {
                 }
             }),
         );
-        this.active = merge(renderFoundSeeds, showLoadingOverlay, indicateValidQuery);
+        this.active = merge(renderNav, renderFoundSeeds, showLoadingOverlay, indicateValidQuery);
     }
 }
 

@@ -16,11 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { BehaviorSubject, EMPTY, fromEvent, merge } from 'rxjs';
+import { BehaviorSubject, EMPTY, fromEvent, merge, of } from 'rxjs';
 import { distinctUntilChanged, filter, switchMap, tap, map } from 'rxjs/operators';
 
 import { createRouter } from '../routers.js';
 import { instantiateTemplate, wireControllers } from '../mvc.js';
+import { NavController } from '../nav.js';
 
 let uploadQueue = new BehaviorSubject([]);
 
@@ -64,6 +65,7 @@ function uploadQueueEntry(queueEntry){
 class UploadController {
     constructor(){
         this.element = instantiateTemplate('upload');
+        let renderNav = wireControllers(of([new NavController()]), this.element.querySelector('.nav-container'));
         let queueUploads = fromEvent(this.element.querySelector('form[name=fileUpload]'), 'submit').pipe(
             tap(event => {
                 event.preventDefault();
@@ -85,7 +87,7 @@ class UploadController {
             map(queue => queue.map(e => new UploadEntryController(e))),
         );
         let renderUploadQueue = wireControllers(uploadQueueControllers, this.element.querySelector('.uploads-queue-container'));
-        this.active = merge(queueUploads, renderUploadQueue);
+        this.active = merge(renderNav, queueUploads, renderUploadQueue);
     }
 }
 
