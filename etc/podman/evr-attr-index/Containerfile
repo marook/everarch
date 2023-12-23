@@ -18,7 +18,7 @@ FROM docker.io/library/alpine:3.18 AS builder
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
-RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison libmicrohttpd-dev
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison libmicrohttpd-dev
 WORKDIR /root/everarch
 COPY . /root/everarch
 RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-attr-index evr
