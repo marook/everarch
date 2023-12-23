@@ -1820,7 +1820,7 @@ static struct MHD_Response *evr_httpd_create_heap_buffer_response(struct evr_fil
 static enum MHD_Result evr_httpd_handle_search(struct MHD_Connection *c){
     int ret = evr_error, res;
     enum MHD_Result mhd_ret;
-    char *search_query;
+    const char *search_query;
     evr_blob_ref index_ref;
     evr_blob_ref_str index_ref_str;
     struct evr_attr_index_db *db;

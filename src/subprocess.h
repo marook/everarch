@@ -42,6 +42,6 @@ struct evr_subprocess {
  *
  * Returns evr_ok on success.
  */
-int evr_spawn(struct evr_subprocess *p, char *argv[]);
+int evr_spawn(struct evr_subprocess *p, const char *argv[]);
 
 #endif

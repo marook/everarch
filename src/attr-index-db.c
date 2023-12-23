@@ -422,7 +422,7 @@ int evr_find_reindexable_claim_sets(struct evr_attr_index_db *db, evr_time t, si
             log_error("claim-set ref of illegal size %d in claim-set table", ref_col_size);
             goto out_with_reset_find_reindexable_claim_sets;
         }
-        const evr_claim_ref *sqlite_cs_ref = sqlite3_column_blob(db->find_reindexable_claim_sets, 0);
+        const evr_claim_ref *sqlite_cs_ref = (void*)sqlite3_column_blob(db->find_reindexable_claim_sets, 0);
         memcpy(*cs_ref, *sqlite_cs_ref, evr_blob_ref_size);
     }
     ret = evr_ok;
@@ -842,7 +842,7 @@ int evr_append_attr_factory_claims_worker(void *context){
     }
     evr_blob_ref_str claim_set_ref_str;
     evr_fmt_blob_ref(claim_set_ref_str, ctx->claim_set_ref);
-    char *argv[] = {
+    const char *argv[] = {
         exe_path,
         claim_set_ref_str,
         NULL
@@ -1692,7 +1692,7 @@ int evr_attr_query_claims(struct evr_attr_index_db *db, const char *query_str, i
         if(ref_col_size != evr_claim_ref_size){
             goto out_with_free_attrs;
         }
-        const evr_claim_ref *seed = sqlite3_column_blob(query_stmt, 0);
+        const evr_claim_ref *seed = (void*)sqlite3_column_blob(query_stmt, 0);
         evr_reset_buf_pos(&attr_ctx.attrs);
         evr_reset_buf_pos(&attr_ctx.data);
         if(evr_collect_selected_attrs(&attr_ctx, db, query->selector, query->effective_time, *seed) != evr_ok){
@@ -1894,7 +1894,7 @@ int evr_attr_visit_claims_for_seed(struct evr_attr_index_db *db, evr_claim_ref s
             log_error("Claim ref of illegal size %d in claim table", ref_col_size);
             goto out_with_reset_stmt;
         }
-        const evr_claim_ref *ref = sqlite3_column_blob(db->find_claims_for_seed, 0);
+        const evr_claim_ref *ref = (void*)sqlite3_column_blob(db->find_claims_for_seed, 0);
         if(visit(ctx, *ref) != evr_ok){
             goto out_with_reset_stmt;
         }

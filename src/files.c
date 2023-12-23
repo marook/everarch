@@ -178,7 +178,7 @@ int read_n(struct evr_file *f, char *buffer, size_t bytes, int (*side_effect)(vo
 }
 
 int write_n(struct evr_file *f, const void *buffer, size_t size){
-    char *buf = buffer;
+    const char *buf = buffer;
     size_t remaining = size;
     while(remaining > 0){
         ssize_t written = f->write(f, buf, remaining);

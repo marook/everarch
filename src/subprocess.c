@@ -35,7 +35,7 @@
         }                                       \
     } while(0)
 
-int evr_spawn(struct evr_subprocess *p, char *argv[]){
+int evr_spawn(struct evr_subprocess *p, const char *argv[]){
     int ret = evr_ok;
     log_debug("Spawn subprocess %s", argv[0]);
     int child_in[2];
@@ -78,7 +78,7 @@ int evr_spawn(struct evr_subprocess *p, char *argv[]){
         replace_fd(child_in[0], 0);
         replace_fd(child_out[1], 1);
         replace_fd(child_err[1], 2);
-        if(execvp(argv[0], argv)){
+        if(execvp(argv[0], (char **)argv)){
             char err_buf[1024];
             char *err_msg = err_buf;
             int exec_errno = errno;

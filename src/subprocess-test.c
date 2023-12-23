@@ -31,7 +31,7 @@
 
 void test_cat_subprocess(){
     struct evr_subprocess sp;
-    char *argv[] = {
+    const char *argv[] = {
         "/bin/cat",
         "-",
         NULL
@@ -58,7 +58,7 @@ void test_cat_subprocess(){
 
 void test_false_subprocess(){
     struct evr_subprocess sp;
-    char *argv[] = {
+    const char *argv[] = {
         "/bin/false",
         NULL
     };
@@ -75,7 +75,7 @@ char *evr_env_path();
 
 void test_pass_path_to_subprocess(){
     struct evr_subprocess sp;
-    char *argv[] = {
+    const char *argv[] = {
         "/bin/sh",
         "-c",
         "echo PATH=$PATH",

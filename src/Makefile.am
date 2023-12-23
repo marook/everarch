@@ -5,7 +5,6 @@ CFLAGS_WARN=\
 	-Werror \
 	-Wextra \
 	-Wpedantic \
-	-Wno-discarded-qualifiers \
 	-Wno-missing-field-initializers \
 	-Wno-unused-parameter \
 	-Wno-variadic-macros

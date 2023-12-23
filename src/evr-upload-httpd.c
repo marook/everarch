@@ -270,7 +270,7 @@ static enum MHD_Result evr_http_upload_handle_file_upload(struct MHD_Connection 
 
 static enum MHD_Result evr_http_upload_handle_request(void *cls, struct MHD_Connection *c, const char *url, const char *method, const char *version, const char *upload_data, size_t *upload_data_size, void **con_cls){
     int res;
-    char *file_name;
+    const char *file_name;
 #ifdef EVR_LOG_DEBUG
     if(!*con_cls){
         log_debug("http request %s %s", method, url);
@@ -297,7 +297,7 @@ struct evr_file_upload_ctx {
 
 static enum MHD_Result evr_http_upload_handle_file_upload(struct MHD_Connection *c, const char *file_name, const char *upload_data, size_t *upload_data_size, void **con_cls){
     struct evr_file_upload_ctx *ctx;
-    char *evr_cli_argv[] = {
+    const char *evr_cli_argv[] = {
         "evr",
         "post-file",
         "-t",
