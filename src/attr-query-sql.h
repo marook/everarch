@@ -50,10 +50,10 @@ struct evr_attr_query_node {
 };
 
 // TODO make this a variadic macro and allow msg to be printf format string
-#define evr_ret_node($$, node, msg)             \
+#define evr_ret_node(ret, node, msg)            \
     do {                                        \
-        $$ = node;                              \
-        if(!($$)) {                             \
+        ret = node;                             \
+        if(!(ret)) {                            \
             yyerror(res, msg);                  \
             YYERROR;                            \
         }                                       \

@@ -1,5 +1,6 @@
 SUBDIRS = \
 	evr-alpine \
+	clang \
 	evr-glacier-storage \
 	evr-attr-index \
 	evr-join-link \

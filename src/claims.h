@@ -45,7 +45,7 @@
  * evr_init_xml_error_logging initializes the libxml error
  * logging. Must be called once per thread.
  */
-void evr_init_xml_error_logging();
+void evr_init_xml_error_logging(void);
 
 struct evr_claim_set {
     /**

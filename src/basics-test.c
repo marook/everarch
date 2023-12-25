@@ -24,7 +24,7 @@
 #include "basics.h"
 #include "test.h"
 
-void test_evr_trim(){
+void test_evr_trim(void){
     char *s;
     char *start;
     char *end;
@@ -55,7 +55,7 @@ void test_evr_trim(){
     assert(end == &s[2]);
 }
 
-void test_buf_pos_checksums(){
+void test_buf_pos_checksums(void){
     char buf[4];
     struct evr_buf_pos bp;
     // write data with checksum
@@ -81,7 +81,7 @@ void test_buf_pos_checksums(){
         assert_msg(is_err(evr_time_from_iso8601(&t, s)), "Expected " s " to be invalid syntax but was successfully parsed\n", NULL); \
     } while(0)
 
-void test_evr_time(){
+void test_evr_time(void){
     evr_time t_past, t_future;
     assert(is_ok(evr_time_from_iso8601(&t_past, "2022-04-01T12:01:02.123000Z")));
     assert(is_ok(evr_time_from_iso8601(&t_future, "2022-04-01T13:00:00.000000Z")));
@@ -109,7 +109,7 @@ void test_evr_time(){
 
 #undef assert_invalid_syntaxt
 
-void test_split_n(){
+void test_split_n(void){
     char *s = strdup("a:bb:ccc");
     assert(s);
     const size_t fragments_len = 4;
@@ -130,7 +130,7 @@ void test_split_n(){
     free(s);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_evr_trim);
     run_test(test_buf_pos_checksums);

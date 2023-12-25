@@ -38,7 +38,7 @@ int split(struct Rollsum *rs){
 
 size_t print_splits(char *buffer, size_t buffer_size, size_t *splits);
 
-void test_zero_input_rollsum(){
+void test_zero_input_rollsum(void){
     const size_t buffer_size = 5 * 8 * 1024;
     char *buffer = malloc(buffer_size);
     assert(buffer);
@@ -101,7 +101,7 @@ size_t print_splits(char *buffer, size_t buffer_size, size_t *splits){
     return split_count;
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_zero_input_rollsum);
     return 0;

@@ -30,7 +30,7 @@
 
 void stringify_dynamic_array(struct dynamic_array **da);
 
-void test_hello_world_signature(){
+void test_hello_world_signature(void){
     struct dynamic_array *out = NULL;
     assert(is_ok(evr_sign(NULL, &out, "hello world!")));
     assert(out);
@@ -42,7 +42,7 @@ void test_hello_world_signature(){
 
 int get_signature_fpr(char *fpr, size_t fpr_max_size, struct dynamic_array *msg);
 
-void test_validate_hello_world_signature(){
+void test_validate_hello_world_signature(void){
     struct dynamic_array *sgn = NULL;
     assert(is_ok(evr_sign(NULL, &sgn, "hello world!")));
     assert(sgn);
@@ -138,7 +138,7 @@ void stringify_dynamic_array(struct dynamic_array **da){
     assert(*da);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     evr_init_signatures();
     run_test(test_hello_world_signature);

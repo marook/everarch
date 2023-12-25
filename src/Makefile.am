@@ -5,6 +5,7 @@ CFLAGS_WARN=\
 	-Werror \
 	-Wextra \
 	-Wpedantic \
+	-Wno-language-extension-token \
 	-Wno-missing-field-initializers \
 	-Wno-unused-parameter \
 	-Wno-variadic-macros

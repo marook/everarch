@@ -82,7 +82,7 @@ int evr_persister_start(struct evr_glacier_storage_cfg *config){
     return evr_error;
 }
 
-int evr_persister_stop(){
+int evr_persister_stop(void){
     evr_persister.working = 0;
     if(mtx_lock(&evr_persister.worker_lock) != thrd_success){
         goto fail;

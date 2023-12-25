@@ -26,7 +26,7 @@
  * evr_init_signatures must be called once in the process before any
  * sign operation.
  */
-void evr_init_signatures();
+void evr_init_signatures(void);
 
 /**
  * evr_sign will sign s and write the signed string s in text mode

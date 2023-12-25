@@ -22,7 +22,7 @@
 #include "test.h"
 #include "file-mem.h"
 
-void test_write_and_read(){
+void test_write_and_read(void){
     struct evr_file_mem fm;
     struct evr_file f;
     char data[] = "hi";
@@ -37,7 +37,7 @@ void test_write_and_read(){
     evr_destroy_file_mem(&fm);
 }
 
-void test_write_and_read_realloc(){
+void test_write_and_read_realloc(void){
     struct evr_file_mem fm;
     struct evr_file f;
     char data[] = "hello world!";
@@ -52,7 +52,7 @@ void test_write_and_read_realloc(){
     evr_destroy_file_mem(&fm);
 }
 
-void test_write_and_read_max_size_reached(){
+void test_write_and_read_max_size_reached(void){
     struct evr_file_mem fm;
     struct evr_file f;
     char data[] = "hello world!";
@@ -64,7 +64,7 @@ void test_write_and_read_max_size_reached(){
     evr_destroy_file_mem(&fm);
 }
 
-int main(){
+int main(void){
     run_test(test_write_and_read);
     run_test(test_write_and_read_realloc);
     run_test(test_write_and_read_max_size_reached);

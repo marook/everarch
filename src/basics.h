@@ -54,7 +54,7 @@ extern size_t evr_page_size;
         s = strdup(arg);                        \
     } while(0)
 
-void evr_init_basics();
+void evr_init_basics(void);
 
 #define evr_glacier_storage_host "localhost"
 #define evr_glacier_storage_port 2361
@@ -282,6 +282,6 @@ int evr_strpcmp(char **l, char **r);
  *
  * Returns evr_ok if the delay was performed. evr_error otherwise.
  */
-int evr_back_off_delay(int failed_retries, int (*running)());
+int evr_back_off_delay(int failed_retries, int (*running)(void));
 
 #endif

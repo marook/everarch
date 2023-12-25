@@ -23,7 +23,7 @@
 #include "errors.h"
 
 inline size_t get_dynamic_array_size(size_t data_size);
-char *evr_alloc_chunk();
+char *evr_alloc_chunk(void);
 void evr_free_chunk(char *chunk);
 
 struct dynamic_array *alloc_dynamic_array(size_t initial_size){
@@ -163,7 +163,7 @@ void evr_free_chunk_set(struct chunk_set *cs){
     free(cs);
 }
 
-char *evr_alloc_chunk(){
+char *evr_alloc_chunk(void){
     // TODO chunks should be organized in a pool in the future.
     return malloc(evr_chunk_size);
 }

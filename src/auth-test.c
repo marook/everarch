@@ -22,7 +22,7 @@
 #include "assert.h"
 #include "test.h"
 
-void test_parse_and_fmt_auth_token(){
+void test_parse_and_fmt_auth_token(void){
     evr_auth_token t;
     assert(is_err(evr_parse_auth_token(t, "")));
     assert(is_err(evr_parse_auth_token(t, "00")));
@@ -34,7 +34,7 @@ void test_parse_and_fmt_auth_token(){
     assert_msg(is_str_eq(s, "98ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff"), "But was %s", s);
 }
 
-void test_parse_and_push_auth_token(){
+void test_parse_and_push_auth_token(void){
     struct evr_auth_token_cfg *cfg = NULL;
     assert(is_ok(evr_parse_and_push_auth_token(&cfg, "ye-host:1234:98ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff")));
     assert(is_str_eq(cfg->host, "ye-host"));
@@ -44,7 +44,7 @@ void test_parse_and_push_auth_token(){
     evr_free_auth_token_chain(cfg);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_parse_and_fmt_auth_token);
     run_test(test_parse_and_push_auth_token);

@@ -44,7 +44,7 @@ int evr_setup_log(char *log_file){
     return evr_ok;
 }
 
-int evr_teardown_log(){
+int evr_teardown_log(void){
     if(evr_log_fd > 2){
         if(close(evr_log_fd) != 0){
             return evr_error;

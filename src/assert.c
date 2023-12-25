@@ -52,7 +52,7 @@ void loc_fail(const char *loc, const char *format, ...){
     va_end(args);
 }
 
-void print_backtrace();
+void print_backtrace(void);
 
 void vfail(const char* format, va_list args){
     vfprintf(stderr, format, args);
@@ -60,7 +60,7 @@ void vfail(const char* format, va_list args){
     exit(1);
 }
 
-void print_backtrace(){
+void print_backtrace(void){
 #ifdef EVR_HAVE_BACKTRACE
     const size_t max_pointers = 100;
     void *buffer[max_pointers];

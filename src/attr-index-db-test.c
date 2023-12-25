@@ -60,10 +60,10 @@ int found_tag_b = 0;
 int found_claim_0 = 0;
 
 int never_called_blob_file_writer(void *ctx, char *path, mode_t mode, evr_blob_ref ref);
-void reset_visit_attrs();
+void reset_visit_attrs(void);
 int visit_attrs(void *ctx, const char *key, const char *value);
 void assert_attrs(int expected_found_tag_a, int expected_found_tag_b);
-void reset_visit_claims();
+void reset_visit_claims(void);
 int claims_status_ok(void *ctx, int parse_res, char *parse_error);
 int visit_claims(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 void assert_claims(int expected_found_claim_0);
@@ -74,11 +74,11 @@ evr_claim_ref asserting_claims_visitor_expected_ref;
 int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 int denying_claim_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr_tuple *attrs, size_t attrs_len);
 
-xsltStylesheetPtr create_attr_mapping_stylesheet();
+xsltStylesheetPtr create_attr_mapping_stylesheet(void);
 
 xmlDocPtr create_xml_doc(char *content);
 
-void test_open_new_attr_index_db_twice(){
+void test_open_new_attr_index_db_twice(void){
     struct evr_attr_def attr_def[2];
     attr_def[0].key = "tag";
     attr_def[0].type = evr_type_str;
@@ -283,7 +283,7 @@ int one_attr_factory_blob_file_writer(void *ctx, char *path, mode_t mode, evr_bl
     return evr_ok;
 }
 
-void reset_visit_attrs(){
+void reset_visit_attrs(void){
     found_tag_a = 0;
     found_tag_b = 0;
 }
@@ -307,7 +307,7 @@ void assert_attrs(int expected_found_tag_a, int expected_found_tag_b){
     assert_msg(found_tag_b == expected_found_tag_b, "Expected found_b to be %d but was %d\n", expected_found_tag_b, found_tag_b);
 }
 
-void reset_visit_claims(){
+void reset_visit_claims(void){
     found_claim_0 = 0;
 }
 
@@ -348,7 +348,7 @@ struct evr_attr_index_db *create_prepared_attr_index_db(struct evr_attr_index_cf
     return db;
 }
 
-void test_add_two_attr_claims_for_same_target(){
+void test_add_two_attr_claims_for_same_target(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     struct evr_attr_claim c;
@@ -365,7 +365,7 @@ void test_add_two_attr_claims_for_same_target(){
     evr_free_attr_index_cfg(cfg);
 }
 
-void test_get_set_state(){
+void test_get_set_state(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     sqlite3_int64 value = -1;
@@ -379,7 +379,7 @@ void test_get_set_state(){
     evr_free_attr_index_cfg(cfg);
 }
 
-void test_setup_attr_index_db_twice(){
+void test_setup_attr_index_db_twice(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     assert(is_ok(evr_free_attr_index_db(db)));
@@ -393,11 +393,11 @@ static char *expected_syntax_error_msg;
 
 void assert_syntax_error(char *query, char *expected_error_msg);
 
-void test_query_syntax_error(){
+void test_query_syntax_error(void){
     assert_syntax_error("tag=todo && tachjen at 1970-01-01T00:00:07.000000Z", "syntax error, unexpected AT, expecting EQ or CONTAINS");
 }
 
-void test_query_syntax_error_open_and_expression(){
+void test_query_syntax_error_open_and_expression(void){
     assert_syntax_error("select * where class=file &&", "syntax error, unexpected END, expecting B_OPEN or STRING or REF");
 }
 
@@ -428,7 +428,7 @@ int visited_seed_refs = 0;
 
 int visit_claims_for_seed(void *ctx, const evr_claim_ref claim);
 
-void test_attr_factories(){
+void test_attr_factories(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     evr_blob_ref attr_factory_ref;
     assert(is_ok(evr_parse_blob_ref(attr_factory_ref, "sha3-224-fac00000000000000000000000000000000000000000000000000000")));
@@ -476,7 +476,7 @@ xmlDocPtr get_claim_set_adapter(void *ctx, evr_blob_ref claim_set_ref){
     return create_xml_doc(claim_set_content);
 }
 
-void test_attr_factories_fail_and_reindex(){
+void test_attr_factories_fail_and_reindex(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     evr_blob_ref attr_factory_ref;
     assert(is_ok(evr_parse_blob_ref(attr_factory_ref, "sha3-224-fac00000000000000000000000000000000000000000000000000000")));
@@ -517,7 +517,7 @@ int visit_claims_for_seed(void *ctx, const evr_claim_ref claim){
     return evr_ok;
 }
 
-void test_attr_attribute_factories(){
+void test_attr_attribute_factories(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_spec_claim spec;
     spec.attr_def_len = 0;
@@ -556,7 +556,7 @@ void test_attr_attribute_factories(){
     evr_free_attr_index_cfg(cfg);
 }
 
-void test_attr_value_type_self_claim_ref(){
+void test_attr_value_type_self_claim_ref(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     struct evr_attr_spec_claim spec;
@@ -592,7 +592,7 @@ void test_attr_value_type_self_claim_ref(){
     evr_free_attr_index_cfg(cfg);
 }
 
-void test_attr_type_claim_ref_invalid_value(){
+void test_attr_type_claim_ref_invalid_value(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_def defs[] = {
         {
@@ -630,7 +630,7 @@ void test_attr_type_claim_ref_invalid_value(){
     evr_free_attr_index_cfg(cfg);
 }
 
-void test_failed_transformation(){
+void test_failed_transformation(void){
     struct evr_attr_index_cfg *cfg = create_temp_attr_index_db_configuration();
     struct evr_attr_index_db *db = create_prepared_attr_index_db(cfg, NULL, NULL);
     struct evr_attr_spec_claim spec;
@@ -671,7 +671,7 @@ void test_failed_transformation(){
     evr_free_attr_index_cfg(cfg);
 }
 
-xsltStylesheetPtr create_attr_mapping_stylesheet(){
+xsltStylesheetPtr create_attr_mapping_stylesheet(void){
     char content[] =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\" xmlns:evr=\"https://evr.ma300k.de/claims/\" xmlns:dc=\"http://purl.org/dc/terms/\" >"
@@ -731,7 +731,7 @@ int asserting_claims_visitor(void *ctx, const evr_claim_ref ref, struct evr_attr
 
 xmlNode *evr_append_claim_set(xmlDoc *doc);
 
-void test_move_claims_without_claimsets(){
+void test_move_claims_without_claimsets(void){
     xmlDoc *src = xmlNewDoc(BAD_CAST "1.0");
     assert(src);
     xmlDoc *dst = xmlNewDoc(BAD_CAST "1.0");
@@ -745,7 +745,7 @@ void test_move_claims_without_claimsets(){
 
 size_t evr_count_claims(xmlNode *cs);
 
-void test_move_claims_with_one_claim(){
+void test_move_claims_with_one_claim(void){
     xmlDoc *src = xmlNewDoc(BAD_CAST "1.0");
     assert(src);
     xmlDoc *dst = xmlNewDoc(BAD_CAST "1.0");
@@ -769,7 +769,7 @@ void test_move_claims_with_one_claim(){
     xmlFreeDoc(src);
 }
 
-void test_move_claims_with_two_claims(){
+void test_move_claims_with_two_claims(void){
     size_t count;
     xmlDoc *src = xmlNewDoc(BAD_CAST "1.0");
     assert(src);
@@ -840,7 +840,7 @@ void evr_test_db_with_attrs(struct evr_simple_attr_claim *claims, size_t claims_
 
 void assert_test_replace_attr(struct evr_attr_index_db *db, evr_claim_ref seed);
 
-void test_replace_attr(){
+void test_replace_attr(void){
     struct evr_simple_attr_claim attrs[] = {
         { ts_str(10), "=", "v1" },
         { ts_str(20), "=", "v2" },
@@ -879,7 +879,7 @@ void assert_test_replace_attr(struct evr_attr_index_db *db, evr_claim_ref seed){
 
 void assert_test_replace_added_attr(struct evr_attr_index_db *db, evr_claim_ref seed);
 
-void test_replace_added_attr(){
+void test_replace_added_attr(void){
     struct evr_simple_attr_claim attrs[] = {
         { ts_str(10), "+", "v1" },
         { ts_str(20), "=", "v2" },
@@ -918,7 +918,7 @@ void assert_test_replace_added_attr(struct evr_attr_index_db *db, evr_claim_ref 
 
 void assert_test_remove_trunc_attr(struct evr_attr_index_db *db, evr_claim_ref seed);
 
-void test_remove_trunc_attr(){
+void test_remove_trunc_attr(void){
     struct evr_simple_attr_claim attrs[] = {
         { ts_str(10), "=", "v0" },
         { ts_str(20), "+", "v+" },
@@ -1157,7 +1157,7 @@ void evr_free_llbuf_query_claim_result_item(void *item){
     free(r->attrs);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_open_new_attr_index_db_twice);
     run_test(test_add_two_attr_claims_for_same_target);

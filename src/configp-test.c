@@ -56,7 +56,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state, void (*us
 
 static struct configp configp = { options, parse_opt, args_doc, doc };
 
-void test_parse_config(){
+void test_parse_config(void){
 #define files_dir "../testing/data/configs/"
     char *files[] = {
         files_dir "no-such-config-file.conf",
@@ -72,7 +72,7 @@ void test_parse_config(){
     free(input.config_option);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_parse_config);
     return 0;

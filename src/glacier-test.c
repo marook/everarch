@@ -41,7 +41,7 @@ struct evr_glacier_storage_cfg* clone_config(struct evr_glacier_storage_cfg *con
 char* clone_string(const char* s);
 void free_glacier_ctx(struct evr_glacier_write_ctx *ctx);
 
-void test_evr_glacier_open_same_empty_glacier_twice(){
+void test_evr_glacier_open_same_empty_glacier_twice(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     for(int i = 0; i < 2; i++){
         log_info("Round %d…", i);
@@ -57,7 +57,7 @@ void test_evr_glacier_open_same_empty_glacier_twice(){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_evr_glacier_create_context_twice_fails(){
+void test_evr_glacier_create_context_twice_fails(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *ctx1;
     assert(is_ok(evr_create_glacier_write_ctx(&ctx1, config)));
@@ -75,7 +75,7 @@ struct visit_blobs_ctx {
 
 void visit_blobs(struct evr_glacier_read_ctx *ctx, struct evr_blob_filter *filter, struct visit_blobs_ctx *vbctx);
 
-void test_evr_glacier_write_smal_blobs(){
+void test_evr_glacier_write_smal_blobs(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *write_ctx;
     assert(is_ok(evr_create_glacier_write_ctx(&write_ctx, clone_config(config))));
@@ -239,7 +239,7 @@ int store_into_void(void *arg, const char *data, size_t data_len){
     return 0;
 }
 
-void test_evr_glacier_write_big_blob(){
+void test_evr_glacier_write_big_blob(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *ctx;
     assert(is_ok(evr_create_glacier_write_ctx(&ctx, config)));
@@ -276,7 +276,7 @@ void test_evr_glacier_write_big_blob(){
 
 void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *blob_str, int last_modified);
 
-void test_evr_glacier_write_blob_twice(){
+void test_evr_glacier_write_blob_twice(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     struct evr_glacier_write_ctx *ctx;
     assert(is_ok(evr_create_glacier_write_ctx(&ctx, config)));
@@ -326,15 +326,15 @@ void free_glacier_ctx(struct evr_glacier_write_ctx *ctx){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_evr_free_glacier_read_ctx_with_null_ctx(){
+void test_evr_free_glacier_read_ctx_with_null_ctx(void){
     evr_free_glacier_read_ctx(NULL);
 }
 
-void test_evr_free_glacier_write_ctx_with_null_ctx(){
+void test_evr_free_glacier_write_ctx_with_null_ctx(void){
     evr_free_glacier_write_ctx(NULL);
 }
 
-void test_open_bucket_with_extra_data_at_end(){
+void test_open_bucket_with_extra_data_at_end(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     // open for the first time
     struct evr_glacier_write_ctx *write_ctx;
@@ -388,7 +388,7 @@ void delete_glacier_index(struct evr_glacier_storage_cfg *config);
 
 size_t read_bucket_end_offset(struct evr_glacier_storage_cfg *config);
 
-void test_reindex_glacier(){
+void test_reindex_glacier(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     evr_blob_ref ref;
     evr_blob_ref second;
@@ -411,7 +411,7 @@ void test_reindex_glacier(){
 
 void corrupt_bucket_at_offset(struct evr_glacier_storage_cfg *config, size_t offset);
 
-void test_reindex_glacier_first_blob_header_corrupt(){
+void test_reindex_glacier_first_blob_header_corrupt(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     evr_blob_ref first;
     evr_blob_ref second;
@@ -433,7 +433,7 @@ void test_reindex_glacier_first_blob_header_corrupt(){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_reindex_glacier_first_blob_data_corrupt(){
+void test_reindex_glacier_first_blob_data_corrupt(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     evr_blob_ref first;
     evr_blob_ref second;
@@ -456,7 +456,7 @@ void test_reindex_glacier_first_blob_data_corrupt(){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_reindex_glacier_second_blob_header_corrupt(){
+void test_reindex_glacier_second_blob_header_corrupt(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     evr_blob_ref first;
     evr_blob_ref second;
@@ -477,7 +477,7 @@ void test_reindex_glacier_second_blob_header_corrupt(){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_reindex_glacier_end_offset_corrupt(){
+void test_reindex_glacier_end_offset_corrupt(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     evr_blob_ref first;
     evr_blob_ref second;
@@ -500,7 +500,7 @@ void test_reindex_glacier_end_offset_corrupt(){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_reindex_and_append_glacier_with_corrupt_bucket_end(){
+void test_reindex_and_append_glacier_with_corrupt_bucket_end(void){
     struct evr_glacier_storage_cfg *config = create_temp_evr_glacier_storage_cfg();
     evr_blob_ref first;
     evr_blob_ref second;
@@ -536,7 +536,7 @@ void test_reindex_and_append_glacier_with_corrupt_bucket_end(){
     evr_free_glacier_storage_cfg(config);
 }
 
-void test_many_small_buckets(){
+void test_many_small_buckets(void){
     // how big should blob_count be? it should be bigger that the
     // number of open file handles permitted on the system.
     const int blob_count = 1111;
@@ -637,7 +637,7 @@ void write_one_blob(struct evr_glacier_write_ctx *ctx, evr_blob_ref ref, char *b
     assert(is_ok(evr_glacier_append_blob(ctx, &wb, &lm)));
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_evr_glacier_open_same_empty_glacier_twice);
     run_test(test_evr_glacier_create_context_twice_fails);

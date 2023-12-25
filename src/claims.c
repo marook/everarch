@@ -22,7 +22,7 @@
 #include "errors.h"
 #include "logger.h"
 
-void evr_init_xml_error_logging(){
+void evr_init_xml_error_logging(void){
     xmlSetGenericErrorFunc(NULL, evr_log_xml_error);
 }
 

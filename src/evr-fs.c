@@ -669,8 +669,8 @@ xmlDoc *evr_seed_desc_to_file_set(xmlDoc *seed_desc_doc, evr_claim_ref seed){
     return file_set_doc;
 }
 
-void evr_lock_inode_set_or_panic();
-void evr_unlock_inode_set_or_panic();
+void evr_lock_inode_set_or_panic(void);
+void evr_unlock_inode_set_or_panic(void);
 struct evr_inode *evr_get_inode(fuse_req_t req, fuse_ino_t ino);
 int evr_fs_stat(fuse_req_t req, struct stat *st, fuse_ino_t ino);
 
@@ -910,13 +910,13 @@ static int evr_fs_open_file(fuse_req_t req, fuse_ino_t ino, struct fuse_file_inf
     return ret;
 }
 
-void evr_lock_inode_set_or_panic(){
+void evr_lock_inode_set_or_panic(void){
     if(mtx_lock(&inode_set_lock) != thrd_success){
         evr_panic("Unable to lock inode set");
     }
 }
 
-void evr_unlock_inode_set_or_panic(){
+void evr_unlock_inode_set_or_panic(void){
     if(mtx_unlock(&inode_set_lock) != thrd_success){
         evr_panic("Unable to unlock inode set.");
     }
@@ -1084,7 +1084,7 @@ int evr_start_index_watch(void **arg){
 
 int evr_index_watch_worker_visit_changed_seed(void *ctx, evr_blob_ref index_ref, evr_claim_ref seed, evr_time last_modified);
 
-int is_running();
+int is_running(void);
 
 int evr_index_watch_worker(void *_ctx){
     int ret = evr_error;
@@ -1133,7 +1133,7 @@ int evr_index_watch_worker(void *_ctx){
     return ret;
 }
 
-int is_running(){
+int is_running(void){
     return running;
 }
 

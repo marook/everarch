@@ -51,9 +51,9 @@ int evr_attri_read_search(struct evr_buf_read *r, int (*visit_seed)(void *ctx, e
     return evr_ok;
 }
 
-xsltStylesheet *create_fs_map_xslt();
+xsltStylesheet *create_fs_map_xslt(void);
 
-void test_build_seed_desc(){
+void test_build_seed_desc(void){
     evr_claim_ref seed;
     assert(is_ok(evr_parse_claim_ref(seed, test_claim_ref)));
     xmlDoc *doc;
@@ -93,7 +93,7 @@ void test_build_seed_desc(){
     free(desc_node_str);
 }
 
-xsltStylesheet *create_fs_map_xslt(){
+xsltStylesheet *create_fs_map_xslt(void){
     const char buf[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<xsl:stylesheet version=\"1.0\""
         " xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\""
@@ -115,7 +115,7 @@ xsltStylesheet *create_fs_map_xslt(){
     return style;
 }
 
-int main(){
+int main(void){
     run_test(test_build_seed_desc);
     return 0;
 }

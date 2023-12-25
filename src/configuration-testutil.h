@@ -29,8 +29,8 @@
  *
  * Every call can assume to point to an empty glacier.
  */
-struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg();
+struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(void);
 
-struct evr_attr_index_cfg *create_temp_attr_index_db_configuration();
+struct evr_attr_index_cfg *create_temp_attr_index_db_configuration(void);
 
 #endif

@@ -30,7 +30,7 @@
 
 #define random_path "/dev/urandom"
 
-void test_read_fd_partial_file(){
+void test_read_fd_partial_file(void){
     struct dynamic_array *buf = alloc_dynamic_array(1024);
     assert(buf);
     int f = open(random_path, O_RDONLY);
@@ -38,16 +38,18 @@ void test_read_fd_partial_file(){
     assert(is_ok(read_fd(&buf, f, 1024)));
     assert(buf);
     assert(buf->size_used == 1024);
+#ifdef EVR_LOG_DEBUG
     char sum = 0;
     for(size_t i = 0; i < buf->size_used; ++i){
         sum += buf->data[i];
     }
     log_debug("Accessed every byte in buf (%d)", sum);
+#endif
     close(f);
     free(buf);
 }
 
-void test_read_into_chunks_with_small_file(){
+void test_read_into_chunks_with_small_file(void){
     int fd = open("../etc/configuration/empty.json", O_RDONLY);
     assert(fd >= 0);
     struct evr_file f;
@@ -62,7 +64,7 @@ void test_read_into_chunks_with_small_file(){
     evr_free_chunk_set(cs);
 }
 
-void test_append_into_chunk_set_with_small_file(){
+void test_append_into_chunk_set_with_small_file(void){
     int f = open("../etc/configuration/empty.json", O_RDONLY);
     assert(f >= 0);
     struct chunk_set *cs = evr_allocate_chunk_set(0);
@@ -84,7 +86,7 @@ size_t slice_size_sum;
 
 int visit_slice(char *buf, size_t size, void *ctx);
 
-void test_rollsum_split_infinite_file(){
+void test_rollsum_split_infinite_file(void){
     slice_counter = 0;
     small_slices_counter = 0;
     slice_size_sum = 0;
@@ -97,7 +99,7 @@ void test_rollsum_split_infinite_file(){
     log_info("Splitted into slices with average size of %d bytes", max_read / slice_counter);
 }
 
-void test_rollsum_split_tiny_file(){
+void test_rollsum_split_tiny_file(void){
     slice_counter = 0;
     small_slices_counter = 0;
     slice_size_sum = 0;
@@ -130,7 +132,7 @@ int visit_slice(char *buf, size_t size, void *ctx){
     return evr_ok;
 }
 
-void test_buf_read_bytes_ready(){
+void test_buf_read_bytes_ready(void){
     struct evr_file_mem fm;
     assert(is_ok(evr_init_file_mem(&fm, 32, 32)));
     assert(fm.data);
@@ -195,7 +197,7 @@ void test_buf_read_bytes_ready(){
     evr_destroy_file_mem(&fm);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_read_fd_partial_file);
     run_test(test_read_into_chunks_with_small_file);

@@ -28,7 +28,7 @@
 
 int is_ignored(int c);
 
-void test_fill_dynamic_array(){
+void test_fill_dynamic_array(void){
     struct dynamic_array *a = alloc_dynamic_array(1);
     assert(a);
     a->size_used = 1;
@@ -37,7 +37,7 @@ void test_fill_dynamic_array(){
     free(a);
 }
 
-void test_rtrim_empty_array(){
+void test_rtrim_empty_array(void){
     struct dynamic_array *a = alloc_dynamic_array(1);
     assert(a);
     rtrim_dynamic_array(a, is_ignored);
@@ -45,7 +45,7 @@ void test_rtrim_empty_array(){
     free(a);
 }
 
-void test_rtrim_end_of_array(){
+void test_rtrim_end_of_array(void){
     struct dynamic_array *a = alloc_dynamic_array(1024);
     assert(a);
     strcpy((char*)a->data, "test   ");
@@ -55,7 +55,7 @@ void test_rtrim_end_of_array(){
     free(a);
 }
 
-void test_grow_dynamic_array_at_least_existing(){
+void test_grow_dynamic_array_at_least_existing(void){
     struct dynamic_array *a = alloc_dynamic_array(1);
     assert(a);
     assert(a->size_allocated == 1);
@@ -69,7 +69,7 @@ void test_grow_dynamic_array_at_least_existing(){
     free(a);
 }
 
-void test_grow_dynamic_array_at_least_null(){
+void test_grow_dynamic_array_at_least_null(void){
     struct dynamic_array *a = NULL;
     a = grow_dynamic_array_at_least(a, 1);
     assert(a);
@@ -78,7 +78,7 @@ void test_grow_dynamic_array_at_least_null(){
     free(a);
 }
 
-void test_dynamic_array_remove(){
+void test_dynamic_array_remove(void){
     struct dynamic_array *a = alloc_dynamic_array(100);
     assert(a);
     for(size_t i = 0; i < a->size_allocated; ++i){
@@ -95,7 +95,7 @@ int is_ignored(int c){
     return c == 0 || isspace(c);
 }
 
-void test_allocate_chunk_set(){
+void test_allocate_chunk_set(void){
     struct chunk_set *cs = evr_allocate_chunk_set(3);
     assert(cs);
     assert(cs->chunks_len == 3);
@@ -108,7 +108,7 @@ void test_allocate_chunk_set(){
     evr_free_chunk_set(cs);
 }
 
-void test_llbuf(){
+void test_llbuf(void){
     evr_free_llbuf_chain(NULL, NULL);
     struct evr_llbuf *llb = NULL;
     struct evr_buf_pos bp;
@@ -133,7 +133,7 @@ struct a_child {
     char c;
 };
 
-void test_empty_llbuf_s(){
+void test_empty_llbuf_s(void){
     struct evr_llbuf_s llb;
     evr_init_llbuf_s(&llb, sizeof(struct a_child));
     assert(!llb.first);
@@ -149,7 +149,7 @@ void test_empty_llbuf_s(){
     evr_llbuf_s_empty(&llb, NULL);
 }
 
-void test_filled_llbuf_s(){
+void test_filled_llbuf_s(void){
     struct evr_llbuf_s llb;
     evr_init_llbuf_s(&llb, sizeof(struct a_child));
     assert_msg(llb.block_count == 0, "But was %zu", llb.block_count);
@@ -185,7 +185,7 @@ void test_filled_llbuf_s(){
     evr_llbuf_s_empty(&llb, NULL);
 }
 
-void test_llbuf_s_grow(){
+void test_llbuf_s_grow(void){
     struct evr_llbuf_s llb;
     evr_init_llbuf_s(&llb, sizeof(struct a_child));
     assert_msg(llb.block_count == 0, "But was %zu", llb.block_count);
@@ -202,7 +202,7 @@ void test_llbuf_s_grow(){
     evr_llbuf_s_empty(&llb, NULL);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_fill_dynamic_array);
     run_test(test_rtrim_empty_array);

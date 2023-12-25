@@ -23,7 +23,7 @@
 #include "assert.h"
 #include "errors.h"
 
-void test_empty_queue_wait(){
+void test_empty_queue_wait(void){
     struct evr_queue *q = evr_create_queue(2, 1);
     assert(q);
     assert(evr_queue_take(q, NULL) == evr_not_found);
@@ -34,7 +34,7 @@ void test_empty_queue_wait(){
     assert(is_ok(status));
 }
 
-void test_overflow_queue(){
+void test_overflow_queue(void){
     struct evr_queue *q = evr_create_queue(1, 1);
     assert(q);
     char a = 'a';
@@ -50,7 +50,7 @@ void test_overflow_queue(){
     assert(status == evr_temporary_occupied);
 }
 
-void test_put_take_queue(){
+void test_put_take_queue(void){
     struct evr_queue *q = evr_create_queue(1, 1);
     assert(q);
     char a = 'a';
@@ -64,7 +64,7 @@ void test_put_take_queue(){
     assert(is_ok(evr_free_queue(q, NULL)));
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_empty_queue_wait);
     run_test(test_overflow_queue);

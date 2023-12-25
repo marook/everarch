@@ -246,7 +246,7 @@ int evr_watch_index_claims_worker(void *arg);
 int evr_build_index_worker(void *arg);
 int evr_index_sync_worker(void *arg);
 int evr_bootstrap_db(evr_blob_ref claim_key, struct evr_attr_spec_claim *spec);
-int evr_attr_index_tcp_server();
+int evr_attr_index_tcp_server(void *ctx);
 int evr_connection_worker(void *ctx);
 int evr_work_cmd(struct evr_connection *ctx, char *line);
 int evr_respond_search_status(void *context, int parse_res, char *parse_errer);
@@ -1233,7 +1233,7 @@ xmlDocPtr get_claim_set_for_reindex(void *ctx, evr_blob_ref claim_set_ref){
     return doc;
 }
 
-int evr_attr_index_tcp_server(){
+int evr_attr_index_tcp_server(void *ctx){
     int ret = evr_error;
     int s = evr_make_tcp_socket(cfg->host, cfg->port);
     if(s < 0){

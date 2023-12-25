@@ -159,6 +159,7 @@ AC_CONFIG_FILES([
     emacs/Makefile
     etc/Makefile
     etc/podman/Makefile
+    etc/podman/clang/Makefile
     etc/podman/evr-alpine/Makefile
     etc/podman/evr-glacier-storage/Makefile
     etc/podman/evr-attr-index/Makefile

@@ -23,7 +23,7 @@
 #include "test.h"
 #include "logger.h"
 
-void test_create_free_inodes(){
+void test_create_free_inodes(void){
     struct evr_inode *inodes = evr_create_inodes(100);
     assert(inodes);
     struct evr_inode *root = &inodes[FUSE_ROOT_ID];
@@ -33,7 +33,7 @@ void test_create_free_inodes(){
     evr_free_inodes(inodes);
 }
 
-void test_inodes_with_file(){
+void test_inodes_with_file(void){
     size_t inodes_len = 100;
     struct evr_inode *inodes = evr_create_inodes(inodes_len);
     assert(inodes);
@@ -93,7 +93,7 @@ void test_inodes_with_file(){
     evr_free_inodes(inodes);
 }
 
-void test_grow_inode_set(){
+void test_grow_inode_set(void){
     struct evr_inode_set s;
     assert(is_ok(evr_init_inode_set(&s)));
     const size_t initial_inode_set_len = s.inodes_len;
@@ -110,7 +110,7 @@ void test_grow_inode_set(){
     evr_empty_inode_set(&s);
 }
 
-void test_collect_affected_inodes(){
+void test_collect_affected_inodes(void){
     evr_claim_ref p1_seed;
     assert(is_ok(evr_parse_claim_ref(p1_seed, "sha3-224-10000000000000000000000000000000000000000000000000000000-0000")));
     struct evr_inode_set s;
@@ -164,7 +164,7 @@ void test_collect_affected_inodes(){
     evr_empty_inode_set(&s);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_create_free_inodes);
     run_test(test_inodes_with_file);

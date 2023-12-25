@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+. ../evr-podman.conf
+
+# only build am amd64 because we just use this build as a canary for
+# clang
+platforms='amd64'
+
+evr_podman_build clang

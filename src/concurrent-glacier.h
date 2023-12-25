@@ -53,7 +53,7 @@ int evr_persister_start(struct evr_glacier_storage_cfg *config);
  * evr_persister_stop gracefully stops the persister. Blocks until the
  * currently processed task is done if there is any.
  */
-int evr_persister_stop();
+int evr_persister_stop(void);
 
 struct evr_persister_task {
     struct evr_writing_blob *blob;

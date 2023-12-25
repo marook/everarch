@@ -40,11 +40,11 @@ void evr_tls_log_ssl_errors(struct evr_file *f, char *log_level);
         evr_tls_log_ssl_errors(&f, log_level);          \
     } while(0)
 
-void evr_tls_init(){
+void evr_tls_init(void){
     SSL_load_error_strings();
 }
 
-void evr_tls_free(){
+void evr_tls_free(void){
     ERR_free_strings();
 }
 
@@ -106,7 +106,7 @@ void evr_free_cert_chain(struct evr_cert_cfg *cfg){
     }
 }
 
-SSL_CTX *evr_create_ssl_ctx();
+SSL_CTX *evr_create_ssl_ctx(void);
 
 SSL_CTX *evr_create_ssl_server_ctx(char *cert_path, char *key_path){
     SSL_CTX *ctx = evr_create_ssl_ctx();
@@ -150,7 +150,7 @@ SSL_CTX *evr_create_ssl_client_ctx(char *host, char *port, struct evr_cert_cfg *
     return NULL;
 }
 
-SSL_CTX *evr_create_ssl_ctx(){
+SSL_CTX *evr_create_ssl_ctx(void){
     SSL_CTX *ctx = SSL_CTX_new(TLS_method());
     if(!ctx){
         return NULL;

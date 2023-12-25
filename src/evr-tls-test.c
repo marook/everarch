@@ -41,7 +41,7 @@ struct client_server_ctx {
 int client_worker(void *context);
 int server_worker(void *context);
 
-void test_tls_accept_connect(){
+void test_tls_accept_connect(void){
     struct client_server_ctx ctx;
     assert(mtx_init(&ctx.server_ready, mtx_plain) == thrd_success);
     assert(mtx_lock(&ctx.server_ready) == thrd_success);
@@ -125,7 +125,7 @@ void client_worker_tls_connect_once(struct evr_cert_cfg *cert_cfg){
     assert(c.close(&c) == 0);
 }
 
-void test_evr_cert_cfg(){
+void test_evr_cert_cfg(void){
     struct evr_cert_cfg *cfg = NULL;
     assert(is_ok(evr_parse_and_push_cert(&cfg, "localhost:1234:/ye/path/to/cert.pem")));
     struct evr_cert_cfg *found_cfg = NULL;
@@ -137,7 +137,7 @@ void test_evr_cert_cfg(){
     evr_free_cert_chain(cfg);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     evr_tls_init();
     run_test(test_tls_accept_connect);

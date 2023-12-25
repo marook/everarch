@@ -20,7 +20,7 @@
 #include "test.h"
 #include "assert.h"
 
-void test_format_parse_cmd_header(){
+void test_format_parse_cmd_header(void){
     struct evr_cmd_header in;
     in.type = evr_cmd_type_get_blob;
     in.body_size = 42;
@@ -32,7 +32,7 @@ void test_format_parse_cmd_header(){
     assert(out.body_size == 42);
 }
 
-void test_format_parse_resp_header(){
+void test_format_parse_resp_header(void){
     struct evr_resp_header in;
     in.status_code = evr_status_code_unknown_cmd;
     in.body_size = 666;
@@ -44,7 +44,7 @@ void test_format_parse_resp_header(){
     assert(out.body_size == 666);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_format_parse_cmd_header);
     run_test(test_format_parse_resp_header);

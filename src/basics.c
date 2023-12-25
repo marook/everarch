@@ -35,7 +35,7 @@ void evr_get_sysconf_size(int name, size_t* v){
 
 size_t evr_page_size = 4096;
 
-void evr_init_basics(){
+void evr_init_basics(void){
     evr_get_sysconf_size(_SC_PAGESIZE, &evr_page_size);
 }
 
@@ -183,7 +183,7 @@ int evr_strpcmp(char **l, char **r){
     return strcmp(*l, *r);
 }
 
-int evr_back_off_delay(int failed_retries, int (*running)()){
+int evr_back_off_delay(int failed_retries, int (*running)(void)){
     for(int i = 1 << min(8, failed_retries); i > 0; --i){
         if(running && !running()){
             return evr_end;

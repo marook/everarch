@@ -29,7 +29,7 @@
 #include "files.h"
 #include "logger.h"
 
-void test_cat_subprocess(){
+void test_cat_subprocess(void){
     struct evr_subprocess sp;
     const char *argv[] = {
         "/bin/cat",
@@ -56,7 +56,7 @@ void test_cat_subprocess(){
     assert(status == 0);
 }
 
-void test_false_subprocess(){
+void test_false_subprocess(void){
     struct evr_subprocess sp;
     const char *argv[] = {
         "/bin/false",
@@ -71,9 +71,9 @@ void test_false_subprocess(){
     assert(status);
 }
 
-char *evr_env_path();
+char *evr_env_path(void);
 
-void test_pass_path_to_subprocess(){
+void test_pass_path_to_subprocess(void){
     struct evr_subprocess sp;
     const char *argv[] = {
         "/bin/sh",
@@ -99,7 +99,7 @@ void test_pass_path_to_subprocess(){
     assert(status == 0);
 }
 
-char *evr_env_path(){
+char *evr_env_path(void){
     char *path = NULL;
     char *path_prefix = "PATH=";
     size_t path_len = strlen(path_prefix);
@@ -112,7 +112,7 @@ char *evr_env_path(){
     return path;
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_cat_subprocess);
     run_test(test_false_subprocess);

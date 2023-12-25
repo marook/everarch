@@ -25,7 +25,7 @@
 #include "logger.h"
 #include "errors.h"
 
-void test_write_auth_token(){
+void test_write_auth_token(void){
     struct evr_file_mem fm;
     assert(is_ok(evr_init_file_mem(&fm, 1024, 1024)));
     assert(fm.data);
@@ -41,7 +41,7 @@ void test_write_auth_token(){
     evr_destroy_file_mem(&fm);
 }
 
-void test_write_list_claims_for_seed(){
+void test_write_list_claims_for_seed(void){
     struct evr_file_mem fm;
     assert(is_ok(evr_init_file_mem(&fm, 1024, 1024)));
     assert(fm.data);
@@ -78,7 +78,7 @@ int test_read_search_visit_attr(void *ctx, evr_claim_ref claim_ref, char *key, c
     return evr_ok;
 }
 
-void test_read_search(){
+void test_read_search(void){
     struct evr_file_mem fm;
     assert(is_ok(evr_init_file_mem(&fm, 1024, 1024)));
     assert(fm.data);
@@ -102,7 +102,7 @@ void test_read_search(){
     evr_destroy_file_mem(&fm);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_write_auth_token);
     run_test(test_write_list_claims_for_seed);

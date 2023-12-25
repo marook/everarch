@@ -831,6 +831,7 @@ int evr_append_attr_factory_claims(struct evr_attr_index_db *db, xmlDocPtr raw_c
 int evr_ensure_attr_factory_exe_ready(struct evr_attr_index_db *db, evr_blob_ref attr_factory, char *exe_path);
 
 int evr_append_attr_factory_claims_worker(void *context){
+    const int closed_fd = -1;
     evr_init_xml_error_logging();
     struct evr_append_attr_factory_claims_worker_ctx *ctx = context;
     size_t dir_len = strlen(ctx->db->dir);
@@ -863,7 +864,6 @@ int evr_append_attr_factory_claims_worker(void *context){
     if(sp_stdin.close(&sp_stdin)){
         goto out_with_close_sp;
     }
-    const int closed_fd = -1;
     sp.in = closed_fd;
     struct dynamic_array *buf = alloc_dynamic_array(32 * 1024);
     if(!buf){

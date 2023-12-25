@@ -28,13 +28,13 @@ evr_time t0 = 0;
 
 void assert_file_claim(const struct evr_file_claim *claim, const char *expected_file_document);
 
-void test_empty_claim_without_finalize(){
+void test_empty_claim_without_finalize(void){
     struct evr_claim_set cs;
     assert(is_ok(evr_init_claim_set(&cs, &t0)));
     assert(is_ok(evr_free_claim_set(&cs)));
 }
 
-void test_empty_claim(){
+void test_empty_claim(void){
     struct evr_claim_set cs;
     assert(is_ok(evr_init_claim_set(&cs, &t0)));
     assert(is_ok(evr_finalize_claim_set(&cs)));
@@ -42,7 +42,7 @@ void test_empty_claim(){
     assert(is_ok(evr_free_claim_set(&cs)));
 }
 
-void test_file_claim_with_filename(){
+void test_file_claim_with_filename(void){
     struct evr_file_slice slice;
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
@@ -56,7 +56,7 @@ void test_file_claim_with_filename(){
     assert_file_claim(&claim, "<file dc:title=\"test.txt\"><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
-void test_file_claim_with_null_filename(){
+void test_file_claim_with_null_filename(void){
     struct evr_file_slice slice;
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
@@ -70,7 +70,7 @@ void test_file_claim_with_null_filename(){
     assert_file_claim(&claim, "<file><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
-void test_file_claim_with_empty_filename(){
+void test_file_claim_with_empty_filename(void){
     struct evr_file_slice slice;
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
@@ -84,7 +84,7 @@ void test_file_claim_with_empty_filename(){
     assert_file_claim(&claim, "<file><body><slice ref=\"sha3-224-00000000000000000000000000000000000000000000000000000000\" size=\"1\"/></body></file>");
 }
 
-void test_file_claim_with_seed(){
+void test_file_claim_with_seed(void){
     struct evr_file_slice slice;
     memset(slice.ref, 0, sizeof(slice.ref));
     slice.size = 1;
@@ -132,7 +132,7 @@ void assert_file_claim(const struct evr_file_claim *claim, const char *expected_
     assert(is_ok(evr_free_claim_set(&cs)));
 }
 
-void test_parse_file_claim_claim_set(){
+void test_parse_file_claim_claim_set(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -171,7 +171,7 @@ void test_parse_file_claim_claim_set(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_claim_with_claim_seed(){
+void test_parse_attr_claim_with_claim_seed(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -219,7 +219,7 @@ void test_parse_attr_claim_with_claim_seed(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_claim_with_self_ref(){
+void test_parse_attr_claim_with_self_ref(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -243,7 +243,7 @@ void test_parse_attr_claim_with_self_ref(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_claim_with_index_seed(){
+void test_parse_attr_claim_with_index_seed(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -267,7 +267,7 @@ void test_parse_attr_claim_with_index_seed(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_two_attr_claims(){
+void test_parse_two_attr_claims(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -299,7 +299,7 @@ void test_parse_two_attr_claims(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_spec_claim(){
+void test_parse_attr_spec_claim(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -342,7 +342,7 @@ void test_parse_attr_spec_claim(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_spec_claim_error_unknown_transformation_type(){
+void test_parse_attr_spec_claim_error_unknown_transformation_type(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -363,7 +363,7 @@ void test_parse_attr_spec_claim_error_unknown_transformation_type(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_attr_spec_claim_error_unknown_attr_factory_type(){
+void test_parse_attr_spec_claim_error_unknown_attr_factory_type(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -385,7 +385,7 @@ void test_parse_attr_spec_claim_error_unknown_attr_factory_type(){
     xmlFreeDoc(doc);
 }
 
-void test_nth_claim(){
+void test_nth_claim(void){
     const char *buf =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<claim-set dc:created=\"1970-01-01T00:00:07.000000Z\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns=\"https://evr.ma300k.de/claims/\">"
@@ -413,7 +413,7 @@ void test_nth_claim(){
     xmlFreeDoc(doc);
 }
 
-void test_parse_xml_user_data_invalid(){
+void test_parse_xml_user_data_invalid(void){
     char *docs[] = {
         "",
         " ",
@@ -429,7 +429,7 @@ void test_parse_xml_user_data_invalid(){
     }
 }
 
-void test_format_xml_node(){
+void test_format_xml_node(void){
     const char src_doc_str[] =
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
         "<root xmlns=\"https://whatever\">"
@@ -446,7 +446,7 @@ void test_format_xml_node(){
     free(an_el_str);
 }
 
-int main(){
+int main(void){
     xmlInitParser();
     evr_init_basics();
     run_test(test_empty_claim_without_finalize);

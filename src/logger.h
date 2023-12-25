@@ -70,7 +70,7 @@ extern char *evr_log_app;
 #define log_error(args...) evr_log(evr_log_level_error, args)
 
 int evr_setup_log(char *log_file);
-int evr_teardown_log();
+int evr_teardown_log(void);
 
 void evr_log(const char *level, const char *fmt, ...);
 

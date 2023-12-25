@@ -28,7 +28,7 @@
 
 const char *temp_dir_template = "/tmp/evr-glacier-test-XXXXXX";
 
-char *new_temp_dir_path(){
+char *new_temp_dir_path(void){
     size_t dir_len = strlen(temp_dir_template);
     char *s = (char*)malloc(dir_len + 1);
     assert(s);
@@ -39,7 +39,7 @@ char *new_temp_dir_path(){
 
 static struct evr_glacier_storage_cfg evr_glacier_storage_cfg_init = { 0 };
 
-struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(){
+struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(void){
     struct evr_glacier_storage_cfg *config = malloc(sizeof(struct evr_glacier_storage_cfg));
     assert(config);
     *config = evr_glacier_storage_cfg_init;
@@ -57,7 +57,7 @@ struct evr_glacier_storage_cfg *create_temp_evr_glacier_storage_cfg(){
 
 static struct evr_attr_index_cfg evr_attr_index_cfg_init = { 0 };
 
-struct evr_attr_index_cfg *create_temp_attr_index_db_configuration(){
+struct evr_attr_index_cfg *create_temp_attr_index_db_configuration(void){
     struct evr_attr_index_cfg *cfg = malloc(sizeof(struct evr_attr_index_cfg));
     assert(cfg);
     *cfg = evr_attr_index_cfg_init;

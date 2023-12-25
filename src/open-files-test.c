@@ -28,7 +28,7 @@ int evr_req_cmd_get_blob(struct evr_file *f, evr_blob_ref key, struct evr_resp_h
     return evr_error;
 }
 
-void test_open_close_many_files_sequentially(){
+void test_open_close_many_files_sequentially(void){
     struct evr_open_file_set set;
     assert(is_ok(evr_init_open_file_set(&set)));
     uint64_t fh;
@@ -39,7 +39,7 @@ void test_open_close_many_files_sequentially(){
     assert(is_ok(evr_empty_open_file_set(&set)));
 }
 
-void test_open_close_two_files_parallel(){
+void test_open_close_two_files_parallel(void){
     struct evr_open_file_set set;
     assert(is_ok(evr_init_open_file_set(&set)));
     const size_t fh_len = 2;
@@ -53,7 +53,7 @@ void test_open_close_two_files_parallel(){
     assert(is_ok(evr_empty_open_file_set(&set)));
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_open_close_many_files_sequentially);
     run_test(test_open_close_two_files_parallel);

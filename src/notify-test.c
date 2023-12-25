@@ -23,7 +23,7 @@
 #include "notify.h"
 #include "errors.h"
 
-void test_notify_send(){
+void test_notify_send(void){
     struct evr_notify_ctx *nt = evr_create_notify_ctx(1, 1, 1);
     assert(nt);
     struct evr_queue *msg = evr_notify_register(nt, NULL);
@@ -41,7 +41,7 @@ void test_notify_send(){
     evr_free_notify_ctx(nt);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_notify_send);
     return 0;

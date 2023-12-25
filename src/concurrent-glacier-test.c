@@ -60,15 +60,15 @@ int evr_glacier_append_blob(struct evr_glacier_write_ctx *ctx, struct evr_writin
 
 struct evr_glacier_storage_cfg *test_config;
 
-void evr_temp_persister_start(){
+void evr_temp_persister_start(void){
     assert(is_ok(evr_persister_start(test_config)));
 }
 
-void evr_temp_persister_stop(){
+void evr_temp_persister_stop(void){
     assert(is_ok(evr_persister_stop()));
 }
 
-void test_queue_one_blob_success(){
+void test_queue_one_blob_success(void){
     evr_glacier_append_blob_result = evr_ok;
     append_blob_delay = NULL;
     evr_temp_persister_start();
@@ -83,7 +83,7 @@ void test_queue_one_blob_success(){
     evr_temp_persister_stop();
 }
 
-void test_queue_one_blob_write_error(){
+void test_queue_one_blob_write_error(void){
     evr_glacier_append_blob_result = evr_error;
     append_blob_delay = NULL;
     evr_temp_persister_start();
@@ -97,9 +97,9 @@ void test_queue_one_blob_write_error(){
     evr_temp_persister_stop();
 }
 
-void queue_and_process_many_blobs();
+void queue_and_process_many_blobs(struct timespec *queue_delay);
 
-void test_queue_many_blobs_race(){
+void test_queue_many_blobs_race(void){
     evr_glacier_append_blob_result = evr_ok;
     append_blob_delay = NULL;
     for(int i = 0; i < 1000; i++){
@@ -107,13 +107,13 @@ void test_queue_many_blobs_race(){
     }
 }
 
-void test_queue_many_blobs_slow_append(){
+void test_queue_many_blobs_slow_append(void){
     evr_glacier_append_blob_result = evr_ok;
     append_blob_delay = &short_delay;
     queue_and_process_many_blobs(NULL);
 }
 
-void test_queue_many_blobs_slow_queue(){
+void test_queue_many_blobs_slow_queue(void){
     evr_glacier_append_blob_result = evr_ok;
     append_blob_delay = NULL;
     queue_and_process_many_blobs(&short_delay);
@@ -156,7 +156,7 @@ void queue_and_process_many_blobs(struct timespec *queue_delay){
     evr_temp_persister_stop();
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     test_config = create_temp_evr_glacier_storage_cfg();
     assert(test_config);

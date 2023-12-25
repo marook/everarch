@@ -25,9 +25,9 @@
 
 #include "files.h"
 
-void evr_tls_init();
+void evr_tls_init(void);
 
-void evr_tls_free();
+void evr_tls_free(void);
 
 struct evr_cert_cfg {
     char *host;

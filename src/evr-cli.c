@@ -562,6 +562,8 @@ int main(int argc, char **argv){
         ret = evr_cli_sync(&cfg);
         break;
     }
+ out_with_free_cfg:
+    do {} while(0);
     void *tbfree[] = {
         cfg.storage_host,
         cfg.storage_port,
@@ -579,7 +581,6 @@ int main(int argc, char **argv){
         cfg.meta_path,
     };
     void **tbfree_end = &tbfree[static_len(tbfree)];
- out_with_free_cfg:
     for(void **it = tbfree; it != tbfree_end; ++it){
         if(*it){
             free(*it);

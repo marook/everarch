@@ -25,7 +25,7 @@
 #include "errors.h"
 #include "logger.h"
 
-void evr_init_signatures(){
+void evr_init_signatures(void){
     gpgme_check_version(NULL);
 }
 

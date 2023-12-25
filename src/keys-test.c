@@ -26,7 +26,7 @@
 #include "logger.h"
 #include "errors.h"
 
-void test_evr_fmt_key_into(){
+void test_evr_fmt_key_into(void){
     evr_blob_ref_str fmt_key;
     evr_blob_ref key;
     memset(key, 0, evr_blob_ref_size);
@@ -37,7 +37,7 @@ void test_evr_fmt_key_into(){
     assert(is_str_eq(fmt_key, "sha3-224-ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
 }
 
-void test_evr_parse_blob_ref(){
+void test_evr_parse_blob_ref(void){
     evr_blob_ref key;
     assert(is_ok(evr_parse_blob_ref(key, "sha3-224-010203ff000000000000000000000000000000000000000000000000")));
     assert(key[0] == 0x01);
@@ -52,7 +52,7 @@ void test_evr_parse_blob_ref(){
     assert(key[3] == 0xff);
 }
 
-void test_calc_blob_key(){
+void test_calc_blob_key(void){
     evr_blob_ref key;
     evr_blob_ref_str fmt_key;
     char *chunks = "hello world";
@@ -61,7 +61,7 @@ void test_calc_blob_key(){
     assert(is_str_eq(fmt_key, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5"));
 }
 
-void test_build_fmt_claim_ref(){
+void test_build_fmt_claim_ref(void){
     evr_blob_ref bref;
     assert(is_ok(evr_parse_blob_ref(bref, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5")));
     evr_claim_ref cref;
@@ -81,7 +81,7 @@ void test_build_fmt_claim_ref(){
     assert(is_str_eq(cref_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-0000"));
 }
 
-void test_parse_fmt_claim_ref(){
+void test_parse_fmt_claim_ref(void){
     evr_claim_ref in;
     assert(is_ok(evr_parse_claim_ref(in, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8")));
     evr_claim_ref_str out_str;
@@ -89,7 +89,7 @@ void test_parse_fmt_claim_ref(){
     assert(is_str_eq(out_str, "sha3-224-dfb7f18c77e928bb56faeb2da27291bd790bc1045cde45f3210bb6c5-fde8"));
 }
 
-void test_claim_ref_tiny_set(){
+void test_claim_ref_tiny_set(void){
     struct evr_claim_ref_tiny_set *set = evr_create_claim_ref_tiny_set(16);
     assert(set);
     evr_claim_ref c1;
@@ -112,7 +112,7 @@ void test_claim_ref_tiny_set(){
     evr_free_claim_ref_tiny_set(set);
 }
 
-void test_fill_claim_ref_tiny_set(){
+void test_fill_claim_ref_tiny_set(void){
     const size_t refs_len = 16;
     struct evr_claim_ref_tiny_set *set = evr_create_claim_ref_tiny_set(refs_len);
     assert(set);
@@ -127,7 +127,7 @@ void test_fill_claim_ref_tiny_set(){
     evr_free_claim_ref_tiny_set(set);
 }
 
-int main(){
+int main(void){
     evr_init_basics();
     run_test(test_evr_fmt_key_into);
     run_test(test_evr_parse_blob_ref);
