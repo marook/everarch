@@ -6,7 +6,9 @@
 /evr-glacier-fs
 /evr-glacier-storage
 /evr-glacier-tool
+/evr-parallel
 /evr-upload-httpd
+/finally
 /slow-read
 /zipper
 

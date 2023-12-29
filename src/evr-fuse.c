@@ -25,25 +25,19 @@
 #include "errors.h"
 #include "logger.h"
 
-#define evr_fuse_opt_subtype "-osubtype="
 #define evr_fuse_opt_allow_other "-oallow_other"
 
-int evr_run_fuse(char *prog, char *prog_name, struct evr_fuse_cfg *cfg){
+int evr_run_fuse(char *prog, struct evr_fuse_cfg *cfg){
     int ret = 1;
     size_t fuse_argv_len = 1;
     char *fuse_argv[] = {
         prog,
-        // reserved for evr_fuse_opt_subtype and evr_fuse_opt_allow_other
-        NULL,
+        // the following NULL is a spot reserved for
+        // evr_fuse_opt_allow_other
         NULL,
     };
     struct fuse_session *se;
     void *ctx;
-    const size_t prog_name_len = strlen(prog_name);
-    char buf_subtype[sizeof(evr_fuse_opt_subtype) - 1 + prog_name_len + 1];
-    memcpy(buf_subtype, evr_fuse_opt_subtype, sizeof(evr_fuse_opt_subtype) - 1);
-    memcpy(&buf_subtype[sizeof(evr_fuse_opt_subtype)], prog_name, prog_name_len + 1);
-    fuse_argv[fuse_argv_len++] = buf_subtype;
     if(cfg->allow_other){
         fuse_argv[fuse_argv_len++] = evr_fuse_opt_allow_other;
     }
@@ -66,6 +60,7 @@ int evr_run_fuse(char *prog, char *prog_name, struct evr_fuse_cfg *cfg){
     if(cfg->setup && cfg->setup(&ctx) != evr_ok){
         goto out_with_session_unmount;
     }
+    log_debug("Entering fuse session loop");
     if(cfg->single_thread) {
         ret = fuse_session_loop(se);
     } else {
@@ -74,6 +69,7 @@ int evr_run_fuse(char *prog, char *prog_name, struct evr_fuse_cfg *cfg){
         fcfg.max_idle_threads = 10;
         ret = fuse_session_loop_mt(se, &fcfg);
     }
+    log_debug("Left fuse session loop");
     if(cfg->teardown && cfg->teardown(ctx) != evr_ok){
         evr_panic("Unable to tear down fuse context.");
         ret = evr_error;

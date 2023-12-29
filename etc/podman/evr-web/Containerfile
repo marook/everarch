@@ -14,6 +14,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+FROM docker.io/library/alpine:3.18 AS builder
+LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
+LABEL org.opencontainers.image.licenses="AGPL-3.0"
+LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
+
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev fuse3-dev
+WORKDIR /root/everarch
+COPY . /root/everarch
+RUN autoreconf --install && ./configure --enable-log-debug && make clean && cd src && make -j 4 evr-parallel evr-glacier-fs finally
+
 FROM docker.io/library/nginx:1.25.3-alpine3.18 AS image
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
@@ -22,7 +32,22 @@ LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
 # http port
 EXPOSE 80
 
+# the volume /pub exposes the public GPG keys used and auth-token
+# necessary to access the other evr services.
+VOLUME /pub
+
+# the volume /data stores the state of the evr-web instance. this
+# volume should not be shared with other containers.
+VOLUME /data
+
+RUN apk update && apk add libxml2 libxslt gpgme fuse3
+
 COPY README AUTHORS COPYING /opt/evr/
 COPY etc/podman/evr-web/envsubst-var-fix.sh /docker-entrypoint.d/18-envsubst-var-fix.sh
 COPY etc/podman/evr-web/nginx.conf /etc/nginx/templates/default.conf.template
+COPY etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
+COPY etc/podman/evr-web/entrypoint.sh /opt/evr/entrypoint.sh
 COPY evr-web/dist/. /opt/evr/evr-web/
+COPY --from=builder /root/everarch/src/evr-parallel /root/everarch/src/evr-glacier-fs /root/everarch/src/finally /opt/evr/
+
+ENTRYPOINT ["/opt/evr/entrypoint.sh"]

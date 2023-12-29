@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
     cfg.fuse.ops.read = evr_glacier_fs_read;
     cfg.fuse.setup = NULL;
     cfg.fuse.teardown = NULL;
-    if(evr_run_fuse(argv[0], program_name, &cfg.fuse) != 0){
+    if(evr_run_fuse(argv[0], &cfg.fuse) != 0){
         goto out_with_empty_open_file_set;
     }
     ret = 0;

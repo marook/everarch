@@ -18,10 +18,10 @@ FROM docker.io/library/alpine:3.18 AS builder
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
-RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev coreutils openssl openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison bash netcat-openbsd socat util-linux libmicrohttpd-dev curl
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev coreutils openssl openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison bash netcat-openbsd socat util-linux libmicrohttpd-dev curl fuse3 fuse3-dev
 COPY . /root/everarch
 WORKDIR /root/everarch
-RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && cp testing/suite/config.alpine testing/suite/config.local && autoreconf --install && ./configure && make clean && make -j 4 && ./test.sh || cat /root/everarch/testing/suite/test-suite.log
+RUN gpg --quick-gen-key --batch --passphrase '' evr-alpine@example.org && cp testing/suite/config.alpine testing/suite/config.local && autoreconf --install && ./configure && make clean && make -j 4 && ./test.sh
 
 # The following commented RUN instructions are a collection of 'last
 # resort, show me the error' quick hacks.
@@ -42,7 +42,7 @@ EXPOSE 8030
 # this volume should not be shared with other containers.
 VOLUME /data
 
-RUN apk update && apk add sqlite-libs libgcrypt coreutils openssl libxml2 libxslt gpgme libgcrypt libmicrohttpd
+RUN apk update && apk add sqlite-libs libgcrypt coreutils openssl libxml2 libxslt gpgme libgcrypt libmicrohttpd fuse3
 
 COPY README AUTHORS COPYING /opt/evr/
 COPY --from=builder /root/everarch/src/evr /root/everarch/src/evr-glacier-storage /root/everarch/src/evr-glacier-tool /root/everarch/src/evr-attr-index /root/everarch/src/evr-fs /opt/evr/bin/

@@ -44,4 +44,6 @@ struct evr_subprocess {
  */
 int evr_spawn(struct evr_subprocess *p, const char *argv[]);
 
+int evr_subprocess_pipe_output(struct evr_subprocess *p, int out_fd);
+
 #endif

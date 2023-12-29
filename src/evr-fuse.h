@@ -50,7 +50,7 @@ struct evr_fuse_cfg {
     int (*teardown)(void *ctx);
 };
 
-int evr_run_fuse(char *prog, char *prog_name, struct evr_fuse_cfg *cfg);
+int evr_run_fuse(char *prog, struct evr_fuse_cfg *cfg);
 
 
 #endif

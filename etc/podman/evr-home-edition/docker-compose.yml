@@ -74,10 +74,20 @@ services:
     image: localhost/evr-web:amd64
     environment:
       - NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+      - EVR_GLACIER_STORAGE_HOST=storage
       - EVR_ATTR_INDEX_HOST=attr-index
       - EVR_UPLOAD_HTTPD_HOST=upload-httpd
+      - EVR_WITH_UPLOAD_HTTPD=1
+      - EVR_WITH_ATTR_INDEX=1
+    volumes:
+      - conf:/pub
+      - web:/data
     ports:
       - "8030:80"
+    cap_add:
+      - sys_admin
+    devices:
+      - "/dev/fuse:/dev/fuse"
     networks:
       - internal
   evr-join-link:

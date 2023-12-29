@@ -321,7 +321,7 @@ int main(int argc, char *argv[]) {
     cfg.fuse.ops.read = evr_fs_read;
     cfg.fuse.setup = evr_start_index_watch;
     cfg.fuse.teardown = evr_free_index_watch;
-    if(evr_run_fuse(argv[0], program_name, &cfg.fuse) != evr_ok){
+    if(evr_run_fuse(argv[0], &cfg.fuse) != evr_ok){
         goto out_with_empty_open_file_set;
     }
     ret = 0;

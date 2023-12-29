@@ -7,4 +7,6 @@ set -e
 # that's why it's not part of the evr-alpine build
 platforms='amd64 arm64'
 
+evr_podman_build_with_fuse=1
+
 evr_podman_build evr-alpine

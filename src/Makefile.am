@@ -23,7 +23,9 @@ info_TEXINFOS = evr.texi
 bin_PROGRAMS = \
 	evr \
 	evr-glacier-storage \
-	evr-glacier-tool
+	evr-glacier-tool \
+	evr-parallel \
+	finally
 
 dist_bin_SCRIPTS =
 
@@ -235,6 +237,24 @@ evr_glacier_fs_SOURCES = \
 	open-files.c \
 	signatures.c
 evr_glacier_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+
+evr_parallel_SOURCES = \
+	basics.c \
+	dyn-mem.c \
+	errors.c \
+	evr-parallel.c \
+	files.c \
+	logger.c \
+	subprocess.c
+
+finally_SOURCES = \
+	basics.c \
+	dyn-mem.c \
+	errors.c \
+	files.c \
+	finally.c \
+	logger.c \
+	subprocess.c
 
 evr_fs_SOURCES = \
 	auth.c \

@@ -21,9 +21,12 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
+#include <poll.h>
 
 #include "errors.h"
 #include "logger.h"
+#include "basics.h"
+#include "files.h"
 
 #define replace_fd(oldfd, newfd)                \
     do {                                        \
@@ -112,3 +115,56 @@ int evr_spawn(struct evr_subprocess *p, const char *argv[]){
 }
 
 #undef replace_fd
+
+int evr_subprocess_pipe_output(struct evr_subprocess *p, int out_fd){
+    struct pollfd pfds[2] = { 0 };
+    size_t i, num_open_fds;
+    ssize_t bytes_read;
+    struct evr_file stdout;
+    char buf[2048];
+    pfds[0].fd = p->out;
+    pfds[1].fd = p->err;
+    num_open_fds = 2;
+    for(i = 0; i < static_len(pfds); ++i){
+        pfds[i].events = POLLIN;
+    }
+    evr_file_bind_fd(&stdout, STDOUT_FILENO);
+    while(num_open_fds > 0){
+        if(poll(pfds, static_len(pfds), -1) <= 0){
+            log_error("Unable to poll output streams");
+            return evr_error;
+        }
+        for(i = 0; i < static_len(pfds); ++i){
+            if(pfds[i].revents == 0){
+                continue;
+            }
+            if(pfds[i].revents & POLLIN){
+                bytes_read = read(pfds[i].fd, buf, sizeof(buf));
+                if(bytes_read < 0){
+                    log_error("Error when reading from file descriptor");
+                    return evr_error;
+                }
+                if(write_n(&stdout, buf, bytes_read) != evr_ok){
+                    log_error("Unable to write output to stdout");
+                    return evr_error;
+                }
+            } else {
+                // POLLERR | POLLHUP
+                if(close(pfds[i].fd) != 0){
+                    char err_buf[1024];
+                    char *err_msg = err_buf;
+                    int exec_errno = errno;
+                    if(evr_strerror_r(exec_errno, &err_msg, sizeof(err_buf)) != evr_ok){
+                        log_error("Unable to produce error message for errno %d", exec_errno);
+                        err_msg = "";
+                    }
+                    log_error("Unable to close output stream: %s", err_msg);
+                    return evr_error;
+                }
+                pfds[i].fd = -1;
+                --num_open_fds;
+            }
+        }
+    }
+    return evr_ok;
+}
