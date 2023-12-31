@@ -70,6 +70,14 @@ AC_ARG_ENABLE(
   [AC_DEFINE([EVR_LOG_DEBUG], [1], [Turns on log message output on level debug.])],
 )
 
+AC_ARG_ENABLE(
+  [clang-test-build],
+  [AS_HELP_STRING([--enable-clang-test-build], [Enables a clang compatibility test build within a podman container.])],
+  [enable_clang_test_build=true],
+  [enable_clang_test_build=false]
+)
+AM_CONDITIONAL([ENABLE_CLANG_TEST_BUILD], [test x$enable_clang_test_build = xtrue])
+
 if test x$prefix = xNONE ; then
   prefix=${ac_default_prefix}
 fi
@@ -192,5 +200,6 @@ AC_MSG_NOTICE([With the results from the checks above configure decided the foll
 	build evr-backup: $build_evr_backup
         build fuse file systems: $has_fuse
         http server for evr-attr-index: $has_httpd
+        test clang build: $enable_clang_test_build
         test evr-attr-index default attr-spec transformations: $has_xsltproc
 ])
