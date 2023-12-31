@@ -153,6 +153,7 @@ configp_test_SOURCES = \
 	configp.c \
 	configp-test.c \
 	logger.c
+configp_test_LDADD = $(WORDEXP_LIBS)
 
 dyn_mem_test_SOURCES = \
 	assert.c \
@@ -191,7 +192,7 @@ evr_attr_index_SOURCES = \
 	server.c \
 	signatures.c \
 	subprocess.c
-evr_attr_index_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) -lm $(SSL_LIBS)
+evr_attr_index_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(XML_LIBS) $(GPGME_LIBS) -lm $(SSL_LIBS) $(WORDEXP_LIBS)
 evr_attr_index_LFLAGS = --header-file=attr-query-lexer.h
 if HAS_HTTPD
   evr_attr_index_SOURCES += httpd.c
@@ -216,7 +217,7 @@ evr_SOURCES = \
 	metadata.c \
 	seed-desc.c \
 	signatures.c
-evr_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+evr_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS) $(WORDEXP_LIBS)
 
 evr_glacier_fs_SOURCES = \
 	auth.c \
@@ -236,7 +237,7 @@ evr_glacier_fs_SOURCES = \
 	metadata.c \
 	open-files.c \
 	signatures.c
-evr_glacier_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+evr_glacier_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS) $(WORDEXP_LIBS)
 
 evr_parallel_SOURCES = \
 	basics.c \
@@ -277,7 +278,7 @@ evr_fs_SOURCES = \
 	open-files.c \
 	seed-desc.c \
 	signatures.c
-evr_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS)
+evr_fs_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(FUSE_LIBS) $(LIBGCRYPT_LIBS) $(GPGME_LIBS) $(SSL_LIBS) $(WORDEXP_LIBS)
 
 evr_glacier_storage_SOURCES = \
 	auth.c \
@@ -300,7 +301,7 @@ evr_glacier_storage_SOURCES = \
 	notify.c \
 	queue.c \
 	server.c
-evr_glacier_storage_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS)
+evr_glacier_storage_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(WORDEXP_LIBS)
 
 evr_upload_httpd_SOURCES = \
 	auth.c \
@@ -314,7 +315,7 @@ evr_upload_httpd_SOURCES = \
 	httpd.c \
 	logger.c \
 	subprocess.c
-evr_upload_httpd_LDADD = @ARGP_LIBS@ $(HTTPD_LIBS)
+evr_upload_httpd_LDADD = @ARGP_LIBS@ $(HTTPD_LIBS) $(WORDEXP_LIBS)
 
 evr_glacier_tool_SOURCES = \
 	basics.c \
@@ -327,7 +328,7 @@ evr_glacier_tool_SOURCES = \
 	glacier.c \
 	keys.c \
 	logger.c
-evr_glacier_tool_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS)
+evr_glacier_tool_LDADD = @ARGP_LIBS@ $(SQLITE_LIBS) $(LIBGCRYPT_LIBS) $(WORDEXP_LIBS)
 
 evr_attr_index_client_test_SOURCES = \
 	assert.c \
@@ -394,7 +395,7 @@ glacier_benchmark_SOURCES = \
 	logger.c \
 	metadata.c \
 	signatures.c
-glacier_benchmark_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS)
+glacier_benchmark_LDADD = @ARGP_LIBS@ $(XML_LIBS) $(LIBGCRYPT_LIBS) $(SSL_LIBS) $(GPGME_LIBS) $(WORDEXP_LIBS)
 
 glacier_cmd_test_SOURCES = \
 	assert.c \

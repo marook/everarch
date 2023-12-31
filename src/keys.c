@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <endian.h>
 
 #include "errors.h"
 #include "dyn-mem.h"

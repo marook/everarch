@@ -26,6 +26,20 @@ AC_CHECK_FUNC(
 )
 AC_SUBST(ARGP_LIBS)
 
+# the wordexp(…) function is provided via libc by glibc and musl. on
+# BSD libc it is an external library. termux provides the wordexp
+# library via the package android-wordexp.
+AC_CHECK_FUNC(
+  [wordexp],
+  [have_wordexp=yes],
+  AC_CHECK_LIB([android-wordexp],
+    [wordexp],
+    [WORDEXP_LIBS="-landroid-wordexp"],
+    []
+  )
+)
+AC_SUBST(WORDEXP_LIBS)
+
 AC_CHECK_FUNC(
   [backtrace],
   [AC_DEFINE([EVR_HAVE_BACKTRACE], [1], [libc backtrace(…) function is available.])]

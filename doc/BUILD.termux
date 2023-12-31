@@ -1,0 +1,18 @@
+Build instructions for termux
+
+This document describes the steps to build everarch within a termux
+https://termux.dev/en/ environment on an Android device.
+
+Install at least the minimal required dependencies:
+
+$ apt install gpgme flex bison clang argp libsqlite pkg-config libxslt libandroid-wordexp
+
+Then enter the root directory and run:
+
+$ autoreconf --install
+$ ./configure
+
+Then you can build single everarch binaries like this:
+
+$ cd src
+$ make MAKEINFO=true evr-glacier-storage

@@ -46,11 +46,10 @@ https://github.com/marook/everarch
 ------------------------------------------------------------------------
 Build & Installation
 
-everarch uses some linux and GNU libc APIs which makes it POSIX
-incompatible. So you might not be able to compile it on Windows or BSD
-systems.
+everarch should compile on linux and BSD systems. It relies on some
+POSIX APIs which make it incompatible to Windows.
 
-Everarch is known to run at least on i686 and arm64 systems.
+Everarch is known to run at least on i686, arm64 and arm32 systems.
 
 Install at least the minimal required dependencies on Debian. For
 other distributions see the corresponding doc/BUILD.* files:
