@@ -122,6 +122,7 @@ int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s);
 
 int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const char *s, size_t s_maxlen, struct evr_file *meta){
     int ret = evr_error;
+    gpgme_error_t op_res;
     gpgme_ctx_t gpg_ctx;
     if(evr_signatures_build_ctx(&gpg_ctx) != evr_ok){
         goto out;
@@ -135,21 +136,28 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
     if(gpgme_data_new(&out) != GPG_ERR_NO_ERROR){
         goto out_with_release_in;
     }
-    if(gpgme_op_verify(gpg_ctx, in, NULL, out) != GPG_ERR_NO_ERROR){
+    op_res = gpgme_op_verify(gpg_ctx, in, NULL, out);
+    if(op_res != GPG_ERR_NO_ERROR){
+        char buf[2048];
+        if(gpgme_strerror_r(op_res, buf, sizeof(buf)) != 0){
+            log_error("Unable to resolve gpgme error code to error string");
+            buf[0] = '\0';
+        }
+        log_error("gpgme verify operation failed: %s", buf);
         goto out_with_release_out;
     }
-    gpgme_verify_result_t res = gpgme_op_verify_result(gpg_ctx);
-    if(res == NULL){
+    gpgme_verify_result_t vres = gpgme_op_verify_result(gpg_ctx);
+    if(vres == NULL){
         goto out_with_release_out;
     }
     if(meta){
-        for(gpgme_signature_t s = res->signatures; s; s = s->next){
+        for(gpgme_signature_t s = vres->signatures; s; s = s->next){
             if(evr_meta_write_str(meta, evr_meta_signed_by, s->fpr) != evr_ok){
                 goto out_with_release_out;
             }
         }
     }
-    if(evr_is_signature_accepted(ctx, res->signatures) != evr_ok){
+    if(evr_is_signature_accepted(ctx, vres->signatures) != evr_ok){
         ret = evr_user_data_invalid;
         goto out_with_release_out;
     }
@@ -168,7 +176,13 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
 }
 
 int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s){
+#ifdef EVR_LOG_DEBUG
+    size_t signature_counter = 0;
+#endif
     for(; s; s = s->next){
+#ifdef EVR_LOG_DEBUG
+        ++signature_counter;
+#endif
         if((s->summary & GPGME_SIGSUM_VALID) == 0 && s->summary != GPGME_SIGSUM_KEY_EXPIRED){
             log_debug("Signature from key %s not valid. Signature summary is 0x%lx and status is %lu", s->fpr, (unsigned long)s->summary, (unsigned long)s->status);
             continue;
@@ -179,6 +193,7 @@ int evr_is_signature_accepted(struct evr_verify_ctx* ctx, gpgme_signature_t s){
         }
         return evr_ok;
     }
+    log_debug("Checked %zu signatures on content but did not find any matching in verify context", signature_counter);
     return evr_error;
 }
 

@@ -184,10 +184,16 @@ int evr_fetch_file_claim(struct evr_file_claim **claim, struct evr_file *c, evr_
     if(res == evr_not_found){
         ret = evr_not_found;
         goto out;
-    } else if(res != evr_ok){
+    } else if(res == evr_user_data_invalid){
+        ret = evr_user_data_invalid;
         evr_claim_ref_str claim_ref_str;
         evr_fmt_claim_ref(claim_ref_str, claim_ref);
         log_error("No validly signed XML found for ref %s", claim_ref_str);
+        goto out;
+    } else if(res != evr_ok){
+        evr_claim_ref_str claim_ref_str;
+        evr_fmt_claim_ref(claim_ref_str, claim_ref);
+        log_error("Unable to fetch file claim for ref %s", claim_ref_str);
         goto out;
     }
     xmlNode *cs = evr_get_root_claim_set(doc);
