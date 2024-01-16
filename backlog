@@ -1,12 +1,125 @@
-* evr-web's nginx cannot read from the evr-glacier-fs file system :bug:
-the nginx logs show the following when trying to access a file via nginx:
+* evr-web's evr-glacier-fs cannot validate evr-upload-httpd claims      :bug:
+when trying to access a file claim via evr-glacier-fs the following
+error occurs:
 
 #+BEGIN_SRC
-2023/12/29 20:30:08 [error] 77#77: *1 open() "/mnt/evr-glacier-fs/file/sha3-224-791da4c1f988da94ccf1d3a0c0cc7616e588349450aa981794cb3363-0000" failed (13: Permission denied), client: 10.89.5.30, server: localhost, request: "GET /evr-glacier-fs/file/sha3-224-791da4c1f988da94ccf1d3a0c0cc7616e588349450aa981794cb3363-0000 HTTP/1.1", host: "localhost:8030"
+2024-01-03T20:16:29 aD fuse request 0x7f5007ecb210: lookup file with parent 1
+2024-01-03T20:16:29 aD fuse request 0x7f5007ecb180: lookup sha3-224-c848c29ce7c17017c9b01320cb414fd0c1b6b9f85f37dc0badcec804-0000 with parent 2
+2024-01-03T20:16:29 aD Use SSL cert /pub/evr-glacier-storage-cert.pem for storage:2361
+2024-01-03T20:16:29 aD Sending get sha3-224-c848c29ce7c17017c9b01320cb414fd0c1b6b9f85f37dc0badcec804 command to server
+2024-01-03T20:16:29 aD Storage responded with status code 0x20 and body size 735
+2024-01-03T20:16:29 aE No validly signed XML found for ref sha3-224-c848c29ce7c17017c9b01320cb414fd0c1b6b9f85f37dc0badcec804-0000
+2024/01/03 20:16:29 [crit] 90#90: *1 open() "/mnt/evr-glacier-fs/file/sha3-224-c848c29ce7c17017c9b01320cb414fd0c1b6b9f85f37dc0badcec804-0000" failed (5: I/O error), client: 10.89.5.15, server: localhost, request: "GET /evr-glacier-fs/file/sha3-224-c848c29ce7c17017c9b01320cb414fd0c1b6b9f85f37dc0badcec804-0000 HTTP/1.1", host: "localhost:8030"
 #+END_SRC
 
-when accessing the file via cat the file's content is printed.
-* analyze DNS resolution errors in podman network :bug:
+when fetching the claim on the evr-attr-index container the file ref
+seems to be fine:
+
+#+BEGIN_SRC
+/opt/evr/bin/evr get sha3-224-c848c29ce7c17017c9b01320cb414fd0c1b6b9f85f37dc0badcec804
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set dc:created="2024-01-03T20:16:14.167000Z" xmlns:dc="http://purl.org/dc/terms/" xmlns="https://evr.ma300k.de/claims/">
+ <file dc:title="023-12-31T15_46_10_screenshot.png">
+  <body>
+   <slice ref="sha3-224-97b309d505b8b4c57bb6f4a4441facbcb1e47fcebe81bb3169a100a4" size="141121"/>
+   <slice ref="sha3-224-506bfed2c5826fab52e0062429adae4e03efa9b26f532d14233aec6d" size="137985"/>
+  </body>
+ </file>
+</claim-set>
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYKAB0WIQTEVc0zC5mtNaEi48zNQFFdAHwwsQUCZZXAjgAKCRDNQFFdAHww
+sd3lAQC7DkX3qVgTSTZR8VOmOqLg6NHLGhMFwS9mOayxHvfCBQD/b9jH894P3rsM
+I+5gDZN5sWr9ZOlX1CNyZi4RYUFzFgE=
+=q6P7
+-----END PGP SIGNATURE-----
+#+END_SRC
+
+gpg verify responds the following regarding to the signature on
+another machince without the public keys from within the containers:
+
+#+BEGIN_SRC
+gpg: Signature made Mi 03 Jan 2024 21:16:14 CET
+gpg:                using EDDSA key C455CD330B99AD35A122E3CCCD40515D007C30B1
+gpg: Can't check signature: No public key
+#+END_SRC
+
+the evr-attr-index container knows the following public keys:
+
+#+BEGIN_SRC
+[keyboxd]
+---------
+pub   ed25519 2024-01-03 [SC] [expires: 2033-12-31]
+      C455CD330B99AD35A122E3CCCD40515D007C30B1
+uid           [ultimate] evr-upload-httpd@example.org
+sub   cv25519 2024-01-03 [E]
+#+END_SRC
+
+the evr-web container knows the followving public keys:
+
+#+BEGIN_SRC
+$ podman exec 6ae38bce335f runuser -u nginx -- gpg --list-keys
+/var/cache/nginx/.gnupg/pubring.kbx
+-----------------------------------
+pub   ed25519 2024-01-03 [SC] [expires: 2033-12-31]
+      C455CD330B99AD35A122E3CCCD40515D007C30B1
+uid           [ultimate] evr-upload-httpd@example.org
+sub   cv25519 2024-01-03 [E]
+
+pub   ed25519 2024-01-03 [SC] [expires: 2033-12-31]
+      B24BD77512C3E2CB8C14B22A13A8D43830928ACB
+uid           [ultimate] evr-attr-index@example.org
+sub   cv25519 2024-01-03 [E]
+#+END_SRC
+
+the evr-web evr-glacier-fs.conf is the following:
+
+#+BEGIN_SRC
+$ podman exec 6ae38bce335f cat /data/evr-glacier-fs.conf
+storage-host=storage
+ssl-cert=storage:2361:/pub/evr-glacier-storage-cert.pem
+auth-token=storage:2361:d11110a99e5564c422d0f38a1bbc1c1c42fb7e0402f19e6d2d7fd33a1e34441a
+accepted-gpg-key=C455CD330B99AD35A122E3CCCD40515D007C30B1
+accepted-gpg-key=00A1D88C5311BE78B00DCD9ED94BDDADCE5AEF09
+accepted-gpg-key=B24BD77512C3E2CB8C14B22A13A8D43830928ACB
+accepted-gpg-key=395C1ADA77F6A725574B9BCDC0967678FA3EACF5
+#+END_SRC
+
+the following content comes from a separate session with the same
+steps. so don't be confused by different refs and fingerprints.
+
+gpg can verify the claim even as nginx user:
+
+#+BEGIN_SRC
+$ podman cp ~/file.txt 94cedd5552a7:/data
+$ podman exec 94cedd5552a7 runuser -u nginx -- gpg --verify /data/file.txt
+gpg: Signature made Wed Jan  3 21:09:18 2024 UTC
+gpg:                using EDDSA key 518DD27EBB5A5DAE1930E1939EF1E2573D000FBA
+gpg: Good signature from "evr-upload-httpd@example.org" [ultimate]
+$ podman exec 94cedd5552a7 runuser -u nginx -- gpg --list-keys
+/var/cache/nginx/.gnupg/pubring.kbx
+-----------------------------------
+pub   ed25519 2024-01-03 [SC] [expires: 2033-12-31]
+      518DD27EBB5A5DAE1930E1939EF1E2573D000FBA
+uid           [ultimate] evr-upload-httpd@example.org
+sub   cv25519 2024-01-03 [E]
+
+pub   ed25519 2024-01-03 [SC] [expires: 2033-12-31]
+      30D420C7947A70CEE511D21152F2FD8B835D657A
+uid           [ultimate] evr-attr-index@example.org
+sub   cv25519 2024-01-03 [E]
+#+END_SRC
+
+running evr-glacier-fs with strace revealed the following error that
+is occuring during the verification:
+
+#+BEGIN_SRC
+read(7, "gpg: Fatal: can't create directory '/root/.gnupg': Permission denied\n", 4096) = 69
+#+END_SRC
+* analyze DNS resolution errors in podman network                       :bug:
 estimated every 10th DNS request within a podman container is unable
 to resolve a neighbouring service. when retrying the resolution works
 again afterwards. that behavior has been observed with the evr-web and
