@@ -65,7 +65,7 @@ int main(int argc, char **argv){
         nt_argv[i] = argv[i + 1];
     }
     nt_argv[argc - 1] = NULL;
-    if(evr_spawn(&sp, nt_argv) != evr_ok){
+    if(evr_spawn(&sp, nt_argv, NULL) != evr_ok){
         log_error("Unable to spawn subprocess");
         goto out;
     }

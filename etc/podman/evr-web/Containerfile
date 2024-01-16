@@ -40,7 +40,7 @@ VOLUME /pub
 # volume should not be shared with other containers.
 VOLUME /data
 
-RUN apk update && apk add libxml2 libxslt gpgme fuse3
+RUN apk update && apk add libxml2 libxslt gpgme fuse3 util-linux
 
 COPY README AUTHORS COPYING /opt/evr/
 COPY etc/podman/evr-web/envsubst-var-fix.sh /docker-entrypoint.d/18-envsubst-var-fix.sh

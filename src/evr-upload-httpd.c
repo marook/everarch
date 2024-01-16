@@ -320,7 +320,7 @@ static enum MHD_Result evr_http_upload_handle_file_upload(struct MHD_Connection 
         if(!ctx){
             goto fail;
         }
-        if(evr_spawn(&ctx->evr_cli, evr_cli_argv) != evr_ok){
+        if(evr_spawn(&ctx->evr_cli, evr_cli_argv, NULL) != evr_ok){
             log_error("Unable to spawn evr cli for post-file");
             goto fail_with_free_ctx;
         }

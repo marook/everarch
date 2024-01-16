@@ -36,7 +36,7 @@ void test_cat_subprocess(void){
         "-",
         NULL
     };
-    assert(is_ok(evr_spawn(&sp, argv)));
+    assert(is_ok(evr_spawn(&sp, argv, NULL)));
     const char msg[] = "hello world!";
     const size_t msg_len = strlen(msg);
     struct evr_file sp_stdin;
@@ -62,7 +62,7 @@ void test_false_subprocess(void){
         "/bin/false",
         NULL
     };
-    assert(is_ok(evr_spawn(&sp, argv)));
+    assert(is_ok(evr_spawn(&sp, argv, NULL)));
     assert(close(sp.in) == 0);
     assert(close(sp.out) == 0);
     assert(close(sp.err) == 0);
@@ -85,7 +85,7 @@ void test_pass_path_to_subprocess(void){
     // if the following assert breaks you have to extend this test to
     // support not existing PATH environment variables
     assert(my_path);
-    assert(is_ok(evr_spawn(&sp, argv)));
+    assert(is_ok(evr_spawn(&sp, argv, NULL)));
     assert(close(sp.in) == 0);
     char sp_path[4096];
     ssize_t bytes_read = read(sp.out, sp_path, sizeof(sp_path));

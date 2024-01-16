@@ -124,15 +124,16 @@ int evr_verify(struct evr_verify_ctx *ctx, struct dynamic_array **dest, const ch
     int ret = evr_error;
     gpgme_error_t op_res;
     gpgme_ctx_t gpg_ctx;
+    size_t s_len;
+    gpgme_data_t in;
+    gpgme_data_t out;
     if(evr_signatures_build_ctx(&gpg_ctx) != evr_ok){
         goto out;
     }
-    size_t s_len = strnlen(s, s_maxlen);
-    gpgme_data_t in;
+    s_len = strnlen(s, s_maxlen);
     if(gpgme_data_new_from_mem(&in, s, s_len, 0) != GPG_ERR_NO_ERROR){
         goto out_with_release_gpg_ctx;
     }
-    gpgme_data_t out;
     if(gpgme_data_new(&out) != GPG_ERR_NO_ERROR){
         goto out_with_release_in;
     }

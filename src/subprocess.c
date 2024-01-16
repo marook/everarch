@@ -18,10 +18,13 @@
 
 #include "subprocess.h"
 
+#include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
 #include <poll.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 #include "errors.h"
 #include "logger.h"
@@ -38,7 +41,9 @@
         }                                       \
     } while(0)
 
-int evr_spawn(struct evr_subprocess *p, const char *argv[]){
+int evr_switch_user(const char *user);
+
+int evr_spawn(struct evr_subprocess *p, const char *argv[], const char *as_user){
     int ret = evr_ok;
     log_debug("Spawn subprocess %s", argv[0]);
     int child_in[2];
@@ -64,6 +69,12 @@ int evr_spawn(struct evr_subprocess *p, const char *argv[]){
         evr_log_fd = STDERR_FILENO;
     }
     if (pid == 0) {
+        if(as_user){
+            if(evr_switch_user(as_user) != evr_ok){
+                log_error("Unable to switch process user to %s", as_user);
+                goto panic;
+            }
+        }
         for(int f = 0; f <= 2; ++f){
             if(close(f)){
                 goto panic;
@@ -115,6 +126,52 @@ int evr_spawn(struct evr_subprocess *p, const char *argv[]){
 }
 
 #undef replace_fd
+
+int evr_switch_user(const char *user) {
+    int ret = evr_error, res;
+    struct passwd pw;
+    struct passwd *pw_res;
+    long buf_size;
+    char *buf;
+    buf_size = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if(buf_size == -1){
+        log_debug("Guessing passwd entry max size because unable to determine it");
+        buf_size = 16384;
+    }
+    buf = malloc(buf_size);
+    if(!buf){
+        goto out;
+    }
+    res = getpwnam_r(user, &pw, buf, buf_size, &pw_res);
+    if(pw_res == NULL){
+        if(res != 0){
+            log_error("Unable to switch to unknown user %s", user);
+            goto out_with_free_buf;
+        }
+        log_error("Unable to lookup user %s", user);
+        goto out_with_free_buf;
+    }
+    if(setgid(pw_res->pw_gid) != 0){
+        log_error("Unable to switch process to group from user %s", user);
+        goto out_with_free_buf;
+    }
+    if(setuid(pw_res->pw_uid) != 0){
+        // panic in this case because process group id was already
+        // successfully changed
+        evr_panic("Unable to switch process to user %s", user);
+    }
+    if (setenv("HOME", pw_res->pw_dir, 1) != 0) {
+        // panic in this case because process group id was already
+        // successfully changed
+        evr_panic("Unable to set HOME environment variable for user %s", user);
+    }
+    log_debug("Switched process user to %s", user);
+    ret = evr_ok;
+ out_with_free_buf:
+    free(buf);
+ out:
+    return ret;
+}
 
 int evr_subprocess_pipe_output(struct evr_subprocess *p, int out_fd){
     struct pollfd pfds[2] = { 0 };

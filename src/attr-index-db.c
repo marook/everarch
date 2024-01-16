@@ -852,7 +852,7 @@ int evr_append_attr_factory_claims_worker(void *context){
     evr_fmt_blob_ref(attr_factory_str, ctx->attr_factory);
     log_debug("Spawn attr-factory %s for claim-set %s", attr_factory_str, claim_set_ref_str);
     struct evr_subprocess sp;
-    if(evr_spawn(&sp, argv) != evr_ok){
+    if(evr_spawn(&sp, argv, NULL) != evr_ok){
         goto out;
     }
     struct evr_file sp_stdin;

@@ -35,6 +35,7 @@
 struct evr_cmd {
     size_t args_len;
     char **args;
+    char *run_as_user;
     pid_t pid;
 };
 
@@ -137,9 +138,19 @@ static int evr_split_cmds(struct evr_cmd *cmds, size_t cmds_len, size_t argc, ch
             continue;
         }
         if(ca->args_len == 0){
-            ca->args = &argv[i];
+            if(strcmp(argv[i], "--user") == 0){
+                if(i + 1 >= argc){
+                    log_error("Expecting username after --user argument");
+                    return evr_error;
+                }
+                ca->run_as_user = argv[++i];
+            } else {
+                ca->args = &argv[i];
+                ++ca->args_len;
+            }
+        } else {
+            ++ca->args_len;
         }
-        ++ca->args_len;
     }
     return evr_ok;
 }
@@ -181,7 +192,7 @@ static int evr_run_cmd(void *ctx){
     if(stopping){
         return 0;
     }
-    if(evr_spawn(&p, argv) != evr_ok){
+    if(evr_spawn(&p, argv, cmd->run_as_user) != evr_ok){
         evr_panic("Unable to spawn %s", argv[0]);
     }
     cmd->pid = p.pid;

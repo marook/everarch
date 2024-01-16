@@ -20,32 +20,36 @@ set -e
 ORIG_PATH="${PATH}"
 PATH="/opt/evr/entrypoint:${PATH}"
 
+mkdir /var/cache/nginx/.gnupg
+chmod go= /var/cache/nginx/.gnupg
+chown nginx:nginx /var/cache/nginx/.gnupg
+
 if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' ]
 then
     echo "Importing upload httpd GPG keys..."
     wait_for_file "/pub/evr-upload-httpd-identity.pub.gpg"
-    gpg --import "/pub/evr-upload-httpd-identity.pub.gpg"
+    runuser -u nginx -- gpg --import "/pub/evr-upload-httpd-identity.pub.gpg"
 fi
 
 if [ "${EVR_WITH_WEBSOCKET_SERVER}" == '1' ]
 then
     echo "Importing websocket server GPG keys..."
     wait_for_file "/pub/evr-websocket-server-identity.pub.gpg"
-    gpg --import "/pub/evr-websocket-server-identity.pub.gpg"
+    runuser -u nginx -- gpg --import "/pub/evr-websocket-server-identity.pub.gpg"
 fi
 
-if [ "${EVR_WITH_ATTR_INDEX_HTTPD}" == '1' ]
+if [ "${EVR_WITH_ATTR_INDEX}" == '1' ]
 then
     echo "Importing attr index GPG keys..."
     wait_for_file "/pub/evr-attr-index-identity.pub.gpg"
-    gpg --import "/pub/evr-attr-index-identity.pub.gpg"
+    runuser -u nginx -- gpg --import "/pub/evr-attr-index-identity.pub.gpg"
 fi
 
-if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' -o "${EVR_WITH_WEBSOCKET_SERVER}" == '1' ]
+if [ "${EVR_WITH_UPLOAD_HTTPD}" == '1' -o "${EVR_WITH_WEBSOCKET_SERVER}" == '1' -o "${EVR_WITH_ATTR_INDEX}" == '1' ]
 then
-    for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    for fpr in `runuser -u nginx -- gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
     do
-        echo "${fpr}:6:" | gpg --import-ownertrust
+        echo "${fpr}:6:" | runuser -u nginx -- gpg --import-ownertrust
     done
 fi
 
@@ -66,7 +70,7 @@ then
     storage_auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
     echo "auth-token=${EVR_GLACIER_STORAGE_HOST}:2361:${storage_auth_token}" >> '/data/evr-glacier-fs.conf.tmp'
 
-    for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    for fpr in `runuser -u nginx -- gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
     do
         echo "accepted-gpg-key=${fpr}" >> '/data/evr-glacier-fs.conf.tmp'
     done
@@ -75,7 +79,8 @@ then
 fi
 
 mkdir -p '/mnt/evr-glacier-fs'
+chown nginx:nginx '/mnt/evr-glacier-fs'
 
 cd /data
 export PATH="/opt/evr/bin:${ORIG_PATH}"
-exec /opt/evr/evr-parallel /opt/evr/evr-glacier-fs -f /mnt/evr-glacier-fs \; /docker-entrypoint.sh nginx -g 'daemon off;' \; /opt/evr/finally umount /mnt/evr-glacier-fs
+exec /opt/evr/evr-parallel --user nginx /opt/evr/evr-glacier-fs -s -f /mnt/evr-glacier-fs \; /docker-entrypoint.sh nginx -g 'daemon off;' \; /opt/evr/finally umount /mnt/evr-glacier-fs

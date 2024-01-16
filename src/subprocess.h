@@ -40,9 +40,12 @@ struct evr_subprocess {
  * The spawned process details are written to p. The caller must close
  * in, out and err if evr_spawn returns with evr_ok.
  *
+ * as_user is the username as which the subprocess is executed. It may
+ * be NULL if the user should not be switched.
+ *
  * Returns evr_ok on success.
  */
-int evr_spawn(struct evr_subprocess *p, const char *argv[]);
+int evr_spawn(struct evr_subprocess *p, const char *argv[], const char *as_user);
 
 int evr_subprocess_pipe_output(struct evr_subprocess *p, int out_fd);
 
