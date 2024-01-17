@@ -30,11 +30,11 @@ then
     echo "Importing ${key_name} GPG keys..."
     gpg --import "/pub/${key_name}-identity.pub.gpg"
     gpg --import "/data/${key_name}-identity.sec.gpg"
-    gpg --import-ownertrust < '/data/${key_name}-ownertrust.sec.txt'
+    gpg --import-ownertrust < "/data/${key_name}-ownertrust.sec.txt"
 else
     echo "Generating ${key_name} GPG key..."
     gpg --quick-gen-key --batch --passphrase '' "${key_name}@example.org" 'default' 'default' '3650d'
     gpg --export --output "/pub/${key_name}-identity.pub.gpg"
     gpg --export-secret-keys --output "/data/${key_name}-identity.sec.gpg"
-    gpg --export-ownertrust > '/data/${key_name}-ownertrust.sec.txt'
+    gpg --export-ownertrust > "/data/${key_name}-ownertrust.sec.txt"
 fi
