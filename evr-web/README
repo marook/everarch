@@ -1,0 +1,20 @@
+evr-web - a web UI for everarch
+
+1) Development
+
+
+------------------------------------------------------------------------
+Development
+
+Mount evr-glacier-fs and keep it running:
+
+$ evr-glacier-fs -f mnt/evr-glacier-fs
+
+Start the development server and keep it running:
+
+$ npm run serve
+
+Then build the application and reload the webpage
+http://localhost:8000 afterwards:
+
+$ make

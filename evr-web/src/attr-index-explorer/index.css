@@ -45,7 +45,6 @@
     padding: var(--gap-space);
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
     gap: var(--gap-space);
 }
 
@@ -142,32 +141,25 @@
     }
 }
 
-.seed-tile-view {
+.seed-details-view {
     cursor: default;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     padding: var(--gap-space-1-2);
     gap: var(--gap-space-1-2);
-    width: 8rem;
-    max-height: 80vh;
+    min-width: 8rem;
     background-color: #fff;
 }
 
-.seed-tile-view.expanded {
-    width: auto;
-    min-width: 8rem; /* TODO centralize into var with default width */
-    max-height: auto;
-}
-
-.seed-tile-view .title {
+.seed-details-view .title {
     font-size: 1rem;
     font-weight: normal;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.seed-tile-view .attrs {
+.seed-details-view .attrs {
     padding: 0;
     list-style: none;
 }

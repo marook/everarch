@@ -23,6 +23,7 @@ import { createRouter } from '../routers.js';
 import { instantiateTemplate, wireControllers } from '../mvc.js';
 import { search, ClientError } from '../evr-attr-index.js';
 import { NavController } from '../nav.js';
+import { SeedDetailsController } from './seed-details.js';
 
 class SearchController {
     constructor(){
@@ -69,7 +70,7 @@ class SearchController {
             )),
         );
         let seedTiles = seeds.pipe(
-            map(seeds => seeds.map(s => new SeedTileController(s))),
+            map(seeds => seeds.map(s => new SeedDetailsController(s))),
         );
         let renderFoundSeeds = wireControllers(seedTiles, this.element.querySelector('.found-seeds'));
         let showLoadingOverlay = loading.pipe(
@@ -89,40 +90,6 @@ class SearchController {
             }),
         );
         this.active = merge(renderNav, renderFoundSeeds, showLoadingOverlay, indicateValidQuery);
-    }
-}
-
-class SeedTileController {
-    constructor(seedDesc){
-        this.element = instantiateTemplate('seed-tile');
-        this.element.setAttribute('data-seed', seedDesc.ref);
-        let title = seedDesc.firstAttr('title');
-        if(title){
-            this.element.setAttribute('title', title);
-            this.element.querySelector('.title').textContent = title;
-        }
-        let expanded = new BehaviorSubject(false);
-        let clickHandler = fromEvent(this.element, 'click').pipe(
-            tap(() => expanded.next(!expanded.value)),
-        );
-        let renderExpanded = expanded.pipe(
-            distinctUntilChanged(),
-            tap(expanded => {
-                if(expanded){
-                    this.element.classList.add('expanded');
-                    let ul = this.element.querySelector('.attrs');
-                    for(let [key, val] of seedDesc.attrs){
-                        let li = document.createElement('li');
-                        li.textContent = `${key} = ${val}`;
-                        ul.appendChild(li);
-                    }
-                } else {
-                    this.element.classList.remove('expanded');
-                    this.element.querySelector('.attrs').innerHTML = '';
-                }
-            }),
-        );
-        this.active = merge(clickHandler, renderExpanded);
     }
 }
 
