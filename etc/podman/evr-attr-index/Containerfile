@@ -18,10 +18,10 @@ FROM docker.io/library/alpine:3.18 AS builder
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
 LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
-RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison libmicrohttpd-dev
+RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev flex bison libmicrohttpd-dev fuse3-dev
 WORKDIR /root/everarch
 COPY . /root/everarch
-RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-attr-index evr
+RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-attr-index evr evr-parallel evr-glacier-fs finally
 
 FROM docker.io/library/alpine:3.18 AS image
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"
@@ -44,14 +44,14 @@ VOLUME /pub
 # this volume should not be shared with other containers.
 VOLUME /data
 
-RUN apk update && apk add sqlite-libs libgcrypt openssl libxml2 libxslt gpgme libmicrohttpd python3 file imagemagick
+RUN apk update && apk add sqlite-libs libgcrypt openssl libxml2 libxslt gpgme libmicrohttpd python3 file imagemagick fuse3
 
 COPY README AUTHORS COPYING /opt/evr/
 COPY etc/podman/entrypoints/prepare_auth_token etc/podman/entrypoints/prepare_gpg_key etc/podman/entrypoints/prepare_tls_cert etc/podman/entrypoints/wait_for_file /opt/evr/entrypoint/
 COPY etc/podman/evr-attr-index/entrypoint.sh /
 COPY etc/podman/entrypoints/cert.conf /opt/evr/
 COPY etc/podman/evr-attr-index/attr-spec/file-meta-factory etc/podman/evr-attr-index/attr-spec/attr-trans.xslt etc/podman/evr-attr-index/attr-spec/install_attr_spec /opt/evr/attr-spec/
-COPY --from=builder /root/everarch/src/evr-attr-index /opt/evr/
-COPY --from=builder /root/everarch/src/evr /opt/evr/bin/
+COPY --from=builder /root/everarch/src/evr-attr-index /root/everarch/src/evr-glacier-fs /opt/evr/
+COPY --from=builder /root/everarch/src/evr /root/everarch/src/evr-parallel /root/everarch/src/finally /opt/evr/bin/
 
 CMD ["/entrypoint.sh"]

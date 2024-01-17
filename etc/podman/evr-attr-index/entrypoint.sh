@@ -115,7 +115,34 @@ then
     mv '/data/evr-attr-index.conf.tmp' '/data/evr-attr-index.conf'
 fi
 
+if [ ! -e '/data/evr-glacier-fs.conf' ]
+then
+    echo -n '' > '/data/evr-glacier-fs.conf.tmp'
+
+    echo "Configure evr-glacier-fs..."
+    if [ -z "${EVR_GLACIER_STORAGE_HOST}" ]
+    then
+        echo "evr-glacier-storage hostname must be provided via environment variable EVR_GLACIER_STORAGE_HOST"
+        exit 1
+    fi
+    echo "storage-host=${EVR_GLACIER_STORAGE_HOST}" >> '/data/evr-glacier-fs.conf.tmp'
+    echo "ssl-cert=${EVR_GLACIER_STORAGE_HOST}:2361:/pub/evr-glacier-storage-cert.pem" >> '/data/evr-glacier-fs.conf.tmp'
+    echo "Waiting for glacier auth-token..."
+    wait_for_file "/pub/evr-glacier-storage-auth-token"
+    storage_auth_token=`cat "/pub/evr-glacier-storage-auth-token"`
+    echo "auth-token=${EVR_GLACIER_STORAGE_HOST}:2361:${storage_auth_token}" >> '/data/evr-glacier-fs.conf.tmp'
+
+    for fpr in `gpg --list-public-keys --with-colons | grep '^fpr:.*$' | sed 's/fpr:[:]*\([^:]*\):[:]*/\1/'`
+    do
+        echo "accepted-gpg-key=${fpr}" >> '/data/evr-glacier-fs.conf.tmp'
+    done
+
+    mv '/data/evr-glacier-fs.conf.tmp' '/data/evr-glacier-fs.conf'
+fi
+
+mkdir -p '/mnt/evr-glacier-fs'
+
 export PATH="/opt/evr/bin:${ORIG_PATH}"
 cd /data
 /opt/evr/attr-spec/install_attr_spec
-exec /opt/evr/evr-attr-index -f
+exec /opt/evr/bin/evr-parallel /opt/evr/evr-glacier-fs -f /mnt/evr-glacier-fs \; /opt/evr/evr-attr-index -f \; /opt/evr/bin/finally umount /mnt/evr-glacier-fs

@@ -19,9 +19,12 @@
 # This script produces attr claims based on file claim's content
 # metadata.
 
+import os
 from subprocess import run
 import sys
 import xml.etree.ElementTree as et
+
+evr_file_path = '/mnt/evr-glacier-fs/file'
 
 ns = {
     '': 'https://evr.ma300k.de/claims/',
@@ -59,7 +62,8 @@ for claim_index, fc in enumerate(in_doc.getroot()):
         qname(':seed'): seed,
     })
     file_claim_ref = f'{claim_ref}-{claim_index:04x}'
-    file_stdout = shell(f'evr get-file {file_claim_ref} | file -b -i -')
+    file_path = os.path.join(evr_file_path, file_claim_ref)
+    file_stdout = shell(f'file -b -i {file_path}')
     mime_type, charset = [s.strip() for s in file_stdout.split(';')]
     charset = charset.split('=')[1]
     et.SubElement(attr, qname(':a'), {
@@ -77,7 +81,7 @@ for claim_index, fc in enumerate(in_doc.getroot()):
         max_w = None
         max_h = None
         # gifs which contain multiple frames report multiple resolutions
-        for line in shell(f'evr get-file {file_claim_ref} | identify -ping -format \'%w %h\\n\' {fmt}-').split('\n'):
+        for line in shell(f'identify -ping -format \'%w %h\\n\' {fmt}{file_path}').split('\n'):
             if line.strip() == '':
                 continue
             w, h = [int(n) for n in line.split(' ')]

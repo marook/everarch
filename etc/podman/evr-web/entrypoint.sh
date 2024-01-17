@@ -83,4 +83,4 @@ chown nginx:nginx '/mnt/evr-glacier-fs'
 
 cd /data
 export PATH="/opt/evr/bin:${ORIG_PATH}"
-exec /opt/evr/evr-parallel --user nginx /opt/evr/evr-glacier-fs -s -f /mnt/evr-glacier-fs \; /docker-entrypoint.sh nginx -g 'daemon off;' \; /opt/evr/finally umount /mnt/evr-glacier-fs
+exec /opt/evr/evr-parallel --user nginx /opt/evr/evr-glacier-fs -f /mnt/evr-glacier-fs \; /docker-entrypoint.sh nginx -g 'daemon off;' \; /opt/evr/finally umount /mnt/evr-glacier-fs

@@ -22,7 +22,7 @@ LABEL org.opencontainers.image.source="https://github.com/marook/everarch"
 RUN apk update && apk add gcc musl-dev make autoconf automake pkgconfig libtool texinfo argp-standalone libxml2-dev libxslt-dev openssl-dev gpgme-dev libgcrypt-dev sqlite-dev fuse3-dev
 WORKDIR /root/everarch
 COPY . /root/everarch
-RUN autoreconf --install && ./configure --enable-log-debug && make clean && cd src && make -j 4 evr-parallel evr-glacier-fs finally
+RUN autoreconf --install && ./configure && make clean && cd src && make -j 4 evr-parallel evr-glacier-fs finally
 
 FROM docker.io/library/nginx:1.25.3-alpine3.18 AS image
 LABEL org.opencontainers.image.authors="markus.peroebner@gmail.com"

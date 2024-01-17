@@ -58,6 +58,10 @@ services:
     volumes:
       - conf:/pub
       - attr-index:/data
+    cap_add:
+      - sys_admin
+    devices:
+      - "/dev/fuse:/dev/fuse"
     networks:
       - internal
   upload-httpd:
