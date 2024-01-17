@@ -20,7 +20,7 @@ set -e
 ORIG_PATH="${PATH}"
 PATH="/opt/evr/entrypoint:${PATH}"
 
-mkdir /var/cache/nginx/.gnupg
+mkdir -p /var/cache/nginx/.gnupg
 chmod go= /var/cache/nginx/.gnupg
 chown nginx:nginx /var/cache/nginx/.gnupg
 
@@ -57,7 +57,7 @@ if [ ! -e '/data/evr-glacier-fs.conf' ]
 then
     echo -n '' > '/data/evr-glacier-fs.conf.tmp'
 
-    echo "Configure glacier..."
+    echo "Configure evr-glacier-fs..."
     if [ -z "${EVR_GLACIER_STORAGE_HOST}" ]
     then
         echo "evr-glacier-storage hostname must be provided via environment variable EVR_GLACIER_STORAGE_HOST"
