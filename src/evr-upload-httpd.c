@@ -284,7 +284,7 @@ static enum MHD_Result evr_http_upload_handle_request(void *cls, struct MHD_Conn
     }
     // after this point the request is authenticated
     if(strcmp(method, "POST") == 0 && strncmp(url, evr_files_url_prefix, sizeof(evr_files_url_prefix) - 1) == 0){
-        file_name = &url[sizeof(evr_files_url_prefix)];
+        file_name = &url[sizeof(evr_files_url_prefix) - 1];
         return evr_http_upload_handle_file_upload(c, file_name, upload_data, upload_data_size, con_cls);
     }
     return evr_httpd_respond_static_msg(c, 404, evr_httpd_not_found, server_name);
