@@ -1,23 +1,4 @@
-* analyze DNS resolution errors in podman network                       :bug:
-estimated every 10th DNS request within a podman container is unable
-to resolve a neighbouring service. when retrying the resolution works
-again afterwards. that behavior has been observed with the evr-web and
-the evr-attr-index images.
-
-after making the podman network internal the communication with the
-external DNS ended:
-
-#+BEGIN_SRC
-2023/12/19 20:47:29 [crit] 38#38: connect() failed (101: Network unreachable) while resolving, resolver: 192.168.178.3:53
-#+END_SRC
-
-probably my own unstable dns server was the cause of the issue. let's
-monitor the situation and close this issue if it does not appear
-anymore soon.
-* forward signals to evr-parallel child process
-for example SIGTERM and SIGKILL
-* server evr-glacier-fs from evr-web's nginx
-but make sure to use an authorization token
+* enforce authorization token in evr-web's evr-glacier-fs nginx location
 * centralize gpg --import-ownertrust
 the entrypoint.sh files contain some calls to gpg --import-ownertrust
 which could be centralized.
@@ -27,38 +8,6 @@ also the possible paths to import gpg keys from can be centralized.
 so that these files are generated when the container is build. maybe
 we can event get rid of the one or other volume. like the /data volume
 from evr-web?
-* allow access to file claim content with evr-home-edition
-file claim content should be accessible via the evr-web server.
-
-the ideal option would be to have a container run evr-glacier-fs and
-some webserver for accessing these files.
-
-trying to mount a evr-glacier-fs inside a podman container fails like
-this:
-
-#+BEGIN_SRC
-Mounting evr-glacier-fs…
-fuse: device not found, try 'modprobe fuse' first
-#+END_SRC
-
-After running the build with the '--device /dev/fuse' option now the
-following error stops the mounting:
-
-#+BEGIN_SRC
-Mounting evr-glacier-fs…
-fusermount3: mount failed: Operation not permitted
-#+END_SRC
-
-After running the build with the --cap-add=sys_admin option we get the
-following error:
-
-#+BEGIN_SRC
-Mounting evr-glacier-fs…
-fuse: mount failed: Invalid argument
-#+END_SRC
-
-[[https://stackoverflow.com/questions/69786271/how-to-mount-a-squashfs-file-in-a-container-when-running-rootless-podman][describes how to use squashfuse inside podman]].
-[[https://unix.stackexchange.com/questions/625206/cant-run-fuse-inside-podman-fusermount-mount-failed-operation-not-permitted][describes how to use sshfs inside podman]].
 * implement a evr-thumbnail-httpd server
 it should retrieve refs that point to file claims. a thumbnail for the
 given image should be generated.
