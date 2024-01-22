@@ -98,7 +98,10 @@ AC_CHECK_DECLS([be32toh htobe32], [], [],
 
 AC_CHECK_FUNCS_ONCE([mkdtemp])
 
-PKG_PROG_PKG_CONFIG
+m4_ifndef([PKG_PREREQ],
+    [m4_fatal([must install pkg-config 0.29 or later before running autoconf/autogen])])
+PKG_PREREQ([0.29.0])
+PKG_PROG_PKG_CONFIG([0.9.0])
 
 AX_PTHREAD
 
