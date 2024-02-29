@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<claim-set xmlns:dc="http://purl.org/dc/terms/" xmlns="https://evr.ma300k.de/claims/" dc:created="2023-12-11T10:03:41.930000Z">
+ <file dc:title="puppy.jpeg">
+  <body>
+   <slice ref="sha3-224-9d3b627d89765e2d040035e865a008f403e1640c838c964573615c2e" size="10587"/>
+   <slice ref="sha3-224-9d3b627d89765e2d040035e865a008f403e1640c838c964573615c2f" size="9423"/>
+  </body>
+ </file>
+</claim-set>

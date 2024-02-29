@@ -1,5 +1,5 @@
 # everarch - the hopefully ever lasting archive
-# Copyright (C) 2021-2022  Markus Peröbner
+# Copyright (C) 2021-2024  Markus Peröbner
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -13,12 +13,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# evr.py is a wrapper around the evr command line interface for more
-# python convenience.
-#
-# Provided functions you might care about are get_blob, get_verify,
-# post_file, watch and search.
 
 import subprocess
 
@@ -32,8 +26,8 @@ get_blob yields the blob's content as multiple buffers.
     args = ['evr', 'get', ref]
     return _evr(args)
 
-def get_verify(ref):
-    """get_verify is a wrapper around 'evr get-verify' shell command.
+def get_verify(ref, annotate=False):
+    """get_verify is a wrapper around the 'evr get-verify' shell command.
 
 get_verify yields the blob's content as multiple buffers.
 
@@ -44,8 +38,18 @@ import xml.etree.ElementTree as et
 doc = et.fromstringlist(evr.get_verify('sha3-224-9a974826c9b0b66aff5205db87956f398582e0209603414defa9aa39'))
 
     """
-    args = ['evr', 'get-verify', ref]
+    args = ['evr', 'get-verify']
+    if annotate:
+        args.append('--annotate')
+    args.append(ref)
     return _evr(args)
+
+def get_file(claim_ref):
+    """get_file is a wrapper around the 'evr get-file' shell command.
+
+get_file yields the blob's content as multiple buffers.
+    """
+    return _evr(['evr', 'get-file', claim_ref])
 
 def post_file(path, title=None):
     """post_file is a wrapper around 'evr post-file' shell command.
@@ -75,9 +79,13 @@ def _read_ref(lines):
     return next(lines).strip()
 
 class ModifiedBlob(object):
-    def __init__(self, seed_ref, last_modified, watch_flags):
-        # TODO maybe it was wrong to name this seed_ref here because it's the blob that changes
-        self.seed_ref = seed_ref
+    def __init__(self, ref, last_modified, watch_flags):
+        # initially the ref was just provided as 'seed_ref'. the name
+        # is very missleading as the blob may contain a claim that
+        # references another seed. so the seed_ref property here is
+        # deprecated.
+        self.seed_ref = ref
+        self.ref = ref
         self.last_modified = last_modified
         self.watch_flags = watch_flags
 

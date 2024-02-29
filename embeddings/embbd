@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+#
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2024  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# embbd is the embeddings builder daemon.  It watches for new content
+# in an evr-glacier-storage and creates embeddings for it.  The
+# created embeddings are stored in a chroma db.
+
+import argparse
+from evr import get_verify, watch, get_file
+from evr.claims import parse_file_claim
+import os
+from subprocess import run
+from tempfile import TemporaryDirectory
+import xml.etree.ElementTree as et
+
+from embeddings import add_embeddings_args, connect_chroma, build_embeddings
+
+chroma = None
+
+def parse_args():
+    p = argparse.ArgumentParser(description='''embbd is the embeddings
+    builder daemon. embbd watches for file claims. LLM embeddings are
+    created for text based files and stored into a chroma database.''')
+    add_embeddings_args(p)
+    return p.parse_args()
+
+def main(args):
+    global chroma
+    chroma = connect_chroma(args)
+    for blob in watch(flags=1):
+        process_blob(args, blob)
+
+def process_blob(args, blob):
+    cs = et.fromstringlist(get_verify(blob.ref, annotate=True))
+    for claim in cs:
+        if claim.tag == '{https://evr.ma300k.de/claims/}file':
+            process_file_claim(args, blob.ref, claim)
+
+def process_file_claim(args, cs_ref, claim_element):
+    fc = parse_file_claim(claim_element)
+    cr = fc.claim_ref
+    max_size = 32
+    if fc.size > max_size*1024*1024:
+        print(f'Skipping file claim {cr} because the file is bigger than {max_size} MB')
+        return
+    with TemporaryDirectory() as tmp_dir:
+        content_path = os.path.join(tmp_dir, 'content')
+        with open(content_path, 'wb') as f:
+            for buf in get_file(cr):
+                f.write(buf)
+        mime_type, charset = detect_file_type(content_path)
+        if mime_type.startswith('text/'):
+            text_file_embeddings(args, cr, content_path, charset)
+        # TODO pdf: pdftotext, then embedd by page
+
+def detect_file_type(file_path):
+    stdout = shell(f'file -b -i {file_path}')
+    return [s.strip() for s in stdout.split(';')]
+
+def shell(cmd):
+    p = run(['/bin/bash', '-e', '-o', 'pipefail', '-c', cmd], capture_output=True, encoding='UTF-8')
+    if p.returncode != 0:
+        raise Exception(f'Failed to execute cmd: {cmd}\n\n{p.stderr}')
+    return p.stdout
+
+charset_encoding_map = {
+    'us-ascii': 'ascii',
+}
+
+def text_file_embeddings(args, claim_ref, file_path, charset):
+    charset_low = charset.lower()
+    encoding = 'utf-8'
+    if charset_low in charset_encoding_map:
+        encoding = charset_encoding_map[charset_low]
+    else:
+        print(f'Guessing encoding {encoding} based on charset {charset}')
+    with open(file_path, 'r', encoding=encoding) as f:
+        content = f.read()
+    emb = build_embeddings(args, content)
+    meta = {
+        'claim_ref': claim_ref,
+        'strategy': 'text',
+    }
+    chroma.upsert(
+        ids=[claim_ref],
+        metadatas=[meta],
+        embeddings=[emb],
+    )
+
+if __name__ == '__main__':
+    args = parse_args()
+    main(args)

@@ -1,1 +1,1 @@
-python_PYTHON = evr.py
+TESTS = evr-test

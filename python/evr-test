@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+#
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2024  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+import os
+import xml.etree.ElementTree as et
+
+from evr.claims import parse_file_claim
+
+def main():
+    test_parse_file_claim()
+
+def test_parse_file_claim():
+    claim_el = load_test_claim_set('file-claim')[0]
+    claim = parse_file_claim(claim_el)
+    assert claim.size == 10587 + 9423
+
+def load_test_claim_set(name):
+    p = os.path.join(os.path.dirname(__file__), 'test', f'{name}.xml')
+    return et.parse(p).getroot()
+
+if __name__ == '__main__':
+    main()
