@@ -16,12 +16,12 @@
 
 import chromadb
 import json
+import os
 from requests import post
 
 ollama_base_url = 'http://localhost:11434'
 ollama_model = 'mistral'
-chroma_db_path = './chromadb'
-chroma_collection_name = 'evr'
+state_dir_path = 'embeddings'
 
 def add_embeddings_args(p):
     p.add_argument('--ollama-base-url',
@@ -30,16 +30,15 @@ def add_embeddings_args(p):
     p.add_argument('--ollama-model',
                    default=ollama_model,
                    help=f'The ollama model used for generating the embeddings. The default model is {ollama_model}')
-    p.add_argument('--chroma-db-path',
-                   default=chroma_db_path,
-                   help=f'The path to the chroma database. Will be created if not existing. The default path is {chroma_db_path}')
-    p.add_argument('--chroma-collection',
-                   default=chroma_collection_name,
-                   help=f'The name of the used collection within chroma. The default name is {chroma_collection_name}')
+    p.add_argument('--state-dir',
+                   metavar='DIR',
+                   default=state_dir_path,
+                   help=f'The path to the embeddings index directory. The directory will be created if it does not exist. The default path is {state_dir_path}')
 
 def connect_chroma(args):
-    c = chromadb.PersistentClient(path=args.chroma_db_path)
-    return c.get_or_create_collection(name=args.chroma_collection)
+    chroma_db_path = os.path.join(args.state_dir, 'chromadb')
+    c = chromadb.PersistentClient(path=chroma_db_path)
+    return c.get_or_create_collection(name='evr')
 
 def build_embeddings(args, prompt):
     # the ollama API documentation for that service is at

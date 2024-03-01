@@ -41,7 +41,8 @@ def main(args):
     for i, emb_id in enumerate(results['ids'][0]):
         dist = results['distances'][0][i]
         meta = results['metadatas'][0][i]
-        print(f'{emb_id} {dist}:\n  {meta}')
+        doc = results['documents'][0][i]
+        print(f'{emb_id} {dist}:\n  {meta}\n  {doc}')
 
 if __name__ == '__main__':
     args = parse_args()
