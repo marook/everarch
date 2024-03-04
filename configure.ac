@@ -46,6 +46,14 @@ AC_CHECK_FUNC(
 )
 
 AC_ARG_ENABLE(
+  [python-install-system],
+  [AS_HELP_STRING([--enable-python-install-system], [Configures the build to install the everarch python module as shared python package. This might interfer with an equally named python package provided by your distribution. The target location of the installed python package will be independent of the --prefix option provided to configure.])],
+  [enable_python_install_system=true],
+  [enable_python_install_system=false]
+)
+AM_CONDITIONAL([ENABLE_PYTHON_INSTALL_SYSTEM], [test x$enable_python_install_system = xtrue])
+
+AC_ARG_ENABLE(
   [futile-claim-set-tracking],
   [AS_HELP_STRING([--enable-futile-claim-set-tracking], [Enables tracking of claim-sets without any effect to the attr-index. Helpful for finding custom claims which are missing in the transformation.])],
   [AC_DEFINE([EVR_FUTILE_CLAIM_SET_TRACKING], [1], [Enables futile claim set tracking.])],

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 #
 # everarch - the hopefully ever lasting archive
 # Copyright (C) 2021-2024  Markus Peröbner
