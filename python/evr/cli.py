@@ -89,6 +89,16 @@ class ModifiedBlob(object):
         self.last_modified = last_modified
         self.watch_flags = watch_flags
 
+    @property
+    def end_of_batch(self):
+        '''end_of_batch flags if the current blob is the last one in a
+        batch of blobs retrieved.
+
+        Further blobs may follow even if this blob was the end of
+        batch.
+        '''
+        return self.watch_flags & 0x01
+
     def __str__(self):
         return f'{self.seed_ref} {self.last_modified} {self.watch_flags}'
 
