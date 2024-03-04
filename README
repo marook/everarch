@@ -88,7 +88,7 @@ to build the application.
 
 Setup the build system once after you clone the repository:
 
-$ autoreconf --install
+$ autoreconf --install --symlink
 $ ./configure
 
 There are some feature toggles available with the configure

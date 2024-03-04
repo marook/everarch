@@ -19,10 +19,12 @@ Makefile.in
 /config.sub
 /configure
 /depcomp
+/INSTALL
 /install-sh
 /missing
 /stamp-h1
 /test.conf
+/test-driver
 /ylwrap
 
 # i use this script to call ./configure with the arguments i usually
