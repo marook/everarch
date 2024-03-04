@@ -45,6 +45,9 @@ def parse_args():
     builder daemon. embbd watches for file claims. LLM embeddings are
     created for text based files and stored into a chroma database.''')
     add_embeddings_args(p)
+    p.add_argument('--single-run',
+                   action='store_true',
+                   help='With this flag embbd will create embeddings for the currently stored claims and terminate afterwards.')
     return p.parse_args()
 
 def main(args):
@@ -56,6 +59,8 @@ def main(args):
         process_blob(args, blob)
         state.last_modified_after = blob.last_modified
         state.save()
+        if args.single_run and blob.end_of_batch:
+            break
 
 class State(object):
     def __init__(self, state_dir):
