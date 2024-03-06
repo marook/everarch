@@ -17,6 +17,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import argparse
+import json
+import sys
+
 from embeddings import add_embeddings_args, connect_chroma, build_embeddings
 
 ollama_base_url = 'http://localhost:11434'
@@ -38,11 +41,15 @@ def main(args):
         query_embeddings=[emb],
         n_results=10,
     )
+    res = []
     for i, emb_id in enumerate(results['ids'][0]):
-        dist = results['distances'][0][i]
-        meta = results['metadatas'][0][i]
-        doc = results['documents'][0][i]
-        print(f'{emb_id} {dist}:\n  {meta}\n  {doc}')
+        res.append({
+            'id': emb_id,
+            'doc': results['documents'][0][i],
+            'dist': results['distances'][0][i],
+            'meta': results['metadatas'][0][i],
+        })
+    json.dump(res, sys.stdout, indent='\t')
 
 if __name__ == '__main__':
     args = parse_args()

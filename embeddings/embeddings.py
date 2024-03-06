@@ -56,3 +56,29 @@ def build_embeddings(args, prompt):
         raise Exception(f'Unable to generate embeddings: {resp.status_code}')
     content = json.loads(resp.text)
     return content['embedding']
+
+def text_splitter(source, block_len=200, window_len=7):
+    return text_block_weaver(text_block_splitter(source, block_len=block_len), window_len=window_len)
+
+def text_block_splitter(source, block_len=200):
+    backlog = ''
+    for s in source:
+        backlog += s
+        while len(backlog) > block_len:
+            yield backlog[0:block_len]
+            backlog = backlog[block_len:]
+    if len(backlog) > 0:
+        yield backlog
+
+def text_block_weaver(blocks, window_len=7):
+    off = 0
+    window = []
+    for block in blocks:
+        window.append(block)
+        if len(window) >= window_len:
+            yield (off, ''.join(window))
+            for b in window[0:-1]:
+                off += len(b)
+            window = window[-1:]
+    if len(window) > 1:
+        yield (off, ''.join(window))
