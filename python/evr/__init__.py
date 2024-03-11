@@ -17,4 +17,4 @@
 # The evr python module is a wrapper around the evr command line
 # interface for more python convenience.
 
-from .cli import get_blob, get_verify, get_file, post_file, sign_put, watch
+from .cli import get_blob, get_verify, get_file, post_file, sign_put, watch, search
