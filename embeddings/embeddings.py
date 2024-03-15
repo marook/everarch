@@ -20,7 +20,7 @@ import os
 from requests import post
 
 ollama_base_url = 'http://localhost:11434'
-ollama_model = 'mistral'
+ollama_model = 'all-minilm'
 state_dir_path = 'embeddings'
 
 def add_embeddings_args(p):
@@ -57,7 +57,22 @@ def build_embeddings(args, prompt):
     content = json.loads(resp.text)
     return content['embedding']
 
-def text_splitter(source, block_len=200, window_len=7):
+def pdf_splitter(pdf_reader, block_len=64, window_len=4):
+    for page in pdf_reader.pages:
+        page_no = page.page_number
+        page_text = page.extract_text()
+        for sec_off, sec_text in text_splitter(page_text, block_len=block_len, window_len=window_len):
+            yield (page_no, sec_text)
+
+def text_splitter(source, block_len=64, window_len=4):
+    '''text_splitter splits the text from source into even and
+    overlapping blocks.
+
+    Choose block_len and window_len so that the context size of the
+    used LLM model is saturated. If you assume that for example 1500
+    characters fit into your LLM's model make sure that
+    block_len*window_len is <= 1500.
+    '''
     return text_block_weaver(text_block_splitter(source, block_len=block_len), window_len=window_len)
 
 def text_block_splitter(source, block_len=200):

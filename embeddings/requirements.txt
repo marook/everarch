@@ -1,3 +1,4 @@
 ../python
 requests==2.31.0
 chromadb==0.4.24
+pypdf==4.1.0
