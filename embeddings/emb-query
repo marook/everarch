@@ -22,11 +22,6 @@ import sys
 
 from embeddings import add_embeddings_args, connect_chroma, build_embeddings
 
-ollama_base_url = 'http://localhost:11434'
-ollama_model = 'mistral'
-chroma_db_path = './chromadb'
-chroma_collection_name = 'evr'
-
 def parse_args():
     p = argparse.ArgumentParser()
     add_embeddings_args(p)
