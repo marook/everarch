@@ -30,7 +30,7 @@ from subprocess import run
 from tempfile import TemporaryDirectory
 import xml.etree.ElementTree as et
 
-from embeddings import add_embeddings_args, connect_chroma, build_embeddings, text_splitter, pdf_splitter
+from evr_embeddings import add_embeddings_args, connect_chroma, build_embeddings, text_splitter, pdf_splitter
 
 chroma = None
 

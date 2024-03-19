@@ -20,7 +20,7 @@ import argparse
 import json
 import sys
 
-from embeddings import add_embeddings_args, connect_chroma, build_embeddings
+from evr_embeddings import add_embeddings_args, connect_chroma, build_embeddings
 
 def parse_args():
     p = argparse.ArgumentParser()

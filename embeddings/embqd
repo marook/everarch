@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+#
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2024  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# embqd is the embeddings query daemon. It takes search queries via
+# http and responds with a list of matching claim segments.
+
+import argparse
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import json
+
+from evr_embeddings import add_embeddings_args, build_embeddings, connect_chroma
+
+default_host = 'localhost'
+default_port = 2365
+
+def parse_args():
+    p = argparse.ArgumentParser(description='''embqd is the embeddings query daemon. It takes search queries via http and responds with a list of matching claim segments.''')
+    add_embeddings_args(p)
+    p.add_argument('--host',
+                   metavar='HOST',
+                   default=default_host,
+                   help=f'The network interface at which the embqd server will listen on. The default is {default_host}.')
+    p.add_argument('--port',
+                   metavar='PORT',
+                   type=int,
+                   default=default_port,
+                   help=f'The tcp port at which the embqd server will listen on. The default port is {default_port}.')
+    return p.parse_args()
+
+args = parse_args()
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = 'embqd/0.1.0'
+
+    def do_POST(self):
+        length = int(self.headers['Content-Length'])
+        if length > 256*1024:
+            raise Exception('Content-Length exceeds limit')
+        body = json.loads(self.rfile.read(length))
+        fields = body['fields'] if 'fields' in body else ['meta']
+        fields = frozenset(fields)
+        emb = build_embeddings(args, body['query'])
+        chroma = connect_chroma(args)
+        chroma_results = chroma.query(
+            query_embeddings=[emb],
+            n_results=10,
+        )
+        http_results = []
+        for i, emb_id in enumerate(chroma_results['ids'][0]):
+            r = {}
+            if 'meta' in fields:
+                r['meta'] = chroma_results['metadatas'][0][i]
+            if 'dist' in fields:
+                r['dist'] = chroma_results['distances'][0][i]
+            if 'doc' in fields:
+                r['doc'] = chroma_results['documents'][0][i]
+            http_results.append(r)
+        resp = {
+            'results': http_results,
+        }
+        resp_body = json.dumps(resp).encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(resp_body)
+
+if __name__ == '__main__':
+    addr = (args.host, args.port)
+    server = HTTPServer(addr, Handler)
+    server.serve_forever()

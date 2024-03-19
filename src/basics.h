@@ -68,6 +68,10 @@ void evr_init_basics(void);
 #define evr_upload_httpd_host "localhost"
 #define evr_upload_httpd_http_port 2364
 
+// just for completeness as this seems to be the central place where we
+// document all ports occupied by evr servers.
+#define evr_embqd_http_port 2365
+
 #define evr_max_blob_data_size (16*1024*1024)
 
 /**
