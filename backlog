@@ -1,3 +1,15 @@
+* support other languages than english in emb
+system prompt for language detection:
+
+#+BEGIN_SRC
+What is the primary language of the following text block. Answer with only a few words. Ignore grammar and spelling.
+#+END_SRC
+
+system prompt for translation:
+
+#+BEGIN_SRC
+You rephrase exclusively the input so it can be well understood in english language.
+#+END_SRC
 * enforce authorization token in evr-web's evr-glacier-fs nginx location
 * centralize gpg --import-ownertrust
 the entrypoint.sh files contain some calls to gpg --import-ownertrust
