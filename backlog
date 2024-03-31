@@ -1,3 +1,8 @@
+* make sure evr signal handlers only use sig_atomic_t
+i assume that there are currently some int's used instead of sig_atomic_t.
+
+some background on this topic is avaliable via
+https://beej.us/guide/bgipc/html/
 * implement evr-seed-index
 evr-seed-index should watch an evr-glacier-storage and index all the
 found claims. there should be an http API for retrieving all claims
