@@ -1,3 +1,6 @@
+* release source tarballs via webserver
+include the everarch source in the tarball. sign the tarball and place
+tarball + signature onto a webserver like evr.ma300k.de
 * make sure evr signal handlers only use sig_atomic_t
 i assume that there are currently some int's used instead of sig_atomic_t.
 
@@ -8,6 +11,8 @@ evr-seed-index should watch an evr-glacier-storage and index all the
 found claims. there should be an http API for retrieving all claims
 for one seed. there should be a websocket API for watching updates to
 certain seeds.
+* support alternative embedding models provided by ollama
+https://ollama.com/blog/embedding-models
 * visualize embeddings built by embbd
 https://www.tensorflow.org/tensorboard/tensorboard_projector_plugin
 * enforce authorization token in evr-web's evr-glacier-fs nginx location
