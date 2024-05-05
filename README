@@ -5,8 +5,9 @@ everarch - the hopefully ever lasting archive
 3) Podman Images
 4) Usage
 5) Tests
-6) License
-7) Contact
+6) Release
+7) License
+8) Contact
 
 
 ------------------------------------------------------------------------
@@ -41,6 +42,7 @@ at https://evr.ma300k.de
 
 The everarch source code is available at
 https://github.com/marook/everarch
+https://evr.ma300k.de/dist
 
 
 ------------------------------------------------------------------------
@@ -148,6 +150,15 @@ socat ( http://www.dest-unreach.org/socat/ ).
 You can customize some integration test variables for you local
 system's needs if you create the file testing/suite/config.local. See
 testing/suite/config for potential variables.
+
+
+------------------------------------------------------------------------
+Release
+
+Releases the source code committed to the main branch to
+https://evr.ma300k.de/dist
+
+$ ./release
 
 
 ------------------------------------------------------------------------

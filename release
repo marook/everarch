@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# everarch - the hopefully ever lasting archive
+# Copyright (C) 2021-2024  Markus Peröbner
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# This script releases the commited everarch code to
+# https://evr.ma300k.de/dist
+set -e
+set -o pipefail
+
+wd=
+
+cleanup() {
+    if [[ -n "${wd}" ]]
+    then
+        rm -rf "${wd}"
+    fi
+}
+trap cleanup EXIT
+wd=`mktemp -d`
+
+git archive --format=tar.gz -o "${wd}/everarch-snapshot.tar.gz" --prefix=everarch-snapshot/ main
+gpg -o "${wd}/everarch-snapshot.tar.gz.sig" -ba "${wd}/everarch-snapshot.tar.gz"
+sftp mammut <<EOF
+put "${wd}/everarch-snapshot.tar.gz" "/var/www/evr.ma300k-secure/dist/everarch-snapshot.tar.gz"
+put "${wd}/everarch-snapshot.tar.gz.sig" "/var/www/evr.ma300k-secure/dist/everarch-snapshot.tar.gz.sig"
+quit
+EOF
