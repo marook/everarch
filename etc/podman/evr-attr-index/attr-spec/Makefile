@@ -8,6 +8,9 @@ all:
 .PHONY: check
 check: $(tests_passed) $(addsuffix .out.xml, $(test))
 
+.PHONY: install
+install:
+
 .PHONY: clean
 clean:
 	rm -f tests/*.diff tests/*.out.xml
