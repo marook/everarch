@@ -1,3 +1,10 @@
+* use gcc's attribute format declaration for printf-like functions
+see
+https://gcc.gnu.org/onlinedocs/gcc-4.7.0/gcc/Function-Attributes.html
+for a declaration of the format attribute.
+
+the format attribute should at least be declareable on the function in
+logger.h.
 * release source tarballs via webserver
 include the everarch source in the tarball. sign the tarball and place
 tarball + signature onto a webserver like evr.ma300k.de
